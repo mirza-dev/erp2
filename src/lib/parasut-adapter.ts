@@ -74,6 +74,18 @@ export interface ParasutShipmentDocument {
     };
 }
 
+export interface ParasutPurchaseBill {
+    id:         string;
+    attributes: {
+        invoice_no:  string | null;
+        description: string | null;
+        net_total:   number;
+        gross_total: number;
+        currency:    string;
+        issue_date:  string;
+    };
+}
+
 export interface ParasutEInvoiceInbox {
     id:         string;
     attributes: { vkn: string; alias: string };
@@ -130,6 +142,34 @@ export interface InvoiceInput {
         description:     string;
         product_id?:     string;
         // warehouse: KASITLI OLARAK YOK — stok hareketi yaratmasın
+    }>;
+}
+
+/**
+ * Alış faturası (Faz 13) — Paraşüt `purchase_bills#detailed`.
+ *
+ * STOK INVARIANT (satışın simetriği): `details` içinde warehouse ilişkisi
+ * GÖNDERİLMEZ → Paraşüt stok hareketi yaratmaz. ERP stok otoritesidir;
+ * Paraşüt stoğu Faz 15 mutabakatından beslenir.
+ */
+export interface PurchaseBillInput {
+    supplier_id:    string;
+    issue_date:     string;
+    due_date:       string;
+    currency:       'TRL' | 'USD' | 'EUR' | 'GBP';
+    description:    string;
+    /** Tedarikçinin KENDİ fatura numarası — KDV indiriminin resmî künyesi. */
+    invoice_no?:    string;
+    exchange_rate?: number;
+    details: Array<{
+        quantity:        number;
+        unit_price:      number;
+        vat_rate:        number;
+        discount_type?:  'percentage' | 'amount';
+        discount_value?: number;
+        description:     string;
+        product_id?:     string;
+        // warehouse: KASITLI OLARAK YOK — stok invariant
     }>;
 }
 
@@ -193,6 +233,10 @@ export interface ParasutAdapter {
     // Shipment document (filter zayıf — pagination + local filtre)
     listRecentShipmentDocuments(page: number, pageSize: number): Promise<ParasutShipmentDocument[]>;
     createShipmentDocument(input: ShipmentDocInput): Promise<ParasutShipmentDocument>;
+
+    // Purchase bill — alış faturası (filter[invoice_no] YOK → tedarikçi + sayfalama)
+    listPurchaseBillsBySupplier(supplierId: string, page: number, pageSize: number): Promise<ParasutPurchaseBill[]>;
+    createPurchaseBill(input: PurchaseBillInput): Promise<ParasutPurchaseBill>;
 
     // E-fatura mükellef kontrolü
     listEInvoiceInboxesByVkn(vkn: string): Promise<ParasutEInvoiceInbox[]>;

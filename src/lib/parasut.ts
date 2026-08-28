@@ -15,10 +15,12 @@ import {
     type ParasutInvoice,
     type ParasutInvoiceWithEDocument,
     type ParasutShipmentDocument,
+    type ParasutPurchaseBill,
     type ParasutEInvoiceInbox,
     type ContactInput,
     type ProductInput,
     type InvoiceInput,
+    type PurchaseBillInput,
     type ShipmentDocInput,
     type EInvoiceInput,
     type EArchiveInput,
@@ -42,6 +44,8 @@ export class MockParasutAdapter implements ParasutAdapter {
     private products        = new Map<string, ParasutProduct>();
     private invoices        = new Map<string, ParasutInvoice>();
     private shipments       = new Map<string, ParasutShipmentDocument>();
+    private purchaseBills   = new Map<string, ParasutPurchaseBill>();
+    private billSupplier    = new Map<string, string>(); // billId → supplierId
     private trackableJobs   = new Map<string, { callCount: number; error: boolean }>();
     private eDocuments      = new Map<string, string>(); // invoiceId → eDocId
     // 'random' = %10 rastgele (production mock default)
@@ -65,6 +69,8 @@ export class MockParasutAdapter implements ParasutAdapter {
         this.products.clear();
         this.invoices.clear();
         this.shipments.clear();
+        this.purchaseBills.clear();
+        this.billSupplier.clear();
         this.trackableJobs.clear();
         this.eDocuments.clear();
         this._pendingJobForInvoice.clear();
@@ -248,6 +254,47 @@ export class MockParasutAdapter implements ParasutAdapter {
         };
         this.shipments.set(id, shipment);
         return shipment;
+    }
+
+    // ── Purchase bill (alış faturası) ────────────────────────────────────────
+
+    async listPurchaseBillsBySupplier(
+        supplierId: string, page: number, pageSize: number,
+    ): Promise<ParasutPurchaseBill[]> {
+        await mockDelay();
+        const mine = [...this.purchaseBills.values()]
+            .filter(b => this.billSupplier.get(b.id) === supplierId);
+        const start = (page - 1) * pageSize;
+        return mine.slice(start, start + pageSize);
+    }
+
+    async createPurchaseBill(input: PurchaseBillInput): Promise<ParasutPurchaseBill> {
+        // Stok invariant assertion (gerçek adapter ile AYNI mesaj)
+        for (const d of input.details) {
+            if ('warehouse' in d || 'warehouse_id' in d) {
+                throw new ParasutError('validation', 'createPurchaseBill: detail must NOT contain warehouse (stok invariant)');
+            }
+        }
+
+        await mockDelay();
+        this._shouldError();
+
+        const id = `bill_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        const net = input.details.reduce((s, d) => s + d.quantity * d.unit_price, 0);
+        const bill: ParasutPurchaseBill = {
+            id,
+            attributes: {
+                invoice_no:  input.invoice_no ?? null,
+                description: input.description,
+                net_total:   net,
+                gross_total: input.details.reduce((s, d) => s + d.quantity * d.unit_price * (1 + (d.vat_rate ?? 20) / 100), 0),
+                currency:    input.currency,
+                issue_date:  input.issue_date,
+            },
+        };
+        this.purchaseBills.set(id, bill);
+        this.billSupplier.set(id, input.supplier_id);
+        return bill;
     }
 
     // ── E-fatura mükellef ────────────────────────────────────────────────────

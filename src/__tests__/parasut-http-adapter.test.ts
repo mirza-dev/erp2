@@ -592,6 +592,83 @@ describe("stok invariant guard'ları (mock ile AYNI mesajlar)", () => {
     });
 });
 
+describe("createPurchaseBill payload (Faz 13)", () => {
+    const BILL = {
+        supplier_id: "c9", issue_date: "2026-08-28", due_date: "2026-09-27",
+        currency: "TRL" as const, description: "Roven #PO-2026-0007",
+        invoice_no: "FTR-2026-1188",
+        details: [{
+            quantity: 5, unit_price: 250, vat_rate: 10,
+            description: "Flanş (FL-1)", product_id: "p9",
+        }],
+    };
+
+    it("#detailed biçimi: supplier + details ilişkisi, item_type=purchase_bill", async () => {
+        const { adapter, calls } = makeAdapter([jsonResponse({ data: { id: "b1", attributes: {} } })]);
+        await adapter.createPurchaseBill(BILL);
+
+        expect(bodyOf(calls[0])).toMatchObject({ data: { type: "purchase_bills" } });
+        expect(attrs(calls[0])).toMatchObject({ item_type: "purchase_bill", currency: "TRL" });
+        expect(rels(calls[0]).supplier).toEqual({ data: { id: "c9", type: "contacts" } });
+
+        const details = (rels(calls[0]).details as { data: Array<Record<string, unknown>> }).data;
+        expect(details[0].type).toBe("purchase_bill_details");
+        expect(details[0].attributes).toMatchObject({ quantity: 5, unit_price: 250, vat_rate: 10 });
+        expect(details[0].relationships).toEqual({ product: { data: { id: "p9", type: "products" } } });
+    });
+
+    it("STOK INVARIANT: detail'de warehouse ilişkisi YOK", async () => {
+        const { adapter, calls } = makeAdapter([jsonResponse({ data: { id: "b1", attributes: {} } })]);
+        await adapter.createPurchaseBill(BILL);
+        const details = (rels(calls[0]).details as { data: Array<Record<string, unknown>> }).data;
+        expect(details[0].relationships).not.toHaveProperty("warehouse");
+    });
+
+    it("tedarikçi fatura numarası invoice_no alanına gider (KDV künyesi)", async () => {
+        const { adapter, calls } = makeAdapter([jsonResponse({ data: { id: "b1", attributes: {} } })]);
+        await adapter.createPurchaseBill(BILL);
+        expect(attrs(calls[0]).invoice_no).toBe("FTR-2026-1188");
+    });
+
+    it("künye yoksa alan HİÇ gönderilmez (boş string değil)", async () => {
+        const { adapter, calls } = makeAdapter([jsonResponse({ data: { id: "b1", attributes: {} } })]);
+        const { invoice_no: _omit, ...noInvoice } = BILL;
+        void _omit;
+        await adapter.createPurchaseBill(noInvoice);
+        expect(attrs(calls[0])).not.toHaveProperty("invoice_no");
+    });
+
+    it("guard ihlalinde ağa çıkılmaz", async () => {
+        const fetchImpl = vi.fn();
+        const adapter = new HttpParasutAdapter({
+            getAccessToken: async () => "T", companyId: "1", clientId: "c", clientSecret: "s",
+            fetchImpl: fetchImpl as unknown as typeof fetch,
+        });
+        await expect(adapter.createPurchaseBill({
+            ...BILL, details: [{ ...BILL.details[0], warehouse: "w1" } as never],
+        })).rejects.toThrow(/stok invariant/);
+        expect(fetchImpl).not.toHaveBeenCalled();
+    });
+
+    it("kurtarma listesi tedarikçiye göre filtreler (invoice_no filtresi YOK)", async () => {
+        const { adapter, calls } = makeAdapter([jsonResponse({ data: [] })]);
+        await adapter.listPurchaseBillsBySupplier("c9", 2, 100);
+        const url = decodeURIComponent(calls[0].url);
+        expect(url).toContain("filter[supplier_id]=c9");
+        expect(url).toContain("page[number]=2");
+        expect(url).toContain("page[size]=25");
+    });
+
+    it("kurtarma yanıtı açıklamayı taşır (yerel eşleşme anahtarı)", async () => {
+        const { adapter } = makeAdapter([jsonResponse({ data: [
+            { id: "b1", attributes: { description: "Roven #PO-2026-0007", invoice_no: "FTR-1", currency: "TRL", issue_date: "2026-08-28" } },
+        ] })]);
+        const [bill] = await adapter.listPurchaseBillsBySupplier("c9", 1, 25);
+        expect(bill.attributes.description).toBe("Roven #PO-2026-0007");
+        expect(bill.attributes.invoice_no).toBe("FTR-1");
+    });
+});
+
 // ── Sözleşme eşitliği: mock ≡ http ───────────────────────────────────────────
 
 describe("sözleşme eşitliği (mock ≡ http)", () => {

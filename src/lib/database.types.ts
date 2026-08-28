@@ -121,6 +121,11 @@ export interface VendorRow {
     is_active: boolean
     created_at: string
     updated_at: string
+    // Paraşüt alış tarafı (migration 107)
+    parasut_contact_id?: string | null
+    parasut_synced_at?: string | null
+    parasut_contact_creating_until?: string | null
+    parasut_contact_creating_owner?: string | null
 }
 
 export interface CustomerRow {
@@ -306,6 +311,22 @@ export interface PurchaseOrderRow {
     created_by: string | null
     created_at: string
     updated_at: string
+    // Tedarikçi fatura künyesi — KDV indiriminin resmî kimliği (migration 107)
+    vendor_invoice_no?: string | null
+    vendor_invoice_date?: string | null
+    // Paraşüt alış faturası senkronu (migration 107)
+    parasut_bill_id?: string | null
+    parasut_bill_no?: string | null
+    parasut_bill_synced_at?: string | null
+    parasut_bill_error?: string | null
+    parasut_bill_create_attempted_at?: string | null
+    parasut_step?: string | null
+    parasut_error_kind?: string | null
+    parasut_retry_count?: number
+    parasut_next_retry_at?: string | null
+    parasut_last_failed_step?: string | null
+    parasut_sync_lock_until?: string | null
+    parasut_sync_lock_owner?: string | null
 }
 
 export interface PurchaseOrderLineRow {
@@ -318,6 +339,8 @@ export interface PurchaseOrderLineRow {
     line_total: number
     received_qty: number
     notes: string | null
+    /** Satır bazlı KDV YÜZDESİ (20 = %20). NULL → PO başlığının oranı (migration 107). */
+    vat_rate?: number | null
 }
 
 export interface PoLineRecommendationRow {

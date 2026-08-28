@@ -28,6 +28,7 @@ const ALWAYS_PUBLIC = ["/api/health", "/api/auth/demo", "/api/seed", "/api/alert
 // kendi içinde session OR CRON_SECRET kontrolü yapar (UI butonları var).
 const CRON_PATHS = [
     "/api/parasut/sync-all",
+    "/api/parasut/sync-purchase-all",
     "/api/parasut/poll-e-documents",
     "/api/orders/check-shipments",
     "/api/quotes/expire",

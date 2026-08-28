@@ -59,6 +59,9 @@ const PROBES: Record<string, Probe> = {
     "099": { kind: "column", table: "quote_line_items", column: "unit" },
     "100": { kind: "table", table: "supplier_rfqs" },
     "106": { kind: "column", table: "company_settings", column: "quote_validity_days" },
+    // Faz 13 — Paraşüt alış tarafı. Tek kolon yeterli sinyal: 107 tek dosyada
+    // vendors/purchase_orders/purchase_order_lines'ı birlikte değiştirir.
+    "107": { kind: "column", table: "purchase_orders", column: "parasut_bill_id" },
 };
 
 /** OpenAPI'den görünmeyen migration'lar — elle SQL doğrulaması gerekir.

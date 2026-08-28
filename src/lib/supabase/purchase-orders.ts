@@ -320,6 +320,27 @@ export async function dbReceivePurchaseOrderLines(
     if (error) throw new Error(error.message);
 }
 
+/**
+ * Tedarikçi fatura künyesini yazar (migration 107).
+ *
+ * KDV indirimi için alış faturasının resmî kimliği tedarikçinin KENDİ fatura
+ * numarası ve tarihidir — PO numarası değil. Fatura malla birlikte geldiği
+ * için mal kabul anında girilir.
+ */
+export async function dbSetVendorInvoiceIdentity(
+    poId: string,
+    input: { vendor_invoice_no?: string | null; vendor_invoice_date?: string | null },
+): Promise<void> {
+    const patch: Record<string, string | null> = {};
+    if (input.vendor_invoice_no !== undefined)   patch.vendor_invoice_no   = input.vendor_invoice_no || null;
+    if (input.vendor_invoice_date !== undefined) patch.vendor_invoice_date = input.vendor_invoice_date || null;
+    if (Object.keys(patch).length === 0) return;
+
+    const supabase = createServiceClient();
+    const { error } = await supabase.from("purchase_orders").update(patch).eq("id", poId);
+    if (error) throw new Error(error.message);
+}
+
 export interface LinkedPO {
     id: string;
     po_number: string;

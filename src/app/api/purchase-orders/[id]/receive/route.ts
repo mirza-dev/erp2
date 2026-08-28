@@ -57,10 +57,38 @@ export async function POST(
             qty: Number(l.qty),
         }));
 
+        // Tedarikçi fatura künyesi (opsiyonel) — KDV indiriminin resmî kimliği.
+        // Boş bırakılabilir: mal kabul bloklanmaz, Paraşüt'e künyesiz gider ve
+        // servis katmanı "muhasebeci tamamlasın" uyarısı açar.
+        const rawInvoiceNo   = body.vendor_invoice_no;
+        const rawInvoiceDate = body.vendor_invoice_date;
+
+        if (rawInvoiceNo !== undefined && rawInvoiceNo !== null) {
+            if (typeof rawInvoiceNo !== "string" || rawInvoiceNo.length > 100) {
+                return NextResponse.json(
+                    { error: "vendor_invoice_no en fazla 100 karakter metin olmalıdır." },
+                    { status: 400 },
+                );
+            }
+        }
+        if (rawInvoiceDate !== undefined && rawInvoiceDate !== null && rawInvoiceDate !== "") {
+            if (typeof rawInvoiceDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(rawInvoiceDate)) {
+                return NextResponse.json(
+                    { error: "vendor_invoice_date YYYY-MM-DD biçiminde olmalıdır." },
+                    { status: 400 },
+                );
+            }
+        }
+
+        const invoice = {
+            vendor_invoice_no:   typeof rawInvoiceNo === "string" ? rawInvoiceNo.trim() : undefined,
+            vendor_invoice_date: typeof rawInvoiceDate === "string" && rawInvoiceDate ? rawInvoiceDate : undefined,
+        };
+
         // O1: actor sunucu-otoriter (oturum kullanıcısı) — istemci gövdesi DEĞİL.
         // Stok hareketi created_by + audit_log.actor buradan beslenir.
         const actor = (await getCurrentUserId()) ?? "system";
-        const result = await serviceReceivePOLines(id, lines, actor);
+        const result = await serviceReceivePOLines(id, lines, actor, invoice);
 
         revalidateTag("purchase-orders", "max");
         revalidateTag("products", "max");  // on_hand artar → stok hesapları etkilenir

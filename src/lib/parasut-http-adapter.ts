@@ -33,10 +33,12 @@ import type {
     ParasutInvoiceWithEDocument,
     ParasutEDocument,
     ParasutShipmentDocument,
+    ParasutPurchaseBill,
     ParasutEInvoiceInbox,
     ContactInput,
     ProductInput,
     InvoiceInput,
+    PurchaseBillInput,
     ShipmentDocInput,
     EInvoiceInput,
     EArchiveInput,
@@ -209,6 +211,20 @@ function toShipment(res: JsonApiResource): ParasutShipmentDocument {
             procurement_number: str(res.attributes?.procurement_number),
             shipment_date:      str(res.attributes?.shipment_date),
             issue_date:         str(res.attributes?.issue_date) ?? "",
+        },
+    };
+}
+
+function toPurchaseBill(res: JsonApiResource): ParasutPurchaseBill {
+    return {
+        id: String(res.id ?? ""),
+        attributes: {
+            invoice_no:  str(res.attributes?.invoice_no),
+            description: str(res.attributes?.description),
+            net_total:   num(res.attributes?.net_total)   ?? 0,
+            gross_total: num(res.attributes?.gross_total) ?? 0,
+            currency:    str(res.attributes?.currency)    ?? "TRL",
+            issue_date:  str(res.attributes?.issue_date)  ?? "",
         },
     };
 }
@@ -619,6 +635,68 @@ export class HttpParasutAdapter implements ParasutAdapter {
         return toShipment(asSingle(doc));
     }
 
+    // ── Purchase bill (alış faturası) ────────────────────────────────────────
+
+    async listPurchaseBillsBySupplier(
+        supplierId: string, page: number, pageSize: number,
+    ): Promise<ParasutPurchaseBill[]> {
+        const doc = await this.api("GET", "/purchase_bills", {
+            query: {
+                "filter[supplier_id]": supplierId,
+                "page[number]":        page,
+                "page[size]":          Math.min(Math.max(pageSize, 1), 25),
+                sort:                  "-id",
+            },
+            op: "listPurchaseBillsBySupplier",
+        });
+        return asList(doc).map(toPurchaseBill);
+    }
+
+    async createPurchaseBill(input: PurchaseBillInput): Promise<ParasutPurchaseBill> {
+        assertPurchaseBillStockInvariant(input);
+
+        // `#detailed` biçimi: kalemler `details` ilişkisinde; toplamlar Paraşüt'te
+        // hesaplanır (basic biçimde net_total/total_vat elle verilirdi).
+        const doc = await this.api("POST", "/purchase_bills", {
+            op: "createPurchaseBill",
+            payload: {
+                data: {
+                    type: "purchase_bills",
+                    attributes: {
+                        item_type:   "purchase_bill",
+                        description: input.description,
+                        issue_date:  input.issue_date,
+                        due_date:    input.due_date,
+                        currency:    input.currency,
+                        ...(input.invoice_no    ? { invoice_no:    input.invoice_no }    : {}),
+                        ...(input.exchange_rate !== undefined ? { exchange_rate: input.exchange_rate } : {}),
+                    },
+                    relationships: {
+                        supplier: { data: { id: input.supplier_id, type: "contacts" } },
+                        details: {
+                            data: input.details.map(d => ({
+                                type: "purchase_bill_details",
+                                attributes: {
+                                    quantity:    d.quantity,
+                                    unit_price:  d.unit_price,
+                                    vat_rate:    d.vat_rate,
+                                    description: d.description,
+                                    ...(d.discount_type  !== undefined ? { discount_type:  d.discount_type }  : {}),
+                                    ...(d.discount_value !== undefined ? { discount_value: d.discount_value } : {}),
+                                },
+                                relationships: d.product_id
+                                    ? { product: { data: { id: d.product_id, type: "products" } } }
+                                    : {},
+                                // warehouse: KASITLI OLARAK YOK — stok invariant
+                            })),
+                        },
+                    },
+                },
+            },
+        });
+        return toPurchaseBill(asSingle(doc));
+    }
+
     // ── E-fatura mükellef kontrolü ───────────────────────────────────────────
 
     async listEInvoiceInboxesByVkn(vkn: string): Promise<ParasutEInvoiceInbox[]> {
@@ -690,6 +768,14 @@ export function assertSalesInvoiceStockInvariant(input: InvoiceInput): void {
     for (const d of input.details) {
         if ("warehouse" in d || "warehouse_id" in d) {
             throw new ParasutError("validation", "createSalesInvoice: detail must NOT contain warehouse (stok invariant)");
+        }
+    }
+}
+
+export function assertPurchaseBillStockInvariant(input: PurchaseBillInput): void {
+    for (const d of input.details) {
+        if ("warehouse" in d || "warehouse_id" in d) {
+            throw new ParasutError("validation", "createPurchaseBill: detail must NOT contain warehouse (stok invariant)");
         }
     }
 }

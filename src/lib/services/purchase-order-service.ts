@@ -8,6 +8,7 @@ import {
     type ReceivePOLine,
     type CreatePurchaseOrderLine,
     VALID_PO_TRANSITIONS,
+    dbSetVendorInvoiceIdentity,
 } from "@/lib/supabase/purchase-orders";
 import { dbListRecommendations, dbUpdateRecommendationStatus } from "@/lib/supabase/recommendations";
 import { dbTryResolveShortages } from "@/lib/supabase/products";
@@ -28,6 +29,17 @@ export async function serviceTransitionPO(
     await dbTransitionPurchaseOrder(id, next, opts);
     const po = await dbGetPurchaseOrderById(id);
     if (!po) throw new Error("PO bulunamadı.");
+    // Paraşüt alış faturası (Faz 13) — satıştaki `ship` tetiğinin aynası.
+    // YALNIZ tamamen mal kabul edildiğinde: kısmi kabulde PO toplamını gider
+    // yazmak muhasebeyi yanıltırdı. Best-effort — Paraşüt hatası mal kabulü
+    // ve stok hareketini GERİ ALMAZ; CRON emniyet ağı tekrar dener.
+    if (po.status === "received") {
+        try {
+            const { serviceSyncPurchaseOrderToParasut } = await import("@/lib/services/parasut-purchase-service");
+            await serviceSyncPurchaseOrderToParasut(po.id).catch(() => { /* best-effort */ });
+        } catch { /* modül yüklenemese bile mal kabul bozulmaz */ }
+    }
+
     return { id: po.id, status: po.status };
 }
 
@@ -160,12 +172,31 @@ export async function serviceCreatePOFromRecommendations(
 }
 
 /** PO mal kabul (kısmi destekli). receive_po_lines RPC + best-effort alert scan tetikler. */
+export interface VendorInvoiceIdentity {
+    /** Tedarikçinin KENDİ fatura numarası — KDV indiriminin resmî künyesi. */
+    vendor_invoice_no?:   string | null;
+    /** Tedarikçi faturasının tarihi (YYYY-MM-DD) — KDV dönemini belirler. */
+    vendor_invoice_date?: string | null;
+}
+
 export async function serviceReceivePOLines(
     id: string,
     lines: ReceivePOLine[],
     actor?: string,
+    invoice?: VendorInvoiceIdentity,
 ): Promise<ReceiveResult> {
     await dbReceivePurchaseOrderLines(id, lines, actor ?? "system");
+
+    // Tedarikçi fatura künyesi — fatura fiziksel olarak malla birlikte gelir,
+    // bu yüzden mal kabul anında yazılır. Stok hareketinden SONRA yazılması
+    // bilinçli: künye yazımı başarısız olsa bile mal kabul geçerli kalmalı.
+    if (invoice && (invoice.vendor_invoice_no || invoice.vendor_invoice_date)) {
+        try {
+            await dbSetVendorInvoiceIdentity(id, invoice);
+        } catch (err) {
+            console.error(JSON.stringify({ po_vendor_invoice_write_fail: String(err), poId: id }));
+        }
+    }
 
     const po = await dbGetPurchaseOrderById(id);
     if (!po) throw new Error("PO bulunamadı.");

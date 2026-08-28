@@ -238,11 +238,61 @@ describe("POST /api/purchase-orders/[id]/receive", () => {
             makeRequest({ lines: [{ line_id: VALID_LINE_ID, qty: 5 }], actor: "spoofed-actor" }),
             makeParams(),
         );
+        // Faz 13: 4. argüman tedarikçi fatura künyesi (opsiyonel). Testin niyeti
+        // actor'ün sunucu-otoriter olması → ilk üç argüman aynen kilitli kalır.
         expect(mockServiceReceivePOLines).toHaveBeenCalledWith(
             VALID_PO_ID,
             [{ line_id: VALID_LINE_ID, qty: 5 }],
             "session-user-id",
+            expect.anything(),
         );
+    });
+
+    // ── Faz 13: tedarikçi fatura künyesi ─────────────────────────────────────
+
+    it("tedarikçi fatura künyesi servise geçirilir (KDV indiriminin kimliği)", async () => {
+        mockDbGetPurchaseOrderById.mockResolvedValueOnce(makePO("confirmed"));
+        mockServiceReceivePOLines.mockResolvedValueOnce({ id: VALID_PO_ID, status: "received" });
+        await POST(
+            makeRequest({
+                lines: [{ line_id: VALID_LINE_ID, qty: 5 }],
+                vendor_invoice_no: "FTR-2026-1188",
+                vendor_invoice_date: "2026-08-20",
+            }),
+            makeParams(),
+        );
+        expect(mockServiceReceivePOLines).toHaveBeenCalledWith(
+            VALID_PO_ID,
+            [{ line_id: VALID_LINE_ID, qty: 5 }],
+            "session-user-id",
+            { vendor_invoice_no: "FTR-2026-1188", vendor_invoice_date: "2026-08-20" },
+        );
+    });
+
+    it("künye OPSİYONEL — verilmezse mal kabul yine yapılır", async () => {
+        mockDbGetPurchaseOrderById.mockResolvedValueOnce(makePO("confirmed"));
+        mockServiceReceivePOLines.mockResolvedValueOnce({ id: VALID_PO_ID, status: "received" });
+        const res = await POST(makeRequest({ lines: [{ line_id: VALID_LINE_ID, qty: 5 }] }), makeParams());
+        expect(res.status).toBe(200);
+    });
+
+    it("bozuk fatura tarihi 400 — yanlış KDV dönemi yazılmasın", async () => {
+        mockDbGetPurchaseOrderById.mockResolvedValueOnce(makePO("confirmed"));
+        const res = await POST(
+            makeRequest({ lines: [{ line_id: VALID_LINE_ID, qty: 5 }], vendor_invoice_date: "20.08.2026" }),
+            makeParams(),
+        );
+        expect(res.status).toBe(400);
+        expect(mockServiceReceivePOLines).not.toHaveBeenCalled();
+    });
+
+    it("aşırı uzun fatura numarası 400", async () => {
+        mockDbGetPurchaseOrderById.mockResolvedValueOnce(makePO("confirmed"));
+        const res = await POST(
+            makeRequest({ lines: [{ line_id: VALID_LINE_ID, qty: 5 }], vendor_invoice_no: "X".repeat(101) }),
+            makeParams(),
+        );
+        expect(res.status).toBe(400);
     });
 });
 
