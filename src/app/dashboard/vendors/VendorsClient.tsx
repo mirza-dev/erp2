@@ -14,6 +14,7 @@ import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
+import VendorDetailPanel from "@/components/vendors/VendorDetailPanel";
 import { CircleOff, Pencil, Plus, RotateCcw } from "lucide-react";
 
 // ── Styles ────────────────────────────────────────────────────
@@ -134,6 +135,7 @@ export default function VendorsClient(props: VendorsClientProps) {
     // Drawer state
     const [drawerMode, setDrawerMode] = useState<"create" | "edit" | null>(null);
     const [editTarget, setEditTarget] = useState<VendorRow | null>(null);
+    const [selectedVendor, setSelectedVendor] = useState<VendorRow | null>(null);
     const [form, setForm] = useState<FormState>(emptyForm);
     const [saving, setSaving] = useState(false);
     const [formError, setFormError] = useState<string | null>(null);
@@ -412,7 +414,12 @@ export default function VendorsClient(props: VendorsClientProps) {
             header: "İşlem",
             align: "right",
             cell: v => (
-                <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
+                // A3: satır artık detay panelini açıyor → aksiyon butonları
+                // tıklamayı satıra SIZDIRMAMALI (Düzenle'ye basınca panel de açılırdı).
+                <div
+                    style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}
+                    onClick={e => e.stopPropagation()}
+                >
                     <Button
                         variant="secondary"
                         size="sm"
@@ -536,6 +543,10 @@ export default function VendorsClient(props: VendorsClientProps) {
                     columns={columns}
                     rows={displayVendors}
                     rowKey={v => v.id}
+                    // A3: satır detay panelini açar — tedarik ettiği ürünler,
+                    // son fiyatlar ve satın alma özeti (veri vardı, yeri yoktu).
+                    onRowClick={v => setSelectedVendor(v)}
+                    rowAriaLabel={v => `${v.name} detayını gör`}
                     emptyMessage={search ? "Arama kriterine uyan tedarikçi bulunamadı." : "Henüz tedarikçi eklenmemiş."}
                     footer={displayTotal > 0 ? (
                         <Pagination
@@ -713,6 +724,8 @@ export default function VendorsClient(props: VendorsClientProps) {
                     </div>
                 </div>
             )}
+
+            <VendorDetailPanel vendor={selectedVendor} onClose={() => setSelectedVendor(null)} />
         </div>
     );
 }

@@ -71,10 +71,15 @@ export function aggregateCustomerOrderStats(
         stats.orderCount += 1;
 
         // grand_total PostgREST'ten numeric → string gelebilir; NaN toplama kirletmesin.
-        const amount = Number(o.grand_total ?? 0);
-        if (Number.isFinite(amount) && o.currency) {
-            stats.revenueByCurrency[o.currency] =
-                (stats.revenueByCurrency[o.currency] ?? 0) + amount;
+        // null = "bilinmiyor", 0 DEĞİL: bu yol siparişleri ham okur (redaction
+        // sonra, cari satırında olur) ama semantik `vendor-detail` ile aynı
+        // tutulur — null'ı 0 saymak olmayan bir tutar uydurur.
+        if (o.grand_total != null && o.currency) {
+            const amount = Number(o.grand_total);
+            if (Number.isFinite(amount)) {
+                stats.revenueByCurrency[o.currency] =
+                    (stats.revenueByCurrency[o.currency] ?? 0) + amount;
+            }
         }
         if (!stats.lastOrderDate || o.created_at > stats.lastOrderDate) {
             stats.lastOrderDate = o.created_at;
