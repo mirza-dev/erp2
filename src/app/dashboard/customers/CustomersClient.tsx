@@ -22,6 +22,7 @@ import { useSelection } from "@/hooks/useSelection";
 import { Ban, Plus, RotateCcw, Trash2 } from "lucide-react";
 import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
 import type { CustomerTab } from "@/lib/supabase/customers";
+import PageHeader from "@/components/ui/PageHeader";
 
 const newCustomerInitial = {
     name: "", email: "", phone: "", address: "",
@@ -474,17 +475,10 @@ export default function CustomersClient(props: CustomersClientProps) {
     return (
         <>
             <div style={{ display: "flex", flexDirection: "column", gap: "16px", opacity: isPending ? 0.7 : 1, transition: "opacity 0.12s" }}>
-                {/* Header */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
-                    <div>
-                        <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
-                            Cariler
-                        </div>
-                        <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "3px" }}>
-                            {displayCounts.all} müşteri · {displayCounts.active} aktif
-                        </div>
-                    </div>
-                    <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", justifyContent: "flex-end", flex: "1 1 320px" }}>
+                <PageHeader
+                    title="Cariler"
+                    subtitle={`${displayCounts.all} müşteri · ${displayCounts.active} aktif`}
+                    actions={<>
                         <input
                             type="text"
                             value={searchText}
@@ -498,7 +492,6 @@ export default function CustomersClient(props: CustomersClientProps) {
                                 borderRadius: "6px",
                                 background: "var(--input-bg)",
                                 color: "var(--text-primary)",
-                                width: "100%",
                                 maxWidth: "220px",
                                 minWidth: "0",
                                 flex: "1 1 190px",
@@ -515,8 +508,8 @@ export default function CustomersClient(props: CustomersClientProps) {
                                 Yeni Müşteri
                             </Button>
                         )}
-                    </div>
-                </div>
+                    </>}
+                />
 
                 <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
                     <UnderlinedFilterTabs

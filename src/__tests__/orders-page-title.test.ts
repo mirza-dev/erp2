@@ -20,7 +20,11 @@ const PURCHASE_ORDERS = readFileSync(
 
 describe("/dashboard/orders — Satış Siparişleri h1 + title", () => {
     it('h1 metin: "Satış Siparişleri"', () => {
-        expect(SALES_ORDERS).toMatch(/<h1[^>]*>\s*Satış Siparişleri\s*<\/h1>/);
+        // h1 artık PageHeader'dan geliyor (2026-08-24). Sayfa başlığı prop olarak
+        // verir; component onu HER ZAMAN <h1> olarak basar — bu davranış
+        // `ui/page-header.test.tsx`'te render seviyesinde kilitli, dolayısıyla
+        // garanti tek tek sayfalardan DAHA güçlü.
+        expect(SALES_ORDERS).toMatch(/title="Satış Siparişleri"/);
     });
 
     it("document.title 'Satış Siparişleri · Roven' set ediliyor", () => {
@@ -35,7 +39,7 @@ describe("/dashboard/orders — Satış Siparişleri h1 + title", () => {
 
 describe("/dashboard/purchase/orders — Satın Alma Siparişleri h1 + title", () => {
     it('h1 metin: "Satın Alma Siparişleri" (zaten vardı)', () => {
-        expect(PURCHASE_ORDERS).toMatch(/<h1[^>]*>\s*Satın Alma Siparişleri\s*<\/h1>/);
+        expect(PURCHASE_ORDERS).toMatch(/title="Satın Alma Siparişleri"/);
     });
 
     it("document.title 'Satın Alma Siparişleri · Roven' set ediliyor", () => {

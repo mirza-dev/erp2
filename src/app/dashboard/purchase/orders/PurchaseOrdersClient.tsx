@@ -20,8 +20,9 @@ import Button, { ButtonLink } from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Badge, { type BadgeTone } from "@/components/ui/Badge";
 import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
-import { CircleOff, Plus, RefreshCw } from "lucide-react";
+import { CircleOff, Plus } from "lucide-react";
 import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
+import PageHeader from "@/components/ui/PageHeader";
 
 const STATUS_TABS: { key: PurchaseOrderTab; label: string }[] = [
     { key: "all", label: "Tümü" },
@@ -249,28 +250,14 @@ export default function PurchaseOrdersClient(props: PurchaseOrdersClientProps) {
 
     return (
         <div style={{ maxWidth: "1200px", margin: "0 auto", opacity: isPending ? 0.7 : 1, transition: "opacity 0.12s" }}>
-            {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
-                <div>
-                    <h1 style={{ fontSize: "20px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
-                        Satın Alma Siparişleri
-                    </h1>
-                    <p style={{ fontSize: "13px", color: "var(--text-tertiary)", margin: "4px 0 0" }}>
-                        {displayTotal} sipariş
-                    </p>
-                </div>
-                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                    <Button
-                        variant="toolbar"
-                        size="md"
-                        onClick={handleRefresh}
-                        disabled={refreshing || isPending}
-                        aria-label="Siparişleri yenile"
-                        leftIcon={<RefreshCw size={15} />}
-                    >
-                        {refreshing || isPending ? "Yenileniyor…" : "Yenile"}
-                    </Button>
-                    {has("manage_purchase_orders") && (
+            <div style={{ marginBottom: "20px" }}>
+                <PageHeader
+                    title="Satın Alma Siparişleri"
+                    subtitle={`${displayTotal} sipariş`}
+                    onRefresh={handleRefresh}
+                    refreshing={refreshing || isPending}
+                    refreshAriaLabel="Siparişleri yenile"
+                    actions={has("manage_purchase_orders") ? (
                         <ButtonLink
                             href="/dashboard/purchase/orders/new"
                             size="cta"
@@ -280,8 +267,8 @@ export default function PurchaseOrdersClient(props: PurchaseOrdersClientProps) {
                         >
                             Yeni Sipariş
                         </ButtonLink>
-                    )}
-                </div>
+                    ) : null}
+                />
             </div>
 
             <UnderlinedFilterTabs

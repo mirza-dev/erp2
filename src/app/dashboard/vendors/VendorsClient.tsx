@@ -16,6 +16,7 @@ import Badge from "@/components/ui/Badge";
 import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 import VendorDetailPanel from "@/components/vendors/VendorDetailPanel";
 import { CircleOff, Pencil, Plus, RotateCcw } from "lucide-react";
+import PageHeader from "@/components/ui/PageHeader";
 
 // ── Styles ────────────────────────────────────────────────────
 
@@ -460,27 +461,22 @@ export default function VendorsClient(props: VendorsClientProps) {
 
     return (
         <div style={{ maxWidth: "1100px", margin: "0 auto", opacity: isPending ? 0.7 : 1, transition: "opacity 0.12s" }}>
-            {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "20px" }}>
-                <div>
-                    <h1 style={{ fontSize: "20px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
-                        Tedarikçiler
-                    </h1>
-                    <p style={{ fontSize: "13px", color: "var(--text-tertiary)", margin: "4px 0 0" }}>
-                        {displayTotal} tedarikçi
-                    </p>
-                </div>
-                {has("manage_vendors") && (
-                    <Button
-                        size="cta"
-                        leftIcon={<Plus size={15} />}
-                        onClick={openCreate}
-                        disabled={isDemo}
-                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                    >
-                        Yeni Tedarikçi
-                    </Button>
-                )}
+            <div style={{ marginBottom: "20px" }}>
+                <PageHeader
+                    title="Tedarikçiler"
+                    subtitle={`${displayTotal} tedarikçi`}
+                    actions={has("manage_vendors") ? (
+                        <Button
+                            size="cta"
+                            leftIcon={<Plus size={15} />}
+                            onClick={openCreate}
+                            disabled={isDemo}
+                            title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                        >
+                            Yeni Tedarikçi
+                        </Button>
+                    ) : null}
+                />
             </div>
 
             {/* Filters */}

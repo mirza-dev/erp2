@@ -19,6 +19,7 @@ import type { ProductTypeRow, ProductTypeFieldRow } from "@/lib/database.types";
 import { missingRequiredTechnicalFields } from "@/lib/technical-templates";
 import { Plus, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
+import PageHeader from "@/components/ui/PageHeader";
 
 
 interface RiskItem {
@@ -663,13 +664,9 @@ export default function ProductsPage() {
                     ⚠ {loadError}
                 </div>
             )}
-            {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
-                <div>
-                    <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
-                        Stok & Ürünler
-                    </div>
-                    <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "3px" }}>
+            <PageHeader
+                title="Stok & Ürünler"
+                subtitle={<>
                         {totalProductCount} ürün · {categories.length - 1} kategori
                         {criticalCount > 0 && (
                             <span style={{ color: "var(--danger-text)", fontWeight: 600 }}> · {criticalCount} kritik</span>
@@ -689,9 +686,8 @@ export default function ProductsPage() {
                         {!riskLoading && aiAvailable === false && (
                             <span style={{ color: "var(--text-tertiary)", fontStyle: "italic" }}> · Deterministik mod</span>
                         )}
-                    </div>
-                </div>
-                <div style={{ display: "flex", gap: "8px", alignItems: "center", justifyContent: isMobile ? "flex-start" : "flex-end", flexWrap: "wrap", flex: isMobile ? "1 1 100%" : undefined }}>
+                </>}
+                actions={<>
                     <Button
                         variant="toolbar"
                         size="md"
@@ -738,8 +734,8 @@ export default function ProductsPage() {
                             Yeni Ürün
                         </Button>
                     )}
-                </div>
-            </div>
+                </>}
+            />
 
             {/* Category filter dropdown */}
             <div ref={categoryDropdownRef} style={{ position: "relative", display: "inline-block" }}>

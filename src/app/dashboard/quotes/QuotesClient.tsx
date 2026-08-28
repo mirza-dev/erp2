@@ -17,9 +17,10 @@ import { computeTotalPages } from "@/hooks/usePagination";
 import Pagination from "@/components/ui/Pagination";
 import { useSelection } from "@/hooks/useSelection";
 import { getValidUntilBadge, canDeleteQuote } from "./_utils/quote-display";
-import { Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
 import type { QuoteTab } from "@/lib/supabase/quotes";
+import PageHeader from "@/components/ui/PageHeader";
 
 type QuoteStatus = QuoteSummary["status"];
 
@@ -322,38 +323,18 @@ export default function QuotesClient(props: QuotesClientProps) {
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px", opacity: isPending ? 0.7 : 1, transition: "opacity 0.12s" }}>
-            {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div>
-                    <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
-                        Teklifler
-                    </div>
-                    <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "3px" }}>
-                        {displayCounts.ALL} teklif{draftCount > 0 ? ` · ${draftCount} taslak` : ""}
-                    </div>
-                </div>
-                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                    <Button
-                        variant="toolbar"
-                        size="md"
-                        onClick={handleRefresh}
-                        disabled={refreshing || isPending}
-                        aria-label="Teklifleri yenile"
-                        leftIcon={<RefreshCw size={15} />}
-                    >
-                        {refreshing || isPending ? "Yenileniyor…" : "Yenile"}
-                    </Button>
-                    {has("manage_quotes") && (
-                        <ButtonLink
-                            href="/dashboard/quotes/new"
-                            size="cta"
-                            leftIcon={<Plus size={15} />}
-                        >
-                            Yeni Teklif
-                        </ButtonLink>
-                    )}
-                </div>
-            </div>
+            <PageHeader
+                title="Teklifler"
+                subtitle={`${displayCounts.ALL} teklif${draftCount > 0 ? ` · ${draftCount} taslak` : ""}`}
+                onRefresh={handleRefresh}
+                refreshing={refreshing || isPending}
+                refreshAriaLabel="Teklifleri yenile"
+                actions={has("manage_quotes") ? (
+                    <ButtonLink href="/dashboard/quotes/new" size="cta" leftIcon={<Plus size={15} />}>
+                        Yeni Teklif
+                    </ButtonLink>
+                ) : null}
+            />
 
             {/* Toolbar */}
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>

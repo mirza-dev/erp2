@@ -91,7 +91,10 @@ describe("quotes/page.tsx — DOM mutation + UX + a11y fixes", () => {
     });
 
     it("Refresh butonuna aria-label eklendi", () => {
-        expect(LIST_SRC).toMatch(/aria-label="Teklifleri yenile"/);
+        // Yenile butonu artık PageHeader'dan geliyor (2026-08-24) — erişilebilir ad
+        // prop olarak veriliyor, component onu `aria-label`e basıyor
+        // (`ui/page-header.test.tsx` bunu render seviyesinde kilitler).
+        expect(LIST_SRC).toMatch(/refreshAriaLabel="Teklifleri yenile"/);
     });
 
     it("Delete butonuna aria-label eklendi", () => {

@@ -21,8 +21,9 @@ import { dateDaysFromToday } from "@/lib/stock-utils";
 import { computeTotalPages } from "@/hooks/usePagination";
 import Pagination from "@/components/ui/Pagination";
 import { useSelection } from "@/hooks/useSelection";
-import { CircleOff, Plus, RefreshCw } from "lucide-react";
+import { CircleOff, Plus } from "lucide-react";
 import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
+import PageHeader from "@/components/ui/PageHeader";
 
 const commercialStatusConfig: Record<CommercialStatus, { label: string; cls: string }> = {
     draft:            { label: "Taslak",      cls: "badge-neutral" },
@@ -386,37 +387,18 @@ export default function OrdersClient(props: OrdersClientProps) {
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px", opacity: isPending ? 0.7 : 1, transition: "opacity 0.12s" }}>
-            {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div>
-                    <h1 style={{ fontSize: "20px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
-                        Satış Siparişleri
-                    </h1>
-                    <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "3px" }}>
-                        {displayCounts.ALL} sipariş · {pendingCount} onay bekliyor
-                    </div>
-                </div>
-                <div style={{ display: "flex", gap: "8px", alignItems: "center" }}>
-                    <Button
-                        variant="toolbar"
-                        size="md"
-                        onClick={handleRefresh}
-                        disabled={refreshing || isPending}
-                        leftIcon={<RefreshCw size={15} />}
-                    >
-                        {refreshing || isPending ? "Yenileniyor…" : "Yenile"}
-                    </Button>
-                    {has("manage_sales_orders") && (
-                        <ButtonLink
-                            href="/dashboard/orders/new"
-                            size="cta"
-                            leftIcon={<Plus size={15} />}
-                        >
-                            Yeni Sipariş
-                        </ButtonLink>
-                    )}
-                </div>
-            </div>
+            <PageHeader
+                title="Satış Siparişleri"
+                subtitle={`${displayCounts.ALL} sipariş · ${pendingCount} onay bekliyor`}
+                onRefresh={handleRefresh}
+                refreshing={refreshing || isPending}
+                refreshAriaLabel="Siparişleri yenile"
+                actions={has("manage_sales_orders") ? (
+                    <ButtonLink href="/dashboard/orders/new" size="cta" leftIcon={<Plus size={15} />}>
+                        Yeni Sipariş
+                    </ButtonLink>
+                ) : null}
+            />
 
             {/* Toolbar */}
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
