@@ -20,7 +20,8 @@
     "gen:test-xlsx": "tsx tests/fixtures/generate-test-xlsx.ts",
     "docker:build": "docker build -t erp2:local .",
     "docker:run": "docker run --rm -p 3000:3000 --env-file .env.local erp2:local",
-    "doctor": "npx react-doctor@latest"
+    "doctor": "npx react-doctor@latest",
+    "find-test-data": "tsx scripts/find-test-data.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
