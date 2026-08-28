@@ -81,7 +81,13 @@ describe("Üretim — a11y aria-label'lar", () => {
         expect(PAGE_SRC).toMatch(/aria-label=\{`\$\{idx \+ 1\}\. satır ürün`\}/);
         expect(PAGE_SRC).toMatch(/aria-label=\{`\$\{idx \+ 1\}\. satır adet`\}/);
         expect(PAGE_SRC).toMatch(/aria-label=\{`\$\{idx \+ 1\}\. satır not`\}/);
-        expect(PAGE_SRC.match(/type="button"/g)).toHaveLength(2);
+        // Niyet: HER native <button> açık `type` taşır (varsayılan "submit" form
+        // içinde kazara gönderim yapar). Sabit sayı kırılgandı — mobil kart
+        // görünümü üçüncü butonu getirince kırıldı (2026-08-24). Sayı yerine
+        // değişmezin kendisi kilitleniyor: type'sız buton KALMAMALI.
+        const buttons = PAGE_SRC.match(/<button[\s\S]*?>/g) ?? [];
+        expect(buttons.length).toBeGreaterThan(0);
+        for (const b of buttons) expect(b).toMatch(/type="button"/);
     });
 
     it("silme × butonu aria-label taşır", () => {

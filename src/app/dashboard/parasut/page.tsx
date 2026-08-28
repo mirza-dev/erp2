@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from "react";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import type { IntegrationSyncLogRow, SalesOrderRow } from "@/lib/database.types";
+import { LoadingState } from "@/components/ui/StateViews";
 
 type SyncStatus = "idle" | "syncing" | "done";
 type ConnectionStatus = "connected" | "disconnected";
@@ -100,6 +101,10 @@ export default function ParasutPage() {
     const [syncStatus, setSyncStatus] = useState<SyncStatus>("idle");
     const [logs, setLogs] = useState<IntegrationSyncLogRow[]>([]);
     const [stats, setStats] = useState<ParasutStats>({ customers: 0, synced_invoices: 0, pending_syncs: 0, failed_syncs: 0 });
+    // İlk yükleme bayrağı (2026-08-24): sayfa sıfırlarla açılıp veri gelince
+    // rakamlar zıplıyordu — kullanıcı bir an "0 müşteri, 0 fatura" görüyordu.
+    // Yanlış veriyi gerçekmiş gibi göstermek, "yükleniyor" demekten kötüdür.
+    const [initialLoading, setInitialLoading] = useState(true);
     const [syncedOrders, setSyncedOrders] = useState<SalesOrderRow[]>([]);
     const [expandedError, setExpandedError] = useState<string | null>(null);
     const [retryingId, setRetryingId] = useState<string | null>(null);
@@ -141,6 +146,8 @@ export default function ParasutPage() {
             }
         } catch (err) {
             console.error("Failed to fetch parasut data:", err);
+        } finally {
+            setInitialLoading(false);
         }
     }, [logFilterStep, logFilterErrorKind, logFilterStatus]);
 
@@ -230,6 +237,8 @@ export default function ParasutPage() {
         { label: "Faturalar", count: stats.synced_invoices, unit: "fatura" },
         { label: "Bekleyen", count: stats.pending_syncs, unit: "sipariş" },
     ], [stats]);
+
+    if (initialLoading) return <LoadingState message="Paraşüt durumu yükleniyor..." />;
 
     return (
         <div style={{ padding: "0" }}>

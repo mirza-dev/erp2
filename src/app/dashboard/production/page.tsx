@@ -11,6 +11,7 @@ import { useVoiceRecorder, type VoiceRecorderResult } from "@/hooks/useVoiceReco
 import type { VoiceProductionEntry } from "@/lib/services/voice-service";
 import { mergeFireIntoNote } from "@/lib/voice-note-helpers";
 import { CalendarDays, Mic, RotateCcw, Square, Trash2, X } from "lucide-react";
+import { useIsMobile } from "@/hooks/useIsMobile";
 
 interface FormLine {
     id: string;
@@ -110,6 +111,9 @@ function ProductionPageInner() {
     const { uretimKayitlari, addUretimKaydi, deleteUretimKaydi, productionError } = useProduction();
     const loadError = buildLoadError([productsError, productionError], undefined);
     const { toast } = useToast();
+    // Sahada telefondan kullanılan TEK ekran (2026-08-24): üç tablo da sabit
+    // genişlikteydi (600/480/460px) → operatör yatay kaydırmak zorundaydı.
+    const isMobile = useIsMobile();
     const isDemo = useIsDemo();
     const searchParams = useSearchParams();
     const [tarih, setTarih] = useState(() => today());
@@ -521,8 +525,94 @@ function ProductionPageInner() {
                     </div>
                 )}
 
+                {/* Dar ekran: tablo yerine kart listesi (2026-08-24).
+                    Operatörün sahada telefondan doldurduğu asıl alan burası;
+                    5 kolonu 390px'e sıkıştırmak yerine alanlar alt alta iner.
+                    Tüm handler'lar, aria-label'lar ve sesli-giriş ipuçları aynı. */}
+                {isMobile ? (
+                    <div style={{ display: "flex", flexDirection: "column", gap: "10px", padding: "12px 14px" }}>
+                        {lines.map((line, idx) => {
+                            const selectedProduct = products.find(p => p.id === line.productId);
+                            return (
+                                <div
+                                    key={line.id}
+                                    style={{
+                                        border: "var(--line-width) solid var(--border-tertiary)",
+                                        borderRadius: "8px", padding: "10px 12px",
+                                        background: line._lowConfidence ? "var(--warning-bg)" : "var(--bg-primary)",
+                                        display: "flex", flexDirection: "column", gap: "8px",
+                                    }}
+                                >
+                                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                                        <span style={{ fontSize: "11px", color: "var(--text-tertiary)", fontWeight: 600 }}>
+                                            {idx + 1}. kalem
+                                        </span>
+                                        <button
+                                            type="button"
+                                            onClick={() => removeLine(line.id)}
+                                            aria-label={`${idx + 1}. satırı kaldır`}
+                                            style={{
+                                                fontSize: "18px", color: "var(--danger-text)", background: "transparent",
+                                                border: "none", cursor: "pointer", lineHeight: 1, padding: "2px 6px",
+                                            }}
+                                        >×</button>
+                                    </div>
+
+                                    <select
+                                        value={line.productId}
+                                        onChange={e => setLineField(line.id, "productId", e.target.value)}
+                                        aria-label={`${idx + 1}. satır ürün`}
+                                        style={inputStyle}
+                                    >
+                                        <option value="" disabled>Ürün seç...</option>
+                                        {products.filter(p => p.isActive).map(p => (
+                                            <option key={p.id} value={p.id}>{p.sku} — {p.name}</option>
+                                        ))}
+                                    </select>
+                                    {selectedProduct && (
+                                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "-4px" }}>
+                                            Mevcut stok: {formatNumber(selectedProduct.available_now)} {selectedProduct.unit}
+                                        </div>
+                                    )}
+                                    {line._voiceHint && !line.productId && (
+                                        <div style={{ fontSize: "11px", color: "var(--text-secondary)", marginTop: "-4px" }}>
+                                            Sesli: &ldquo;{line._voiceHint}&rdquo; — listeden ürün seçin
+                                        </div>
+                                    )}
+                                    {line._lowConfidence && (
+                                        <div style={{ fontSize: "11px", color: "var(--warning-text)", marginTop: "-4px" }}>
+                                            ⚠ Sesli giriş düşük güvenle eşleşti — kontrol edin
+                                        </div>
+                                    )}
+
+                                    <div style={{ display: "flex", gap: "8px" }}>
+                                        <input
+                                            type="number"
+                                            inputMode="numeric"
+                                            min={1}
+                                            value={line.adet}
+                                            onChange={e => setLineField(line.id, "adet", e.target.value)}
+                                            placeholder="Adet"
+                                            aria-label={`${idx + 1}. satır adet`}
+                                            style={{ ...inputStyle, width: "96px", textAlign: "right" }}
+                                        />
+                                        <input
+                                            type="text"
+                                            value={line.notlar}
+                                            onChange={e => setLineField(line.id, "notlar", e.target.value)}
+                                            placeholder="Not (opsiyonel)"
+                                            aria-label={`${idx + 1}. satır not`}
+                                            style={{ ...inputStyle, flex: 1 }}
+                                        />
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                ) : (
+
                 <div style={{ overflowX: "auto" }}>
-                <table style={{ width: "100%", minWidth: "600px", borderCollapse: "collapse" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", ...(isMobile ? {} : { minWidth: "600px" }) }}>
                     <thead>
                         <tr style={{ background: "var(--table-header-bg)" }}>
                             <th style={{ ...thStyle, width: "34px" }}>#</th>
@@ -573,6 +663,7 @@ function ProductionPageInner() {
                                     <td style={{ ...tdStyle, textAlign: "right" as const }}>
                                         <input
                                             type="number"
+                                            inputMode="numeric"
                                             min={1}
                                             value={line.adet}
                                             onChange={e => setLineField(line.id, "adet", e.target.value)}
@@ -615,6 +706,7 @@ function ProductionPageInner() {
                     </tbody>
                 </table>
                 </div>
+                )}
 
                 <div style={{ padding: "10px 16px", display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "space-between", alignItems: "center" }}>
                     <button
@@ -674,25 +766,36 @@ function ProductionPageInner() {
                     </div>
                 ) : (
                     <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "480px" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", ...(isMobile ? {} : { minWidth: "480px" }) }}>
                         <thead>
                             <tr style={{ background: "var(--table-header-bg)" }}>
-                                <th style={thStyle}>SKU</th>
+                                {/* Dar ekranda SKU ve Not gizlenir: ürün adı zaten var,
+                                    telefonda yer daralınca öncelik adet ve silme. */}
+                                {!isMobile && <th style={thStyle}>SKU</th>}
                                 <th style={thStyle}>Ürün</th>
                                 <th style={{ ...thStyle, textAlign: "right" as const }}>Üretilen Adet</th>
-                                <th style={thStyle}>Not</th>
+                                {!isMobile && <th style={thStyle}>Not</th>}
                                 <th style={{ ...thStyle, width: "34px" }} aria-label="Kayıt işlemleri"></th>
                             </tr>
                         </thead>
                         <tbody>
                             {selectedDateLogs.map(kaydi => (
                                 <tr key={kaydi.id} style={{ borderBottom: "var(--line-width) solid var(--border-tertiary)" }}>
-                                    <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>{kaydi.productSku}</td>
-                                    <td style={{ ...tdStyle, fontWeight: 500 }}>{kaydi.productName}</td>
+                                    {!isMobile && <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>{kaydi.productSku}</td>}
+                                    <td style={{ ...tdStyle, fontWeight: 500 }}>
+                                        {kaydi.productName}
+                                        {/* Gizlenen kolonların bilgisi kaybolmasın: dar ekranda
+                                            SKU ve not ürün adının altına iner. */}
+                                        {isMobile && (
+                                            <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "2px" }}>
+                                                {kaydi.productSku}{kaydi.notlar ? ` · ${kaydi.notlar}` : ""}
+                                            </div>
+                                        )}
+                                    </td>
                                     <td style={{ ...tdStyle, textAlign: "right" as const, fontWeight: 600, color: "var(--success-text)" }}>
                                         +{formatNumber(kaydi.adet)}
                                     </td>
-                                    <td style={{ ...tdStyle, color: "var(--text-tertiary)", fontSize: "12px" }}>{kaydi.notlar || "—"}</td>
+                                    {!isMobile && <td style={{ ...tdStyle, color: "var(--text-tertiary)", fontSize: "12px" }}>{kaydi.notlar || "—"}</td>}
                                     <td style={{ ...tdStyle, textAlign: "center" as const }}>
                                         <Button
                                             variant="dangerSoft"
@@ -735,11 +838,11 @@ function ProductionPageInner() {
                         </div>
                     </div>
                     <div style={{ overflowX: "auto" }}>
-                    <table style={{ width: "100%", borderCollapse: "collapse", minWidth: "460px" }}>
+                    <table style={{ width: "100%", borderCollapse: "collapse", ...(isMobile ? {} : { minWidth: "460px" }) }}>
                         <thead>
                             <tr style={{ background: "var(--table-header-bg)" }}>
                                 <th style={thStyle}>Tarih</th>
-                                <th style={thStyle}>SKU</th>
+                                {!isMobile && <th style={thStyle}>SKU</th>}
                                 <th style={thStyle}>Ürün</th>
                                 <th style={{ ...thStyle, textAlign: "right" as const }}>Adet</th>
                             </tr>
@@ -765,8 +868,15 @@ function ProductionPageInner() {
                                     }}
                                     style={{ borderBottom: "var(--line-width) solid var(--border-tertiary)", cursor: "pointer" }}>
                                     <td style={{ ...tdStyle, color: "var(--text-tertiary)", fontSize: "12px" }}>{kaydi.tarih}</td>
-                                    <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>{kaydi.productSku}</td>
-                                    <td style={tdStyle}>{kaydi.productName}</td>
+                                    {!isMobile && <td style={{ ...tdStyle, color: "var(--text-secondary)" }}>{kaydi.productSku}</td>}
+                                    <td style={tdStyle}>
+                                        {kaydi.productName}
+                                        {isMobile && (
+                                            <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "2px" }}>
+                                                {kaydi.productSku}
+                                            </div>
+                                        )}
+                                    </td>
                                     <td style={{ ...tdStyle, textAlign: "right" as const, color: "var(--success-text)", fontWeight: 500 }}>+{formatNumber(kaydi.adet)}</td>
                                 </tr>
                             ))}
