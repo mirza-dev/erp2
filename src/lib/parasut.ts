@@ -17,11 +17,13 @@ import {
     type ParasutShipmentDocument,
     type ParasutPurchaseBill,
     type ParasutPaymentState,
+    type ParasutInventoryLevel,
     type ParasutEInvoiceInbox,
     type ContactInput,
     type ProductInput,
     type InvoiceInput,
     type PurchaseBillInput,
+    type StockUpdateDetailInput,
     type ShipmentDocInput,
     type EInvoiceInput,
     type EArchiveInput,
@@ -73,6 +75,7 @@ export class MockParasutAdapter implements ParasutAdapter {
         this.purchaseBills.clear();
         this.billSupplier.clear();
         this.paymentStates.clear();
+        this.inventory.clear();
         this.trackableJobs.clear();
         this.eDocuments.clear();
         this._pendingJobForInvoice.clear();
@@ -297,6 +300,40 @@ export class MockParasutAdapter implements ParasutAdapter {
         this.purchaseBills.set(id, bill);
         this.billSupplier.set(id, input.supplier_id);
         return bill;
+    }
+
+    // ── Stok mutabakatı ──────────────────────────────────────────────────────
+    //
+    // Mock, Paraşüt stoğunu tek depoda tutar ve `stock_updates`'i MUTLAK
+    // atama olarak uygular — gerçek API'nin semantiği bu.
+    private inventory = new Map<string, number>(); // productId → stock_count
+
+    /** Test kancası — Paraşüt tarafındaki stoğu kur. */
+    setInventory(productId: string, count: number): void {
+        this.inventory.set(productId, count);
+    }
+
+    async listInventoryLevels(productId: string): Promise<ParasutInventoryLevel[]> {
+        await mockDelay();
+        if (!this.inventory.has(productId)) return [];
+        return [{
+            id: `lvl_${productId}`,
+            warehouse_id: 'wh_default',
+            stock_count: this.inventory.get(productId) as number,
+        }];
+    }
+
+    async createStockUpdate(details: StockUpdateDetailInput[]): Promise<{ id: string }> {
+        if (details.length === 0) {
+            throw new ParasutError('validation', 'createStockUpdate: en az bir kalem gerekli');
+        }
+        await mockDelay();
+        this._shouldError();
+        for (const d of details) {
+            // MUTLAK atama (delta DEĞİL) — gerçek API ile aynı semantik.
+            this.inventory.set(d.product_id, d.new_total_inventory);
+        }
+        return { id: `stockupd_${Date.now()}_${Math.random().toString(36).slice(2)}` };
     }
 
     // ── Tahsilat / ödeme durumu ──────────────────────────────────────────────

@@ -102,6 +102,29 @@ export interface ParasutPaymentState {
     due_date:         string | null;
 }
 
+/**
+ * Bir ürünün bir depodaki stok seviyesi (Faz 15) — SALT OKUNUR.
+ * Paraşüt `inventory_levels` ucundan gelir.
+ */
+export interface ParasutInventoryLevel {
+    id:            string;
+    warehouse_id:  string | null;
+    stock_count:   number;
+}
+
+/**
+ * Stok güncelleme kalemi (Faz 15).
+ *
+ * DİKKAT: `new_total_inventory` MUTLAK değerdir — delta DEĞİL. Paraşüt stoğu
+ * bu değere EŞİTLENİR. Doğası gereği idempotent (aynı değeri iki kez yazmak
+ * zararsız), ama eşzamanlı Paraşüt-tarafı hareketin üzerine yazar.
+ */
+export interface StockUpdateDetailInput {
+    product_id:          string;
+    new_total_inventory: number;
+    warehouse_id?:       string;
+}
+
 export interface ParasutEInvoiceInbox {
     id:         string;
     attributes: { vkn: string; alias: string };
@@ -253,6 +276,11 @@ export interface ParasutAdapter {
     // Purchase bill — alış faturası (filter[invoice_no] YOK → tedarikçi + sayfalama)
     listPurchaseBillsBySupplier(supplierId: string, page: number, pageSize: number): Promise<ParasutPurchaseBill[]>;
     createPurchaseBill(input: PurchaseBillInput): Promise<ParasutPurchaseBill>;
+
+    // Stok mutabakatı (Faz 15)
+    listInventoryLevels(productId: string): Promise<ParasutInventoryLevel[]>;
+    /** MUTLAK stok ataması — delta değil. Paraşüt stoğunu verilen değere eşitler. */
+    createStockUpdate(details: StockUpdateDetailInput[]): Promise<{ id: string }>;
 
     // Tahsilat/ödeme durumu (tek yönlü okuma)
     getSalesInvoicePaymentState(id: string): Promise<ParasutPaymentState>;

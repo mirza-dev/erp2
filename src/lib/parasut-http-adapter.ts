@@ -35,11 +35,13 @@ import type {
     ParasutShipmentDocument,
     ParasutPurchaseBill,
     ParasutPaymentState,
+    ParasutInventoryLevel,
     ParasutEInvoiceInbox,
     ContactInput,
     ProductInput,
     InvoiceInput,
     PurchaseBillInput,
+    StockUpdateDetailInput,
     ShipmentDocInput,
     EInvoiceInput,
     EArchiveInput,
@@ -245,6 +247,14 @@ function toPaymentState(res: JsonApiResource): ParasutPaymentState {
         remaining_in_trl: num(res.attributes?.remaining_in_trl),
         currency:         str(res.attributes?.currency),
         due_date:         str(res.attributes?.due_date),
+    };
+}
+
+function toInventoryLevel(res: JsonApiResource): ParasutInventoryLevel {
+    return {
+        id:           String(res.id ?? ""),
+        warehouse_id: relId(res, "warehouse"),
+        stock_count:  num(res.attributes?.stock_count) ?? 0,
     };
 }
 
@@ -714,6 +724,49 @@ export class HttpParasutAdapter implements ParasutAdapter {
             },
         });
         return toPurchaseBill(asSingle(doc));
+    }
+
+    // ── Stok mutabakatı ──────────────────────────────────────────────────────
+
+    async listInventoryLevels(productId: string): Promise<ParasutInventoryLevel[]> {
+        // Not: bu uç `/{company}/product/{id}/inventory_levels` (tekil "product")
+        // — diğer uçlardaki "products" çoğulundan FARKLI. Spec böyle.
+        const doc = await this.api("GET", `/product/${encodeURIComponent(productId)}/inventory_levels`, {
+            query: { "page[size]": 25 },
+            op:    "listInventoryLevels",
+        });
+        return asList(doc).map(toInventoryLevel);
+    }
+
+    async createStockUpdate(details: StockUpdateDetailInput[]): Promise<{ id: string }> {
+        if (details.length === 0) {
+            throw new ParasutError("validation", "createStockUpdate: en az bir kalem gerekli");
+        }
+        const doc = await this.api("POST", "/stock_updates", {
+            op: "createStockUpdate",
+            payload: {
+                data: {
+                    type: "stock_updates",
+                    attributes: {},
+                    relationships: {
+                        details: {
+                            data: details.map(d => ({
+                                type: "stock_update_details",
+                                // MUTLAK atama — Paraşüt stoğu bu değere EŞİTLENİR.
+                                attributes: { new_total_inventory: d.new_total_inventory },
+                                relationships: {
+                                    product: { data: { id: d.product_id, type: "products" } },
+                                    ...(d.warehouse_id
+                                        ? { warehouse: { data: { id: d.warehouse_id, type: "warehouses" } } }
+                                        : {}),
+                                },
+                            })),
+                        },
+                    },
+                },
+            },
+        });
+        return { id: String(asSingle(doc).id ?? "") };
     }
 
     // ── Tahsilat / ödeme durumu ──────────────────────────────────────────────

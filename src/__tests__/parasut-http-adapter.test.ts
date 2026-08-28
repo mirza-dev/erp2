@@ -717,6 +717,92 @@ describe("tahsilat durumu okuma (Faz 14)", () => {
     });
 });
 
+describe("stok mutabakatı uçları (Faz 15)", () => {
+    it("inventory_levels TEKİL 'product' yolundan okunur (spec böyle)", async () => {
+        const { adapter, calls } = makeAdapter([jsonResponse({ data: [
+            { id: "l1", attributes: { stock_count: 42 }, relationships: { warehouse: { data: { id: "w1", type: "warehouses" } } } },
+        ] })]);
+        const levels = await adapter.listInventoryLevels("p1");
+
+        // Diğer uçlar "products" (çoğul); bu uç "product" (tekil).
+        expect(calls[0].url).toContain("/product/p1/inventory_levels");
+        expect(levels).toEqual([{ id: "l1", warehouse_id: "w1", stock_count: 42 }]);
+    });
+
+    it("stok kaydı yoksa boş liste (servis bunu 'kayıt yok' okur)", async () => {
+        const { adapter } = makeAdapter([jsonResponse({ data: [] })]);
+        expect(await adapter.listInventoryLevels("p1")).toEqual([]);
+    });
+
+    it("stock_updates MUTLAK değer gönderir (delta DEĞİL)", async () => {
+        const { adapter, calls } = makeAdapter([jsonResponse({ data: { id: "su1", attributes: {} } })]);
+        await adapter.createStockUpdate([{ product_id: "p1", new_total_inventory: 90 }]);
+
+        expect(bodyOf(calls[0])).toMatchObject({ data: { type: "stock_updates" } });
+        const details = (rels(calls[0]).details as { data: Array<Record<string, unknown>> }).data;
+        expect(details[0].type).toBe("stock_update_details");
+        expect(details[0].attributes).toEqual({ new_total_inventory: 90 });
+        expect(details[0].relationships).toEqual({ product: { data: { id: "p1", type: "products" } } });
+    });
+
+    it("depo verilirse ilişkiye eklenir, verilmezse hiç gönderilmez", async () => {
+        const withWh = makeAdapter([jsonResponse({ data: { id: "s", attributes: {} } })]);
+        await withWh.adapter.createStockUpdate([{ product_id: "p1", new_total_inventory: 5, warehouse_id: "w1" }]);
+        const d1 = (rels(withWh.calls[0]).details as { data: Array<Record<string, unknown>> }).data;
+        expect(d1[0].relationships).toHaveProperty("warehouse");
+
+        const noWh = makeAdapter([jsonResponse({ data: { id: "s", attributes: {} } })]);
+        await noWh.adapter.createStockUpdate([{ product_id: "p1", new_total_inventory: 5 }]);
+        const d2 = (rels(noWh.calls[0]).details as { data: Array<Record<string, unknown>> }).data;
+        expect(d2[0].relationships).not.toHaveProperty("warehouse");
+    });
+
+    it("boş kalem listesi ağa çıkmadan reddedilir", async () => {
+        const fetchImpl = vi.fn();
+        const adapter = new HttpParasutAdapter({
+            getAccessToken: async () => "T", companyId: "1", clientId: "c", clientSecret: "s",
+            fetchImpl: fetchImpl as unknown as typeof fetch,
+        });
+        await expect(adapter.createStockUpdate([])).rejects.toThrow(/en az bir kalem/);
+        expect(fetchImpl).not.toHaveBeenCalled();
+    });
+
+    it("çok kalem tek istekte gider", async () => {
+        const { adapter, calls } = makeAdapter([jsonResponse({ data: { id: "s", attributes: {} } })]);
+        await adapter.createStockUpdate([
+            { product_id: "p1", new_total_inventory: 10 },
+            { product_id: "p2", new_total_inventory: 20 },
+        ]);
+        expect(calls).toHaveLength(1);
+        expect((rels(calls[0]).details as { data: unknown[] }).data).toHaveLength(2);
+    });
+});
+
+describe("mock stok semantiği gerçek API ile aynı", () => {
+    it("stock_updates mock'ta da MUTLAK atar (delta değil)", async () => {
+        const { mockParasutAdapter } = await import("@/lib/parasut");
+        mockParasutAdapter.reset();
+        mockParasutAdapter.setErrorMode(false);
+        mockParasutAdapter.setInventory("p1", 100);
+
+        await mockParasutAdapter.createStockUpdate([{ product_id: "p1", new_total_inventory: 90 }]);
+        expect(await mockParasutAdapter.listInventoryLevels("p1")).toEqual([
+            { id: "lvl_p1", warehouse_id: "wh_default", stock_count: 90 },
+        ]);
+
+        // Delta olsaydı ikinci yazım 80 yapardı; mutlak olduğu için 90 kalır.
+        await mockParasutAdapter.createStockUpdate([{ product_id: "p1", new_total_inventory: 90 }]);
+        const after = await mockParasutAdapter.listInventoryLevels("p1");
+        expect(after[0].stock_count).toBe(90);
+    });
+
+    it("kaydı olmayan üründe boş liste", async () => {
+        const { mockParasutAdapter } = await import("@/lib/parasut");
+        mockParasutAdapter.reset();
+        expect(await mockParasutAdapter.listInventoryLevels("yok")).toEqual([]);
+    });
+});
+
 // ── Sözleşme eşitliği: mock ≡ http ───────────────────────────────────────────
 
 describe("sözleşme eşitliği (mock ≡ http)", () => {
