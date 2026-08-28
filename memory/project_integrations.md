@@ -1,12 +1,43 @@
 ---
 name: Roven — Entegrasyonlar, AI ve Test Altyapısı
-description: Paraşüt mock, AI kolon eşleştirme, health check, test altyapısı ve mock pattern'ler
+description: Paraşüt entegrasyonu (Faz 1-16, gerçek HTTP adapter dahil), AI kolon eşleştirme, health check, test altyapısı
 type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 ## Paraşüt Entegrasyonu
 
-**Durum: Faz 1-10 tamamlandı (2026-04-26) — Faz 11 sırada**
+**Durum: Faz 1-16 KOD OLARAK TAMAMLANDI (2026-08-29). Canlı doğrulama bekliyor.**
+
+### Faz 12-16 (2026-08-29 — muhasebe/vergilendirme kapanışı)
+Kullanıcı: "stoklar siparişler satışlar vs her şey muhasebe ve vergilendirme için
+Paraşüt ile entegre, hatasız eksiksiz akmalı."
+
+**Kritik tespit:** Faz 1-11 olgundu ama **fişi takılı değildi** —
+`getParasutAdapter()` `PARASUT_USE_MOCK=false` iken THROW ediyordu; gerçek API'ye
+giden TEK SATIR kod yoktu. Ayrıca alış tarafı (indirilecek KDV), tahsilat ve stok
+girişi tamamen eksikti.
+
+| Faz | Commit | Özet |
+|-----|--------|------|
+| 12 | `21497bf` | **Gerçek HTTP adapter** (`parasut-http-adapter.ts`, JSON:API). Spec'ten 4 düzeltme: e-fatura ilişki anahtarı `invoice` / e-arşiv `sales_invoice` (ASİMETRİK) · e-belge `issue_date` readOnly → gönderilmez · `internet_sale` OBJE (boolean 422 verirdi) · irsaliye kalemleri `stock_movements` ilişkisi. **İmport döngüsü** `serviceParasutOAuthRefresh(adapter)` imzasıyla kaynakta kırıldı. Ayrıca `exchange_rate` (TCMB alış) + `order_no` boşluğu kapandı. 5930 test |
+| 13 | `7adc040` | **Alış faturası** — mig.107. `vendors.parasut_contact_id`+lease · PO `parasut_*` · **`purchase_order_lines.vat_rate`** (KDV yalnız başlıktaydı, karışık oranda yanlış fatura) · **`vendor_invoice_no/date`** (KDV indiriminin resmî künyesi, mal kabulde girilir). Tetik yalnız `received` (kısmi kabulde gider yazmak yanlış). `listPurchaseBills`'te invoice_no filtresi YOK → tedarikçi bazlı sayfalama + açıklamada PO no eşleşmesi. 5995 test |
+| 14 | `0ba37ef` | **Tahsilat geri okuma** — mig.108. `payment_status`/`remaining`/`remaining_try` · poll CRON (claim yok, `paid` terminal) · **Açık Alacak KPI'ı GERİ GELDİ** (2026-06'da proxy olduğu için kaldırılmıştı; artık Paraşüt gerçeği) · `payment_overdue` uyarısı. Toplama YALNIZ TL üzerinden. 6045 test |
+| 15 | `26333b5` | **Stok mutabakatı** — `stock_updates` MUTLAK yazar (delta değil) → olay tekrarı yerine mutabakat. **Varsayılan yalnız-rapor**; yazma `PARASUT_STOCK_AUTOCORRECT=true` ile. `inventory_levels` boş → `null` (0 DEĞİL). 6083 test |
+| 16 | `1cf8ee3` | **`scripts/parasut-gate.ts`** (`npm run parasut:gate [--write]`) — stok invariant'ını gerçek API'de ÖLÇER, ihlalde exit 1. **Kapalı-teslim kanıtı** testi. `docs/parasut-golive-runbook.md` (mali müşavir belge eşleme tablosu dahil). 6100 test |
+
+**Teslim yapılandırması:** `PARASUT_ENABLED=false` + `PARASUT_USE_MOCK=true` →
+kapalı teslim (kullanıcı kararı). İKİ anahtar da gerekli.
+
+**Kullanıcı tarafı kalan:** Paraşüt API başvurusu (`destek@parasut.com`) + redirect
+URI kaydı · **mig.107 + 108 APPLY** · `npm run parasut:gate -- --write` (deneme
+şirketinde) · anahtarları açma. Sıra: `docs/parasut-golive-runbook.md`.
+
+**Bilinçli kapsam dışı (v1):** iade/iade faturası · kısmi sevkiyat faturası ·
+çift yönlü senkron · çok depolu stok · e-Defter/BA-BS · ihracat `item_type: export`.
+
+---
+
+### Faz 1-11 (2026-04, mock altyapısı)
 
 ### Tamamlanan Fazlar
 | Faz | Özet | Test |
@@ -23,13 +54,13 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 | 10 | E-belge: idempotent, recovery 1/2, type detection (VKN normalize), poll CRON, idempotent guards | 1914 |
 
 ### Mimari (plan: parasut_plan.md)
-- `ParasutAdapter` interface (`parasut-adapter.ts`) — gerçek HTTP adapter en son eklenecek
+- `ParasutAdapter` interface (`parasut-adapter.ts`) — **gerçek adapter Faz 12'de eklendi** (`parasut-http-adapter.ts`)
 - `MockParasutAdapter` (`parasut.ts`) — in-memory, tri-state error injection, invariant assertions
 - `parasut-constants.ts` — ParasutStep, ParasutErrorKind, ALERT_ENTITY_* UUID'leri
 - `parasut-api-call.ts` — parasutApiCall() wrapper (429 retry, structured log)
 - `parasut-service.ts` — serviceEnsureParasutContact (TTL lease mutex), classifyAndPatch, markStepDone, checkAuthAlertThreshold
 - `parasut-oauth.ts` — getAccessToken, CAS lease
-- **`PARASUT_ENABLED=true`** → sync aktif; boş/false → erken döner
+- **`PARASUT_ENABLED=true` VE `PARASUT_USE_MOCK=false`** → gerçek sync; biri eksikse ölü yol
 
 ### DB alanları (migration 039)
 - `parasut_oauth_tokens` tablosu (singleton lease, CAS)

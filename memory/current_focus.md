@@ -7,15 +7,95 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
-## ▶ SIRADAKİ İŞ (compact sonrası buradan başla) — Faz B #8: `Input`/`PageHeader`/`SectionHeader`/`NavLink`/`Stat` + drawer/form
+## ▶ SIRADAKİ İŞ (compact sonrası buradan başla)
 
-**Bağlam:** Faz B'nin **liste tarafı BİTTİ** — 7 liste yüzeyinin tamamı `Card`+`DataTable`'a taşındı (Vendors → PurchaseOrders → Customers → Orders → Quotes → 3 settings tablosu → **products**). Repoda ham `<table>` tutan tek kalan yüzey `src/components/dashboard/StockDataGrid.tsx` (theme-system testinin "temsilci tablolar" döngüsünde yalnız o kaldı) — dönüştürülecekse ayrı değerlendirilmeli (grid, liste değil).
+**Bağlam:** Fabrika teslimine ~1,5 hafta. Bu oturumda **Paraşüt epic'i (Faz 12-16)
+kod olarak tamamlandı** — 5 commit, 6100 test, hepsi push'lu.
 
-**Sıradaki dilim:** `src/components/ui/` altına kalan atom'lar — `Input` (100+ dosyada tekrarlayan inline input stili; products'taki `modalInputStyle` tipik örnek), `PageHeader`, `SectionHeader`, `NavLink`, `Stat`. Ardından drawer/form konsolidasyonu. Detay [[project_frontend_renewal]].
+### Paraşüt muhasebe/vergilendirme kapanışı ✅ (`21497bf` → `1cf8ee3`)
 
-**Kalıp (liste dönüşümlerinden öğrenilen):** ham `<table>` + yerel thStyle/tdStyle (+varsa `hoveredId`) → `<Card><DataTable columns rows rowKey [onRowClick] [rowAriaLabel] [minWidth] [rowStyle] emptyMessage [footer]/></Card>`. Hover globals.css `.erp-data-table` devralır; hover-reveal öğeler `.row-reveal`; per-satır stil → `rowStyle?(row)`; **satır klavye erişimi `onRowClick` ile otomatik gelir** (tabIndex+Enter/Space), erişilebilir ad `rowAriaLabel?(row)`. `cellStyle` kolona STATİKTİR — satır bazlı koşullu renk hücre içeriğinde `<span style>` ile verilir. DataTable ortak stili `whiteSpace:nowrap` VERMEZ — gerekiyorsa kolon bazında `headerStyle`/`cellStyle` ile. checkbox/aksiyon hücreleri `onClick stopPropagation`. `.badge` CSS-class rozetleri KORUNUR. Davranış/RBAC/demo/veri/route/AI overlay değişmez; migration yok.
+**Kök tespit:** Faz 1-11 olgundu ama **fişi takılı değildi** —
+`getParasutAdapter()` gerçek modda THROW ediyordu; entegrasyonun tamamı
+in-memory mock'a karşı çalışıyordu. Alış tarafı (indirilecek KDV), tahsilat ve
+stok girişi ise hiç yoktu.
 
-**Akış:** dönüştür → source-lock testi VARSA güncelle (niyet korunur, kilit gevşetilmez) → tsc/lint/vitest/build yeşil → commit (`.claude/settings.local.json` STAGE ETME; sonu `Co-Authored-By: Claude Opus 5 <noreply@anthropic.com>` + `Claude-Session:`; react-doctor hook bulguları pre-existing ise `--no-verify` + doğrula/logla) → `git -C ../proje-codex reset --hard main` → push both (codex ff) → SHA+tree+divergence doğrula → memory güncelle.
+| Faz | Commit | Ne kapandı |
+|---|---|---|
+| 12 | `21497bf` | Gerçek HTTP adapter. Spec'ten 4 düzeltme (mock asla yakalayamazdı): e-fatura `invoice` / e-arşiv `sales_invoice` asimetrisi · e-belge `issue_date` readOnly · `internet_sale` obje · irsaliye kalemleri `stock_movements`. İmport döngüsü imza değişikliğiyle kırıldı. `exchange_rate` (TCMB alış) + `order_no` gönderilmiyordu → kapandı. |
+| 13 | `7adc040` | Alış faturası (mig.107). İki domain boşluğu: satır bazlı KDV (başlıkta tek oran vardı) + tedarikçi fatura künyesi (KDV indiriminin resmî kimliği). Yalnız `received` tetikler. |
+| 14 | `0ba37ef` | Tahsilat geri okuma (mig.108) + **Açık Alacak KPI'ı geri geldi** (proxy değil, Paraşüt gerçeği) + `payment_overdue`. |
+| 15 | `26333b5` | Stok mutabakatı. `stock_updates` MUTLAK yazar → olay tekrarı yerine mutabakat. Varsayılan yalnız-rapor. |
+| 16 | `1cf8ee3` | `npm run parasut:gate` — stok invariant'ını gerçek API'de ölçer. Kapalı-teslim kanıtı testi. `docs/parasut-golive-runbook.md`. |
+
+**Teslim:** `PARASUT_ENABLED=false` + `PARASUT_USE_MOCK=true` → kapalı.
+
+### ⏳ AÇIK (kullanıcı tarafı)
+1. **Paraşüt API başvurusu** — `destek@parasut.com` + redirect URI kaydı.
+   Uzun teslim süreli, **şimdi başlatılmalı**.
+2. **mig.107 + 108 APPLY** (Studio) → `npx tsx scripts/check-migrations.ts`
+3. `npm run parasut:gate -- --write` deneme şirketinde — **stok invariant'ı
+   burada kanıtlanır** (plandaki tek doğrulanmamış varsayımdı).
+4. Devredenler: `ANTHROPIC_API_KEY` yenileme · mig.106 APPLY · 25 test kaydı
+   temizliği · Coolify/Hetzner deploy (~2026-09-07) · görsel teyit.
+
+---
+
+### Önceki oturum: 3 blok iş (2026-08-24, `c7ff8d0`)
+
+
+**Bağlam:** Fabrika teslimine ~2 hafta. Bu oturumda üç blok iş bitti; hepsi push'lu.
+
+### 1) Fabrika teslim denetimi — 8 bulgu ✅ (`d85d780`)
+B1 cari ölü sayaçlar (okuma-anında hesap, PB'ler ayrı) · B2 teklif geçerliliği (**mig.106**) ·
+B3 4 başlıksız rota + tarama guard'ı · A1 teklif stok uyarısı · A2 geçmiş üretim düzeltme ·
+A3 tedarikçi detay paneli · A4 22 erişilemez pasif ürün · A5 cari pasife alma.
+Araçlar: `npm run check:chains` (4/4 ✅) · `npm run find-test-data` (25 şüpheli).
+
+### 2) AI/Uyarılar tutarsızlığı — 5 kusur ✅ (`b4f06d4`)
+**C1** "AI Öner" butonu CRON_PATHS'te olduğu için HER tıkta 401 alıyordu → ALWAYS_PUBLIC'e
+alındı, route `CRON_SECRET VEYA oturum+view_alerts` doğruluyor · **C2 (kök neden)** kural
+taraması `stock_risk`'i kaynak ayırmadan kapatıyordu; AI tam da kurala göre SAĞLIKLI ürünlere
+yazar → her bulgu 6 saniyede siliniyordu (102 AI uyarısının tamamı `stock_recovered`, tek
+üründe 40 tekrar) → `BatchResolveEntry.source` filtresi, kural yalnız `system`, AI yalnız `ai`
+kapatır · **C3** `degraded` dışarı taşınmıyordu, UI yeşil "0 öneri oluşturuldu" basıyordu ·
+**C4** AI 2 aydır koşmamıştı → `GET /api/alerts/ai-status` + "Son AI analizi: X" + 24s'ten
+eskiyse sayfa açılışında bir kez oto-tetik · **C5** Öneriler↔Uyarılar çapraz linki.
+**CANLI TEŞHİS: `ANTHROPIC_API_KEY` GEÇERSİZ** (`401 invalid x-api-key`) — AI'ın ölü olmasının
+gerçek sebebi. Kanıt: sentetik AI uyarısı yazıldı → tarama koştu → `status: open` KALDI.
+
+### 3) Frontend tutarlılık turu ✅ (`1d4cac5` · `0a77ba2` · `c7ff8d0`)
+**Dilim 1** 19 `inputStyle` sabitinin 13'ü eski token'daydı (koyu temada görünmez, AYDINLIKTA
+farklı) → 11'i ortak `fieldStyle(size)`'a bağlandı (JSX'e hiç dokunulmadı); 2'si bilinçli
+istisna (alerts/NoteFormModal'ın `1px + bg-primary` yüzey-üstü dili).
+**Dilim 3** Üretim Girişi mobil: sabit genişlikler (600/480/460px) yalnız geniş ekranda; dar
+ekranda giriş kalemleri KART listesi; `inputMode="numeric"`; SKU/Not gizlenince bilgi ürün
+adının altına iner. YENİ `useIsMobile` hook'u (3 dosyadaki kopya birleşti). Paraşüt sıfır-flaşı
+düzeldi.
+**Dilim 4** YENİ `PageHeader` — 9 liste sayfası İKİ ayrı başlık kalıbındaydı (20px `<h1>` vs
+**14px `<div>`**; ikinci grupta hiç `<h1>` yoktu). 7 sayfa dönüştü, 3'ünün başlığı görünür
+şekilde büyüdü. Garanti artık `ui/page-header.test.tsx`'te render seviyesinde.
+**Dilim 2 İPTAL — ölçüm hatasıydı:** "29 sayfa boş açılıyor" yanlıştı; 26'sı `"use client"`
+(orada `loading.tsx` çalışmaz) ve 13'ünde sayfa-içi yükleme durumu ZATEN vardı. Gerçek boşluk
+tek dosyaydı (parasut), o düzeltildi.
+
+**AÇIK — KULLANICI TARAFI:**
+1. **`ANTHROPIC_API_KEY` yenile** — AI'ın çalışması buna bağlı (kod hazır, dürüstçe raporluyor)
+2. **mig.106 APPLY** (`company_settings.quote_validity_days`) — uygulanmadan sistem çalışır
+3. **25 test kaydı temizliği** (`npm run find-test-data`) · **8 MANUAL migration SQL'i**
+4. **Görsel teyit yapılamadı** — Chrome eklentisi oturum ortasında koptu ve dönmedi. Aydınlık
+   temada form ekranları, 390px'te Üretim Girişi, 7 sayfanın yeni başlığı gözle görülmedi
+   (test+build yeşil).
+
+**SIRADAKİ AI İŞİ (öneri):** kalan ham `<table>` yüzeyleri DataTable'a (products/aging ·
+settings/product-types/[id] · SupplierPricesPanel · StockDataGrid) — belge/baskı tabloları
+(QuoteDocument/RfqDocument/PurchaseOrderDocument/DashboardReport) ve form satır-editörleri
+(QuoteForm/OrderForm) KAPSAM DIŞI. Detay [[project_frontend_renewal]].
+
+**Akış:** düzelt → source-lock testi VARSA güncelle (niyet korunur, kilit gevşetilmez) →
+tsc/lint/vitest/build yeşil → commit (`.claude/settings.local.json` STAGE ETME;
+`Co-Authored-By: Claude Opus 5` + `Claude-Session:`; react-doctor bulguları pre-existing ise
+`--no-verify` + logla) → `git -C ../proje-codex reset --hard main` → push both → SHA+tree+
+divergence doğrula → memory güncelle.
 
 ---
 
