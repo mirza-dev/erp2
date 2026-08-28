@@ -181,11 +181,6 @@ describe("middleware — demo mode blocks sensitive write endpoints", () => {
 
     // CRON paths — middleware returns 401 (CRON_SECRET required), not 403
     // Demo mode does not apply: CRON paths are checked before user/demo state
-    it("POST /api/alerts/ai-suggest → 401 in demo mode (CRON_SECRET required)", async () => {
-        const res = await middleware(makeRequest("/api/alerts/ai-suggest", { method: "POST", cookies: DEMO_COOKIE }));
-        expect(res.status).toBe(401);
-    });
-
     it("POST /api/parasut/sync-all → 401 in demo mode (CRON_SECRET required)", async () => {
         const res = await middleware(makeRequest("/api/parasut/sync-all", { method: "POST", cookies: DEMO_COOKIE }));
         expect(res.status).toBe(401);
@@ -199,6 +194,17 @@ describe("middleware — demo mode blocks sensitive write endpoints", () => {
     // /api/alerts/scan is in ALWAYS_PUBLIC — middleware passes through, route handles own auth
     it("POST /api/alerts/scan → 200 from middleware (route manages own auth via CRON_SECRET or session)", async () => {
         const res = await middleware(makeRequest("/api/alerts/scan", { method: "POST", cookies: DEMO_COOKIE }));
+        expect(res.status).toBe(200);
+    });
+
+    // 2026-08-24: ai-suggest CRON_PATHS'ten ALWAYS_PUBLIC'e taşındı — "AI Öner"
+    // butonu tarayıcıdan çağırıyor ama Bearer token gönderemiyordu, her tık 401'di.
+    // Demo koruması KAYBOLMADI, katman değişti: middleware geçirir, route
+    // `resolveAuthContext` ile oturum arar → demo kullanıcısının oturumu yok → 401.
+    // Route seviyesindeki bu kanıt: alert-action-routes.test.ts
+    // "oturum YOK + cron token YOK → 401".
+    it("POST /api/alerts/ai-suggest → 200 from middleware (route manages own auth, scan ile aynı sınıf)", async () => {
+        const res = await middleware(makeRequest("/api/alerts/ai-suggest", { method: "POST", cookies: DEMO_COOKIE }));
         expect(res.status).toBe(200);
     });
 

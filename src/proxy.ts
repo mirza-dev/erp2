@@ -17,12 +17,16 @@ import { hasInternalOperatorAccess } from "@/lib/auth/internal-access";
 // Not: /api/seed kendi içinde CRON_SECRET veya session kontrolü yapar
 // /api/alerts/scan is listed here because it handles its own auth (CRON_SECRET OR session)
 // /api/quotes/shared: müşteri teklif linki (login'siz) — kendi HMAC token doğrulaması var
-const ALWAYS_PUBLIC = ["/api/health", "/api/auth/demo", "/api/seed", "/api/alerts/scan", "/api/ai/purchase-copilot", "/api/parasut/oauth/callback", "/api/email/webhooks/resend", "/auth/callback", "/api/quotes/shared"];
+// /api/alerts/ai-suggest: /api/alerts/scan ile AYNI sebeple burada (2026-08-24) —
+// Uyarılar sayfasındaki "AI Öner" butonu bunu tarayıcıdan çağırıyor ama CRON_PATHS'te
+// olduğu için her tık 401 alıyordu; AI bulguları kullanıcıya HİÇ ulaşmıyordu.
+// Route kendi içinde CRON_SECRET OR (oturum + view_alerts) doğrular.
+const ALWAYS_PUBLIC = ["/api/health", "/api/auth/demo", "/api/seed", "/api/alerts/scan", "/api/alerts/ai-suggest", "/api/ai/purchase-copilot", "/api/parasut/oauth/callback", "/api/email/webhooks/resend", "/auth/callback", "/api/quotes/shared"];
 
 // Sadece CRON_SECRET Bearer token ile erişilir — session bypass YOK
-// Not: /api/alerts/scan buraya dahil değil — kendi içinde session OR CRON_SECRET kontrolü yapar
+// Not: /api/alerts/scan ve /api/alerts/ai-suggest buraya dahil DEĞİL — ikisi de
+// kendi içinde session OR CRON_SECRET kontrolü yapar (UI butonları var).
 const CRON_PATHS = [
-    "/api/alerts/ai-suggest",
     "/api/parasut/sync-all",
     "/api/parasut/poll-e-documents",
     "/api/orders/check-shipments",

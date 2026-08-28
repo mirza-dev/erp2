@@ -293,3 +293,32 @@ export function eventLabel(a: CalendarAlert): string {
     if (a.orderCode) return a.orderCode;
     return (a.title || "").replace(/^[^:]*:\s*/, "") || a.type;
 }
+
+/**
+ * "Son AI analizi" için insan-okur göreli süre.
+ *
+ * 2026-08-24: AI bulgu üretimi iki aydır hiç koşmamıştı ve boş AI sekmesi
+ * "AI bir şey bulamadı" gibi görünüyordu. Ham ISO tarih yerine "2 ay önce"
+ * demek, sorunun kendisini ekranda görünür kılar.
+ */
+export function formatRelativeAiRun(iso: string, now: Date = new Date()): string {
+    const then = new Date(iso).getTime();
+    if (!Number.isFinite(then)) return "—";
+    const diffMs = now.getTime() - then;
+    if (diffMs < 0) return "az önce";
+
+    const mins = Math.floor(diffMs / 60000);
+    if (mins < 1) return "az önce";
+    if (mins < 60) return `${mins} dakika önce`;
+
+    const hours = Math.floor(mins / 60);
+    if (hours < 24) return `${hours} saat önce`;
+
+    const days = Math.floor(hours / 24);
+    if (days === 1) return "dün";
+    if (days < 30) return `${days} gün önce`;
+
+    const months = Math.floor(days / 30);
+    if (months < 12) return `${months} ay önce`;
+    return `${Math.floor(months / 12)} yıl önce`;
+}

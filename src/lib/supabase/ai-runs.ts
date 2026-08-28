@@ -38,3 +38,28 @@ export function logAiRun(params: LogAiRunParams): void {
         }
     })();
 }
+
+/**
+ * Bir AI özelliğinin SON BAŞARILI koşu zamanı (ISO) — yoksa null.
+ *
+ * 2026-08-24: AI yüzeyleri iki aydır boştu ve kullanıcı bunu hiçbir yerden
+ * göremiyordu ("tutarsız" hissinin bir kaynağı). Uyarılar sayfası bu değeri
+ * gösterir; "son analiz 2 ay önce" tek bakışta durumu anlatır. Aynı değer
+ * günlük otomatik koşunun da kapısıdır (24 saatten eskiyse tetikle).
+ */
+export async function dbGetLastAiRunAt(feature: AiFeature): Promise<string | null> {
+    try {
+        const supabase = createServiceClient();
+        const { data } = await supabase
+            .from("ai_runs")
+            .select("created_at")
+            .eq("feature", feature)
+            .order("created_at", { ascending: false })
+            .limit(1)
+            .maybeSingle();
+        return (data?.created_at as string | undefined) ?? null;
+    } catch {
+        // Okuma hatası akışı kırmamalı — bilinmiyor = null (UI "—" gösterir).
+        return null;
+    }
+}

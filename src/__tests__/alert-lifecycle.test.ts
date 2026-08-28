@@ -256,7 +256,9 @@ describe("AI regenerasyon — entity-bağlı dedup, churn yok", () => {
 
         const result = await serviceGenerateAiAlerts();
 
-        expect(result).toEqual({ aiAvailable: true, dismissed: 0, created: 0, updated: 0, summary: "" });
+        // degraded ARTIK dışarı taşınıyor (2026-08-24): UI "0 öneri oluşturuldu"
+        // yeşil toast'ı yerine "AI cevap veremedi" uyarısı basabilsin diye.
+        expect(result).toEqual({ aiAvailable: true, dismissed: 0, created: 0, updated: 0, degraded: true, summary: "" });
         expect(mockDbBatchResolveAlerts).not.toHaveBeenCalled();
         expect(mockDbUpdateAlertStatus).not.toHaveBeenCalled();
         expect(mockDbCreateAlert).not.toHaveBeenCalled();
@@ -270,8 +272,10 @@ describe("AI regenerasyon — entity-bağlı dedup, churn yok", () => {
 
         const result = await serviceGenerateAiAlerts();
 
+        // source: "ai" ZORUNLU (2026-08-24): kaynak filtresi olmadan aynı ürün için
+        // açılmış bir KURAL uyarısı da (tip aynı: stock_risk) silinirdi.
         expect(mockDbBatchResolveAlerts).toHaveBeenCalledWith([
-            { type: "stock_risk", entityId: "prod-1", reason: "ai_finding_cleared" },
+            { type: "stock_risk", entityId: "prod-1", reason: "ai_finding_cleared", source: "ai" },
         ]);
         expect(result.dismissed).toBe(1);
         // ESKİ davranış geri gelmesin: toptan source-dismiss çağrılmaz

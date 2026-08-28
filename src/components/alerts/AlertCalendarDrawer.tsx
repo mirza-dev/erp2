@@ -114,6 +114,7 @@ export function AlertCalendarDrawer({
     // ── order_shortage: İLGİLİ SİPARİŞLER ──
     const [shortageRows, setShortageRows]       = useState<ShortageDetailRow[] | null>(null);
     const [shortageTotal, setShortageTotal]     = useState(0);
+    const [linkedRec, setLinkedRec] = useState<{ id: string; title: string } | null>(null);
     const [shortageLoading, setShortageLoading] = useState(false);
     const [shortageError, setShortageError]     = useState<string | null>(null);
 
@@ -154,6 +155,23 @@ export function AlertCalendarDrawer({
         })();
         return () => { cancelled = true; };
     }, [alert.type, entityId]);
+
+    // Bu ürün için aktif satın alma önerisi var mı (çapraz link, 2026-08-24).
+    // Öneriler ve Uyarılar aynı ürün hakkında birbirinden habersiz kayıt
+    // üretiyordu; kullanıcı iki ekranda iki ayrı gerçek görüyordu.
+    useEffect(() => {
+        if (alert.entityType !== "product" || !entityId) return;
+        let cancelled = false;
+        void (async () => {
+            try {
+                const res = await fetch(`/api/products/${entityId}/recommendation`);
+                if (!res.ok) return;   // yetki yok / hata → link gösterme, sessiz
+                const data = await res.json() as { recommendation: { id: string; title: string } | null };
+                if (!cancelled) setLinkedRec(data.recommendation);
+            } catch { /* çapraz link opsiyonel — drawer normal çalışır */ }
+        })();
+        return () => { cancelled = true; };
+    }, [alert.entityType, entityId]);
 
     const handleExtend = async () => {
         if (isDemo || extending || !entityId) return;
@@ -478,9 +496,25 @@ export function AlertCalendarDrawer({
                                         {syncRetrying ? "Yeniden deneniyor..." : "Yeniden Dene"}
                                     </Button>
                                 )}
-                                {links.map((l) => (
-                                    <ButtonLink key={l.href} href={l.href} variant={l.variant} size="md" fullWidth>{l.label}</ButtonLink>
-                                ))}
+                                {/* Çapraz link (2026-08-24): bu ürün için zaten bir satın alma
+                                    önerisi varsa genel "Satın Alma Planla" yerine ONA götür.
+                                    Öneriler ve Uyarılar aynı ürün hakkında birbirinden habersiz
+                                    kayıt üretiyordu; kullanıcı iki ekranda iki gerçek görüyordu. */}
+                                {linkedRec && (
+                                    <ButtonLink
+                                        href="/dashboard/purchase/suggested"
+                                        variant="primary"
+                                        size="md"
+                                        fullWidth
+                                    >
+                                        Bu ürün için satın alma önerisi var →
+                                    </ButtonLink>
+                                )}
+                                {links
+                                    .filter(l => !(linkedRec && l.href === "/dashboard/purchase/suggested"))
+                                    .map((l) => (
+                                        <ButtonLink key={l.href} href={l.href} variant={l.variant} size="md" fullWidth>{l.label}</ButtonLink>
+                                    ))}
                                 {p && alert.entityId && onDismissProduct && (
                                     <Button
                                         variant="ghost" size="md" fullWidth disabled={isDemo}

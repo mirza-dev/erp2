@@ -1,16 +1,39 @@
 import { NextRequest, NextResponse } from "next/server";
-import { requireCronSecret } from "@/lib/auth/cron-guard";
 import { serviceGenerateAiAlerts } from "@/lib/services/alert-service";
 import { handleApiError } from "@/lib/api-error";
 import { createServiceClient } from "@/lib/supabase/service";
+import { resolveAuthContext, requirePermissionFor } from "@/lib/auth/role-guard";
 
+/**
+ * POST /api/alerts/ai-suggest
+ *
+ * Auth: CRON_SECRET Bearer token (zamanlanmış koşu) **VEYA** oturum + `view_alerts`
+ * (Uyarılar sayfasındaki "AI Öner" butonu).
+ *
+ * 2026-08-24 — ÖNCEDEN YALNIZ CRON'DU ve bu, AI yüzeyini fiilen ölü bırakıyordu:
+ * uç hem `proxy.ts` CRON_PATHS'te hem route içinde `requireCronSecret` ile
+ * korunuyordu, tarayıcı Bearer token göndermediği için "AI Öner" her tıkta 401
+ * alıyor, UI da bunu "AI kullanılamıyor" durumuna çeviriyordu. Kardeş uç
+ * `/api/alerts/scan` bilinçli olarak çift kimlikli yapılmıştı ("Tara" butonu
+ * çalışsın diye); bu uç aynı muameleyi hiç görmemişti.
+ *
+ * Scan'den bir tık sıkı: yalnız oturum değil `view_alerts` de aranır — bu çağrı
+ * dış API'ye para harcar ve alert yazar.
+ */
 export async function POST(req?: NextRequest) {
-    // Denetim D4 (2026-06): route-içi CRON_SECRET (derinlemesine savunma —
-    // proxy CRON_PATHS tek hat olmasın). `req` opsiyonel: unit testler POST()
-    // ile çağırır (stock-risk guardAiRoute kalıbı); prod'da Next her zaman geçirir.
+    // `req` opsiyonel: unit testler POST() ile çağırır (stock-risk guardAiRoute
+    // kalıbı); prod'da Next her zaman geçirir.
     if (req) {
-        const guard = requireCronSecret(req);
-        if (guard) return guard;
+        const secret = process.env.CRON_SECRET;
+        const hasCronSecret = !!secret && req.headers.get("authorization") === `Bearer ${secret}`;
+        if (!hasCronSecret) {
+            const ctx = await resolveAuthContext();
+            if (!ctx.user) {
+                return NextResponse.json({ error: "Yetkisiz erişim." }, { status: 401 });
+            }
+            const guard = requirePermissionFor(ctx, "view_alerts");
+            if (guard) return guard;
+        }
     }
 
     const supabase = createServiceClient();

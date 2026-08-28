@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useCallback, useMemo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef } from "react";
 import { mapProduct } from "@/lib/api-mappers";
 import type { Product } from "@/lib/mock-data";
 import { useToast } from "@/components/ui/Toast";
@@ -13,6 +13,7 @@ import { AiUnavailableBanner } from "@/components/ai/AiUnavailableBanner";
 import { ALERT_TYPE_LABEL } from "@/lib/alert-labels";
 import {
     ALERT_CLASSES, matchesAlertClass, expandAlertOccurrences, getOccurrencesForDate, getCalendarStats,
+    formatRelativeAiRun,
     getMonthDays, timeFromISO, type CalendarAlert, type Occurrence,
 } from "@/lib/alert-calendar";
 import { getCalendarNotesForDate, type CalendarNote } from "@/lib/calendar-notes";
@@ -118,6 +119,8 @@ export default function AlertsPage() {
     const [refreshing, setRefreshing] = useState(false);
     const [aiGenerating, setAiGenerating] = useState(false);
     const [aiUnavailable, setAiUnavailable] = useState<{ reason: "not_configured" | "error" } | null>(null);
+    // Son BAŞARILI AI analizi — undefined = henüz okunmadı, null = hiç koşmamış.
+    const [aiLastRunAt, setAiLastRunAt] = useState<string | null | undefined>(undefined);
     const [syncRetrying, setSyncRetrying] = useState<string | null>(null);
 
     // Takvim durumu
@@ -291,9 +294,27 @@ export default function AlertsPage() {
             if (!res.ok) throw new Error(String(res.status));
             const data = await res.json();
             if (!data.aiAvailable) { setAiUnavailable({ reason: "not_configured" }); return; }
+            // AI çağrısı patladıysa "0 öneri oluşturuldu" YEŞİL toast'ı yanıltıcıydı
+            // (2026-08-24): kullanıcı "bulgu yok" ile "AI cevap veremedi"yi ayırt
+            // edemiyordu. Servis artık `degraded` taşıyor; mevcut bulgulara
+            // dokunulmadığı da açıkça söylenir.
+            if (data.degraded) {
+                setAiUnavailable({ reason: "error" });
+                toast({ type: "warning", message: "AI şu an cevap veremedi — mevcut bulgular korundu" });
+                return;
+            }
             setAiUnavailable(null);
             await refetch();
-            toast({ type: "success", message: `${data.created} AI önerisi oluşturuldu` });
+            const parts = [`${data.created} yeni`];
+            if (data.updated > 0) parts.push(`${data.updated} güncellendi`);
+            if (data.dismissed > 0) parts.push(`${data.dismissed} kapandı`);
+            toast({
+                type: data.created + data.updated > 0 ? "success" : "info",
+                message: data.created + data.updated === 0
+                    ? "AI analizi tamamlandı — yeni bulgu yok"
+                    : `AI bulguları: ${parts.join(" · ")}`,
+            });
+            setAiLastRunAt(new Date().toISOString());
         } catch (err) {
             if (err instanceof Error && err.message === "409") {
                 toast({ type: "warning", message: "AI analiz zaten devam ediyor" });
@@ -304,6 +325,37 @@ export default function AlertsPage() {
             setAiGenerating(false);
         }
     };
+
+    // ── AI durumu + günlük otomatik analiz ───────────────────────────────────
+    // AI bulgu üretimi YALNIZ cron'a bağlıydı; prod ayakta olmadığı ve buton da
+    // 401 aldığı için iki aydır hiç koşmamıştı (son koşu 2026-06-24) ve kullanıcı
+    // bunu hiçbir yerden göremiyordu. Artık: durum okunur, gösterilir ve son
+    // analiz 24 saatten eskiyse sayfa açılışında BİR KEZ tetiklenir.
+    // Eşzamanlılık zaten `try_acquire_ai_suggest_lock` ile güvende (409 → sessiz).
+    const aiAutoRunRef = useRef(false);
+    useEffect(() => {
+        if (isDemo) return;
+        let alive = true;
+        (async () => {
+            try {
+                const res = await fetch("/api/alerts/ai-status");
+                if (!res.ok || !alive) return;
+                const st = await res.json() as { aiAvailable: boolean; lastRunAt: string | null };
+                if (!alive) return;
+                setAiLastRunAt(st.lastRunAt);
+                if (!st.aiAvailable) { setAiUnavailable({ reason: "not_configured" }); return; }
+
+                const stale = !st.lastRunAt ||
+                    Date.now() - new Date(st.lastRunAt).getTime() > 24 * 60 * 60 * 1000;
+                if (stale && !aiAutoRunRef.current) {
+                    aiAutoRunRef.current = true;   // sekme başına tek deneme
+                    void handleAiSuggest();
+                }
+            } catch { /* durum okunamadı — sayfa normal çalışır */ }
+        })();
+        return () => { alive = false; };
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [isDemo]);
 
     const patchStatus = (alertId: string, status: AlertWithDueMeta["status"]) =>
         setRawAlerts((prev) => prev.map((a) => (a.id === alertId ? { ...a, status } : a)));
@@ -435,6 +487,21 @@ export default function AlertsPage() {
                     onClose={() => setAiUnavailable(null)}
                     style={{ marginBottom: "12px" }}
                 />
+            )}
+
+            {/* AI analizi ne zaman koştu — boş bir AI sekmesi ile "AI iki aydır hiç
+                çalışmadı" durumu birbirine karışmasın (2026-08-24). */}
+            {aiLastRunAt !== undefined && !aiUnavailable && (
+                <div style={{
+                    fontSize: "11.5px", color: "var(--text-tertiary)",
+                    marginBottom: "10px", display: "flex", alignItems: "center", gap: "6px",
+                }}>
+                    <span aria-hidden>✦</span>
+                    {aiLastRunAt
+                        ? `Son AI analizi: ${formatRelativeAiRun(aiLastRunAt)}`
+                        : "AI analizi henüz hiç çalışmadı"}
+                    {aiGenerating && <span style={{ color: "var(--accent-text)" }}>· analiz sürüyor…</span>}
+                </div>
             )}
 
             <div

@@ -186,9 +186,17 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
                 if (alert) created++;
             }
         } else {
-            // Stock is healthy — resolve any open stock alerts
-            toResolve.push({ type: "stock_critical", entityId, reason: "stock_recovered" });
-            toResolve.push({ type: "stock_risk", entityId, reason: "stock_recovered" });
+            // Stok kurala göre sağlıklı → KURALIN kendi stok uyarılarını kapat.
+            //
+            // `source: "system"` KRİTİK (2026-08-24): bu filtre olmadan aynı
+            // çağrı AI bulgularını da siliyordu. AI, tanımı gereği kurala göre
+            // sağlıklı ürünlere yazar ("640 adet var ama 60 gün lead-time için
+            // 600 gerekiyor, min 150 yanlış") → her AI bulgusu bir sonraki
+            // taramada ölüyordu. Canlı iz: 102 AI uyarısının TAMAMI
+            // "stock_recovered", medyan ömür 6 saniye, tek üründe 40 tekrar.
+            // AI kendi bayatlayan bulgusunu `ai_finding_cleared` ile kapatır.
+            toResolve.push({ type: "stock_critical", entityId, reason: "stock_recovered", source: "system" });
+            toResolve.push({ type: "stock_risk", entityId, reason: "stock_recovered", source: "system" });
         }
 
         // Order deadline: sipariş son tarihi ≤ 7 gün → alert
@@ -307,6 +315,15 @@ export interface AiAlertGenerationResult {
     created: number;
     /** İçeriği yerinde tazelenen mevcut AI uyarısı sayısı (churn yok). */
     updated: number;
+    /**
+     * AI çağrısı BAŞARISIZ oldu (ağ/anahtar/model hatası) — "bulgu yok" DEĞİL.
+     *
+     * 2026-08-24: bu bayrak servis dışına taşınmıyordu; hata durumunda
+     * `{created: 0}` dönüyor, UI da bunu yeşil "0 AI önerisi oluşturuldu"
+     * toast'ına çeviriyordu. Kullanıcı "AI çalıştı, bulgu çıkmadı" ile
+     * "AI patladı"yı ayırt edemiyordu — tutarsızlık hissinin kaynaklarından biri.
+     */
+    degraded: boolean;
     summary: string;
 }
 
@@ -325,7 +342,7 @@ export interface AiAlertGenerationResult {
  */
 export async function serviceGenerateAiAlerts(): Promise<AiAlertGenerationResult> {
     if (!isAIAvailable()) {
-        return { aiAvailable: false, dismissed: 0, created: 0, updated: 0, summary: "" };
+        return { aiAvailable: false, dismissed: 0, created: 0, updated: 0, degraded: false, summary: "" };
     }
 
     const [products, shortageMap, quotedMap, incomingMap, activeAlerts, recentlyDismissed, pendingOrders, approvedOrders] = await Promise.all([
@@ -385,7 +402,7 @@ export async function serviceGenerateAiAlerts(): Promise<AiAlertGenerationResult
     // "bulgu yok" ile "AI cevap veremedi" farklı — degraded'da temizlik yapılırsa
     // geçerli bulgular API arızasında sessizce silinir (smoke 2026-06-11 bulgusu).
     if (result.degraded) {
-        return { aiAvailable: true, dismissed: 0, created: 0, updated: 0, summary: "" };
+        return { aiAvailable: true, dismissed: 0, created: 0, updated: 0, degraded: true, summary: "" };
     }
 
     // Aktif AI uyarıları (entity'li) + kural-bazlı stok uyarısı olan ürünler.
@@ -445,7 +462,10 @@ export async function serviceGenerateAiAlerts(): Promise<AiAlertGenerationResult
     // Bulgusu geçen ürünlerin AI uyarıları → resolve (yerine yenisi YARATILMAZ).
     const stale: BatchResolveEntry[] = [];
     for (const [entityId, a] of activeAiByEntity) {
-        if (!keepEntities.has(entityId)) stale.push({ type: a.type, entityId, reason: "ai_finding_cleared" });
+        // Simetri: AI da yalnız KENDİ bulgusunu kapatır. `activeAiByEntity` zaten
+        // source=ai ile dolduruluyor ama aynı ürün için bir kural uyarısı da
+        // açılmışsa (tip aynı: stock_risk) filtresiz kapatma onu da silerdi.
+        if (!keepEntities.has(entityId)) stale.push({ type: a.type, entityId, reason: "ai_finding_cleared", source: "ai" });
     }
     let dismissed = stale.length > 0 ? await dbBatchResolveAlerts(stale) : 0;
 
@@ -455,7 +475,7 @@ export async function serviceGenerateAiAlerts(): Promise<AiAlertGenerationResult
         dismissed++;
     }
 
-    return { aiAvailable: true, dismissed, created, updated, summary: result.summary };
+    return { aiAvailable: true, dismissed, created, updated, degraded: false, summary: result.summary };
 }
 
 export async function serviceUpdateAlertStatus(

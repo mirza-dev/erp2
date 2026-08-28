@@ -304,6 +304,20 @@ export interface BatchResolveEntry {
     type: AlertType;
     entityId: string;
     reason: string;
+    /**
+     * SAHİPLİK FİLTRESİ (2026-08-24). Verilirse yalnız o kaynağın uyarısı kapanır.
+     *
+     * Neden gerekli: kural taraması, ürün kendi eşiğine göre sağlıklı olduğunda
+     * `stock_risk` uyarılarını "stock_recovered" ile kapatıyordu — `source`
+     * ayrımı olmadığı için AI bulgularını da siliyordu. AI ise TAM DA kurala göre
+     * sağlıklı ürünlere yazar (varlık sebebi kuralın kaçırdığını bulmaktır) →
+     * her AI bulgusu bir sonraki taramada ölüyordu. Canlı iz: 102 AI uyarısının
+     * tamamı `stock_recovered`, medyan ömür 6 saniye, tek üründe 40 tekrar.
+     *
+     * Kural artık yalnız kendi uyarısını kapatır; AI kendi bulgusunu
+     * `ai_finding_cleared` ile kapatır.
+     */
+    source?: "system" | "ai" | "ui";
 }
 
 /**
@@ -316,23 +330,24 @@ export async function dbBatchResolveAlerts(entries: BatchResolveEntry[]): Promis
     const now = new Date().toISOString();
     let total = 0;
 
-    // Group by type::reason → entityIds[]
+    // Group by type::reason::source → entityIds[]  (source boş = kaynak ayırmaz)
     const groups = new Map<string, string[]>();
     for (const e of entries) {
-        const key = `${e.type}::${e.reason}`;
+        const key = `${e.type}::${e.reason}::${e.source ?? ""}`;
         if (!groups.has(key)) groups.set(key, []);
         groups.get(key)!.push(e.entityId);
     }
 
     for (const [key, entityIds] of groups) {
-        const [type, reason] = key.split("::");
-        const { data, error } = await supabase
+        const [type, reason, source] = key.split("::");
+        let query = supabase
             .from("alerts")
             .update({ status: "resolved", resolved_at: now, resolution_reason: reason })
             .eq("type", type)
             .in("entity_id", entityIds)
-            .in("status", ["open", "acknowledged"])
-            .select("id");
+            .in("status", ["open", "acknowledged"]);
+        if (source) query = query.eq("source", source);
+        const { data, error } = await query.select("id");
         if (error) throw new Error(error.message);
         total += data?.length ?? 0;
     }

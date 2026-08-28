@@ -14,7 +14,11 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // RBAC Faz 4: route'lara requirePermission guard eklendi → guard'ı allow'a mock'la.
+const mockResolveAuthContext = vi.fn();
+const mockRequirePermissionFor = vi.fn();
 vi.mock("@/lib/auth/role-guard", () => ({
+    resolveAuthContext: () => mockResolveAuthContext(),
+    requirePermissionFor: (...a: unknown[]) => mockRequirePermissionFor(...a),
     requirePermission: vi.fn().mockResolvedValue(null),
     requireRole: vi.fn().mockResolvedValue(null),
     requireAnyRole: vi.fn().mockResolvedValue(null),
@@ -210,6 +214,66 @@ describe("POST /api/alerts/ai-suggest — HTTP status contract", () => {
 
         expect(body.aiAvailable).toBeUndefined();
         expect(body.error).toBeDefined();
+    });
+
+    /**
+     * 2026-08-24 — Bu uç ÖNCEDEN yalnız cron'du: hem proxy CRON_PATHS'te hem
+     * route içinde `requireCronSecret`. Uyarılar sayfasındaki "AI Öner" butonu
+     * tarayıcıdan çağırıyor ama Bearer token gönderemiyor → HER TIK 401 →
+     * AI bulguları kullanıcıya hiç ulaşmıyordu. Kardeş uç /api/alerts/scan
+     * bilinçli olarak çift kimlikli yapılmıştı; bu uç atlanmıştı.
+     */
+    describe("kimlik doğrulama — UI butonu çalışmalı, uç açık kalmamalı", () => {
+        const req = (headers: Record<string, string> = {}) =>
+            new NextRequest("http://localhost/api/alerts/ai-suggest", { method: "POST", headers });
+
+        beforeEach(() => {
+            mockRpc.mockResolvedValue({ data: true });
+            mockServiceGenerateAiAlerts.mockResolvedValue({
+                aiAvailable: true, dismissed: 0, created: 2, updated: 0, degraded: false, summary: "",
+            });
+        });
+
+        it("oturum YOK + cron token YOK → 401", async () => {
+            mockResolveAuthContext.mockResolvedValue({ user: null, perms: new Set() });
+            const res = await aiSuggestPost(req());
+            expect(res.status).toBe(401);
+            expect(mockServiceGenerateAiAlerts).not.toHaveBeenCalled();
+        });
+
+        it("oturum VAR ama view_alerts YOK → guard'ın döndürdüğü yanıt (403)", async () => {
+            mockResolveAuthContext.mockResolvedValue({ user: { id: "u1" }, perms: new Set() });
+            mockRequirePermissionFor.mockReturnValue(
+                NextResponse.json({ error: "Yetkisiz." }, { status: 403 }),
+            );
+            const res = await aiSuggestPost(req());
+            expect(res.status).toBe(403);
+            expect(mockServiceGenerateAiAlerts).not.toHaveBeenCalled();
+        });
+
+        it("oturum + view_alerts → 200 (UI butonu ARTIK ÇALIŞIR)", async () => {
+            mockResolveAuthContext.mockResolvedValue({ user: { id: "u1" }, perms: new Set(["view_alerts"]) });
+            mockRequirePermissionFor.mockReturnValue(null);
+            const res = await aiSuggestPost(req());
+            expect(res.status).toBe(200);
+            expect(mockRequirePermissionFor).toHaveBeenCalledWith(expect.anything(), "view_alerts");
+        });
+
+        it("CRON_SECRET Bearer → oturum aranmaz (zamanlanmış koşu korunur)", async () => {
+            process.env.CRON_SECRET = "s3cret";
+            const res = await aiSuggestPost(req({ authorization: "Bearer s3cret" }));
+            expect(res.status).toBe(200);
+            expect(mockResolveAuthContext).not.toHaveBeenCalled();
+            delete process.env.CRON_SECRET;
+        });
+
+        it("YANLIŞ Bearer token → oturum yoluna düşer, oturum yoksa 401", async () => {
+            process.env.CRON_SECRET = "s3cret";
+            mockResolveAuthContext.mockResolvedValue({ user: null, perms: new Set() });
+            const res = await aiSuggestPost(req({ authorization: "Bearer wrong" }));
+            expect(res.status).toBe(401);
+            delete process.env.CRON_SECRET;
+        });
     });
 
     it("409 when advisory lock already held (concurrent AI generation)", async () => {
