@@ -669,6 +669,54 @@ describe("createPurchaseBill payload (Faz 13)", () => {
     });
 });
 
+describe("tahsilat durumu okuma (Faz 14)", () => {
+    it("satış faturası durumu ve iki tutarı ayrı ayrı taşır", async () => {
+        const { adapter, calls } = makeAdapter([jsonResponse({ data: { id: "inv1", attributes: {
+            payment_status: "partially_paid", remaining: 400, remaining_in_trl: 16000,
+            currency: "USD", due_date: "2026-09-01",
+        } } })]);
+        const state = await adapter.getSalesInvoicePaymentState("inv1");
+
+        expect(calls[0].url).toContain("/sales_invoices/inv1");
+        expect(state).toEqual({
+            id: "inv1", payment_status: "partially_paid",
+            remaining: 400, remaining_in_trl: 16000, currency: "USD", due_date: "2026-09-01",
+        });
+    });
+
+    it("alış faturası durumu ayrı uçtan okunur", async () => {
+        const { adapter, calls } = makeAdapter([jsonResponse({ data: { id: "b1", attributes: {
+            payment_status: "paid", remaining: 0, remaining_in_trl: 0, currency: "TRL",
+        } } })]);
+        const state = await adapter.getPurchaseBillPaymentState("b1");
+        expect(calls[0].url).toContain("/purchase_bills/b1");
+        expect(state.payment_status).toBe("paid");
+    });
+
+    it("TANIMADIĞI durum null'a iner — 'ödendi' sanılmaz", async () => {
+        // CHECK kısıtı yalnız 4 değeri kabul eder; uydurma değeri yazmak
+        // migration'ı patlatır, "bilinmiyor" demek doğrudur.
+        const { adapter } = makeAdapter([jsonResponse({ data: { id: "i", attributes: { payment_status: "weird" } } })]);
+        expect((await adapter.getSalesInvoicePaymentState("i")).payment_status).toBeNull();
+    });
+
+    it("durum alanı hiç yoksa null (patlamaz)", async () => {
+        const { adapter } = makeAdapter([jsonResponse({ data: { id: "i", attributes: {} } })]);
+        const state = await adapter.getSalesInvoicePaymentState("i");
+        expect(state.payment_status).toBeNull();
+        expect(state.remaining).toBeNull();
+    });
+
+    it("string gelen tutarlar sayıya çevrilir", async () => {
+        const { adapter } = makeAdapter([jsonResponse({ data: { id: "i", attributes: {
+            payment_status: "unpaid", remaining: "1234.56", remaining_in_trl: "49382.40",
+        } } })]);
+        const state = await adapter.getSalesInvoicePaymentState("i");
+        expect(state.remaining).toBe(1234.56);
+        expect(state.remaining_in_trl).toBe(49382.4);
+    });
+});
+
 // ── Sözleşme eşitliği: mock ≡ http ───────────────────────────────────────────
 
 describe("sözleşme eşitliği (mock ≡ http)", () => {

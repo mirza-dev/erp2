@@ -11,4 +11,5 @@ export const ALERT_TYPE_LABEL: Record<AlertType, string> = {
     sync_issue:           "Paraşüt Senkron Hatası",
     po_overdue:           "Geciken Tedarik",
     rfq_response_due:     "Yanıt Bekleyen Talep",
+    payment_overdue:      "Geciken Tahsilat",
 };

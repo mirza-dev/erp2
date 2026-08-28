@@ -529,11 +529,66 @@ export function incomingPoView(
     return { count, totalReporting: total, redacted, overdueCount: overdue };
 }
 
-// NOT: receivablesAging (Açık Alacak) kullanıcı kararıyla KALDIRILDI.
-// Siparişten türev proxy idi (createdAt+30g sabit vade, 90g pencere, ödeme
-// düşülmez) — güvenilir değildi. Gerçek alacak istenirse `invoices`/`payments`
-// tablolarından (lib/supabase/invoices.ts, payments.ts — mevcut, UI okumuyor)
-// yeniden yazılmalı.
+// ════════════════════════════════════════════════════════════════
+//  Açık Alacak — Paraşüt tahsilat gerçeği (Faz 14)
+// ════════════════════════════════════════════════════════════════
+//
+// TARİHÇE: Eski `receivablesAging` kartı 2026-06'da KALDIRILMIŞTI çünkü
+// siparişten türetilen bir proxy idi (createdAt+30g sabit vade, 90g pencere,
+// ödemeler hiç düşülmüyordu) → güvenilir değildi.
+//
+// Bu sürüm proxy DEĞİL: kaynak Paraşüt'ün kendi `payment_status`/`remaining`i
+// (migration 108 ile ERP'ye geri okunur). Kart yalnız Paraşüt verisi VARSA
+// çıkar — `receivables` null/boş ise şerit fail-soft daralır.
+
+export interface ReceivableInput {
+    /** Paraşüt tahsilat durumu; null = henüz sorgulanmadı. */
+    paymentStatus: string | null;
+    /** Paraşüt'ün hesapladığı TL karşılığı kalan tutar. */
+    remainingTry: number | null;
+}
+
+export interface ReceivablesView {
+    /** Açık (tahsil edilmemiş) fatura sayısı. */
+    openCount: number;
+    /** Vadesi geçmiş fatura sayısı. */
+    overdueCount: number;
+    /** Raporlama para birimine çevrilmiş toplam. */
+    totalReporting: number;
+    /** TL karşılığı bilinmeyen açık fatura sayısı — toplama GİRMEZ. */
+    unknownCount: number;
+}
+
+/**
+ * Açık alacak görünümü.
+ *
+ * Toplama YALNIZ `remainingTry` (Paraşüt'ün TL karşılığı) üzerinden yapılır;
+ * farklı para birimlerindeki ham `remaining` değerleri ASLA toplanmaz
+ * (B1 bulgusunun aynı sınıfı). TL karşılığı çözülemeyen kayıt sessizce 0
+ * sayılmaz — ayrıca sayılır ve kart altında görünür.
+ */
+export function receivablesView(
+    rows: ReceivableInput[], reporting: string, rates: ExchangeRates | null,
+): ReceivablesView {
+    let openCount = 0, overdueCount = 0, totalTry = 0, unknownCount = 0;
+    for (const r of rows) {
+        const st = r.paymentStatus;
+        if (st !== "unpaid" && st !== "partially_paid" && st !== "overdue") continue;
+        openCount++;
+        if (st === "overdue") overdueCount++;
+        if (r.remainingTry === null || r.remainingTry === undefined || !Number.isFinite(Number(r.remainingTry))) {
+            unknownCount++;
+            continue;
+        }
+        totalTry += Number(r.remainingTry);
+    }
+    return {
+        openCount,
+        overdueCount,
+        totalReporting: toReporting(totalTry, "TRY", reporting, rates),
+        unknownCount,
+    };
+}
 
 // ════════════════════════════════════════════════════════════════
 //  Üretim
@@ -767,6 +822,11 @@ export interface KpiInput {
     quotes?: QuotePipelineInput[] | null;
     /** Açık satın alma siparişleri (/api/purchase-orders). null/undefined = kart üretilmez (403 dahil). */
     purchaseOrders?: IncomingPoInput[] | null;
+    /**
+     * Paraşüt tahsilat durumu taşıyan satış siparişleri (Faz 14).
+     * null/undefined = kart üretilmez (Paraşüt kapalı / yetki yok / fetch başarısız).
+     */
+    receivables?: ReceivableInput[] | null;
 }
 
 export interface KpiPerms {
@@ -774,10 +834,11 @@ export interface KpiPerms {
 }
 
 /**
- * Ana sıra: Ciro · Teklif Hattı · Açık Siparişler · Yoldaki Mal · Stok Değeri · Üretim · Uyarılar.
- * Opsiyonel veri gelmezse Teklif/Yoldaki kartları boşluk bırakmadan atlanır.
+ * Ana sıra: Ciro · Teklif Hattı · Açık Siparişler · Yoldaki Mal · Açık Alacak ·
+ * Stok Değeri · Üretim · Uyarılar.
+ * Opsiyonel veri gelmezse (Teklif/Yoldaki/Alacak) kart boşluk bırakmadan atlanır.
  * Finansal değerler raporlama para birimine normalize + RBAC ile maskeli.
- * (Açık Alacak kartı kaldırıldı — yukarıdaki receivablesAging notu.)
+ * Açık Alacak Faz 14'te GERİ GELDİ — bu sefer proxy değil, Paraşüt gerçeği.
  */
 export function buildKpis(
     input: KpiInput, perms: KpiPerms, now: Date = new Date(), period: PeriodModel = periodModel("Ay", now),
@@ -888,6 +949,30 @@ export function buildKpis(
             delta: incoming.count > 0 ? `${incoming.count} açık PO` : undefined,
             up: incoming.overdueCount === 0,
             href: "/dashboard/purchase/orders",
+        });
+    }
+
+    if (input.receivables != null) {
+        const rec = receivablesView(input.receivables, reporting, rates);
+        kpis.push({
+            id: "alacak",
+            label: "Açık Alacak",
+            // Proxy DEĞİL: Paraşüt'ün kendi tahsilat gerçeği (Faz 14).
+            value: rec.openCount === 0
+                ? "—"
+                : formatReportingCompact(rec.totalReporting, reporting, canPrices),
+            tone: "warning",
+            sub: rec.openCount === 0
+                ? "Tahsil edilmemiş fatura yok · anlık"
+                : rec.unknownCount > 0
+                    ? `${rec.unknownCount} faturanın TL karşılığı bilinmiyor`
+                    : "Paraşüt tahsilat durumu · anlık",
+            subTone: rec.overdueCount > 0 ? "danger" : rec.unknownCount > 0 ? "warning" : undefined,
+            delta: rec.overdueCount > 0
+                ? `${rec.overdueCount} tanesi vadesi geçmiş`
+                : rec.openCount > 0 ? `${rec.openCount} açık fatura` : undefined,
+            up: rec.overdueCount === 0,
+            href: "/dashboard/orders",
         });
     }
 

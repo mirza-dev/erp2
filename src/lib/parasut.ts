@@ -16,6 +16,7 @@ import {
     type ParasutInvoiceWithEDocument,
     type ParasutShipmentDocument,
     type ParasutPurchaseBill,
+    type ParasutPaymentState,
     type ParasutEInvoiceInbox,
     type ContactInput,
     type ProductInput,
@@ -71,6 +72,7 @@ export class MockParasutAdapter implements ParasutAdapter {
         this.shipments.clear();
         this.purchaseBills.clear();
         this.billSupplier.clear();
+        this.paymentStates.clear();
         this.trackableJobs.clear();
         this.eDocuments.clear();
         this._pendingJobForInvoice.clear();
@@ -295,6 +297,54 @@ export class MockParasutAdapter implements ParasutAdapter {
         this.purchaseBills.set(id, bill);
         this.billSupplier.set(id, input.supplier_id);
         return bill;
+    }
+
+    // ── Tahsilat / ödeme durumu ──────────────────────────────────────────────
+    //
+    // Mock varsayılanı `unpaid`: fatura yeni kesilmiş gibi davranır. Testler
+    // `setPaymentState` ile istedikleri durumu enjekte eder.
+    private paymentStates = new Map<string, ParasutPaymentState>();
+
+    /** Test kancası — belirli bir belge için tahsilat durumu kur. */
+    setPaymentState(documentId: string, state: Partial<ParasutPaymentState>): void {
+        this.paymentStates.set(documentId, {
+            id:               documentId,
+            payment_status:   state.payment_status   ?? "unpaid",
+            remaining:        state.remaining        ?? null,
+            remaining_in_trl: state.remaining_in_trl ?? null,
+            currency:         state.currency         ?? "TRL",
+            due_date:         state.due_date         ?? null,
+        });
+    }
+
+    private async paymentStateFor(id: string, gross: number, currency: string): Promise<ParasutPaymentState> {
+        await mockDelay();
+        const preset = this.paymentStates.get(id);
+        if (preset) return preset;
+        return {
+            id,
+            payment_status:   "unpaid",
+            remaining:        gross,
+            remaining_in_trl: currency === "TRL" ? gross : null,
+            currency,
+            due_date:         null,
+        };
+    }
+
+    async getSalesInvoicePaymentState(id: string): Promise<ParasutPaymentState> {
+        const invoice = this.invoices.get(id);
+        if (!invoice && !this.paymentStates.has(id)) {
+            throw new ParasutError('not_found', `Invoice not found: ${id}`);
+        }
+        return this.paymentStateFor(id, invoice?.attributes.gross_total ?? 0, invoice?.attributes.currency ?? 'TRL');
+    }
+
+    async getPurchaseBillPaymentState(id: string): Promise<ParasutPaymentState> {
+        const bill = this.purchaseBills.get(id);
+        if (!bill && !this.paymentStates.has(id)) {
+            throw new ParasutError('not_found', `PurchaseBill not found: ${id}`);
+        }
+        return this.paymentStateFor(id, bill?.attributes.gross_total ?? 0, bill?.attributes.currency ?? 'TRL');
     }
 
     // ── E-fatura mükellef ────────────────────────────────────────────────────

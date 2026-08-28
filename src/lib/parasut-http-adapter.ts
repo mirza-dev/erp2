@@ -34,6 +34,7 @@ import type {
     ParasutEDocument,
     ParasutShipmentDocument,
     ParasutPurchaseBill,
+    ParasutPaymentState,
     ParasutEInvoiceInbox,
     ContactInput,
     ProductInput,
@@ -226,6 +227,24 @@ function toPurchaseBill(res: JsonApiResource): ParasutPurchaseBill {
             currency:    str(res.attributes?.currency)    ?? "TRL",
             issue_date:  str(res.attributes?.issue_date)  ?? "",
         },
+    };
+}
+
+const PAYMENT_STATUSES = new Set(["paid", "overdue", "unpaid", "partially_paid"]);
+
+function toPaymentState(res: JsonApiResource): ParasutPaymentState {
+    const raw = str(res.attributes?.payment_status);
+    return {
+        id:               String(res.id ?? ""),
+        // Tanınmayan durum null'a iner: uydurma bir değeri "ödendi" sanmaktansa
+        // "bilinmiyor" demek doğrudur (CHECK kısıtı da yalnız 4 değeri kabul eder).
+        payment_status:   raw && PAYMENT_STATUSES.has(raw)
+            ? (raw as ParasutPaymentState["payment_status"])
+            : null,
+        remaining:        num(res.attributes?.remaining),
+        remaining_in_trl: num(res.attributes?.remaining_in_trl),
+        currency:         str(res.attributes?.currency),
+        due_date:         str(res.attributes?.due_date),
     };
 }
 
@@ -695,6 +714,22 @@ export class HttpParasutAdapter implements ParasutAdapter {
             },
         });
         return toPurchaseBill(asSingle(doc));
+    }
+
+    // ── Tahsilat / ödeme durumu ──────────────────────────────────────────────
+
+    async getSalesInvoicePaymentState(id: string): Promise<ParasutPaymentState> {
+        const doc = await this.api("GET", `/sales_invoices/${encodeURIComponent(id)}`, {
+            op: "getSalesInvoicePaymentState",
+        });
+        return toPaymentState(asSingle(doc));
+    }
+
+    async getPurchaseBillPaymentState(id: string): Promise<ParasutPaymentState> {
+        const doc = await this.api("GET", `/purchase_bills/${encodeURIComponent(id)}`, {
+            op: "getPurchaseBillPaymentState",
+        });
+        return toPaymentState(asSingle(doc));
     }
 
     // ── E-fatura mükellef kontrolü ───────────────────────────────────────────

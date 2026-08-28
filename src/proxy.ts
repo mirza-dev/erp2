@@ -30,6 +30,7 @@ const CRON_PATHS = [
     "/api/parasut/sync-all",
     "/api/parasut/sync-purchase-all",
     "/api/parasut/poll-e-documents",
+    "/api/parasut/poll-payments",
     "/api/orders/check-shipments",
     "/api/quotes/expire",
     "/api/email/retry-failed",

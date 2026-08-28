@@ -126,9 +126,15 @@ describe("RBAC finansal gating", () => {
     });
 });
 
-describe("Açık Alacak kaldırma kilidi", () => {
-    it("page/report 'Açık Alacak' içermez; kur-uyarı satırı mevcut", () => {
-        expect(PAGE).not.toContain("Açık Alacak");
+describe("Açık Alacak — proxy hesap kilidi (Faz 14'te kart geri geldi)", () => {
+    // Kart 2026-06'da kaldırılmıştı; sebep kartın varlığı DEĞİL, siparişten
+    // türetilen güvenilmez proxy hesaptı. Faz 14'te Paraşüt'ün gerçek tahsilat
+    // verisiyle geri geldi → kilit artık proxy'yi hedefler.
+    it("proxy hesap (receivablesAging) page'de geri gelmez", () => {
+        expect(PAGE).not.toContain("receivablesAging");
+    });
+
+    it("kur-uyarı satırı korunuyor", () => {
         expect(PAGE).toMatch(/listUnconvertibleCurrencies/);
         expect(PAGE).toContain("Kur verisi alınamadı");
     });

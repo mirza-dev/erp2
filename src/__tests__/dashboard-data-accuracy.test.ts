@@ -51,10 +51,25 @@ describe("kur uyarısı + Açık Alacak kaldırma (page kilitleri)", () => {
         expect(page).not.toMatch(/fetch\("\/api\/exchange-rates"\)/);
     });
 
-    it("Açık Alacak page'de geri gelmez; KpiPerms yalnız canViewSalesPrices", () => {
-        expect(page).not.toContain("Açık Alacak");
+    /**
+     * 2026-08 (Faz 14): "Açık Alacak" kartı GERİ GELDİ — ama kaldırılma
+     * gerekçesiyle çelişmeden. Kaldırılma sebebi kartın kendisi değil,
+     * SİPARİŞTEN TÜRETİLEN proxy hesaptı (createdAt+30g sabit vade, 90g
+     * pencere, ödemeler düşülmüyordu). Yeni kart Paraşüt'ün kendi
+     * `payment_status`/`remaining` gerçeğini okur.
+     *
+     * Kilidin niyeti korunuyor: PROXY hesap geri gelmesin.
+     */
+    it("Açık Alacak proxy hesabı geri gelmez (kart Paraşüt verisinden beslenir)", () => {
+        expect(page).not.toContain("receivablesAging");
         expect(page).not.toContain("canViewFinancialSummary");
         expect(page).toMatch(/\{ canViewSalesPrices \}/);
+        // Kart verisi sipariş listesinden TÜRETİLMEZ — ayrı Paraşüt ucundan gelir.
+        expect(page).toMatch(/fetch\("\/api\/parasut\/receivables"\)/);
+    });
+
+    it("alacak verisi fail-soft: !ok (403) → null → kart üretilmez", () => {
+        expect(page).toMatch(/if \(Array\.isArray\(d\)\) setReceivables/);
     });
 });
 

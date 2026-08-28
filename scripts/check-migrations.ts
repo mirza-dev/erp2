@@ -62,6 +62,7 @@ const PROBES: Record<string, Probe> = {
     // Faz 13 — Paraşüt alış tarafı. Tek kolon yeterli sinyal: 107 tek dosyada
     // vendors/purchase_orders/purchase_order_lines'ı birlikte değiştirir.
     "107": { kind: "column", table: "purchase_orders", column: "parasut_bill_id" },
+    "108": { kind: "column", table: "sales_orders", column: "parasut_payment_status" },
 };
 
 /** OpenAPI'den görünmeyen migration'lar — elle SQL doğrulaması gerekir.

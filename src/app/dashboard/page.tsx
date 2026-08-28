@@ -16,7 +16,7 @@ import {
     stockValueByCategoryReporting, productionDailySeries,
     reorderView, alertsView, recentOrdersView, listUnconvertibleCurrencies,
     type ExchangeRates, type CogsRow, type RangeKey,
-    type QuotePipelineInput, type IncomingPoInput,
+    type QuotePipelineInput, type IncomingPoInput, type ReceivableInput,
 } from "@/lib/dashboard-view-model";
 
 interface FinanceData {
@@ -57,6 +57,7 @@ export default function DashboardPage() {
     // null = yüklenmedi/başarısız/yetkisiz → ilgili KPI kartı hiç üretilmez (fail-soft).
     const [quotes, setQuotes] = useState<QuotePipelineInput[] | null>(null);
     const [purchaseOrders, setPurchaseOrders] = useState<IncomingPoInput[] | null>(null);
+    const [receivables, setReceivables] = useState<ReceivableInput[] | null>(null);
 
     // Maliyet + raporlama para birimi + döviz kurları (mount'ta bir kez)
     useEffect(() => {
@@ -86,6 +87,17 @@ export default function DashboardPage() {
                 }
             } catch { /* defansif: Yoldaki Mal kartı üretilmez */ }
         })();
+        (async () => {
+            try {
+                // view_parasut olmayan rolde 403 → Açık Alacak kartı hiç görünmez.
+                // Paraşüt kapalıyken tablo boş kalır → kart "—" gösterir.
+                const r = await fetch("/api/parasut/receivables");
+                if (r.ok && alive) {
+                    const d = await r.json();
+                    if (Array.isArray(d)) setReceivables(d as ReceivableInput[]);
+                }
+            } catch { /* defansif: Açık Alacak kartı üretilmez */ }
+        })();
         return () => { alive = false; };
     }, []);
 
@@ -95,12 +107,12 @@ export default function DashboardPage() {
 
     const kpis = useMemo(
         () => buildKpis(
-            { products, orders, uretimKayitlari, openAlerts, reporting, rates, quotes, purchaseOrders },
+            { products, orders, uretimKayitlari, openAlerts, reporting, rates, quotes, purchaseOrders, receivables },
             { canViewSalesPrices },
             now,
             period,
         ),
-        [products, orders, uretimKayitlari, openAlerts, reporting, rates, quotes, purchaseOrders, canViewSalesPrices, now, period],
+        [products, orders, uretimKayitlari, openAlerts, reporting, rates, quotes, purchaseOrders, receivables, canViewSalesPrices, now, period],
     );
 
     // Kur çözülemeyen para birimleri → toplamların dışında kaldılar; görünür uyarı.

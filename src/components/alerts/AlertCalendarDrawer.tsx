@@ -44,6 +44,9 @@ const DRAWER_LINKS: Partial<Record<AlertType, DrawerLink[]>> = {
     po_overdue: [
         { label: "Satınalma Siparişleri", href: "/dashboard/purchase/orders", variant: "secondary" },
     ],
+    payment_overdue: [
+        { label: "Satış Siparişleri", href: "/dashboard/orders", variant: "secondary" },
+    ],
 };
 
 interface Props {

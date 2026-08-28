@@ -19,6 +19,7 @@ const ALL_ALERT_TYPES: AlertType[] = [
     "sync_issue",
     "po_overdue",
     "rfq_response_due",
+    "payment_overdue",
 ];
 
 describe("ALERT_TYPE_LABEL — tüm tipler için Türkçe etiket tanımlı", () => {

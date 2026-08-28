@@ -86,6 +86,22 @@ export interface ParasutPurchaseBill {
     };
 }
 
+/**
+ * Tahsilat/ödeme durumu (Faz 14) — Paraşüt'ten ERP'ye tek yönlü OKUMA.
+ * Satış faturası ve alış faturası için aynı şekil.
+ */
+export interface ParasutPaymentState {
+    id:               string;
+    /** Paraşüt enum'u; tanınmayan değer null'a iner. */
+    payment_status:   'paid' | 'overdue' | 'unpaid' | 'partially_paid' | null;
+    /** Kalan tutar — faturanın KENDİ para biriminde. */
+    remaining:        number | null;
+    /** Paraşüt'ün hesapladığı TL karşılığı. Toplama YALNIZ bunun üzerinden yapılır. */
+    remaining_in_trl: number | null;
+    currency:         string | null;
+    due_date:         string | null;
+}
+
 export interface ParasutEInvoiceInbox {
     id:         string;
     attributes: { vkn: string; alias: string };
@@ -237,6 +253,10 @@ export interface ParasutAdapter {
     // Purchase bill — alış faturası (filter[invoice_no] YOK → tedarikçi + sayfalama)
     listPurchaseBillsBySupplier(supplierId: string, page: number, pageSize: number): Promise<ParasutPurchaseBill[]>;
     createPurchaseBill(input: PurchaseBillInput): Promise<ParasutPurchaseBill>;
+
+    // Tahsilat/ödeme durumu (tek yönlü okuma)
+    getSalesInvoicePaymentState(id: string): Promise<ParasutPaymentState>;
+    getPurchaseBillPaymentState(id: string): Promise<ParasutPaymentState>;
 
     // E-fatura mükellef kontrolü
     listEInvoiceInboxesByVkn(vkn: string): Promise<ParasutEInvoiceInbox[]>;
