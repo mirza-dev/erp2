@@ -17,7 +17,7 @@ import { useSelection } from "@/hooks/useSelection";
 import { DynamicFieldEdit } from "@/components/products/DynamicFieldEdit";
 import type { ProductTypeRow, ProductTypeFieldRow } from "@/lib/database.types";
 import { missingRequiredTechnicalFields } from "@/lib/technical-templates";
-import { Plus, RefreshCw, Trash2 } from "lucide-react";
+import { Plus, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
 
 
@@ -123,6 +123,13 @@ export default function ProductsPage() {
     const [productsWithAlerts, setProductsWithAlerts] = useState<Set<string>>(new Set());
     const [filterManufactured, setFilterManufactured] = useState(false);
     const [filterCommercial, setFilterCommercial] = useState(false);
+    // A4 (2026-08-24): "Sil" ürünü soft-delete ediyor (is_active=false). Bu
+    // seçenek olmadan pasif ürünler UI'dan TAMAMEN erişilemezdi — yanlışlıkla
+    // silinen ürün ne görülebiliyor ne geri alınabiliyordu (SKU unique olduğu
+    // için yeniden de yaratılamaz). Cariler'de "Pasif" sekmesi, Tedarikçiler'de
+    // "Pasifleri göster" var; Ürünler'de hiçbiri yoktu.
+    const [showPassive, setShowPassive] = useState(false);
+    const [restoringId, setRestoringId] = useState<string | null>(null);
     const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
     const [bulkDeleting, setBulkDeleting] = useState(false);
 
@@ -153,8 +160,10 @@ export default function ProductsPage() {
             params.set("signal", "1");
             if (signalIds.length > 0) params.set("ids", signalIds.join(","));
         }
+        // "all" = aktif + pasif birlikte (API üç-durumlu). Varsayılan yalnız aktif.
+        if (showPassive) params.set("is_active", "all");
         return params;
-    }, [currentPage, committedSearch, selectedCategories, filterManufactured, filterCommercial, signalIds]);
+    }, [currentPage, committedSearch, selectedCategories, filterManufactured, filterCommercial, signalIds, showPassive]);
 
     const fetchList = useCallback(async () => {
         try {
@@ -342,6 +351,30 @@ export default function ProductsPage() {
         }
     };
 
+    // A4: pasif ürünü geri yükle. Silme soft-delete olduğundan (is_active=false)
+    // geri alma da PATCH ile aynı alanı çevirir — veri kaybı yok.
+    const handleRestore = async (id: string) => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        setRestoringId(id);
+        try {
+            const res = await fetch(`/api/products/${id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ is_active: true }),
+            });
+            if (!res.ok) {
+                const errBody = await res.json().catch(() => null);
+                throw new Error(errBody?.error ?? "Ürün geri yüklenemedi.");
+            }
+            await Promise.all([fetchList(), refetchCounts()]);
+            toast({ type: "success", message: "Ürün geri yüklendi" });
+        } catch (err) {
+            toast({ type: "error", message: err instanceof Error ? err.message : "Ürün geri yüklenemedi." });
+        } finally {
+            setRestoringId(null);
+        }
+    };
+
     const handleBulkDelete = async () => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         setBulkDeleting(true);
@@ -499,7 +532,19 @@ export default function ProductsPage() {
             header: "SKU",
             headerStyle: NOWRAP,
             cellStyle: { ...NOWRAP, color: "var(--text-secondary)", fontFamily: "var(--font-mono)", fontSize: "12px" },
-            cell: product => product.sku,
+            // A4: pasif ürün listede aktifle karışmasın — soluk satır + açık rozet.
+            cell: product => (
+                <>
+                    {product.sku}
+                    {!product.isActive && (
+                        <span style={{
+                            marginLeft: "6px", fontSize: "9.5px", padding: "1px 5px",
+                            borderRadius: "3px", background: "var(--bg-tertiary)",
+                            color: "var(--text-tertiary)", fontFamily: "inherit",
+                        }}>Pasif</span>
+                    )}
+                </>
+            ),
         },
         {
             key: "name",
@@ -551,7 +596,19 @@ export default function ProductsPage() {
                     style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: "6px" }}
                     onClick={e => e.stopPropagation()}
                 >
-                    {has("manage_product_master") && (confirmDeleteId === product.id ? (
+                    {/* A4: pasif üründe silme anlamsız (zaten pasif) — geri yükleme sunulur. */}
+                    {has("manage_product_master") && !product.isActive ? (
+                        <Button
+                            variant="secondary"
+                            size="xs"
+                            leftIcon={<RotateCcw size={13} />}
+                            disabled={isDemo || restoringId === product.id}
+                            title={isDemo ? DEMO_DISABLED_TOOLTIP : "Ürünü tekrar aktif et"}
+                            onClick={() => handleRestore(product.id)}
+                        >
+                            {restoringId === product.id ? "…" : "Geri Yükle"}
+                        </Button>
+                    ) : has("manage_product_master") && (confirmDeleteId === product.id ? (
                         <>
                             <span style={{ fontSize: "11px", color: "var(--text-secondary)" }}>Emin misin?</span>
                             <Button
@@ -862,6 +919,21 @@ export default function ProductsPage() {
                         </button>
                     );
                 })}
+                {/* A4: pasif (soft-delete edilmiş) ürünlere tek erişim yolu.
+                    Tedarikçiler'deki "Pasifleri göster" kalıbının aynısı. */}
+                <label style={{
+                    display: "flex", alignItems: "center", gap: "6px",
+                    fontSize: "12px", color: "var(--text-interactive-muted)",
+                    cursor: "pointer", marginLeft: "4px",
+                }}>
+                    <input
+                        type="checkbox"
+                        checked={showPassive}
+                        onChange={e => { setShowPassive(e.target.checked); setCurrentPage(1); }}
+                        style={{ cursor: "pointer" }}
+                    />
+                    Pasifleri göster
+                </label>
             </div>
 
             <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "flex-end" }}>
@@ -920,6 +992,8 @@ export default function ProductsPage() {
                     rows={pageRows}
                     rowKey={p => p.id}
                     onRowClick={product => router.push(`/dashboard/products/${product.id}`)}
+                    // A4: pasif satır soluk (product-types tablosundaki rowStyle kalıbı)
+                    rowStyle={product => (product.isActive ? {} : { opacity: 0.55 })}
                     rowAriaLabel={product => `${product.name} detayını gör`}
                     minWidth={isMobile ? "360px" : "640px"}
                     emptyMessage={

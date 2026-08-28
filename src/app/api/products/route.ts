@@ -44,7 +44,7 @@ function enrichProducts(
 }
 
 const getCachedProducts = unstable_cache(
-    async (category: string, productType: string, isActive: boolean, page: number) => {
+    async (category: string, productType: string, isActive: boolean | undefined, page: number) => {
         const [products, quotedMap, incomingMap] = await Promise.all([
             dbListProducts({
                 category: category || undefined,
@@ -66,7 +66,7 @@ const getCachedProducts = unstable_cache(
 // query parametreleri normal endpoint'le aynı şekilde uygulanır; sadece
 // pagination devre dışı (pageSize: 10000). Cache key filter-aware.
 const getCachedAllProducts = unstable_cache(
-    async (category: string, productType: string, isActive: boolean) => {
+    async (category: string, productType: string, isActive: boolean | undefined) => {
         const [products, quotedMap, incomingMap] = await Promise.all([
             dbListProducts({
                 category: category || undefined,
@@ -92,7 +92,13 @@ export async function GET(req: NextRequest) {
         const { searchParams } = req.nextUrl;
         const category = searchParams.get("category") ?? "";
         const productType = searchParams.get("product_type") ?? "";
-        const isActive = searchParams.get("is_active") !== "false";
+        // A4 (2026-08-24): üç durum. "false" → yalnız pasif · "all" → İKİSİ DE
+        // (undefined) · aksi → yalnız aktif (eski varsayılan, davranış korunur).
+        // "Sil" ürünü soft-delete ediyor (is_active=false); üçüncü durum olmadan
+        // pasif ürünler UI'dan TAMAMEN erişilemezdi — yanlışlıkla silinen ürün
+        // geri getirilemiyordu (SKU unique olduğu için yeniden de yaratılamaz).
+        const isActiveRaw = searchParams.get("is_active");
+        const isActive = isActiveRaw === "all" ? undefined : isActiveRaw !== "false";
         // RBAC R3: redaction cache SONRASI, per-request (perms cache key'ine girmez).
         const authSpan = startSpan();
         const perms = await getCurrentUserPermissions(req);
