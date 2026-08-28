@@ -15,6 +15,7 @@ import type { ProductTypeRow, ProductTypeFieldRow } from "@/lib/database.types";
 import { DynamicFieldEdit, FieldEdit } from "@/components/products/DynamicFieldEdit";
 import SupplierPricesPanel from "@/components/products/SupplierPricesPanel";
 import { missingRequiredTechnicalFields } from "@/lib/technical-templates";
+import { fieldStyle } from "@/components/ui/Input";
 
 // Mirror of server-side ALLOWED_MIME — client-safe (no server module imports).
 // Source of truth: src/lib/supabase/product-attachments.ts ALLOWED_MIME.
@@ -137,15 +138,11 @@ export function computeLostAttributeKeys(
     return Object.keys(currentAttributes).filter(k => !newKeys.has(k));
 }
 
-const inputStyle: React.CSSProperties = {
-    fontSize: "13px",
-    padding: "6px 10px",
-    border: "0.5px solid var(--border-secondary)",
-    borderRadius: "5px",
-    background: "var(--bg-tertiary)",
-    color: "var(--text-primary)",
-    width: "100%",
-};
+// Ortak form alanı stili — token tek kaynaktan (`--input-bg`/`--input-border`/
+// `--line-width`). Eskiden burada 0.5px + `--border-secondary` + `--bg-tertiary`
+// vardı; koyu temada fark görünmüyordu ama AYDINLIK temada her form ekranı
+// farklı duruyordu (2026-08-24 tespiti).
+const inputStyle: React.CSSProperties = fieldStyle("md");
 
 const fieldRowStyle: React.CSSProperties = {
     display: "grid",

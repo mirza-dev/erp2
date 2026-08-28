@@ -19,6 +19,7 @@ import { DEMO_BLOCK_TOAST, DEMO_DISABLED_TOOLTIP, useIsDemo } from "@/lib/demo-u
 import { generateTechnicalFieldKey } from "@/lib/technical-templates";
 import type { ProductFieldType, ProductTypeFieldRow, ProductTypeRow } from "@/lib/database.types";
 import type { ProductTypeStatsRow } from "@/lib/supabase/product-types";
+import { fieldStyle } from "@/components/ui/Input";
 
 const FIELD_TYPE_LABELS: Record<ProductFieldType, string> = {
     text: "Metin",
@@ -70,16 +71,11 @@ const cardStyle: React.CSSProperties = {
     padding: "16px",
 };
 
-const inputStyle: React.CSSProperties = {
-    width: "100%",
-    boxSizing: "border-box",
-    fontSize: "13px",
-    padding: "8px 10px",
-    border: "0.5px solid var(--border-secondary)",
-    borderRadius: "6px",
-    background: "var(--bg-tertiary)",
-    color: "var(--text-primary)",
-};
+// Ortak form alanı stili — token tek kaynaktan (`--input-bg`/`--input-border`/
+// `--line-width`). Eskiden burada 0.5px + `--border-secondary` + `--bg-tertiary`
+// vardı; koyu temada fark görünmüyordu ama AYDINLIK temada her form ekranı
+// farklı duruyordu (2026-08-24 tespiti).
+const inputStyle: React.CSSProperties = fieldStyle("lg");
 
 const labelStyle: React.CSSProperties = {
     fontSize: "11px",

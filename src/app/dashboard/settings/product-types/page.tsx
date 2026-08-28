@@ -17,6 +17,7 @@ import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 import { useToast } from "@/components/ui/Toast";
 import { DEMO_BLOCK_TOAST, DEMO_DISABLED_TOOLTIP, useIsDemo } from "@/lib/demo-utils";
 import type { ProductTypeStatsRow } from "@/lib/supabase/product-types";
+import { fieldStyle } from "@/components/ui/Input";
 
 const pageStyle: React.CSSProperties = {
     padding: "24px",
@@ -54,16 +55,11 @@ const tableWrapStyle: React.CSSProperties = {
     background: "var(--bg-primary)",
 };
 
-const inputStyle: React.CSSProperties = {
-    width: "100%",
-    fontSize: "13px",
-    padding: "8px 10px",
-    border: "0.5px solid var(--border-secondary)",
-    borderRadius: "6px",
-    background: "var(--bg-tertiary)",
-    color: "var(--text-primary)",
-    boxSizing: "border-box",
-};
+// Ortak form alanı stili — token tek kaynaktan (`--input-bg`/`--input-border`/
+// `--line-width`). Eskiden burada 0.5px + `--border-secondary` + `--bg-tertiary`
+// vardı; koyu temada fark görünmüyordu ama AYDINLIK temada her form ekranı
+// farklı duruyordu (2026-08-24 tespiti).
+const inputStyle: React.CSSProperties = fieldStyle("lg");
 
 const modalBackdropStyle: React.CSSProperties = {
     position: "fixed",

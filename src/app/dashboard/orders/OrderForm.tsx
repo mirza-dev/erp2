@@ -12,6 +12,7 @@ import Button, { ButtonLink } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { dateDaysFromToday, localISODate } from "@/lib/stock-utils";
+import { fieldStyle } from "@/components/ui/Input";
 
 // ── Shared types ───────────────────────────────────────────────
 
@@ -76,15 +77,11 @@ const thStyle: React.CSSProperties = {
     whiteSpace: "nowrap",
 };
 
-const inputStyle: React.CSSProperties = {
-    fontSize: "13px",
-    padding: "5px 8px",
-    border: "0.5px solid var(--border-secondary)",
-    borderRadius: "4px",
-    background: "var(--bg-tertiary)",
-    color: "var(--text-primary)",
-    width: "100%",
-};
+// Ortak form alanı stili — token tek kaynaktan (`--input-bg`/`--input-border`/
+// `--line-width`). Eskiden burada 0.5px + `--border-secondary` + `--bg-tertiary`
+// vardı; koyu temada fark görünmüyordu ama AYDINLIK temada her form ekranı
+// farklı duruyordu (2026-08-24 tespiti).
+const inputStyle: React.CSSProperties = fieldStyle("sm");
 
 export default function OrderForm({ mode, orderId, initial }: OrderFormProps) {
     const { customers } = useCustomers();

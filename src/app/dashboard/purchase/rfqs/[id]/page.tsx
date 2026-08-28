@@ -7,15 +7,17 @@ import { useIsDemo, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import type { RfqDetail, RfqVendorWithPrices } from "@/lib/supabase/supplier-rfqs";
 import type { SupplierRfqStatus } from "@/lib/database.types";
 import { bestVendorPerLine, type RateMap, type ComparisonLine } from "@/lib/rfq-comparison";
+import { fieldStyle } from "@/components/ui/Input";
 
 const STATUS_LABEL: Record<SupplierRfqStatus, string> = {
     draft: "Taslak", sent: "Gönderildi", awarded: "Karara Bağlandı", cancelled: "İptal",
 };
 
-const inputStyle: React.CSSProperties = {
-    fontSize: "13px", padding: "5px 8px", border: "0.5px solid var(--border-secondary)",
-    borderRadius: "6px", background: "var(--bg-tertiary)", color: "var(--text-primary)", width: "100%", boxSizing: "border-box",
-};
+// Ortak form alanı stili — token tek kaynaktan (`--input-bg`/`--input-border`/
+// `--line-width`). Eskiden burada 0.5px + `--border-secondary` + `--bg-tertiary`
+// vardı; koyu temada fark görünmüyordu ama AYDINLIK temada her form ekranı
+// farklı duruyordu (2026-08-24 tespiti).
+const inputStyle: React.CSSProperties = fieldStyle("sm");
 const btn = (variant: "primary" | "ghost" | "danger" = "primary"): React.CSSProperties => ({
     padding: "7px 14px", fontSize: "13px", borderRadius: "6px", cursor: "pointer", fontWeight: 500,
     border: variant === "ghost" ? "0.5px solid var(--border-secondary)" : "none",

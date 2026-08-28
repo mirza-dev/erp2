@@ -7,6 +7,7 @@ import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-u
 import type { NoteTemplate, NoteTemplateKind } from "@/lib/mock-data";
 import { CircleOff, Pencil, Plus } from "lucide-react";
 import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
+import { fieldStyle } from "@/components/ui/Input";
 
 export const KIND_META: Record<NoteTemplateKind, { label: string; badge: string }> = {
     notes: { label: "Notlar & Şartlar", badge: "Not" },
@@ -30,7 +31,11 @@ const badgeStyle: React.CSSProperties = {
 };
 const modalBackdropStyle: React.CSSProperties = { position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center" };
 const modalStyle: React.CSSProperties = { background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "10px", padding: "24px", width: "100%", maxWidth: "480px", zIndex: 201 };
-const inputStyle: React.CSSProperties = { width: "100%", fontSize: "13px", padding: "8px 10px", border: "0.5px solid var(--border-secondary)", borderRadius: "6px", background: "var(--bg-tertiary)", color: "var(--text-primary)", boxSizing: "border-box" };
+// Ortak form alanı stili — token tek kaynaktan (`--input-bg`/`--input-border`/
+// `--line-width`). Eskiden burada 0.5px + `--border-secondary` + `--bg-tertiary`
+// vardı; koyu temada fark görünmüyordu ama AYDINLIK temada her form ekranı
+// farklı duruyordu (2026-08-24 tespiti).
+const inputStyle: React.CSSProperties = fieldStyle("lg");
 const labelStyle: React.CSSProperties = { fontSize: "12px", color: "var(--text-secondary)", marginBottom: "4px", display: "block" };
 const errStyle: React.CSSProperties = { color: "var(--danger)", fontSize: "12px", marginTop: "8px" };
 

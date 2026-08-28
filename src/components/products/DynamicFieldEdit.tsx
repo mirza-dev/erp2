@@ -1,16 +1,13 @@
 "use client";
 
 import type { ProductTypeFieldRow } from "@/lib/database.types";
+import { fieldStyle } from "@/components/ui/Input";
 
-const inputStyle: React.CSSProperties = {
-    fontSize: "13px",
-    padding: "6px 10px",
-    border: "0.5px solid var(--border-secondary)",
-    borderRadius: "5px",
-    background: "var(--bg-tertiary)",
-    color: "var(--text-primary)",
-    width: "100%",
-};
+// Ortak form alanı stili — token tek kaynaktan (`--input-bg`/`--input-border`/
+// `--line-width`). Eskiden burada 0.5px + `--border-secondary` + `--bg-tertiary`
+// vardı; koyu temada fark görünmüyordu ama AYDINLIK temada her form ekranı
+// farklı duruyordu (2026-08-24 tespiti).
+const inputStyle: React.CSSProperties = fieldStyle("md");
 
 const fieldRowStyle: React.CSSProperties = {
     display: "grid",

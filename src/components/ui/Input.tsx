@@ -31,7 +31,13 @@ const SIZE_PADDING: Record<FieldSize, string> = {
  * `fontWeight` (--font-ui-weight = 500; yalnız 3 dosyada vardı), textarea
  * `resize`, select `cursor`, `fontFamily`. Bunlar gerekiyorsa `style` ile geçilir.
  */
-function fieldStyle(size: FieldSize): CSSProperties {
+/**
+ * Dışa açık (2026-08-24): repoda 19 yerel `inputStyle` sabiti vardı, 13'ü eski
+ * token'da kalmıştı. Her kullanım yerini `<Input>` JSX'ine çevirmek yerine yerel
+ * sabitin GÖVDESİ buraya bağlanır — kullanım yerleri (`style={inputStyle}`)
+ * dokunulmadan çalışmaya devam eder, token tek kaynaktan gelir, blast radius sıfır.
+ */
+export function fieldStyle(size: FieldSize): CSSProperties {
     return {
         width: "100%",
         boxSizing: "border-box",
