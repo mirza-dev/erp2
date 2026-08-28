@@ -233,6 +233,13 @@ export interface UpdateCustomerInput {
     payment_terms_days?: number;
     customer_code?: string;
     default_incoterm?: string;
+    /**
+     * A5 (2026-08-24): cariyi pasife alma/geri açma. Kolon ve "Pasif" sekmesi
+     * migration 001'den beri VARDI ama hiçbir yazma yolu bunu set etmiyordu →
+     * "bu müşteriyle artık çalışmıyoruz" durumunun karşılığı yoktu (tek seçenek
+     * KALICI silmekti, o da siparişi olan caride FK guard'ıyla 409).
+     */
+    is_active?: boolean;
 }
 
 export async function dbUpdateCustomer(id: string, input: UpdateCustomerInput): Promise<CustomerRow> {
@@ -250,6 +257,7 @@ export async function dbUpdateCustomer(id: string, input: UpdateCustomerInput): 
     if (input.payment_terms_days !== undefined) patch.payment_terms_days = input.payment_terms_days ?? null;
     if (input.customer_code !== undefined)    patch.customer_code = input.customer_code || null;
     if (input.default_incoterm !== undefined) patch.default_incoterm = input.default_incoterm || null;
+    if (input.is_active !== undefined)        patch.is_active = input.is_active;
     const { data, error } = await supabase
         .from("customers")
         .update(patch)

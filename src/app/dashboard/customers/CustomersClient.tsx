@@ -19,7 +19,7 @@ import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-u
 import Pagination from "@/components/ui/Pagination";
 import { computeTotalPages } from "@/hooks/usePagination";
 import { useSelection } from "@/hooks/useSelection";
-import { Plus, Trash2 } from "lucide-react";
+import { Ban, Plus, RotateCcw, Trash2 } from "lucide-react";
 import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
 import type { CustomerTab } from "@/lib/supabase/customers";
 
@@ -76,6 +76,7 @@ export default function CustomersClient(props: CustomersClientProps) {
     const [newCustomer, setNewCustomer] = useState(newCustomerInitial);
     const [isAdding, setIsAdding] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
+    const [togglingId, setTogglingId] = useState<string | null>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
     const [bulkDeleteConfirm, setBulkDeleteConfirm] = useState(false);
     const [bulkDeleting, setBulkDeleting] = useState(false);
@@ -161,6 +162,41 @@ export default function CustomersClient(props: CustomersClientProps) {
     const setField = (key: keyof typeof newCustomerInitial) =>
         (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) =>
             setNewCustomer(f => ({ ...f, [key]: e.target.value }));
+
+    /**
+     * A5: cariyi pasife al / geri aç. `customers.is_active` + "Pasif" sekmesi
+     * migration 001'den beri VARDI ama hiçbir UI aksiyonu bunu değiştirmiyordu:
+     * tek seçenek KALICI silmekti, o da siparişi olan caride FK guard'ıyla
+     * 409 veriyordu → "bu müşteriyle artık çalışmıyoruz" durumunun karşılığı
+     * yoktu. Geri alınabilir seçenek artık yıkıcı olanın yanında duruyor.
+     */
+    const handleToggleActive = async (customer: Customer) => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        const next = !customer.isActive;
+        setTogglingId(customer.id);
+        try {
+            const res = await fetch(`/api/customers/${customer.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ is_active: next }),
+            });
+            if (!res.ok) {
+                const errBody = await res.json().catch(() => null);
+                throw new Error(errBody?.error ?? "Müşteri durumu değiştirilemedi.");
+            }
+            applyUpdatedCustomer(mapCustomer(await res.json()));
+            setDisplayCounts(prev => patchCountRecord(prev, {
+                active: next ? 1 : -1,
+                passive: next ? -1 : 1,
+            }));
+            toast({ type: "success", message: next ? "Müşteri aktif edildi" : "Müşteri pasife alındı" });
+            revalidateCustomers();
+        } catch (err) {
+            toast({ type: "error", message: err instanceof Error ? err.message : "Müşteri durumu değiştirilemedi." });
+        } finally {
+            setTogglingId(null);
+        }
+    };
 
     const handleDelete = async (id: string) => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
@@ -402,16 +438,33 @@ export default function CustomersClient(props: CustomersClientProps) {
                             </Button>
                         </span>
                     ) : (
-                        <Button
-                            variant="dangerSoft"
-                            size="xs"
-                            leftIcon={<Trash2 size={13} />}
-                            onClick={() => setConfirmDeleteId(customer.id)}
-                            disabled={isDemo}
-                            title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                        >
-                            Kalıcı Sil
-                        </Button>
+                        <span style={{ display: "flex", alignItems: "center", gap: "6px", justifyContent: "flex-end" }}>
+                            {/* Geri alınabilir seçenek ÖNCE — yıkıcı olan yanında,
+                                Tedarikçiler'deki "Pasife al" kalıbıyla aynı. */}
+                            <Button
+                                variant="secondary"
+                                size="xs"
+                                leftIcon={customer.isActive ? <Ban size={13} /> : <RotateCcw size={13} />}
+                                onClick={() => handleToggleActive(customer)}
+                                disabled={isDemo || togglingId === customer.id}
+                                title={isDemo ? DEMO_DISABLED_TOOLTIP
+                                    : customer.isActive
+                                        ? "Pasife al — kayıt ve geçmiş korunur, listede gizlenir"
+                                        : "Tekrar aktif et"}
+                            >
+                                {togglingId === customer.id ? "…" : customer.isActive ? "Pasife al" : "Aktif et"}
+                            </Button>
+                            <Button
+                                variant="dangerSoft"
+                                size="xs"
+                                leftIcon={<Trash2 size={13} />}
+                                onClick={() => setConfirmDeleteId(customer.id)}
+                                disabled={isDemo}
+                                title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                            >
+                                Kalıcı Sil
+                            </Button>
+                        </span>
                     ))}
                 </span>
             ),

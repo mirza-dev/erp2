@@ -18,9 +18,14 @@ export async function PATCH(
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;
         const body = parsed.data as Record<string, unknown>;
-        const PATCHABLE = ["name","email","phone","address","tax_number","tax_office","country","currency","notes"];
+        // A5: is_active eklendi — cariyi pasife alma/geri açma. (Bu liste yalnız
+        // "en az bir alan geldi mi" kapısı; asıl alan filtresi dbUpdateCustomer'da.)
+        const PATCHABLE = ["name","email","phone","address","tax_number","tax_office","country","currency","notes","is_active"];
         if (!PATCHABLE.some(f => f in body)) {
             return NextResponse.json({ error: "Güncellenecek alan bulunamadı." }, { status: 400 });
+        }
+        if ("is_active" in body && typeof body.is_active !== "boolean") {
+            return NextResponse.json({ error: "is_active boolean olmalı." }, { status: 400 });
         }
         if ("name" in body && !(body.name as string)?.trim()) {
             return NextResponse.json({ error: "Firma adı boş olamaz." }, { status: 400 });
