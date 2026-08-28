@@ -91,7 +91,7 @@ function parseLiveRatesTimestamp(value: unknown): string | undefined {
     return Number.isNaN(date.getTime()) ? undefined : date.toISOString();
 }
 
-function extractCurrencyBlock(xml: string, code: ExchangeCurrencyCode): string {
+function extractCurrencyBlock(xml: string, code: string): string {
     const match = xml.match(
         new RegExp(`<Currency\\b(?=[^>]*(?:Kod|CurrencyCode)=["']${code}["'])[^>]*>([\\s\\S]*?)</Currency>`),
     );
@@ -122,6 +122,42 @@ export function parseTcmbExchangeRates(xml: string, fetchedAt = new Date().toISO
         rates,
         fetchedAt,
     };
+}
+
+/**
+ * TCMB `today.xml`'inden tek bir para biriminin **döviz alış** (ForexBuying)
+ * kurunu okur.
+ *
+ * Neden ayrı fonksiyon: `parseTcmbExchangeRates` yalnız USD+EUR döner ve
+ * eksik biriminde THROW eder (ticker sözleşmesi). Fatura tarafı ise
+ *  · GBP dahil herhangi bir kodu isteyebilir,
+ *  · kur çözülemediğinde patlamak yerine `null` alıp alanı hiç göndermemelidir
+ *    (yanlış kur göndermektense Paraşüt'ün kendi kurunu kullanması doğrudur).
+ *
+ * ForexBuying tercihi bilinçli: fatura TL karşılığı için mevzuatın kullandığı
+ * kur budur (satış değil).
+ *
+ * `date` alanı da döner — çağıran, kurun fatura tarihiyle aynı güne ait
+ * olduğunu doğrulayabilsin diye (today.xml yalnız BUGÜNÜ taşır).
+ */
+export function parseTcmbForexBuying(
+    xml: string,
+    code: string,
+): { rate: number; date: string } | null {
+    try {
+        // Kod doğrudan regex'e giriyor → 3 harfli ISO dışına izin verilmez.
+        if (!/^[A-Z]{3}$/.test(code)) return null;
+        const date = getAttribute(xml, "Tarih") ?? getAttribute(xml, "Date");
+        if (!date) return null;
+        const block = extractCurrencyBlock(xml, code);
+        const raw = getTagText(block, "ForexBuying");
+        if (!raw) return null;
+        const rate = Number(raw.replace(",", "."));
+        if (!Number.isFinite(rate) || rate <= 0) return null;
+        return { rate, date };
+    } catch {
+        return null;
+    }
 }
 
 export function parseLiveRatesExchangeRates(payloads: unknown[], fetchedAt = new Date().toISOString()): ExchangeRatesResponse {

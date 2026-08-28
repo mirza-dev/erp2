@@ -13,6 +13,7 @@ import { dbCreateSyncLog, dbGetSyncLog, dbUpdateSyncLog } from "@/lib/supabase/s
 import { dbCreateAlert } from "@/lib/supabase/alerts";
 import { enqueueInternalNotification } from "@/lib/services/notification-outbox-service";
 import { getParasutAdapter } from "@/lib/parasut";
+import { resolveInvoiceExchangeRate } from "@/lib/services/parasut-exchange-rate";
 import { createServiceClient } from "@/lib/supabase/service";
 import { ParasutError } from "@/lib/parasut-adapter";
 import { parasutApiCall } from "@/lib/services/parasut-api-call";
@@ -709,6 +710,12 @@ async function upsertInvoice(order: OrderWithLines): Promise<void> {
 
     const issueDate = localISODate(Date.now());
     const dueDate   = computeDueDate(issueDate, customer.payment_terms_days ?? 30);
+    const currency  = mapCurrency(order.currency);
+
+    // Faz 12: dövizli faturada TCMB alış kuru gönderilir; çözülemezse alan hiç
+    // gönderilmez (Paraşüt kendi kurunu uygular). Marker'dan ÖNCE çözülür —
+    // ağ hatası create denemesi olarak işaretlenmemeli.
+    const exchangeRate = await resolveInvoiceExchangeRate(currency, issueDate);
 
     // Durable attempted marker — create çağrısından hemen önce, validasyonlar geçtikten sonra
     const { error: markerErr } = await supabase
@@ -727,9 +734,14 @@ async function upsertInvoice(order: OrderWithLines): Promise<void> {
                 invoice_id:        numberInt,
                 issue_date:        issueDate,
                 due_date:          dueDate,
-                currency:          mapCurrency(order.currency),
+                currency,
+                ...(exchangeRate !== undefined ? { exchange_rate: exchangeRate } : {}),
                 shipment_included: false, // KESIN false — shipment ayrı belgede (stok invariant)
                 description:       `Roven #${order.order_number}`,
+                // ERP sipariş referansı resmî alanlarda da taşınır (yalnız
+                // serbest description'da değil) — mali müşavir eşlemesi için.
+                order_no:          order.order_number,
+                order_date:        (order.created_at ?? "").slice(0, 10) || issueDate,
                 details,
             }),
         );

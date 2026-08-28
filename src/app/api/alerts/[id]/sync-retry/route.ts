@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { dbGetAlertById, dbUpdateAlertStatus } from "@/lib/supabase/alerts";
 import { serviceSyncAllPending } from "@/lib/services/parasut-service";
 import { serviceParasutOAuthRefresh } from "@/lib/services/parasut-oauth";
+import { getParasutAdapter } from "@/lib/parasut";
 import {
     ALERT_ENTITY_PARASUT_AUTH,
     PARASUT_SYNC_ALERT_ENTITY_IDS,
@@ -72,7 +73,7 @@ export async function POST(
         let action: "oauth_refresh" | "sync_all";
         if (alert.entity_id === ALERT_ENTITY_PARASUT_AUTH) {
             action = "oauth_refresh";
-            const result = await serviceParasutOAuthRefresh();
+            const result = await serviceParasutOAuthRefresh(getParasutAdapter());
             if (!result.success) {
                 return NextResponse.json(
                     { error: "OAuth bağlantısı kurulmamış. Paraşüt sayfasından yeniden yetkilendirme yapın." },

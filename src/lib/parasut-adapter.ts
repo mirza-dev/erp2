@@ -86,6 +86,12 @@ export interface ContactInput {
     tax_number:  string;
     email?:      string;
     tax_office?: string;
+    /**
+     * Paraşüt'te müşteri ve tedarikçi TEK `contacts` havuzunda tutulur; ayrımı
+     * bu alan yapar. Verilmezse `customer` varsayılır (satış akışının bugünkü
+     * davranışı korunur); Faz 13 tedarikçi akışı `supplier` geçer.
+     */
+    account_type?: 'customer' | 'supplier';
 }
 
 export interface ProductInput {
@@ -104,6 +110,17 @@ export interface InvoiceInput {
     currency:          'TRL' | 'USD' | 'EUR' | 'GBP';
     shipment_included: false; // KESIN false — stok invariant
     description:       string;
+    /**
+     * Dövizli faturada TL karşılığının hesaplandığı kur (TCMB, fatura tarihi).
+     * Gönderilmezse Paraşüt kendi kurunu uygular → ERP'deki tutarla sapabilir.
+     * Çözülemediğinde alan HİÇ gönderilmez (yanlış kur göndermektense
+     * Paraşüt'ün kurunu kullanmak doğrudur).
+     */
+    exchange_rate?:    number;
+    /** ERP sipariş numarası — resmî alan (yalnız `description` metni değil). */
+    order_no?:         string;
+    /** Sipariş tarihi (YYYY-MM-DD). `order_no` doluysa Paraşüt bunu bekler. */
+    order_date?:       string;
     details: Array<{
         quantity:        number;
         unit_price:      number;
@@ -135,8 +152,15 @@ export interface ShipmentDocInput {
 }
 
 export interface EInvoiceInput {
+    /**
+     * DİKKAT: e-belge `issue_date` alanı spec'te READONLY — faturadan miras
+     * alınır. Alan arayüzde geriye dönük uyumluluk için durur, HTTP adapter
+     * payload'a KOYMAZ.
+     */
     issue_date:    string;
     scenario:      'commercial' | 'basic';
+    /** Alıcının e-Fatura gelen kutusu (alias). `listEInvoiceInboxes`'tan gelir. */
+    to?:           string;
 }
 
 export interface EArchiveInput {

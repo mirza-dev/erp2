@@ -16,6 +16,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { handleApiError } from "@/lib/api-error";
 import { serviceParasutOAuthRefresh } from "@/lib/services/parasut-oauth";
+import { getParasutAdapter } from "@/lib/parasut";
 
 async function requireAdmin(): Promise<{ error: NextResponse } | null> {
     const supabase = await createClient();
@@ -35,7 +36,7 @@ export async function POST(): Promise<NextResponse> {
     if (guard) return guard.error;
 
     try {
-        const result = await serviceParasutOAuthRefresh();
+        const result = await serviceParasutOAuthRefresh(getParasutAdapter());
         if (!result.success) {
             return NextResponse.json(
                 { error: "OAuth bağlantısı henüz kurulmamış. Önce 'Paraşüt'e bağlan' linki ile akışı başlatın." },

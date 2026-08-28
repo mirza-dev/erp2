@@ -8,7 +8,6 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { dbCreateAlert } from "@/lib/supabase/alerts";
 import { ALERT_ENTITY_PARASUT_AUTH } from "@/lib/parasut-constants";
 import type { ParasutAdapter } from "@/lib/parasut-adapter";
-import { getParasutAdapter } from "@/lib/parasut";
 
 const LEASE_TTL_MS      = 30_000; // how long we hold the refresh lock
 const EXPIRY_BUFFER_MS  = 60_000; // refresh 60s before actual expiry
@@ -174,8 +173,14 @@ async function pollForFreshToken(
  * Caller'ların kendi auth disiplinini uygulaması gerekir:
  * - /api/parasut/oauth/refresh — admin email gate (manuel refresh).
  * - /api/alerts/[id]/sync-retry — session yeterli (sync_issue alertinden tetiklenir).
+ *
+ * Faz 12: adapter PARAMETRE olarak alınır. Eskiden burada `getParasutAdapter()`
+ * çağrılıyordu; gerçek HTTP adapter jeton için bu dosyadaki `getAccessToken`'a
+ * muhtaç olduğundan bu, `parasut.ts → parasut-http-adapter.ts → parasut-oauth.ts
+ * → parasut.ts` döngüsünü doğururdu. Adapter'ı dışarıdan almak döngüyü kaynakta
+ * kırar (dinamik import hilesine gerek kalmaz).
  */
-export async function serviceParasutOAuthRefresh(): Promise<{
+export async function serviceParasutOAuthRefresh(adapter: ParasutAdapter): Promise<{
     success: true;
     expiresAt: string | null;
     tokenVersion: number | null;
@@ -200,7 +205,7 @@ export async function serviceParasutOAuthRefresh(): Promise<{
     if (updateErr) throw new Error(`Token expiry güncelleme hatası: ${updateErr.message}`);
 
     try {
-        await getAccessToken(getParasutAdapter());
+        await getAccessToken(adapter);
     } catch (err) {
         // Refresh fail → eski expires_at'i geri yaz (buffer mantığını bozma)
         await supabase

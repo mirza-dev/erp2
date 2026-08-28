@@ -4,6 +4,8 @@
  * Gerçek HTTP adapter kullanıma hazır olduğunda bu dosya yerini alır.
  */
 
+import { HttpParasutAdapter } from './parasut-http-adapter';
+import { getAccessToken } from './services/parasut-oauth';
 import {
     ParasutError,
     type ParasutAdapter,
@@ -312,16 +314,35 @@ export const mockParasutAdapter = new MockParasutAdapter();
 // ── Adapter factory ───────────────────────────────────────────────────────────
 
 /**
- * Returns the active ParasutAdapter for use in server code.
- * PARASUT_USE_MOCK !== "false" → MockParasutAdapter (default in dev/test).
- * When PARASUT_USE_MOCK=false, a real HTTP adapter must be returned here (Faz 10).
+ * Sunucu kodunun kullandığı aktif `ParasutAdapter`.
+ *
+ * `PARASUT_USE_MOCK !== "false"` → `MockParasutAdapter` (dev/test varsayılanı).
+ * `PARASUT_USE_MOCK === "false"` → gerçek HTTP adapter (Faz 12).
+ *
+ * Jeton zinciri: adapter kendi `getAccessToken(this)`'ini kullanır — o da
+ * gerektiğinde `adapter.refreshToken()` çağırır. `refreshToken` yalnız
+ * client_id/secret ile çalıştığı için özyineleme oluşmaz.
  */
+let httpAdapterSingleton: HttpParasutAdapter | null = null;
+
 export function getParasutAdapter(): ParasutAdapter {
     if (process.env.PARASUT_USE_MOCK !== "false") {
         return mockParasutAdapter;
     }
-    // Real HTTP adapter placeholder — implement in Faz 10
-    throw new Error("Real ParasutAdapter not yet implemented. Set PARASUT_USE_MOCK to use mock.");
+    if (!httpAdapterSingleton) {
+        const adapter: HttpParasutAdapter = new HttpParasutAdapter({
+            // Lease + CAS mantığı `parasut-oauth.ts`'te kalır; adapter yalnız
+            // geçerli jetonu ister. Kendini geçirir çünkü yenileme onun üstünden.
+            getAccessToken: () => getAccessToken(adapter),
+        });
+        httpAdapterSingleton = adapter;
+    }
+    return httpAdapterSingleton;
+}
+
+/** Test yardımcısı — env değiştiğinde singleton'ı düşürür. */
+export function resetParasutAdapterCache(): void {
+    httpAdapterSingleton = null;
 }
 
 // ── Legacy types (backward compat) ───────────────────────────────────────────
