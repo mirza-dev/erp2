@@ -2,8 +2,10 @@
 
 ## 🎯 Progress Tracker
 
-**Son güncelleme:** 2026-04-26
-**Durum:** Faz 10 TAMAMEN KAPALI — Faz 11 sırada
+**Son güncelleme:** 2026-08-29
+**Durum:** Faz 1–16 TAMAMLANDI (kod). Canlı doğrulama (gate `--write`) BEKLİYOR.
+**Teslim:** `PARASUT_ENABLED=false` + `PARASUT_USE_MOCK=true` → kapalı teslim.
+**Go-live adımları:** `docs/parasut-golive-runbook.md`
 
 ### Faz ilerlemesi
 
@@ -19,14 +21,19 @@
 | 8 | Shipment document (inflow=false + procurement_number + marker) | ✅ Tamamlandı | 2026-04-26 | 1852 test yeşil, TS temiz; upsertShipment + dbWriteShipmentMeta + durable marker + recovery pagination + 28 test; bulgu fix: marker sırası, alert best-effort, recovery parasutApiCall, orderId context |
 | 9 | Sales invoice (shipment_included=false + warehouse YOK invariant) | ✅ Tamamlandı | 2026-04-26 | 1880 test yeşil, TS temiz; upsertInvoice + dbWriteInvoiceMeta + computeDueDate + ALERT_ENTITY_PARASUT_INVOICE + 28 test; bulgu fix: yanlış entity_id (a003→a005) |
 | 10 | E-belge create + trackable_job poll + invoice re-read | ✅ Tamamlandı | 2026-04-26 | 1914 test yeşil, TS temiz; upsertEDocument + dbWriteEDocMeta + serviceParasutPollEDocuments (poll CRON) + /api/parasut/poll-e-documents route + middleware CRON_PATHS güncellendi + 35 test (24 faz10 + 9 poll + 2 stale-order); bulgu fix: stale order re-fetch, idempotent guard'lar (.eq jobId.neq status='done'), pending→running map |
-| 10 | E-belge create + trackable_job poll + invoice re-read | ⬜ Başlamadı | — | |
-| 11 | Backend preflight + step-granular manual retry + UI badges | ⬜ Başlamadı | — | |
-| 12 | Gerçek API adapter + sandbox GATE | ⬜ Başlamadı | — | Kullanıcı yapacak (en son) |
+| 11 | Backend preflight + step-granular manual retry + UI badges | ✅ Tamamlandı | 2026-04-26 | 1914+ test |
+| 12 | **Gerçek HTTP adapter** (JSON:API, OAuth, hata sınıflandırma) | ✅ Tamamlandı | 2026-08-29 | `21497bf` · 5930 test. Spec'ten 4 düzeltme: e-fatura/e-arşiv ilişki asimetrisi · e-belge `issue_date` readOnly · `internet_sale` obje · irsaliye kalemleri `stock_movements`. Ayrıca `exchange_rate` + `order_no` boşluğu kapandı. |
+| 13 | **Alış faturası** (PO → purchase_bill, indirilecek KDV) | ✅ Tamamlandı | 2026-08-29 | `7adc040` · mig.107 · 5995 test. Satır bazlı KDV + tedarikçi fatura künyesi eklendi. |
+| 14 | **Tahsilat/ödeme geri okuma** + Açık Alacak kartı | ✅ Tamamlandı | 2026-08-29 | `0ba37ef` · mig.108 · 6045 test. `payment_overdue` uyarısı. |
+| 15 | **Stok mutabakatı** (`stock_updates` MUTLAK) | ✅ Tamamlandı | 2026-08-29 | `26333b5` · 6083 test. Varsayılan yalnız-rapor. |
+| 16 | Sandbox GATE script'i + go-live runbook | ✅ Tamamlandı | 2026-08-29 | `npm run parasut:gate` · `docs/parasut-golive-runbook.md` |
 
 **Durum legend:** ⬜ Başlamadı · 🟦 Devam ediyor · ✅ Tamamlandı · ⚠️ Bloklu / manuel inceleme
 
 ### Sıradaki adım
-Faz 11 — Backend preflight + step-granular manual retry + UI badges.
+**Kullanıcı tarafı:** Paraşüt API başvurusu (`destek@parasut.com`) + redirect URI kaydı →
+mig.107/108 APPLY → `npm run parasut:gate -- --write` (deneme şirketinde) →
+anahtarları aç. Tam sıra: `docs/parasut-golive-runbook.md`.
 
 ### Son oturum özeti
 - **Faz 10 tamamlandı + bulgu fix (2026-04-26):**
@@ -1167,6 +1174,18 @@ Token süre göstergesi + manual refresh butonu
 - [ ] **Shipment city/district zorunluluğu:** customers.city/district boş olan müşteride shipment_document create 400/422 verir mi? Ret olursa backend preflight'a "adres zorunlu" eklenir; kabul olursa veri opsiyonel kalabilir
 - [ ] 429 Retry-After doğru
 - [ ] refresh_token rotate gerçekten her refresh'te yeni değer döner
+
+### Faz 13-15 ile eklenen gate maddeleri (2026-08-29)
+- [ ] **Alış faturası warehouse'suz → stok DEĞİŞMEZ** (satış invariant'ının simetriği;
+      ihlal olursa Faz 15 mutabakatıyla birlikte ÇİFT artış olur)
+- [ ] **`stock_updates` MUTLAK yazar** — aynı değer iki kez yazılınca stok kaymamalı
+      (delta davranışı çıkarsa Faz 15 tasarımı geçersiz)
+- [ ] `inventory_levels` geri okuma tutuyor
+- [ ] `payment_status` / `remaining` gerçek tahsilatı yansıtıyor
+- [ ] Dövizli faturada gönderilen `exchange_rate` Paraşüt arayüzünde aynen görünüyor
+
+**Bu maddelerin tamamı `npm run parasut:gate -- --write` ile otomatik ölçülür.**
+Salt-okunur maddeler `npm run parasut:gate` ile belge oluşturmadan koşar.
 
 ## Advisor bulgularının kapatma haritası
 | Bulgu | Faz |

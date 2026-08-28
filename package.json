@@ -22,7 +22,8 @@
     "docker:run": "docker run --rm -p 3000:3000 --env-file .env.local erp2:local",
     "doctor": "npx react-doctor@latest",
     "find-test-data": "tsx scripts/find-test-data.ts",
-    "check:chains": "tsx scripts/check-chain-integrity.ts"
+    "check:chains": "tsx scripts/check-chain-integrity.ts",
+    "parasut:gate": "tsx scripts/parasut-gate.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

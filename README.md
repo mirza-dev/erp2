@@ -86,7 +86,9 @@ curl http://localhost:3000/api/health
 | `ANTHROPIC_API_KEY` | ⬜ | AI özet, puanlama ve parse için. Eksikse sistem çalışır; AI özellikleri devre dışı kalır. [console.anthropic.com](https://console.anthropic.com/settings/keys) |
 | `RESEND_API_KEY` · `EMAIL_FROM` | ⬜ | E-posta bildirimleri (Resend). Eksikse bildirim sessizce atlanır. |
 | `REDIS_URL` | ⬜ | Rate limiting (self-hosted Redis). Eksikse fail-open (limit yok). |
-| `PARASUT_CLIENT_ID` · `_SECRET` · `_COMPANY_ID` | ⬜ | Paraşüt Developer Portal → OAuth |
+| `PARASUT_CLIENT_ID` · `_SECRET` · `_COMPANY_ID` | ⬜ | Paraşüt API başvurusu → `destek@parasut.com` |
+| `PARASUT_ENABLED` + `PARASUT_USE_MOCK` | ⬜ | **İkisi de gerekli** — go-live anahtarları. Teslimde kapalı; açmadan önce `docs/parasut-golive-runbook.md` |
+| `PARASUT_STOCK_AUTOCORRECT` | ⬜ | Stok mutabakatı yazma modu. Varsayılan **kapalı** (yalnız rapor) |
 | `CRON_SECRET` | ⬜ | CRON endpoint'leri için Bearer token |
 
 ---
