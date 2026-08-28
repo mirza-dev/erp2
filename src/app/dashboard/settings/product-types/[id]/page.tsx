@@ -20,6 +20,7 @@ import { generateTechnicalFieldKey } from "@/lib/technical-templates";
 import type { ProductFieldType, ProductTypeFieldRow, ProductTypeRow } from "@/lib/database.types";
 import type { ProductTypeStatsRow } from "@/lib/supabase/product-types";
 import { fieldStyle } from "@/components/ui/Input";
+import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 
 const FIELD_TYPE_LABELS: Record<ProductFieldType, string> = {
     text: "Metin",
@@ -84,25 +85,6 @@ const labelStyle: React.CSSProperties = {
     letterSpacing: "0.04em",
     marginBottom: "5px",
     display: "block",
-};
-
-const thStyle: React.CSSProperties = {
-    textAlign: "left",
-    padding: "9px 10px",
-    fontSize: "11px",
-    color: "var(--text-tertiary)",
-    textTransform: "uppercase",
-    letterSpacing: "0.04em",
-    borderBottom: "0.5px solid var(--border-tertiary)",
-    background: "var(--bg-tertiary)",
-};
-
-const tdStyle: React.CSSProperties = {
-    padding: "10px",
-    borderBottom: "0.5px solid var(--border-tertiary)",
-    color: "var(--text-primary)",
-    fontSize: "13px",
-    verticalAlign: "top",
 };
 
 const modalBackdropStyle: React.CSSProperties = {
@@ -440,6 +422,75 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
 
     const hasMissingRequired = (stats?.missing_required_product_count ?? 0) > 0;
 
+    // Faz B: ham <table> → DataTable. Aksiyon kolonu satır bazlı sıra bilgisine
+    // (activeIndex) ihtiyaç duyduğu için `cell` içinde hesaplanır.
+    const fieldColumns: DataTableColumn<ProductTypeFieldRow>[] = [
+        {
+            key: "label", header: "Alan",
+            cell: field => (
+                <>
+                    <div style={{ fontWeight: 650 }}>{field.label_tr}</div>
+                    {field.label_en && <div style={{ color: "var(--text-tertiary)", fontSize: "12px", marginTop: "2px" }}>{field.label_en}</div>}
+                    {field.help_text && <div style={{ color: "var(--text-tertiary)", fontSize: "11px", marginTop: "3px" }}>{field.help_text}</div>}
+                </>
+            ),
+        },
+        {
+            key: "key", header: "Teknik Anahtar",
+            cellStyle: { fontFamily: "monospace", color: "var(--text-secondary)" },
+            cell: field => field.field_key,
+        },
+        {
+            key: "type", header: "Tip",
+            cell: field => (
+                <>
+                    {FIELD_TYPE_LABELS[field.field_type]}
+                    {field.unit && <span style={{ color: "var(--text-tertiary)" }}> · {field.unit}</span>}
+                    {(field.field_type === "select" || field.field_type === "multiselect") && field.options && (
+                        <div style={{ color: "var(--text-tertiary)", fontSize: "11px", marginTop: "2px" }}>
+                            {(field.options as string[]).slice(0, 3).join(", ")}
+                            {(field.options as string[]).length > 3 ? ` (+${(field.options as string[]).length - 3})` : ""}
+                        </div>
+                    )}
+                </>
+            ),
+        },
+        { key: "status", header: "Durum", cell: field => <FieldStatus field={field} /> },
+        {
+            key: "actions", header: "İşlem", align: "right",
+            cell: field => {
+                const activeIndex = activeFields.findIndex(item => item.id === field.id);
+                return (
+                    <div style={{ display: "inline-flex", gap: "5px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+                        <button type="button" onClick={() => void moveField(field.id, "up")} disabled={!field.is_active || activeIndex <= 0 || isDemo} aria-label={`${field.label_tr} yukarı taşı`} style={iconButtonStyle}>
+                            <ArrowUp size={13} />
+                        </button>
+                        <button type="button" onClick={() => void moveField(field.id, "down")} disabled={!field.is_active || activeIndex < 0 || activeIndex >= activeFields.length - 1 || isDemo} aria-label={`${field.label_tr} aşağı taşı`} style={iconButtonStyle}>
+                            <ArrowDown size={13} />
+                        </button>
+                        <button type="button" onClick={() => openEditField(field)} disabled={isDemo} aria-label={`${field.label_tr} düzenle`} style={iconButtonStyle}>
+                            <Pencil size={13} />
+                        </button>
+                        {field.is_active && (
+                            <Button variant="toolbar" size="xs" onClick={() => void toggleRequired(field)} disabled={isDemo}>
+                                {field.required ? "Opsiyonel" : "Zorunlu"}
+                            </Button>
+                        )}
+                        <Button
+                            variant={field.is_active ? "dangerSoft" : "success"}
+                            size="xs"
+                            leftIcon={field.is_active ? <ArchiveRestore size={13} /> : <RotateCcw size={13} />}
+                            onClick={() => void setFieldActive(field, !field.is_active)}
+                            disabled={isDemo}
+                        >
+                            {field.is_active ? "Pasifleştir" : "Aktifleştir"}
+                        </Button>
+                    </div>
+                );
+            },
+        },
+    ];
+
     return (
         <div style={pageStyle}>
             <Link href="/dashboard/settings/product-types" style={{ color: "var(--text-tertiary)", textDecoration: "none", fontSize: "13px" }}>← Teknik Şablonlar</Link>
@@ -514,74 +565,15 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
                         </div>
 
                         <div style={{ border: "0.5px solid var(--border-tertiary)", borderRadius: "8px", overflow: "hidden", background: "var(--bg-primary)" }}>
-                            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                                <thead>
-                                    <tr>
-                                        <th style={thStyle}>Alan</th>
-                                        <th style={thStyle}>Teknik Anahtar</th>
-                                        <th style={thStyle}>Tip</th>
-                                        <th style={thStyle}>Durum</th>
-                                        <th style={{ ...thStyle, textAlign: "right" }}>İşlem</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {template.fields.length === 0 ? (
-                                        <tr>
-                                            <td colSpan={5} style={{ ...tdStyle, color: "var(--text-tertiary)" }}>Henüz teknik alan yok.</td>
-                                        </tr>
-                                    ) : template.fields.map(field => {
-                                        const activeIndex = activeFields.findIndex(item => item.id === field.id);
-                                        return (
-                                            <tr key={field.id} style={{ opacity: field.is_active ? 1 : 0.55 }}>
-                                                <td style={tdStyle}>
-                                                    <div style={{ fontWeight: 650 }}>{field.label_tr}</div>
-                                                    {field.label_en && <div style={{ color: "var(--text-tertiary)", fontSize: "12px", marginTop: "2px" }}>{field.label_en}</div>}
-                                                    {field.help_text && <div style={{ color: "var(--text-tertiary)", fontSize: "11px", marginTop: "3px" }}>{field.help_text}</div>}
-                                                </td>
-                                                <td style={{ ...tdStyle, fontFamily: "monospace", color: "var(--text-secondary)" }}>{field.field_key}</td>
-                                                <td style={tdStyle}>
-                                                    {FIELD_TYPE_LABELS[field.field_type]}
-                                                    {field.unit && <span style={{ color: "var(--text-tertiary)" }}> · {field.unit}</span>}
-                                                    {(field.field_type === "select" || field.field_type === "multiselect") && field.options && (
-                                                        <div style={{ color: "var(--text-tertiary)", fontSize: "11px", marginTop: "2px" }}>
-                                                            {(field.options as string[]).slice(0, 3).join(", ")}
-                                                            {(field.options as string[]).length > 3 ? ` (+${(field.options as string[]).length - 3})` : ""}
-                                                        </div>
-                                                    )}
-                                                </td>
-                                                <td style={tdStyle}><FieldStatus field={field} /></td>
-                                                <td style={{ ...tdStyle, textAlign: "right" }}>
-                                                    <div style={{ display: "inline-flex", gap: "5px", flexWrap: "wrap", justifyContent: "flex-end" }}>
-                                                        <button type="button" onClick={() => void moveField(field.id, "up")} disabled={!field.is_active || activeIndex <= 0 || isDemo} aria-label={`${field.label_tr} yukarı taşı`} style={iconButtonStyle}>
-                                                            <ArrowUp size={13} />
-                                                        </button>
-                                                        <button type="button" onClick={() => void moveField(field.id, "down")} disabled={!field.is_active || activeIndex < 0 || activeIndex >= activeFields.length - 1 || isDemo} aria-label={`${field.label_tr} aşağı taşı`} style={iconButtonStyle}>
-                                                            <ArrowDown size={13} />
-                                                        </button>
-                                                        <button type="button" onClick={() => openEditField(field)} disabled={isDemo} aria-label={`${field.label_tr} düzenle`} style={iconButtonStyle}>
-                                                            <Pencil size={13} />
-                                                        </button>
-                                                        {field.is_active && (
-                                                            <Button variant="toolbar" size="xs" onClick={() => void toggleRequired(field)} disabled={isDemo}>
-                                                                {field.required ? "Opsiyonel" : "Zorunlu"}
-                                                            </Button>
-                                                        )}
-                                                        <Button
-                                                            variant={field.is_active ? "dangerSoft" : "success"}
-                                                            size="xs"
-                                                            leftIcon={field.is_active ? <ArchiveRestore size={13} /> : <RotateCcw size={13} />}
-                                                            onClick={() => void setFieldActive(field, !field.is_active)}
-                                                            disabled={isDemo}
-                                                        >
-                                                            {field.is_active ? "Pasifleştir" : "Aktifleştir"}
-                                                        </Button>
-                                                    </div>
-                                                </td>
-                                            </tr>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                            <DataTable
+                                columns={fieldColumns}
+                                rows={template.fields}
+                                rowKey={f => f.id}
+                                emptyMessage="Henüz teknik alan yok."
+                                // Pasif alan soluk — product-types LİSTE sayfasındaki
+                                // rowStyle kalıbının aynısı (Faz B #6).
+                                rowStyle={f => (f.is_active ? {} : { opacity: 0.55 })}
+                            />
                         </div>
                     </div>
                 </div>

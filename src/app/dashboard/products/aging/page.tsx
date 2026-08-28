@@ -5,6 +5,7 @@ import Link from "next/link";
 import { maskCurrency } from "@/lib/utils";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import type { AgingCategory, AgingRow } from "@/lib/supabase/aging";
+import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 
 // ── Badge config ──────────────────────────────────────────────
 
@@ -127,6 +128,82 @@ export default function AgingPage() {
     // ── Tablo kolonları (tip-bazlı) ───────────────────────────
     const col5Label = reportType === "manufactured" ? "Son Üretim" : "Son Tedarik";
     const col6Label = "Son Satış";
+
+    // Faz B: ham <table> → DataTable. Hover artık CSS'te
+    // (`.erp-data-table tbody tr:hover`) — eskiden her satırda
+    // onMouseEnter/Leave ile `e.currentTarget.style.background` mutasyonu vardı.
+    // Başlıklar uppercase/letter-spacing taşıdığından `headerStyle` ile verilir;
+    // 5. ve 6. kolon etiketleri rapor tipine göre değişir (col5Label/col6Label).
+    const AGING_TH: React.CSSProperties = {
+        fontSize: "11px", fontWeight: 600, color: "var(--text-tertiary)",
+        textTransform: "uppercase", letterSpacing: "0.04em", whiteSpace: "nowrap",
+    };
+    const NOWRAP: React.CSSProperties = { whiteSpace: "nowrap" };
+
+    const agingColumns: DataTableColumn<AgingRow>[] = [
+        {
+            key: "name", header: "Ürün Adı", headerStyle: AGING_TH,
+            cellStyle: { ...NOWRAP, color: "var(--text-primary)", fontWeight: 500 },
+            cell: row => row.productName,
+        },
+        {
+            key: "sku", header: "SKU", align: "right", headerStyle: AGING_TH,
+            cellStyle: { color: "var(--text-tertiary)", fontFamily: "monospace", fontSize: "12px" },
+            cell: row => row.sku,
+        },
+        {
+            key: "onHand", header: "Stokta", align: "right", headerStyle: AGING_TH,
+            cellStyle: { color: "var(--text-secondary)" },
+            cell: row => `${row.onHand} ${row.unit}`,
+        },
+        {
+            key: "capital", header: "Bağlanan Sermaye", align: "right", headerStyle: AGING_TH,
+            cellStyle: { fontWeight: 600 },
+            // Renk satır bazlı → hücre içeriğinde (cellStyle kolona statiktir).
+            cell: row => (
+                <span style={{ color: (row.boundCapital ?? 0) > 0 ? "var(--text-primary)" : "var(--text-tertiary)" }}>
+                    {maskCurrency(row.boundCapital ?? 0, row.currency, canViewPurchaseCosts)}
+                </span>
+            ),
+        },
+        {
+            key: "date5", header: col5Label, align: "right", headerStyle: AGING_TH,
+            cellStyle: { ...NOWRAP, color: "var(--text-secondary)" },
+            cell: row => fmtDate(reportType === "manufactured" ? row.lastProductionDate : row.lastIncomingDate),
+        },
+        {
+            key: "date6", header: col6Label, align: "right", headerStyle: AGING_TH,
+            cellStyle: { ...NOWRAP, color: "var(--text-secondary)" },
+            cell: row => fmtDate(row.lastSaleDate),
+        },
+        {
+            key: "waiting", header: "Bekleme", align: "right", headerStyle: AGING_TH,
+            cellStyle: { ...NOWRAP, fontWeight: 600 },
+            cell: row => (
+                <span style={{ color: CATEGORY_COLORS[row.agingCategory].text }}>
+                    {row.daysWaiting !== null ? `${row.daysWaiting} gün` : "—"}
+                </span>
+            ),
+        },
+        {
+            key: "aging", header: "Eskime", headerStyle: AGING_TH,
+            cell: row => {
+                const c = CATEGORY_COLORS[row.agingCategory];
+                return (
+                    <span style={{
+                        fontSize: "11px", fontWeight: 700, padding: "2px 7px",
+                        borderRadius: "4px",
+                        background: c.bg, color: c.text,
+                        border: `var(--line-width) solid ${c.border}`,
+                        whiteSpace: "nowrap",
+                    }}>
+                        {CATEGORY_LABELS[row.agingCategory]}
+                    </span>
+                );
+            },
+        },
+    ];
+
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
@@ -325,74 +402,11 @@ export default function AgingPage() {
                                 : "Bu kategoride ürün yok."}
                     </div>
                 ) : (
-                    <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-                        <thead>
-                            <tr style={{ background: "var(--bg-tertiary)" }}>
-                                {["Ürün Adı", "SKU", "Stokta", "Bağlanan Sermaye", col5Label, col6Label, "Bekleme", "Eskime"].map(h => (
-                                    <th key={h} style={{
-                                        padding: "8px 12px",
-                                        textAlign: h === "Ürün Adı" || h === "Eskime" ? "left" : "right",
-                                        fontSize: "11px", fontWeight: 600, color: "var(--text-tertiary)",
-                                        textTransform: "uppercase", letterSpacing: "0.04em",
-                                        borderBottom: "0.5px solid var(--border-secondary)",
-                                        whiteSpace: "nowrap",
-                                    }}>{h}</th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody>
-                            {filtered.map(row => {
-                                const c = CATEGORY_COLORS[row.agingCategory];
-                                // Tip-bazlı tarih sütunları
-                                const date5 = reportType === "manufactured" ? row.lastProductionDate : row.lastIncomingDate;
-                                const date6 = row.lastSaleDate;
-                                return (
-                                    <tr
-                                        key={row.productId}
-                                        style={{
-                                            borderBottom: "0.5px solid var(--border-tertiary)",
-                                            transition: "background 150ms",
-                                            cursor: "default",
-                                        }}
-                                        onMouseEnter={e => (e.currentTarget.style.background = "var(--bg-tertiary)")}
-                                        onMouseLeave={e => (e.currentTarget.style.background = "transparent")}
-                                    >
-                                        <td style={{ padding: "8px 12px", color: "var(--text-primary)", fontWeight: 500, whiteSpace: "nowrap" }}>
-                                            {row.productName}
-                                        </td>
-                                        <td style={{ padding: "8px 12px", textAlign: "right", color: "var(--text-tertiary)", fontFamily: "monospace", fontSize: "12px" }}>
-                                            {row.sku}
-                                        </td>
-                                        <td style={{ padding: "8px 12px", textAlign: "right", color: "var(--text-secondary)" }}>
-                                            {row.onHand} {row.unit}
-                                        </td>
-                                        <td style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, color: (row.boundCapital ?? 0) > 0 ? "var(--text-primary)" : "var(--text-tertiary)" }}>
-                                            {maskCurrency(row.boundCapital ?? 0, row.currency, canViewPurchaseCosts)}
-                                        </td>
-                                        <td style={{ padding: "8px 12px", textAlign: "right", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                                            {fmtDate(date5)}
-                                        </td>
-                                        <td style={{ padding: "8px 12px", textAlign: "right", color: "var(--text-secondary)", whiteSpace: "nowrap" }}>
-                                            {fmtDate(date6)}
-                                        </td>
-                                        <td style={{ padding: "8px 12px", textAlign: "right", fontWeight: 600, color: c.text, whiteSpace: "nowrap" }}>
-                                            {row.daysWaiting !== null ? `${row.daysWaiting} gün` : "—"}
-                                        </td>
-                                        <td style={{ padding: "8px 12px" }}>
-                                            <span style={{
-                                                fontSize: "11px", fontWeight: 700, padding: "2px 7px",
-                                                borderRadius: "4px",
-                                                background: c.bg, color: c.text, border: `0.5px solid ${c.border}`,
-                                                whiteSpace: "nowrap",
-                                            }}>
-                                                {CATEGORY_LABELS[row.agingCategory]}
-                                            </span>
-                                        </td>
-                                    </tr>
-                                );
-                            })}
-                        </tbody>
-                    </table>
+                    <DataTable
+                        columns={agingColumns}
+                        rows={filtered}
+                        rowKey={row => row.productId}
+                    />
                 )}
             </div>
 

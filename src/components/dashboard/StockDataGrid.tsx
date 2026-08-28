@@ -5,6 +5,8 @@ import Link from "next/link";
 import { formatNumber } from "@/lib/utils";
 import { useData } from "@/lib/data-context";
 import { getStockStatusInfo, sortByStockPriority } from "@/lib/stock-utils";
+import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
+import type { Product } from "@/lib/mock-data";
 
 interface StockDataGridProps {
     filterCategory?: string;
@@ -21,22 +23,10 @@ function getAvailClass(available: number, min: number) {
     return "var(--success-text)";
 }
 
-const thStyle: React.CSSProperties = {
-    textAlign: "left",
+/** Yükleme iskeleti — DataTable'ın loading modu yok, dışarıda kalır. */
+const skeletonCellStyle: React.CSSProperties = {
     padding: "10px 14px",
-    fontSize: "12px",
-    fontWeight: "var(--font-table-heading-weight)",
-    color: "var(--text-secondary)",
-    borderBottom: "var(--line-width) solid var(--surface-border)",
-};
-
-const tdStyle: React.CSSProperties = {
-    padding: "10px 14px",
-    fontSize: "13px",
-    fontWeight: "var(--font-table-cell-weight)",
     borderBottom: "var(--line-width) solid var(--border-tertiary)",
-    color: "var(--text-primary)",
-    lineHeight: 1.4,
 };
 
 const StockDataGrid = memo(function StockDataGrid({
@@ -65,30 +55,81 @@ const StockDataGrid = memo(function StockDataGrid({
     const visible = limit ? filtered.slice(0, limit) : filtered;
     const hasMore = showViewAllLink && limit ? filtered.length > limit : false;
 
-    const applyHover = (tr: HTMLElement) => {
-        const tds = tr.querySelectorAll("td");
-        tds.forEach((td, i) => {
-            td.style.background = "var(--table-row-hover)";
-            if (i === 0) td.style.borderLeft = "2px solid var(--accent)";
-        });
-    };
+    const columns: DataTableColumn<Product>[] = [
+        {
+            key: "sku",
+            header: "SKU",
+            cellStyle: { color: "var(--text-secondary)" },
+            cell: p => p.sku,
+        },
+        { key: "name", header: "Ürün Adı", cell: p => p.name },
+        {
+            key: "onHand",
+            header: "Gerçek Stok",
+            align: "right",
+            cellStyle: { fontWeight: 500 },
+            cell: p => formatNumber(p.on_hand),
+        },
+        {
+            key: "reserved",
+            header: "Rezerve",
+            align: "right",
+            cellStyle: { color: "var(--warning-text)" },
+            cell: p => formatNumber(p.reserved),
+        },
+        {
+            key: "available",
+            header: "Satılabilir",
+            align: "right",
+            cellStyle: { fontWeight: 500 },
+            // Renk satır bazlı (eşiğe göre) → `cellStyle` kolona statik olduğu
+            // için hücre içeriğinde verilir (products/orders precedent'i).
+            cell: p => (
+                <span style={{ color: getAvailClass(p.available_now, p.minStockLevel) }}>
+                    {formatNumber(p.available_now)}
+                </span>
+            ),
+        },
+        {
+            key: "min",
+            header: "Min. Seviye",
+            align: "right",
+            cellStyle: { color: "var(--text-tertiary)" },
+            cell: p => formatNumber(p.minStockLevel),
+        },
+        {
+            key: "status",
+            header: "Durum",
+            align: "center",
+            cell: p => {
+                const status = getStockStatusInfo(p.available_now, p.minStockLevel);
+                return <span className={`badge ${status.cls}`}>{status.label}</span>;
+            },
+        },
+    ];
 
-    const removeHover = (tr: HTMLElement, productId: string) => {
-        if (selectedId === productId) return;
-        const tds = tr.querySelectorAll("td");
-        tds.forEach((td, i) => {
-            td.style.background = "transparent";
-            if (i === 0) td.style.borderLeft = "2px solid transparent";
-        });
-    };
-
-    const applySelected = (tr: HTMLElement) => {
-        const tds = tr.querySelectorAll("td");
-        tds.forEach((td, i) => {
-            td.style.background = "var(--accent-bg)";
-            if (i === 0) td.style.borderLeft = "2px solid var(--accent)";
-        });
-    };
+    const viewAllFooter = hasMore ? (
+        <div
+            style={{
+                padding: "10px 14px",
+                borderTop: "var(--line-width) solid var(--border-tertiary)",
+                background: "var(--table-header-bg)",
+                textAlign: "right",
+            }}
+        >
+            <Link
+                href="/dashboard/products"
+                style={{
+                    fontSize: "12px",
+                    color: "var(--accent-text)",
+                    textDecoration: "none",
+                    fontWeight: 500,
+                }}
+            >
+                Tümünü gör ({filtered.length}) →
+            </Link>
+        </div>
+    ) : null;
 
     return (
         <div
@@ -100,24 +141,13 @@ const StockDataGrid = memo(function StockDataGrid({
                 boxShadow: "var(--surface-shadow-sm)",
             }}
         >
-            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
-                <thead>
-                    <tr style={{ background: "var(--table-header-bg)" }}>
-                        <th style={thStyle}>SKU</th>
-                        <th style={thStyle}>Ürün Adı</th>
-                        <th style={{ ...thStyle, textAlign: "right" }}>Gerçek Stok</th>
-                        <th style={{ ...thStyle, textAlign: "right" }}>Rezerve</th>
-                        <th style={{ ...thStyle, textAlign: "right" }}>Satılabilir</th>
-                        <th style={{ ...thStyle, textAlign: "right" }}>Min. Seviye</th>
-                        <th style={{ ...thStyle, textAlign: "center" }}>Durum</th>
-                    </tr>
-                </thead>
-                <tbody>
-                    {loading ? (
-                        Array.from({ length: 5 }).map((_, i) => (
+            {loading ? (
+                <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <tbody>
+                        {Array.from({ length: 5 }).map((_, i) => (
                             <tr key={i}>
                                 {Array.from({ length: 7 }).map((_, j) => (
-                                    <td key={j} style={tdStyle}>
+                                    <td key={j} style={skeletonCellStyle}>
                                         <div style={{
                                             height: "13px",
                                             width: j === 1 ? "120px" : "50px",
@@ -129,101 +159,28 @@ const StockDataGrid = memo(function StockDataGrid({
                                     </td>
                                 ))}
                             </tr>
-                        ))
-                    ) : visible.length === 0 ? (
-                        <tr>
-                            <td colSpan={7} style={{ ...tdStyle, textAlign: "center", color: "var(--text-tertiary)", padding: "20px" }}>
-                                Eşleşen ürün bulunamadı
-                            </td>
-                        </tr>
-                    ) : visible.map((product) => {
-                        const status = getStockStatusInfo(product.available_now, product.minStockLevel);
-                        const isSelected = selectedId === product.id;
-                        return (
-                            <tr
-                                key={product.id}
-                                style={{ cursor: "pointer" }}
-                                onClick={(e) => {
-                                    const newId = isSelected ? null : product.id;
-                                    setSelectedId(newId);
-                                    // Apply or remove selected styling
-                                    if (newId) {
-                                        applySelected(e.currentTarget);
-                                    } else {
-                                        removeHover(e.currentTarget, "__force__");
-                                    }
-                                }}
-                                onMouseEnter={(e) => {
-                                    if (!isSelected) applyHover(e.currentTarget);
-                                }}
-                                onMouseLeave={(e) => {
-                                    if (isSelected) {
-                                        applySelected(e.currentTarget);
-                                    } else {
-                                        removeHover(e.currentTarget, "__force__");
-                                    }
-                                }}
-                            >
-                                <td style={{
-                                    ...tdStyle,
-                                    color: "var(--text-secondary)",
-                                    borderLeft: isSelected ? "2px solid var(--accent)" : "2px solid transparent",
-                                    background: isSelected ? "var(--accent-bg)" : "transparent",
-                                }}>
-                                    {product.sku}
-                                </td>
-                                <td style={{ ...tdStyle, background: isSelected ? "var(--accent-bg)" : "transparent" }}>
-                                    {product.name}
-                                </td>
-                                <td style={{ ...tdStyle, textAlign: "right", fontWeight: 500, background: isSelected ? "var(--accent-bg)" : "transparent" }}>
-                                    {formatNumber(product.on_hand)}
-                                </td>
-                                <td style={{ ...tdStyle, textAlign: "right", color: "var(--warning-text)", background: isSelected ? "var(--accent-bg)" : "transparent" }}>
-                                    {formatNumber(product.reserved)}
-                                </td>
-                                <td
-                                    style={{
-                                        ...tdStyle,
-                                        textAlign: "right",
-                                        fontWeight: 500,
-                                        color: getAvailClass(product.available_now, product.minStockLevel),
-                                        background: isSelected ? "var(--accent-bg)" : "transparent",
-                                    }}
-                                >
-                                    {formatNumber(product.available_now)}
-                                </td>
-                                <td style={{ ...tdStyle, textAlign: "right", color: "var(--text-tertiary)", background: isSelected ? "var(--accent-bg)" : "transparent" }}>
-                                    {formatNumber(product.minStockLevel)}
-                                </td>
-                                <td style={{ ...tdStyle, textAlign: "center", background: isSelected ? "var(--accent-bg)" : "transparent" }}>
-                                    <span className={`badge ${status.cls}`}>{status.label}</span>
-                                </td>
-                            </tr>
-                        );
-                    })}
-                </tbody>
-            </table>
-            {hasMore && (
-                <div
-                    style={{
-                        padding: "10px 14px",
-                        borderTop: "var(--line-width) solid var(--border-tertiary)",
-                        background: "var(--table-header-bg)",
-                        textAlign: "right",
-                    }}
-                >
-                    <Link
-                        href="/dashboard/products"
-                        style={{
-                            fontSize: "12px",
-                            color: "var(--accent-text)",
-                            textDecoration: "none",
-                            fontWeight: 500,
-                        }}
-                    >
-                        Tümünü gör ({filtered.length}) →
-                    </Link>
-                </div>
+                        ))}
+                    </tbody>
+                </table>
+            ) : (
+                <DataTable
+                    columns={columns}
+                    rows={visible}
+                    rowKey={p => p.id}
+                    onRowClick={p => setSelectedId(prev => (prev === p.id ? null : p.id))}
+                    rowAriaLabel={p => `${p.name} satırını seç`}
+                    // Seçili satır vurgusu: eskiden hover/seçim `e.currentTarget`
+                    // üzerinde her <td>'nin style'ı ELLE değiştirilerek yapılıyordu
+                    // (applyHover/removeHover/applySelected). Artık hover CSS'te
+                    // (`.erp-data-table tbody tr:hover`), seçim `rowStyle`'da.
+                    // Sol accent `inset box-shadow` ile — <tr> border'ı
+                    // `border-collapse: collapse` altında güvenilir değil.
+                    rowStyle={p => (p.id === selectedId
+                        ? { background: "var(--accent-bg)", boxShadow: "inset 2px 0 0 var(--accent)" }
+                        : {})}
+                    emptyMessage="Eşleşen ürün bulunamadı"
+                    footer={viewAllFooter}
+                />
             )}
         </div>
     );

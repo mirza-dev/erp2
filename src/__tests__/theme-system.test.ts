@@ -210,16 +210,32 @@ describe("Tema — ThemeToggle UI", () => {
         expect(DATA_TABLE_SRC).not.toContain('background: "var(--bg-secondary)"');
     });
 
-    it("temsilci tablolar line-width ve tablo font ağırlığı tokenlarını kullanır", () => {
-        // OrdersClient (Faz B #4) ve products/page.tsx (Faz B #7) DataTable'a taşındı
-        // → tema token'ları DataTable.tsx'te (üstteki testte kapsanır). Henüz kendi
-        // <table>'ını tutan temsilciler burada kontrol edilir.
-        for (const src of [STOCK_GRID_SRC]) {
-            expect(src).toContain("var(--line-width) solid var(--surface-border)");
-            expect(src).toContain("var(--line-width) solid var(--border-tertiary)");
-            expect(src).toContain("var(--font-table-heading-weight)");
-            expect(src).toContain("var(--font-table-cell-weight)");
-        }
+    /**
+     * 2026-08-24: Bu döngü "kendi <table>'ını tutan temsilciler"i tarıyordu.
+     * StockDataGrid de DataTable'a taşınınca liste BOŞALDI — boş döngü sessizce
+     * geçerdi, yani kilit kaybolurdu. Onun yerine ULAŞILAN SON DURUM kilitleniyor:
+     * dashboard veri ızgaraları artık kendi thead/tbody stilini taşımaz, tema
+     * token'ları tek yerden (DataTable) gelir.
+     */
+    it("StockDataGrid kendi tablo stilini TAŞIMAZ — DataTable'a taşındı", () => {
+        expect(STOCK_GRID_SRC).toContain("<DataTable");
+        expect(STOCK_GRID_SRC).not.toMatch(/const thStyle/);
+        expect(STOCK_GRID_SRC).not.toMatch(/<thead>/);
+        // Hover/seçim artık DOM mutasyonu ile değil: CSS + rowStyle.
+        // (Fonksiyon TANIMI aranır — açıklama satırındaki isim geçişi sayılmaz.)
+        expect(STOCK_GRID_SRC).not.toMatch(/const (applyHover|removeHover|applySelected)\s*=/);
+        expect(STOCK_GRID_SRC).not.toMatch(/td\.style\.background/);
+        expect(STOCK_GRID_SRC).toMatch(/rowStyle=\{/);
+    });
+
+    it("dashboard yüzeylerinde ham tablo stili kalmadı (tema tek kaynaktan)", () => {
+        // Belge/baskı tabloları (QuoteDocument, RfqDocument, PurchaseOrderDocument,
+        // DashboardReport) ve form satır-editörleri BİLİNÇLİ olarak hariç — onlar
+        // liste değil, PDF/print çıktısı ve düzenlenebilir ızgara.
+        expect(DATA_TABLE_SRC).toContain("var(--font-table-heading-weight)");
+        expect(DATA_TABLE_SRC).toContain("var(--font-table-cell-weight)");
+        expect(DATA_TABLE_SRC).toContain("var(--line-width) solid var(--surface-border)");
+        expect(DATA_TABLE_SRC).toContain("var(--line-width) solid var(--border-tertiary)");
     });
 });
 
