@@ -21,13 +21,144 @@ import { normalizeTechnicalEvidence } from "@/lib/technical-templates";
 import { IMPORT_ALIAS_FIELD_MAP, IMPORT_CORE_PRODUCT_FIELDS, normalizeCoreProductFields } from "@/lib/import-center";
 import type { TechnicalExtractionEvidence } from "@/lib/database.types";
 
-export function isAIAvailable(): boolean {
-    return !!process.env.ANTHROPIC_API_KEY;
+// ── AI erişilebilirlik mandalı ─────────────────────────────────────────────
+//
+// 2026-08-29: `isAIAvailable()` eskiden yalnız `!!process.env.ANTHROPIC_API_KEY`
+// bakıyordu. Anahtar DOLU ama GEÇERSİZ olduğunda (canlı teşhis: HTTP 401
+// `invalid x-api-key`) fonksiyon `true` dönüyor, her çağrı 401 alıyor, her
+// çağrının kendi `catch`'i sessizce graceful degradation'a düşüyordu. Sistem
+// AI'nın açık olduğunu sanıyor, kullanıcı hiçbir şey görmüyordu — üstelik
+// deterministik olması gereken kolon eşleştirmesi bu sessiz yola bağlıydı.
+//
+// Mandal: Anthropic'ten kimlik hatası (401/403) gelirse kurulur ve
+// `isAIAvailable()` o andan itibaren `false` döner. Kimlik hatası kendiliğinden
+// düzelmez — yeni anahtar süreç yeniden başlatmayı gerektirir, mandal da o
+// zaman sıfırlanır. Geçici hatalar (429/5xx/ağ) mandalı KURMAZ; onlar için
+// mevcut çağrı-başı graceful degradation zaten doğru davranış.
+
+let authFailure: { at: number; status: number } | null = null;
+
+/** Anthropic hata nesnesinden HTTP durumunu çıkarır (SDK `status` taşır). */
+function errorStatus(err: unknown): number | null {
+    if (err && typeof err === "object" && "status" in err) {
+        const s = (err as { status?: unknown }).status;
+        if (typeof s === "number") return s;
+    }
+    return null;
 }
 
-const client = new Anthropic({
+/** Kimlik hatasıysa mandalı kurar. Diğer hatalarda dokunmaz. */
+function noteAnthropicFailure(err: unknown): void {
+    const status = errorStatus(err);
+    if (status === 401 || status === 403) {
+        if (!authFailure) {
+            console.error(`[AI] ANTHROPIC_API_KEY reddedildi (HTTP ${status}) — AI kapalı işaretlendi.`);
+        }
+        authFailure = { at: Date.now(), status };
+    }
+}
+
+/** Başarılı çağrı mandalı kaldırır (anahtar sonradan geçerli hâle gelirse). */
+function noteAnthropicSuccess(): void {
+    if (authFailure) {
+        console.info("[AI] Anthropic yeniden yanıt verdi — AI kapalı işareti kaldırıldı.");
+        authFailure = null;
+    }
+}
+
+export interface AiAvailability {
+    available: boolean;
+    /** "ok" | "no_key" | "auth_failed" — UI mesajını bu belirler. */
+    reason: "ok" | "no_key" | "auth_failed";
+    /** Kimlik hatasının HTTP durumu (varsa). */
+    status?: number;
+}
+
+/** Ayrıntılı durum — `/api/ai/health` ve UI mesajları bunu kullanır. */
+export function getAIAvailability(): AiAvailability {
+    if (!process.env.ANTHROPIC_API_KEY) return { available: false, reason: "no_key" };
+    if (authFailure) return { available: false, reason: "auth_failed", status: authFailure.status };
+    return { available: true, reason: "ok" };
+}
+
+export function isAIAvailable(): boolean {
+    return getAIAvailability().available;
+}
+
+/** Test yardımcısı — mandalı ve probe cache'ini sıfırlar. Prod kodunda çağrılmaz. */
+export function __resetAiAvailabilityLatch(): void {
+    authFailure = null;
+    probeCache = null;
+}
+
+/**
+ * Anahtarın GERÇEKTEN geçerli olup olmadığını en ucuz yoldan ölçer.
+ *
+ * Mandal yalnız bir çağrı denendikten SONRA kurulabilir; ilk kullanıcı yine de
+ * sessiz bir başarısızlığa toslardı. Bu probe o ilk toslamayı ortadan kaldırır:
+ * 1 token'lık istek atar, sonucu 10 dakika saklar. Anahtar yoksa veya mandal
+ * zaten kuruluysa istek HİÇ atılmaz (bedava cevap).
+ */
+const PROBE_TTL_MS = 10 * 60 * 1000;
+let probeCache: { at: number; ok: boolean } | null = null;
+
+export async function probeAIKey(): Promise<AiAvailability> {
+    const known = getAIAvailability();
+    // Anahtar yok ya da mandal kurulu → kanıt zaten elimizde, istek atma.
+    if (!known.available) return known;
+
+    if (probeCache && Date.now() - probeCache.at < PROBE_TTL_MS) {
+        return probeCache.ok ? known : getAIAvailability();
+    }
+
+    try {
+        await client.messages.create({
+            model: MODEL,
+            max_tokens: 1,
+            messages: [{ role: "user", content: "." }],
+        });
+        probeCache = { at: Date.now(), ok: true };
+        return getAIAvailability();
+    } catch {
+        // 401/403 ise wrapper mandalı kurdu; geçici hatada mandal kurulmaz ve
+        // available true kalır (doğru: geçici hata AI'yı kapatmaz).
+        probeCache = { at: Date.now(), ok: false };
+        return getAIAvailability();
+    }
+}
+
+const rawClient = new Anthropic({
     apiKey: process.env.ANTHROPIC_API_KEY,
 });
+
+/**
+ * Anthropic çağrılarının TEK kapısı. 11 çağrı yerinin her birine ayrı ayrı
+ * mandal kodu koymak yerine burada toplanır — yeni bir çağrı eklendiğinde
+ * mandal kendiliğinden çalışır, unutulamaz.
+ */
+// `messages.create` overload'lu (streaming / non-streaming). `Parameters<>`
+// SON overload'u seçtiği için dönüş tipi `Message | Stream` birleşimine
+// düşüyordu; bu servis akış KULLANMIYOR, o yüzden non-streaming imzasına
+// açıkça daraltıyoruz. Streaming eklenirse burası bilinçli olarak kırılır.
+type AnthropicRequestOptions = NonNullable<Parameters<Anthropic["messages"]["create"]>[1]>;
+
+const client = {
+    messages: {
+        create: async (
+            body: Anthropic.MessageCreateParamsNonStreaming,
+            options?: AnthropicRequestOptions,
+        ): Promise<Anthropic.Message> => {
+            try {
+                const result = await rawClient.messages.create(body, options);
+                noteAnthropicSuccess();
+                return result;
+            } catch (err) {
+                noteAnthropicFailure(err);
+                throw err;
+            }
+        },
+    },
+};
 
 const MODEL = "claude-haiku-4-5-20251001";
 

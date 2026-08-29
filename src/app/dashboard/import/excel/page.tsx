@@ -22,10 +22,15 @@ import { useToast } from "@/components/ui/Toast";
 import { IMPORT_FIELDS, REQUIRED_FIELDS } from "@/lib/import-fields";
 import { stashImportFile, takeImportFile } from "@/lib/import-file-transfer";
 import {
+    applyManualSheetEntityType,
+    CLASSIC_IMPORT_ENTITY_LABELS,
     detectSheetEntityType,
+    EXCEL_IMPORT_ENTITY_TYPES,
     EXCEL_IMPORT_TEMPLATES,
     FINANCIAL_IMPORT_FIELDS,
+    isExcelImportTemplateKind,
     type ClassicImportEntityType,
+    type ExcelImportTemplateKind,
     type ImportFieldApproval,
 } from "@/lib/import-center";
 
@@ -99,13 +104,6 @@ const SHEET_ENTITY_MAP: Record<string, { entityType: "customer" | "product" | "v
     Faturalar: { entityType: "invoice", displayName: "Faturalar", entity: "Faturalar", status: "importable" },
     Tahsilatlar: { entityType: "payment", displayName: "Tahsilatlar", entity: "Tahsilatlar", status: "importable" },
     Stok: { entityType: "stock", displayName: "Stok", entity: "Stok Güncellemesi", status: "importable" },
-};
-
-const CLASSIC_ENTITY_LABELS: Record<ClassicImportEntityType, string> = {
-    product: "Ürünler",
-    customer: "Müşteriler",
-    vendor: "Tedarikçiler",
-    stock: "Stok",
 };
 
 const entityTypeLabels: Record<string, string> = {
@@ -216,6 +214,10 @@ export default function ImportExcelWizardPage() {
     const [rememberMappings, setRememberMappings] = useState(true);
     // Stok sheet'leri için sayım/hareket seçimi — keyed by sheet name
     const [stockOps, setStockOps] = useState<Record<string, StockOperationType>>({});
+    // Kurulum panelinden gelindiyse hangi adım için gelindiği (?kind=…).
+    // `useSearchParams` yerine window: bu sayfa zaten tam istemci tarafı ve
+    // useSearchParams statik prerender'da Suspense sınırı istiyor.
+    const [setupKind, setSetupKind] = useState<ExcelImportTemplateKind | null>(null);
     // Inline editing in preview
     const [editingCell, setEditingCell] = useState<{ draftId: string; field: string } | null>(null);
     const [editingValue, setEditingValue] = useState("");
@@ -259,7 +261,7 @@ export default function ImportExcelWizardPage() {
                     const detected = known ? null : detectSheetEntityType(name, headers);
                     const detectedEntity = detected?.entityType ?? null;
                     const displayName = known?.displayName
-                        ?? (detectedEntity ? CLASSIC_ENTITY_LABELS[detectedEntity] : name);
+                        ?? (detectedEntity ? CLASSIC_IMPORT_ENTITY_LABELS[detectedEntity] : name);
 
                     return {
                         name, displayName,
@@ -319,6 +321,14 @@ export default function ImportExcelWizardPage() {
         if (handed) handleFileSelect(handed);
     }, [handleFileSelect]);
 
+    // Kurulum panelinden "Yükle" ile gelindiyse hangi adım olduğunu oku —
+    // sihirbaz o adımın şablonunu öne çıkarır. Yalnız bilinen bir şablon türü
+    // kabul edilir (URL'den gelen serbest metin değil).
+    useEffect(() => {
+        const kind = new URLSearchParams(window.location.search).get("kind");
+        if (isExcelImportTemplateKind(kind)) setSetupKind(kind);
+    }, []);
+
     const handleDrop = (e: React.DragEvent) => {
         e.preventDefault();
         setDragOver(false);
@@ -330,6 +340,27 @@ export default function ImportExcelWizardPage() {
         const sh = sheets[idx];
         if (sh.status !== "importable") return;
         setSheets(prev => prev.map((s, i) => i === idx ? { ...s, selected: !s.selected } : s));
+    };
+
+    /**
+     * Sheet türünü elle ata — otomatik tespitin çıkmazını açar.
+     *
+     * Tespit sheet ADINA, tutmazsa kolon başlıklarına bakıyor; ikisi de
+     * tutmazsa sheet "Desteklenmiyor" damgası yiyor ve kullanıcının HİÇBİR
+     * çıkışı yoktu. Müşteriden gelen "Sayfa1" adlı dosya duvara toslardı
+     * (2026-08-29). Tespit iyi çalışıyor — bu bir emniyet supabı.
+     *
+     * `null` → "Aktarma" (sheet devre dışı, örn. kapak/açıklama sayfası).
+     */
+    const setSheetEntityType = (idx: number, entityType: ClassicImportEntityType | null) => {
+        setSheets(prev => prev.map((s, i) => i === idx ? applyManualSheetEntityType(s, entityType) : s));
+        // Tür değişti → o sheet için önceden hesaplanmış kolon eşleştirmesi
+        // artık başka bir entity'ye aitti, geçersiz.
+        setColumnMappings(prev => {
+            const next = { ...prev };
+            delete next[sheets[idx].name];
+            return next;
+        });
     };
 
     // Bu dosya aslında AI çıkarımı gerektiriyorsa (serbest katalog vb.) hub'ın
@@ -670,6 +701,41 @@ export default function ImportExcelWizardPage() {
             {/* ───── IDLE ───── */}
             {state === "idle" && (
                 <>
+                    {/* Kurulum panelinden gelindi — hangi adım için gelindiği
+                        görünür olsun ve o adımın şablonu elinin altında dursun. */}
+                    {setupKind && (
+                        <div
+                            role="status"
+                            style={{
+                                display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap",
+                                padding: "10px 14px",
+                                background: "var(--accent-bg)",
+                                border: "var(--line-width) solid var(--accent-border)",
+                                borderRadius: "8px",
+                                fontSize: "12px", color: "var(--accent-text)",
+                            }}
+                        >
+                            <span>
+                                <b>Kurulum adımı:</b> {EXCEL_IMPORT_TEMPLATES[setupKind].title}
+                                {" — "}{EXCEL_IMPORT_TEMPLATES[setupKind].description}
+                            </span>
+                            <a
+                                href={`/api/import/templates?kind=${setupKind}`}
+                                download
+                                style={{
+                                    marginLeft: "auto", whiteSpace: "nowrap",
+                                    display: "inline-flex", alignItems: "center", gap: "5px",
+                                    fontSize: "11px", fontWeight: 600, padding: "4px 10px", borderRadius: "5px",
+                                    border: "var(--line-width) solid var(--accent-border)",
+                                    background: "var(--surface-raised)", color: "var(--accent-text)",
+                                    textDecoration: "none",
+                                }}
+                            >
+                                <Download size={12} aria-hidden /> Bu adımın şablonunu indir
+                            </a>
+                        </div>
+                    )}
+
                     <div
                         onDragOver={e => { e.preventDefault(); setDragOver(true); }}
                         onDragLeave={() => setDragOver(false)}
@@ -828,7 +894,9 @@ export default function ImportExcelWizardPage() {
                                     display: "flex", alignItems: "center", gap: "12px", padding: "10px 16px", flexWrap: "wrap",
                                     borderBottom: idx < sheets.length - 1 ? "var(--line-width) solid var(--border-tertiary)" : "none",
                                     cursor: sheet.status === "importable" ? "pointer" : "default",
-                                    opacity: sheet.status === "unsupported" ? 0.5 : 1,
+                                    // Tür seçici geldiğinden beri "tanınmadı" bir çıkmaz değil;
+                                    // satırı yarı saydam yapmak eylemsiz gibi gösterirdi.
+                                    opacity: 1,
                                 }}>
                                     <input type="checkbox" checked={sheet.selected} disabled={sheet.status !== "importable"}
                                         aria-label={`${sheet.displayName} sheet seçimi`}
@@ -844,10 +912,41 @@ export default function ImportExcelWizardPage() {
                                                 Kolonlar: {sheet.headers.slice(0, 5).join(", ")}{sheet.headers.length > 5 ? ` +${sheet.headers.length - 5}` : ""}
                                             </div>
                                         )}
+                                        {!sheet.entityType && (
+                                            <div style={{ fontSize: "11px", color: "var(--warning-text)", marginTop: "3px" }}>
+                                                Türü tanınamadı — sağdan seçerseniz bu sayfa da aktarılır.
+                                            </div>
+                                        )}
                                     </div>
                                     <span style={{ fontSize: "11px", color: "var(--text-tertiary)", whiteSpace: "nowrap" }}>{sheet.rows.toLocaleString("tr-TR")} satır</span>
+
+                                    {/* Tür seçici — otomatik tespitin çıkmazını açar. Tespit
+                                        tutmadığında ("Sayfa1" gibi) kullanıcı türü kendisi söyler. */}
+                                    <select
+                                        value={sheet.entityType ?? ""}
+                                        aria-label={`${sheet.name} sayfasının türü`}
+                                        title="Bu sayfadaki veri hangi tür? Otomatik tespit yanlışsa buradan düzeltin."
+                                        onClick={e => e.stopPropagation()}
+                                        onChange={e => {
+                                            e.stopPropagation();
+                                            const v = e.target.value;
+                                            setSheetEntityType(idx, v === "" ? null : (v as ClassicImportEntityType));
+                                        }}
+                                        style={{
+                                            fontSize: "11px", padding: "3px 6px", borderRadius: "4px",
+                                            background: "var(--bg-primary)", color: "var(--text-primary)",
+                                            border: `var(--line-width) solid ${sheet.entityType ? "var(--border-secondary)" : "var(--warning-border)"}`,
+                                            cursor: "pointer", whiteSpace: "nowrap",
+                                        }}
+                                    >
+                                        <option value="">— Aktarma —</option>
+                                        {EXCEL_IMPORT_ENTITY_TYPES.map(t => (
+                                            <option key={t} value={t}>{CLASSIC_IMPORT_ENTITY_LABELS[t]}</option>
+                                        ))}
+                                    </select>
+
                                     <span style={{ fontSize: "10px", padding: "2px 8px", background: sheet.status === "importable" ? "var(--success-bg)" : "var(--bg-tertiary)", color: sheet.status === "importable" ? "var(--success-text)" : "var(--text-tertiary)", borderRadius: "10px", whiteSpace: "nowrap" }}>
-                                        {sheet.status === "importable" ? "İçe Aktarılabilir" : "Desteklenmiyor"}
+                                        {sheet.status === "importable" ? "İçe Aktarılabilir" : "Aktarılmayacak"}
                                     </span>
                                     {/* Stok sheet'i: sayım/hareket seçimi — veri nereye nasıl gider, burada netleşir */}
                                     {sheet.entityType === "stock" && sheet.selected && (

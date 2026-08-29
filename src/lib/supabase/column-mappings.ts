@@ -1,14 +1,30 @@
 import { createServiceClient } from "./service";
 import type { ColumnMappingRow } from "@/lib/database.types";
-import { COLUMN_MAPPING_COMPANY_SCOPE } from "@/lib/import-center";
+import { COLUMN_MAPPING_COMPANY_SCOPE, normalizeImportToken } from "@/lib/import-center";
 
+/**
+ * Excel kolon başlığı → arama anahtarı.
+ *
+ * TEK NORMALIZER (2026-08-29): eskiden bu fonksiyonun kendi gövdesi vardı ve
+ * `normalizeImportToken`'dan iki nokta ayrılıyordu — ardışık alt çizgileri
+ * sadeleştirmiyor, baş/sondaki alt çizgiyi kırpmıyordu. Alias tabloları
+ * (`IMPORT_ALIAS_FIELD_MAP` / `FALLBACK_FIELD_MAP`) `normalizeImportToken` ile
+ * yazıldığı için noktalama içeren HER başlık ıskalıyordu:
+ *
+ *     "Tedarik Süresi (gün)"  → tedarik_suresi__gun_   ≠ tedarik_suresi_gun
+ *     "Birim Fiyat ($)"       → birim_fiyat____        ≠ birim_fiyat
+ *
+ * Sistemin KENDİ indirdiği şablonun 56 kolonundan 10'u bu yüzden eşleşmiyordu
+ * (biri zorunlu: "Ürün SKU"). Iskalar AI'ya düşüyor, AI da onları doğru
+ * eşleştirdiği için kusur görünmüyordu — AI anahtarı geçersizleşince ortaya
+ * çıktı. Artık tek kaynak `normalizeImportToken`.
+ *
+ * `column_mappings` tablosundaki `normalized` sütunu bu fonksiyonla yazılıyor;
+ * değişim öncesi canlıdaki 3 satır (urun_kodu · stok_adedi · vergi_no) her iki
+ * gövdede de aynı sonucu verdiği için hafıza yetim kalmadı (migration gerekmedi).
+ */
 export function normalizeColumnName(col: string): string {
-    return col.trim()
-        .replace(/İ/g, "i").replace(/I/g, "i")   // Turkish İ → i before toLowerCase (İ.toLowerCase() = i + U+0307)
-        .toLowerCase()
-        .replace(/[ğ]/g, "g").replace(/[ü]/g, "u").replace(/[ş]/g, "s")
-        .replace(/[ı]/g, "i").replace(/[ö]/g, "o").replace(/[ç]/g, "c")
-        .replace(/[^a-z0-9]/g, "_");
+    return normalizeImportToken(col);
 }
 
 /**

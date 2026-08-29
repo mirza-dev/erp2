@@ -32,6 +32,7 @@ import {
 import type { ApplyResultSummary } from "@/lib/extraction-review-helpers";
 import { confidenceLabel } from "@/lib/technical-templates";
 import { coreFieldLabel } from "@/lib/import-center";
+import { aiUnavailableMessage, type AiHealth } from "@/lib/ai-health";
 import {
     getActiveAiImportOperations,
     getAiImportOperation,
@@ -50,6 +51,12 @@ export interface ExtractionReviewProps {
     document: ImportDocumentRow;
     initialLines: ImportDocumentLineRow[];
     productTypes: QueuedSuggestedType[];
+    /**
+     * AI erişilebilirliği (sunucuda ölçülür). Kapalıysa "Çıkar" pasifleşir ve
+     * sebebi yazar — doğrudan URL'le gelen kullanıcı da hub'daki uyarıyı görsün.
+     * `null` = ölçülemedi; bu durumda akış engellenmez (bkz. `fetchAiHealth`).
+     */
+    aiHealth?: AiHealth | null;
 }
 
 function hasTechnicalReviewValue(value: unknown): boolean {
@@ -84,10 +91,12 @@ function buildInitialProductFieldApprovals(lines: ImportDocumentLineRow[]): Reco
     }));
 }
 
-export default function ExtractionReview({ document: doc, initialLines, productTypes }: ExtractionReviewProps) {
+export default function ExtractionReview({ document: doc, initialLines, productTypes, aiHealth = null }: ExtractionReviewProps) {
     const isDemo = useIsDemo();
     const { toast } = useToast();
     const router = useRouter();
+
+    const aiOffMessage = aiUnavailableMessage(aiHealth);
 
     const isCertFlow = isCertFlowDocumentType(doc.classification?.document_type ?? null);
 
@@ -627,15 +636,17 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                     <Button
                         variant="primary"
                         onClick={handleExtract}
-                        disabled={isDemo || extracting || isDocApplied || isDocApplying}
+                        disabled={isDemo || extracting || isDocApplied || isDocApplying || !!aiOffMessage}
                         title={
                             isDemo
                                 ? DEMO_DISABLED_TOOLTIP
-                                : isDocApplied
-                                    ? "Belge uygulandı, tekrar çıkarılamaz"
-                                    : isDocApplying
-                                        ? "Belge şu anda uygulanıyor, sayfayı yenileyin"
-                                        : undefined
+                                : aiOffMessage
+                                    ? aiOffMessage
+                                    : isDocApplied
+                                        ? "Belge uygulandı, tekrar çıkarılamaz"
+                                        : isDocApplying
+                                            ? "Belge şu anda uygulanıyor, sayfayı yenileyin"
+                                            : undefined
                         }
                     >
                         {extracting ? "Çıkarılıyor…" : lines.length > 0 ? "Yeniden Çıkar" : "Çıkar"}
@@ -650,7 +661,12 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                     background: "var(--bg-secondary)", border: "0.5px dashed var(--border-secondary)",
                     borderRadius: "8px", color: "var(--text-tertiary)",
                 }}>
-                    Bu belgeden henüz satır çıkarılmadı. &quot;Çıkar&quot; ile AI ekstraksiyonunu başlatın.
+                    {aiOffMessage ? (
+                        // Kullanıcıyı çalışmayan bir düğmeye yönlendirmeyelim.
+                        <span style={{ color: "var(--warning-text)" }}>{aiOffMessage}</span>
+                    ) : (
+                        <>Bu belgeden henüz satır çıkarılmadı. &quot;Çıkar&quot; ile AI ekstraksiyonunu başlatın.</>
+                    )}
                 </div>
             )}
 

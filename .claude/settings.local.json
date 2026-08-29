@@ -77,7 +77,10 @@
       "Bash(sed -n '20,30p' src/app/api/quotes/route.ts)",
       "Bash(echo \"EXIT: $?\")",
       "Bash(echo \"tsc EXIT: $?\")",
-      "Bash(git rebase *)"
+      "Bash(git rebase *)",
+      "Bash(npm install *)",
+      "Bash(npx eslint *)",
+      "Bash(git *)"
     ],
     "additionalDirectories": [
       "/Users/mirzasaribiyik/Projects/erp2",

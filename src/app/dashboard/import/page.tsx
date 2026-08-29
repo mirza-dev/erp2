@@ -3,14 +3,17 @@
 import { useState, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Download, FileSpreadsheet, ShieldCheck } from "lucide-react";
+import { AlertTriangle, Download, FileSpreadsheet, ShieldCheck } from "lucide-react";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP } from "@/lib/demo-utils";
 import { useToast } from "@/components/ui/Toast";
 import DropZone from "@/components/import/DropZone";
 import ClassifierQueue from "@/components/import/ClassifierQueue";
+import SetupStatusPanel from "@/components/import/SetupStatusPanel";
+import type { ExcelImportTemplateKind } from "@/lib/import-center";
 import type { ProductTypeRow } from "@/lib/database.types";
 import { stashImportFile, takeImportFile, isExcelWizardFile } from "@/lib/import-file-transfer";
 import { getActiveTemplateLinks, IMPORT_TRUST_NOTES } from "@/lib/import-guide";
+import { fetchAiHealth, aiUnavailableMessage, type AiHealth } from "@/lib/ai-health";
 
 // Veri Aktarım Merkezi — dosya-önce model (2026-06-10 sadeleştirme).
 // Eski tasarım: kullanıcı önce işlem-türü ızgarasından seçiyordu (4-6 buton), arayüz buna
@@ -31,6 +34,11 @@ export default function ImportPage() {
     const [aiFiles, setAiFiles] = useState<File[]>([]);
     const [aiSuggestedTypes, setAiSuggestedTypes] = useState<Array<{ id: string; name: string }>>([]);
     const [templateTypeId, setTemplateTypeId] = useState("");
+    // AI erişilebilirliği. `aiHealth` null olabilir hem "henüz sorulmadı" hem
+    // "sorduk ama cevap alınamadı" durumunda — bu ikisi farklı karar gerektirir
+    // (birinde beklenir, diğerinde akış engellenmez), o yüzden ayrı bayrak.
+    const [aiHealth, setAiHealth] = useState<AiHealth | null>(null);
+    const [aiHealthChecked, setAiHealthChecked] = useState(false);
 
     // Load product types once for AI badge labels + tip-özel şablon seçimi
     useEffect(() => {
@@ -48,18 +56,58 @@ export default function ImportPage() {
     }, []);
 
     // Excel sihirbazından "AI ile analiz et" kaçışıyla gelen dosyayı al
-    // (singleton oku-ve-temizle).
+    // (singleton oku-ve-temizle). Kuyruğa DOĞRUDAN koymuyoruz: bu yol
+    // `routeFiles`'ı atladığı için AI kapalı kontrolünü de atlardı. Dosya
+    // beklemede tutulur, sağlık cevabı gelince karar verilir.
+    const [handoffFile, setHandoffFile] = useState<File | null>(null);
     useEffect(() => {
         const handed = takeImportFile("ai");
-        if (handed) setAiFiles(prev => [...prev, handed]);
+        if (handed) setHandoffFile(handed);
     }, []);
+
+    // AI gerçekten çalışıyor mu? Anahtar dolu ama geçersiz olabilir — env
+    // kontrolü yetmez, sunucu ölçüp söyler.
+    useEffect(() => {
+        const ac = new AbortController();
+        void fetchAiHealth(ac.signal).then(h => {
+            if (ac.signal.aborted) return;
+            setAiHealth(h);
+            setAiHealthChecked(true);
+        });
+        return () => ac.abort();
+    }, []);
+
+    // Sağlık cevabı geldiğinde bekleyen devir dosyasını yönlendir. Cevap
+    // alınamadıysa (aiHealth null) akış ENGELLENMEZ — yanlış "kapalı" kararı
+    // sessiz başarısızlık kadar yanıltıcı olur.
+    useEffect(() => {
+        if (!handoffFile || !aiHealthChecked) return;
+        if (aiHealth && !aiHealth.available) {
+            toast({ type: "warning", message: `${aiUnavailableMessage(aiHealth)} "${handoffFile.name}" yüklenmedi.` });
+        } else {
+            setAiFiles(prev => [...prev, handoffFile]);
+        }
+        setHandoffFile(null);
+    }, [handoffFile, aiHealth, aiHealthChecked, toast]);
 
     // Dosya-önce yönlendirme: Excel/CSV → sihirbaz sayfası; diğerleri → AI kuyruğu.
     const routeFiles = (files: File[]) => {
         const excelFiles = files.filter(f => isExcelWizardFile(f.name));
         const aiBound = files.filter(f => !isExcelWizardFile(f.name));
         if (aiBound.length > 0) {
-            setAiFiles(prev => [...prev, ...aiBound]);
+            // AI kapalıyken kuyruğa ALMIYORUZ: kuyruğa girmek yükleme + depo
+            // satırı + sınıflandırma denemesi demek. Anahtar geçersizken bunun
+            // tek sonucu `unknown` sınıflandırma ve kullanıcının anlamadığı bir
+            // çıkmaz olurdu. Dosya kabul edilir görünüp sessizce ölmesin diye
+            // burada durup sebebi söylüyoruz (kullanıcı kararı, 2026-08-29).
+            if (aiHealth && !aiHealth.available) {
+                toast({
+                    type: "warning",
+                    message: `${aiUnavailableMessage(aiHealth)} ${aiBound.length} dosya yüklenmedi.`,
+                });
+            } else {
+                setAiFiles(prev => [...prev, ...aiBound]);
+            }
         }
         if (excelFiles.length > 0) {
             if (excelFiles.length > 1) {
@@ -75,6 +123,12 @@ export default function ImportPage() {
         router.push("/dashboard/import/excel");
     };
 
+    // Kurulum panelinden "Yükle" — dosya henüz yok, sihirbaz o adımın tipiyle
+    // açılır ve dosya seçimini kendisi ister.
+    const openWizardForKind = (kind: ExcelImportTemplateKind) => {
+        router.push(`/dashboard/import/excel?kind=${kind}`);
+    };
+
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
             {/* Header */}
@@ -83,9 +137,34 @@ export default function ImportPage() {
                     Veri Aktarım Merkezi
                 </div>
                 <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "3px" }}>
-                    Dosyanı bırak — Excel/CSV toplu aktarım sihirbazında, PDF ve görseller AI çıkarımında açılır.
+                    Sistemi kurarken listelerini buradan taşırsın; sonrasında toplu güncelleme ve belge ekleme de buradan.
                 </div>
             </div>
+
+            {/* Kurulum durumu — sıra ve eksikler. Sayılar gerçek veriden. */}
+            <SetupStatusPanel
+                onOpenStep={openWizardForKind}
+                disabled={isDemo}
+                disabledTooltip={DEMO_DISABLED_TOOLTIP}
+            />
+
+            {/* AI kapalı şeridi — toast kaybolur, bu kalır. Sebep + ne çalıştığı. */}
+            {aiHealth && !aiHealth.available && (
+                <div
+                    role="status"
+                    style={{
+                        display: "flex", alignItems: "flex-start", gap: "8px",
+                        padding: "10px 14px",
+                        background: "var(--warning-bg)",
+                        border: "var(--line-width) solid var(--warning-border)",
+                        borderRadius: "8px",
+                        fontSize: "12px", lineHeight: 1.6, color: "var(--warning-text)",
+                    }}
+                >
+                    <AlertTriangle size={14} aria-hidden style={{ flexShrink: 0, marginTop: "2px" }} />
+                    <span>{aiUnavailableMessage(aiHealth)}</span>
+                </div>
+            )}
 
             {/* Tek giriş: dropzone */}
             <DropZone
@@ -112,8 +191,18 @@ export default function ImportPage() {
                     </div>
                     <b>Excel/CSV</b> → sheet, kolon ve alan bazlı onaylı toplu aktarım sihirbazı (
                     <Link href="/dashboard/import/excel" style={{ color: "var(--accent-text)", textDecoration: "none" }}>doğrudan aç</Link>
-                    ). <b>PDF, görsel, datasheet, sertifika</b> → AI sınıflandırır, eşleşen ürünleri bulur,
-                    onayınla uygular.
+                    ).{" "}
+                    {aiHealth && !aiHealth.available ? (
+                        <>
+                            <b>PDF, görsel, datasheet, sertifika</b> → <b style={{ color: "var(--warning-text)" }}>şu an alınamıyor</b>,
+                            AI çıkarımı kapalı.
+                        </>
+                    ) : (
+                        <>
+                            <b>PDF, görsel, datasheet, sertifika</b> → AI sınıflandırır, eşleşen ürünleri bulur,
+                            onayınla uygular.
+                        </>
+                    )}
                 </output>
             )}
 

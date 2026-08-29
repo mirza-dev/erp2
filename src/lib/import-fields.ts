@@ -18,6 +18,12 @@ export const IMPORT_FIELDS: Record<string, Array<{ field: string; label: string 
         { field: "vendor_name", label: "Tedarikçi Adı" }, { field: "vendor_email", label: "Tedarikçi E-posta" },
         { field: "vendor_sku", label: "Tedarikçi Ürün Kodu" }, { field: "moq", label: "MOQ" },
         { field: "is_preferred", label: "Tercihli Tedarikçi Yap" },
+        // Tedarikçi-ürün İLİŞKİSİNİN notu — ürünün kendi notu değil (o
+        // `product_notes`). import-service:402 bunu dbUpsertProductVendorLink'e
+        // geçiriyor; whitelist'te olmadığı için apply-mappings sütunu düşürüyor
+        // ve Tedarikçi-Ürün İlişkisi şablonundaki "Not" sütunu hiçbir zaman
+        // uygulanmıyordu (2026-08-29).
+        { field: "notes", label: "Tedarikçi İlişki Notu" },
     ],
     customer: [
         { field: "name", label: "Firma Adı" }, { field: "email", label: "E-posta" },

@@ -1,7 +1,9 @@
 import { IMPORT_FIELDS } from "@/lib/import-fields";
 import type { ProductTypeFieldRow, ProductFieldType } from "@/lib/database.types";
 
-export const EXCEL_IMPORT_TEMPLATE_VERSION = "2026-06-03.1";
+// 2026-08-29: Tedarikçi-Ürün İlişkisi şablonunda "Not" → "Tedarikçi Notu"
+// (ürünün kendi notundan ayrışsın). Kolon etiketi değiştiği için sürüm arttı.
+export const EXCEL_IMPORT_TEMPLATE_VERSION = "2026-08-29.1";
 export const COLUMN_MAPPING_COMPANY_SCOPE = "default";
 
 export type ExcelImportTemplateKind =
@@ -199,7 +201,10 @@ const vendorProductColumns: ExcelTemplateColumn[] = [
     { field: "lead_time_days", label: "Tedarik Süresi (gün)", required: false, example: 21, note: "Negatif olamaz." },
     { field: "moq", label: "MOQ", required: false, example: 10, note: "Minimum sipariş miktarı." },
     { field: "is_preferred", label: "Tercihli", required: false, example: true, note: "true/false, evet/hayır kabul edilir." },
-    { field: "notes", label: "Not", required: false, example: "Ana tedarik ilişkisi", note: "Opsiyonel." },
+    // Etiket "Not" değil "Tedarikçi Notu": bu sheet ürün satırı olarak akıyor ve
+    // ürünün kendi notu (`product_notes`) ile aynı başlığı taşırsa alias tablosu
+    // ikisini ayıramaz. Ayrı etiket = ayrı alan (2026-08-29).
+    { field: "notes", label: "Tedarikçi Notu", required: false, example: "Ana tedarik ilişkisi", note: "Tedarikçi-ürün ilişkisine yazılır; ürünün kendi notu değildir." },
 ];
 
 export const EXCEL_IMPORT_TEMPLATES: Record<ExcelImportTemplateKind, ExcelTemplateDefinition> = {
@@ -278,39 +283,64 @@ export function normalizeImportToken(value: string): string {
         .replace(/^_|_$/g, "");
 }
 
+/**
+ * Excel başlığı (normalize) → ERP alanı. `FALLBACK_FIELD_MAP` bu tabloyla
+ * birleştirilir (ai-service.ts) — 4 klasik tip için TEK KAYNAK burasıdır.
+ *
+ * 2026-08-29 genişletmesi iki kaynaktan beslendi:
+ *  1. **Kendi şablonlarımız** — indirilen şablonun başlıkları kendi alanına
+ *     dönmüyordu (`urun_sku`, `depo_lokasyon`, `tedarikci_e_posta`, product
+ *     tarafında `not`). `import-sablon-roundtrip.test.ts` bunu artık kilitliyor.
+ *  2. **Gerçek dünya başlıkları** — muhasebe/tedarikçi dosyalarının fiilî
+ *     yazımları: `unvan`, `vkn`, `v_d`, `gsm`, `vade`, `e_mail`, `br`,
+ *     `birim_fiyat`, `sayilan`.
+ *
+ * BİLİNÇLİ OLARAK EKLENMEYENLER — yanlış eşleştirmek eşleştirmemekten kötüdür,
+ * çünkü sessizce yanlış veri yazar; eşleşmeyen sütun ise önizlemede görünür
+ * uyarı üretir ve kullanıcı bir kez elle seçer (hafıza `remember` varsayılan
+ * açık olduğu için bir daha sormaz):
+ *  - `olcu` → vana kataloğunda "Ölçü" çoğunlukla DN/ebat demek, ölçü birimi
+ *    değil. `olcu_birimi` ve `br` eşleşiyor, bare `olcu` eşleşmiyor.
+ *  - `aciklama` → fiyat listesinde ürün adı, ürün kartında not. İki yönde de
+ *    yanlış olabilir; `name` zorunlu olduğu için eksikliği zaten yüksek sesle
+ *    bildiriliyor.
+ *  - `il` / `sehir` → şemada karşılık alan yok (adres serbest metin).
+ */
 export const IMPORT_ALIAS_FIELD_MAP: Record<ClassicImportEntityType, Record<string, string>> = {
     customer: {
         firma: "name", firma_adi: "name", musteri: "name", musteri_adi: "name", cari: "name", ad: "name", isim: "name",
-        email: "email", mail: "email", eposta: "email", e_posta: "email", mail_adresi: "email", musteri_e_posta: "email", musteri_email: "email",
-        telefon: "phone", tel: "phone", phone: "phone",
+        unvan: "name", firma_unvani: "name", ticari_unvan: "name",
+        email: "email", mail: "email", eposta: "email", e_posta: "email", e_mail: "email", mail_adresi: "email", musteri_e_posta: "email", musteri_email: "email",
+        telefon: "phone", tel: "phone", phone: "phone", gsm: "phone", cep: "phone", cep_telefonu: "phone",
         ulke: "country", country: "country",
         para_birimi: "currency", doviz: "currency",
-        vergi_no: "tax_number", vergi_numarasi: "tax_number", tax_no: "tax_number",
-        vergi_dairesi: "tax_office",
+        vergi_no: "tax_number", vergi_numarasi: "tax_number", tax_no: "tax_number", vkn: "tax_number",
+        vergi_dairesi: "tax_office", v_d: "tax_office",
         adres: "address", address: "address",
         notlar: "notes", not: "notes",
-        odeme_vadesi: "payment_terms_days", odeme_vadesi_gun: "payment_terms_days",
+        odeme_vadesi: "payment_terms_days", odeme_vadesi_gun: "payment_terms_days", vade: "payment_terms_days",
         musteri_kodu: "customer_code", cari_kodu: "customer_code", code: "customer_code",
         incoterm: "default_incoterm", varsayilan_incoterm: "default_incoterm",
     },
     vendor: {
         tedarikci: "name", tedarikci_adi: "name", firma: "name", firma_adi: "name", ad: "name", isim: "name",
-        email: "contact_email", mail: "contact_email", eposta: "contact_email", e_posta: "contact_email", tedarikci_email: "contact_email",
-        telefon: "contact_phone", tel: "contact_phone", phone: "contact_phone",
+        unvan: "name", firma_unvani: "name", ticari_unvan: "name",
+        email: "contact_email", mail: "contact_email", eposta: "contact_email", e_posta: "contact_email", e_mail: "contact_email", tedarikci_email: "contact_email",
+        telefon: "contact_phone", tel: "contact_phone", phone: "contact_phone", gsm: "contact_phone", cep: "contact_phone", cep_telefonu: "contact_phone",
         yetkili: "contact_person", ilgili_kisi: "contact_person", contact: "contact_person",
-        vergi_no: "tax_number", vergi_numarasi: "tax_number",
+        vergi_no: "tax_number", vergi_numarasi: "tax_number", vkn: "tax_number",
         adres: "address",
         para_birimi: "currency", doviz: "currency",
-        odeme_vadesi: "payment_terms_days", odeme_vadesi_gun: "payment_terms_days",
+        odeme_vadesi: "payment_terms_days", odeme_vadesi_gun: "payment_terms_days", vade: "payment_terms_days",
         tedarik_suresi: "lead_time_days", tedarik_suresi_gun: "lead_time_days", lead_time: "lead_time_days", lead_time_gun: "lead_time_days",
         notlar: "notes", not: "notes",
     },
     product: {
         urun_adi: "name", product_name: "name", malzeme_adi: "name", ad: "name", isim: "name",
-        urun_kodu: "sku", stok_kodu: "sku", malzeme_kodu: "sku", sku: "sku", kod: "sku",
+        urun_kodu: "sku", stok_kodu: "sku", malzeme_kodu: "sku", sku: "sku", kod: "sku", urun_sku: "sku",
         kategori: "category", category: "category",
-        olcu_birimi: "unit", birim: "unit", unit: "unit",
-        liste_fiyati: "price", liste_fiyati_usd: "price", satis_fiyati: "price", fiyat: "price", price: "price",
+        olcu_birimi: "unit", birim: "unit", unit: "unit", br: "unit",
+        liste_fiyati: "price", liste_fiyati_usd: "price", satis_fiyati: "price", fiyat: "price", price: "price", birim_fiyat: "price",
         maliyet: "cost_price", maliyet_fiyati: "cost_price", standart_maliyet: "cost_price", cost: "cost_price", cost_price: "cost_price",
         para_birimi: "currency", doviz: "currency",
         min_stok: "min_stock_level", guvenlik_stogu: "min_stock_level", min_siparis_miktari: "min_stock_level",
@@ -321,19 +351,20 @@ export const IMPORT_ALIAS_FIELD_MAP: Record<ClassicImportEntityType, Record<stri
         uretim_tesisi: "production_site", tesis: "production_site",
         kullanim: "use_cases", kullanim_alanlari: "use_cases",
         sektorler: "industries", standartlar: "standards", sertifikalar: "certifications",
-        urun_notlari: "product_notes", notlar: "product_notes",
+        urun_notlari: "product_notes", notlar: "product_notes", not: "product_notes",
         tedarik_suresi: "lead_time_days", tedarik_suresi_gun: "lead_time_days", lead_time: "lead_time_days",
         yeniden_siparis_miktari: "reorder_qty", moq: "moq", minimum_order_quantity: "moq",
         tercihli_tedarikci: "preferred_vendor", tedarikci: "vendor_name", tedarikci_adi: "vendor_name",
-        tedarikci_email: "vendor_email", tedarikci_mail: "vendor_email",
+        tedarikci_email: "vendor_email", tedarikci_mail: "vendor_email", tedarikci_e_posta: "vendor_email",
         tedarikci_urun_kodu: "vendor_sku", tedarikci_sku: "vendor_sku",
+        tedarikci_notu: "notes", iliski_notu: "notes",
         tercihli: "is_preferred", preferred: "is_preferred",
     },
     stock: {
         urun_kodu: "sku", stok_kodu: "sku", malzeme_kodu: "sku", sku: "sku",
-        stok: "on_hand", stok_miktari: "on_hand", miktar: "on_hand", sayim: "on_hand", sayilan_miktar: "on_hand", qty: "on_hand", adet: "on_hand",
+        stok: "on_hand", stok_miktari: "on_hand", miktar: "on_hand", sayim: "on_hand", sayilan_miktar: "on_hand", sayilan: "on_hand", qty: "on_hand", adet: "on_hand",
         yon: "direction", hareket_yonu: "direction", direction: "direction", islem: "direction",
-        depo: "warehouse", lokasyon: "warehouse", warehouse: "warehouse",
+        depo: "warehouse", lokasyon: "warehouse", warehouse: "warehouse", depo_lokasyon: "warehouse",
         cikis_lokasyonu: "from_location", kaynak_lokasyon: "from_location", from_location: "from_location",
         giris_lokasyonu: "to_location", hedef_lokasyon: "to_location", to_location: "to_location",
         not: "notes", notlar: "notes",
@@ -450,6 +481,41 @@ export function mapHeaderToField(header: string, entityType: string): string | n
     const normalized = normalizeImportToken(header);
     return getAliasFieldMap(entityType)[normalized] ?? null;
 }
+
+/**
+ * Sheet'e elle tür atandığında satırın yeni hâli.
+ *
+ * NEDEN VAR: otomatik tespit sheet ADINA, tutmazsa kolon başlıklarına bakıyor;
+ * ikisi de tutmazsa sheet "aktarılamaz" damgası yiyordu ve kullanıcının hiçbir
+ * çıkışı yoktu — müşteriden gelen "Sayfa1" adlı dosya duvara toslardı
+ * (2026-08-29). Tespitin kendisi iyi çalışıyor (6 gerçekçi senaryonun 6'sında
+ * doğru); bu bir emniyet supabı.
+ *
+ * `entityType === null` → kullanıcı "Aktarma" dedi (kapak/açıklama sayfası).
+ */
+export function applyManualSheetEntityType<
+    T extends { entityType: string | null; displayName: string; entity: string; status: string; selected: boolean },
+>(sheet: T, entityType: ClassicImportEntityType | null): T {
+    if (!entityType) {
+        return { ...sheet, entityType: null, status: "unsupported", selected: false };
+    }
+    return {
+        ...sheet,
+        entityType,
+        displayName: CLASSIC_IMPORT_ENTITY_LABELS[entityType],
+        entity: CLASSIC_IMPORT_ENTITY_LABELS[entityType],
+        status: "importable",
+        selected: true,
+    };
+}
+
+/** Klasik entity tipi → kullanıcıya görünen ad. */
+export const CLASSIC_IMPORT_ENTITY_LABELS: Record<ClassicImportEntityType, string> = {
+    product: "Ürünler",
+    customer: "Müşteriler",
+    vendor: "Tedarikçiler",
+    stock: "Stok",
+};
 
 export function detectSheetEntityType(
     sheetName: string,

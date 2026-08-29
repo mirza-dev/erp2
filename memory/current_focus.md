@@ -5,12 +5,61 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-08-29 — Veri Aktarım Merkezi kurulum aracına dönüştü (4 tur)
+
+Kullanıcı: *"bu sayfa benim için çok karışık kafamda hiçbir şey yok nasıl
+konumlandırıcam"*. Konuşmadan önce ÖLÇTÜM: sistemin kendi şablonunun 56
+kolonundan 10'u kendi alanına dönmüyordu, biri zorunlu → Tedarikçi-Ürün
+İlişkisi şablonu hiç çalışmıyordu. Kusur AI ile örtülüyordu; `ANTHROPIC_API_KEY`
+geçersiz (HTTP 401) olunca ortaya çıktı.
+
+**Yapıldı:** tek normalizer + eksik alias'lar (Tur 1) · AI 401 mandalı +
+`/api/ai/health` + kapalıyken PDF yüklenmiyor (Tur 2) · Kurulum Durumu paneli 5
+adım + `/api/import/setup-status` (Tur 3) · sheet tipi elle seçilebilir (Tur 4).
+
+tsc 0 · lint 0 · **460 dosya / 6353 test** (+148) · build 0 · migration YOK.
+Canlı kanıt: şablon turu **10 sütun elle → 0**; gerçek ürün+tedarikçi ile 7/7
+alan eşleşti, AI olmadan.
+
+**AÇIK:** ANTHROPIC_API_KEY yenileme (kullanıcı) · mig.107 APPLY ·
+`view_import` yalnız admin+satınalma (karar bekliyor) · commit+push yapılmadı.
+
+Detay: [[project_import_module]] · `docs/veri-aktarim-merkezi.md`
+
+
 > Bu dosya yalnız **güncel odak + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda. Aşağıdaki indeks geçmiş oturumlara hızlı bakış içindir.
 
 ## ▶ SIRADAKİ İŞ (compact sonrası buradan başla)
 
-**Bağlam:** Fabrika teslimine ~1,5 hafta. Bu oturumda **Paraşüt epic'i (Faz 12-16)
-kod olarak tamamlandı** — 5 commit, 6100 test, hepsi push'lu.
+**Bağlam:** Fabrika teslimine ~1,5 hafta.
+
+### KOBİ simülasyonu bulgularının kapatılması ✅ (2026-08-29, COMMIT BEKLİYOR)
+
+Beş günlük çalışan simülasyonunun **31 bulgusunun tamamı düzeltildi** (5 tur).
+Rapor: `docs/sim/2026-08-29-sim-bulgular.md` — **§5** ne yapıldığını, **§0**
+düzeltmeden önce yeniden okunup **teşhisi değişen 7 bulguyu** anlatıyor.
+
+**Teslimi açan üç kritik:** teklif gönderiminde cari zorunlu + inline cari
+oluşturma + mevcut siparişler için "Cariye bağla" onarım yolu (K1/Y6) ·
+mal kabulde tedarikçi fatura künyesi + sonradan düzeltme, künye yazılamazsa
+görünür uyarı (K2) · ürün detayında "Sayım / Stok Düzelt" (K3).
+
+**Canlı kanıt:** onarım yolu gerçek `ORD-2026-0030` üzerinde denendi —
+`preflightShipment` artık GEÇİYOR (sevk edilmedi). Aynı turda kendi kodumda
+gerçek bir hata çıktı: `country: "Türkiye"` gönderiyordum, kolon `char(2)`;
+6200 yeşil test bunu görmemişti. Sim artıkları temizlendi, 4 sim hesabı silindi,
+`check:chains` dört zincir de yeşil.
+
+tsc 0 · lint 0 · **455 dosya / 6205 test** · build 0 · **migration YOK**.
+
+**AÇIK:** **mig.107 APPLY** (fatura künyesi kolonları canlıda yok — ekran çalışır
+ve yazamadığında uyarır) · **commit + push** · O5 teslim performansı (ertelendi) ·
+ürün tipi alan konfigürasyonu (Ayarlar → Ürün Tipleri) · 27 test artığı.
+
+<details><summary>Önceki: Paraşüt epic'i (Faz 12-16)</summary>
+
+**Bağlam:** Bu oturumda **Paraşüt epic'i (Faz 12-16) kod olarak tamamlandı** —
+5 commit, 6100 test, hepsi push'lu.
 
 ### Paraşüt muhasebe/vergilendirme kapanışı ✅ (`21497bf` → `1cf8ee3`)
 
@@ -98,6 +147,8 @@ tsc/lint/vitest/build yeşil → commit (`.claude/settings.local.json` STAGE ETM
 divergence doğrula → memory güncelle.
 
 ---
+
+</details>
 
 ## Son Tamamlanan İş — 2026-08-23 (**Faz B #7 — products/page.tsx → DataTable + DataTable satır a11y + bekleyen import fix**)
 
