@@ -5,6 +5,44 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-08-29 — Genel Bakış KPI şeridi sarmalayan ızgaraya geçti
+
+Kullanıcı: *"bu kartların düzeni hoşuma gitmedi"* (ekran görüntüsüyle: 8. kart
+ikinci satırda tek başına öksüz).
+
+**Kök neden aynı gün uyguladığımız migration'dı.** Zincir: mig.108 APPLY →
+`/api/parasut/receivables` 500 yerine **200 []** dönmeye başladı → `receivables`
+`null` yerine `[]` oldu → `buildKpis`'teki `!= null` koşulu boş diziyi geçirdi →
+8. kart ("Açık Alacak —") doğdu → `.kpi-strip` `repeat(7, …)` ile 7'ye
+çakılıydı, kart 2. satıra düştü. **İki ayrı kusur, biri düzeltilse öbürü kalır.**
+
+**Kullanıcı kararı:** sarmalayan ızgara + verisi olmayan kart gizlensin.
+
+**Yapıldı:** `.kpi-strip` yatay kaydırmayı bırakıp ızgara oldu; kolon sayısı
+`data-kpi-count`ten türer (8→4+4 · 7→4+3 · 6→3+3 · 5→3+2 — **hiçbir sayıda
+öksüz satır yok**, kart sayısı role/fetch'e göre 5-8 arasında değişiyor).
+1400/1080/480px'te kolon düşer; eski 640px mobil karusel kalktı.
+`.kpi-card` `min-width: 182px` → `0` (2 kolonlu dar ekranda taşırıyordu).
+`alacak` kartı `.length > 0` ister.
+
+**İki test kilidi düzeltildi, ikisi de aynı dersi verdi:**
+1. `dashboard-overview-preservation` yerleşim kilidi `repeat(7, …)`'yi
+   kilitliyordu → yeni sözleşmeye göre yeniden yazıldı (silinmedi).
+   Yan bulgu: eski iddialar `/\.kpi-strip\s*\{[\s\S]*overflow-x/` kalıbını
+   kullanıyordu — `[\s\S]*` açgözlü olduğu için **dosyanın herhangi bir
+   yerindeki** `overflow-x` eşleşiyordu; iddia kapsamsızdı. `ruleBody()` +
+   `code()` yardımcılarıyla gerçek kural gövdesine bağlandı.
+2. `parasut-payment-status`'taki *"veri yoksa kart HİÇ üretilmez"* testinin
+   **BAŞLIĞI baştan doğruydu, iddiası değildi** (`!= null` boş diziyi geçirir).
+   **Ders: kaynak-kilidi testi yanlış satırı kilitlerse kusuru dondurur.**
+
+tsc 0 · lint 0 · **6416 test** (+6) · build 0 · migration YOK.
+Canlı veriden doğrulandı: receivables 0 satır → şerit **7 kart → 4+3**.
+Tarayıcı turu YAPILAMADI (Chrome eklentisi bağlanmıyor) — derlenmiş CSS
+(`.next/static`) ve canlı sayı üzerinden doğrulandı. **COMMIT EDİLMEDİ.**
+
+---
+
 ## 2026-08-29 — Veri Aktarım Merkezi kurulum aracına dönüştü (4 tur)
 
 Kullanıcı: *"bu sayfa benim için çok karışık kafamda hiçbir şey yok nasıl
@@ -28,10 +66,36 @@ uygulamanın senkronunu atlıyordu; tedarikçi ADI doğru görünüyordu ama ID 
 → UI doğru, otomasyon kör.** `check:chains` 5. zincir bunu artık yakalar.
 461 dosya / 6363 test · beş zincir yeşil · şüpheli kayıt 27→25.
 
-**AÇIK:** ANTHROPIC_API_KEY yenileme (kullanıcı) · mig.106/107/108 APPLY ·
-`view_import` yalnız admin+satınalma (karar bekliyor) · geçmiş veri göçü
-(sipariş/teklif/fatura — kurulum günü sorusu) · **3 commit main'de, PUSH
-EDİLMEDİ** (`9585c2b` sim · `b7db679` içe aktarım · `f7cf988` veri onarımı).
+**Kurulum günü kararları** (`3174168`, PUSH EDİLDİ — origin/main **ve**
+origin/codex-experiment ikisi de `3174168`, `git ls-remote` ile doğrulandı):
+aktarım yetkisi muhasebe+üretime açıldı · sipariş/sipariş-kalemi şablonu +
+`MANUAL_SHEET_TYPES` (10 tür) + sipariş alias'ları · test artıkları temizlendi
+(26 kayıt; `find-test-data` 25→0). **462 dosya / 6410 test.**
+
+**Ölçüldü — geçmiş veri göçü ZATEN ÇALIŞIYOR:** `import-service.ts` sipariş /
+sipariş kalemi / teklif / sevkiyat / fatura / tahsilatı tam işliyor (cari kod
+sonra ad ile eşleşir, KDV genel toplamdan ayrışır, sipariş **taslak** açılır →
+stok rezerve edilmez). Eksik olan üç dar şeydi: şablon yoktu · elle tür
+seçilemiyordu · `Birim Fiyat` alias'ı yoktu. Üçü de kapatıldı.
+
+**mig.106/107/108 APPLY EDİLDİ** (2026-08-29, kullanıcı Studio'dan).
+`check-migrations` → **mig-gate OK**, problanan tüm migration'lar canlıda.
+Bu, canlıda kırık olan bir akışı kapattı: 106 eksikken **Ayarlar → Firma
+Bilgileri kaydetme her seferinde `PGRST204 quote_validity_days` ile
+düşüyordu** (sayfa kolonu koşulsuz gönderiyor, `settings/page.tsx:211`) —
+kurulum günü ilk doldurulacak ekran. Doğrulandı: PATCH provası geçiyor,
+singleton satır `quote_validity_days=30` aldı → QuoteForm artık `valid_until`
+önden doldurur → expire cron'u (094) ve `quote_expired` uyarısı ilk kez canlı.
+
+**Ders — sonda tasarımı:** eşleşmeyen id ile yapılan update KOLONU doğrular
+ama CHECK'i doğrulamaz (satır yazılmadığı için constraint hiç değerlendirilmez).
+`company_settings_quote_validity_days_check` bu yüzden elle doğrulanacak
+(mig-gate'in 9 migration için zaten kullandığı kalıp):
+`SELECT pg_get_constraintdef(oid) FROM pg_constraint WHERE conrelid='company_settings'::regclass AND conname='company_settings_quote_validity_days_check';`
+Risk düşük: API katmanı aynı 1..365 aralığını zaten uyguluyor
+(`api/settings/company/route.ts:73`).
+
+**AÇIK:** ANTHROPIC_API_KEY yenileme (kullanıcı) · Paraşüt API başvurusu.
 
 Detay: [[project_import_module]] · `docs/veri-aktarim-merkezi.md`
 

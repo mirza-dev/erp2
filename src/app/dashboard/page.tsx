@@ -246,9 +246,14 @@ export default function DashboardPage() {
                 </div>
             </div>
 
-            {/* KPI şeridi */}
+            {/* KPI şeridi — sarmalayan ızgara.
+                data-kpi-count: kolon sayısı kart sayısından türer
+                (globals.css .kpi-strip → 5-6 kart 3'lü, 7-8 kart 4'lü). Kart
+                sayısı role ve fetch başarısına göre 5-8 arasında değiştiği için
+                sabit kolon sayısı öksüz satır bırakıyordu. */}
             <div
                 className="kpi-strip"
+                data-kpi-count={kpis.length}
                 role="region"
                 aria-label="Temel performans göstergeleri"
                 style={{ marginBottom: unconvertible.length > 0 ? 8 : gap }}

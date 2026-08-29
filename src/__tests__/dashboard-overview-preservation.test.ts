@@ -79,18 +79,75 @@ describe("tasarım panelleri render edilir (DashDetailed)", () => {
     });
 });
 
+/** Yorumları düşürür — iddia açıklamaya değil koda bakmalı. */
+function code(src: string): string {
+    return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+}
+
+/**
+ * Tek bir CSS kuralının gövdesini çeker.
+ *
+ * NEDEN yardımcı: eski kilit `/\.kpi-strip\s*\{[\s\S]*overflow-x:\s*auto/`
+ * kalıbını kullanıyordu — `[\s\S]*` açgözlü olduğu için dosyanın İLERİSİNDEKİ
+ * herhangi bir `overflow-x: auto` da eşleşiyordu. Yani iddia `.kpi-strip`
+ * hakkında değil, "globals.css'te bir yerde" hakkındaydı. Kural gövdesini
+ * ayırarak iddiaları gerçekten kapsama bağlıyoruz.
+ */
+function ruleBody(css: string, selector: string): string {
+    const at = css.indexOf(`${selector} {`);
+    if (at === -1) return "";
+    const open = css.indexOf("{", at);
+    return css.slice(open + 1, css.indexOf("}", open));
+}
+
 describe("executive KPI şeridi yerleşim kilidi", () => {
-    it("yedi kolon tek satırdır; dar görünümde wrap yerine yatay scroll + snap kullanır", () => {
-        expect(GLOBALS).toMatch(/\.kpi-strip\s*\{[\s\S]*grid-template-columns:\s*repeat\(7,\s*minmax\(182px,\s*1fr\)\)/);
-        expect(GLOBALS).toMatch(/\.kpi-strip\s*\{[\s\S]*overflow-x:\s*auto/);
-        expect(GLOBALS).toMatch(/\.kpi-strip\s*\{[\s\S]*scroll-snap-type:\s*x proximity/);
-        expect(GLOBALS).not.toMatch(/\.kpi-strip\s*\{[\s\S]{0,250}auto-fit/);
+    /* 2026-08-29 — ESKİ KİLİT DÜŞTÜ, yerine bu geldi.
+       Eski sözleşme: `repeat(7, minmax(182px, 1fr))` + `overflow-x: auto` +
+       `scroll-snap-type: x proximity` + açık bir `auto-fit` yasağı; yani
+       "yedi kolon tek satır, dar ekranda yatay kaydır".
+       Neden düştü: mig.108 uygulanınca /api/parasut/receivables 500 yerine 200
+       dönmeye başladı → "Açık Alacak" 8. kart doğdu → 7 sabiti taşıp kartı
+       ikinci satırda ÖKSÜZ bıraktı. Kart sayısı role ve fetch başarısına göre
+       5-8 arasında değiştiği için HİÇBİR sabit sayı doğru değil.
+       Yeni sözleşme: sarmalayan ızgara, kolon sayısı `data-kpi-count`ten türer. */
+
+    // Yorumsuz sürüm: bu bloğun CSS yorumları da `scroll-snap-type: x mandatory`
+    // gibi ifadeleri metin olarak taşıyor — iddia yalnız gerçek kurallara baksın.
+    const CSS = code(GLOBALS);
+    const strip = ruleBody(CSS, ".kpi-strip");
+    const card = ruleBody(CSS, ".kpi-card");
+
+    it("şerit sarmalayan ızgaradır — yatay kaydırma/snap YOK", () => {
+        expect(strip).toMatch(/display:\s*grid/);
+        expect(strip).toMatch(/grid-template-columns:\s*repeat\(4,\s*minmax\(0,\s*1fr\)\)/);
+        expect(strip).not.toMatch(/overflow-x/);
+        expect(strip).not.toMatch(/scroll-snap-type/);
+        expect(strip).not.toMatch(/repeat\(7,/);
     });
 
-    it("kart yüksekliği ve minimum genişliği kararlı; hover React state kullanmaz", () => {
-        expect(GLOBALS).toMatch(/\.kpi-card\s*\{[\s\S]*height:\s*138px/);
-        expect(GLOBALS).toMatch(/\.kpi-card\s*\{[\s\S]*min-width:\s*182px/);
+    it("kolon sayısı kart sayısına bağlıdır — 5-6 kart 3'lü olur", () => {
+        // Sayfa sayıyı DOM'a taşımazsa CSS kuralı ölü kalır: iki uç birlikte kilitli.
+        expect(PAGE).toMatch(/data-kpi-count=\{kpis\.length\}/);
+        expect(CSS).toMatch(
+            /\.kpi-strip\[data-kpi-count="5"\],\s*\n\s*\.kpi-strip\[data-kpi-count="6"\]\s*\{\s*\n\s*grid-template-columns:\s*repeat\(3,/,
+        );
+    });
+
+    it("dar görünümde kolon sayısı düşer (wrap yerine kaydırma değil)", () => {
+        expect(CSS).toMatch(/@media \(max-width: 1400px\)[\s\S]{0,220}repeat\(3,/);
+        expect(CSS).toMatch(/@media \(max-width: 1080px\)[\s\S]{0,220}repeat\(2,/);
+        // Eski mobil karusel geri gelmesin.
+        expect(CSS).not.toMatch(/scroll-snap-type:\s*x mandatory/);
+    });
+
+    it("kart yüksekliği kararlı; min-width ızgarayı taşırmaz; hover React state kullanmaz", () => {
+        expect(card).toMatch(/height:\s*138px/);
+        // 182px, 2 kolonlu dar ekranda taşmaya yol açardı — yatay scroll kalkınca
+        // taşmayı yakalayacak bir emniyet de kalmadı.
+        expect(card).toMatch(/min-width:\s*0/);
+        expect(card).not.toMatch(/scroll-snap-align/);
         expect(KPI_CARD).not.toMatch(/useState|onMouseEnter|onMouseLeave/);
+        // Izgara viewport'tan uzun olabilir → klavye odağı hâlâ görünüre kaymalı.
         expect(KPI_CARD).toMatch(/scrollIntoView\(\{ block: "nearest", inline: "nearest" \}\)/);
         expect(KPI_CARD).not.toMatch(/KPI_ICONS|data-kpi-icon|CircleDollarSign|TriangleAlert/);
     });

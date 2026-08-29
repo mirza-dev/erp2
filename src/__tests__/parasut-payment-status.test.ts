@@ -148,8 +148,12 @@ describe("receivablesView", () => {
 });
 
 describe("Açık Alacak KPI kartı", () => {
-    it("veri yoksa kart HİÇ üretilmez (fail-soft — Yoldaki Mal kalıbı)", () => {
-        expect(VM).toContain("if (input.receivables != null) {");
+    // Bu testin BAŞLIĞI baştan doğruydu, iddiası değildi: kilitlediği koşul
+    // (`!= null`) boş diziyi geçiriyordu. mig.108 uygulanınca uç 500 yerine
+    // 200 [] dönmeye başladı ve "Açık Alacak —" hayalet kartı ekrana geldi.
+    // Artık başlıkla iddia aynı şeyi söylüyor.
+    it("veri yoksa kart HİÇ üretilmez — boş dizi de veri sayılmaz", () => {
+        expect(VM).toContain("if (input.receivables != null && input.receivables.length > 0) {");
     });
 
     it("eski proxy hesap geri gelmedi", () => {

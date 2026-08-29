@@ -1827,31 +1827,43 @@ button:focus-visible {
   box-shadow: var(--surface-shadow-sm);
 }
 
+/* KPI şeridi — SARMALAYAN IZGARA (2026-08-29).
+   Eskiden `repeat(7, …)` + yatay scroll idi: "tek satır executive şerit".
+   mig.108 uygulanınca /api/parasut/receivables 500 yerine 200 dönmeye başladı →
+   sekizinci kart ("Açık Alacak") doğdu → 7 sabiti taşıp kartı ikinci satırda
+   ÖKSÜZ bıraktı. Kart sayısı role ve fetch başarısına göre 5-8 arasında
+   değişiyor (teklif/yoldaki/alacak koşullu), yani hiçbir sabit sayı doğru değil.
+
+   Kolon sayısı kart sayısından türer — hedef her zaman DENGELİ iki satır:
+     8→4 (4+4) · 7→4 (4+3) · 6→3 (3+3) · 5→3 (3+2)
+   Sayı DOM'a `data-kpi-count` ile taşınır: kural saf CSS kalır, sunucuda
+   render edilir, hidrasyon sıçraması olmaz. (`repeat(min(var(--x),3), …)`
+   tarayıcı desteği şüpheli olduğu için öznitelik seçicisi tercih edildi.) */
 .kpi-strip {
   display: grid;
-  grid-template-columns: repeat(7, minmax(182px, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 10px;
-  max-width: 100%;
-  overflow-x: auto;
-  overscroll-behavior-inline: contain;
-  padding: 1px 1px 6px;
-  scroll-snap-type: x proximity;
-  scrollbar-color: var(--surface-border) transparent;
-  scrollbar-width: thin;
+  padding: 1px; /* odak halkası payı; 6px'lik scrollbar payı artık gereksiz */
+}
+
+/* 5-6 kart 4'lü ızgarada 4+1 / 4+2 öksüz kalırdı → 3'lü. */
+.kpi-strip[data-kpi-count="5"],
+.kpi-strip[data-kpi-count="6"] {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .kpi-card {
   position: relative;
   display: flex;
+  /* min-width: 0 — eski 182px, 2 kolonlu dar ekranda ızgarayı taşırırdı.
+     height sabit KALIR: satır hizası buna bağlı. */
   height: 138px;
-  min-width: 182px;
+  min-width: 0;
   flex-direction: column;
   box-sizing: border-box;
   padding: 12px 13px;
   color: inherit;
   text-decoration: none;
-  scroll-snap-align: start;
-  scroll-margin-inline: 1px;
   transition: background-color 140ms ease, border-color 140ms ease, box-shadow 140ms ease;
 }
 
@@ -1947,17 +1959,33 @@ a.kpi-card:focus-visible .kpi-card-link-icon {
   white-space: nowrap;
 }
 
-@media (max-width: 640px) {
-  .kpi-strip {
-    grid-template-columns: repeat(7, minmax(210px, 78vw));
-    gap: 9px;
-    margin-inline: -1px;
-    padding-bottom: 7px;
-    scroll-snap-type: x mandatory;
+/* Daralırken kolon sayısı düşer. Her kural `[data-kpi-count]` varyantını da
+   ezmeli — aksi halde 5-6 kartlı 3'lü kural dar ekranda geçerli kalırdı.
+   Eski 640px bloğu (78vw kart + `scroll-snap-type: x mandatory` karusel)
+   kaldırıldı: yatay kaydırmanın mobil karşılığıydı, kaydırma kalkınca dayanağı
+   kalmadı. */
+@media (max-width: 1400px) {
+  .kpi-strip,
+  .kpi-strip[data-kpi-count="5"],
+  .kpi-strip[data-kpi-count="6"] {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
   }
+}
 
-  .kpi-card {
-    min-width: 210px;
+@media (max-width: 1080px) {
+  .kpi-strip,
+  .kpi-strip[data-kpi-count="5"],
+  .kpi-strip[data-kpi-count="6"] {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+}
+
+@media (max-width: 480px) {
+  .kpi-strip,
+  .kpi-strip[data-kpi-count="5"],
+  .kpi-strip[data-kpi-count="6"] {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
 

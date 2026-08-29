@@ -377,6 +377,54 @@ describe("buildKpis", () => {
         expect(purchaseOnly.map((x) => x.id)).toEqual(["ciro", "siparis", "yoldaki", "stok", "uretim", "uyari"]);
     });
 
+    // ── Açık Alacak: yalnız GERÇEK Paraşüt verisiyle çıkar ────────────────
+    // mig.108 uygulanmadan önce /api/parasut/receivables 500 dönüyordu →
+    // receivables null kalıyor → kart hiç doğmuyordu. Migration gelince uç
+    // 200 [] dönmeye başladı ve boş dizi `!= null` olduğu için "Açık Alacak —"
+    // hayalet kartı doğdu; 8. kart KPI şeridinin kolon düzenini de taşırdı.
+    describe("Açık Alacak kartı — boş veri kart üretmez", () => {
+        const rec = { paymentStatus: "unpaid", remainingTry: 12_000 };
+
+        it("receivables: [] → kart YOK (boş dizi 'temiz' değil, 'hiç senkron olmamış')", () => {
+            const k = buildKpis({ ...input, receivables: [] }, allPerms, NOW);
+            expect(k.some((x) => x.id === "alacak")).toBe(false);
+        });
+
+        it("receivables: null → kart YOK (fetch yok / yetki yok / Paraşüt kapalı)", () => {
+            const k = buildKpis({ ...input, receivables: null }, allPerms, NOW);
+            expect(k.some((x) => x.id === "alacak")).toBe(false);
+        });
+
+        it("receivables dolu → kart VAR, executive sırasında yoldaki'den sonra", () => {
+            const k = buildKpis({
+                ...input,
+                quotes: [{ status: "sent", currency: "USD", grandTotal: 5000, validUntil: null }],
+                purchaseOrders: [{ status: "confirmed", currency: "USD", grand_total: 2000, expected_date: null }],
+                receivables: [rec],
+            }, allPerms, NOW);
+            expect(k.map((x) => x.id)).toEqual(
+                ["ciro", "teklif", "siparis", "yoldaki", "alacak", "stok", "uretim", "uyari"],
+            );
+        });
+
+        // KPI şeridinin kolon kuralı (globals.css) 5-8 aralığını kapsıyor;
+        // bu aralık genişlerse ızgara tekrar öksüz satır bırakır.
+        it("kart sayısı her kombinasyonda 5-8 aralığında kalır", () => {
+            const q = [{ status: "sent", currency: "USD", grandTotal: 5000, validUntil: null }];
+            const po = [{ status: "confirmed", currency: "USD", grand_total: 2000, expected_date: null }];
+            const combos = [
+                {}, { quotes: q }, { purchaseOrders: po }, { receivables: [rec] },
+                { quotes: q, purchaseOrders: po },
+                { quotes: q, purchaseOrders: po, receivables: [rec] },
+            ];
+            for (const extra of combos) {
+                const n = buildKpis({ ...input, ...extra }, allPerms, NOW).length;
+                expect(n).toBeGreaterThanOrEqual(5);
+                expect(n).toBeLessThanOrEqual(8);
+            }
+        });
+    });
+
     it("Teklif Hattı: değer+adet+expiring warning subTone+href", () => {
         const k = buildKpis({
             ...input,

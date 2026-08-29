@@ -952,7 +952,22 @@ export function buildKpis(
         });
     }
 
-    if (input.receivables != null) {
+    // `.length > 0` — yukarıdaki sözleşme (bkz. ReceivableInput yorumu): kart
+    // yalnız Paraşüt'ten GERÇEK veri geldiyse çıkar. Boş dizi "hepsi tahsil
+    // edildi" değil, "hiç senkron olmamış" demektir: Paraşüt kapalıyken
+    // /api/parasut/receivables 200 [] döner ve kart "Açık Alacak —" diye
+    // hayalet gösterirdi (mig.108 uygulanana kadar uç 500 döndüğü için
+    // receivables null kalıyor ve kusur görünmüyordu).
+    //
+    // Bu, teklif/yoldaki kartlarından KASITLI olarak farklı: onlar sayı 0 iken
+    // "—" + "Yanıt bekleyen teklif yok" gösterir ve bu doğrudur, çünkü o
+    // modüller canlı kullanımda — boş sonuç gerçek bir "temiz" bilgisidir.
+    //
+    // TAKAS: Paraşüt canlıya alınıp tüm faturalar ödendiğinde de kart gizlenir,
+    // yani "hepsi temiz" hâli gösterilmez. O gün ayrım netleştirilmeli — uç
+    // `parasut_invoice_id` sayısını da dönerse "senkron var ama açık yok" ile
+    // "hiç senkron yok" ayrışır.
+    if (input.receivables != null && input.receivables.length > 0) {
         const rec = receivablesView(input.receivables, reporting, rates);
         kpis.push({
             id: "alacak",
