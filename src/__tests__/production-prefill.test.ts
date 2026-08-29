@@ -102,7 +102,9 @@ describe("Faz 10 — production page source-regex", () => {
     });
 
     it("Suspense wrapper + ProductionPageInner pattern (Next 15 useSearchParams)", () => {
-        expect(src).toMatch(/import \{ Suspense,/);
+        // KOBİ-sim O8: `Fragment` eklendi (diğer günler tarihe göre gruplandı),
+        // import listesi sıralı olduğu için Suspense artık ikinci sırada.
+        expect(src).toMatch(/import \{[^}]*\bSuspense\b[^}]*\} from "react";/);
         expect(src).toContain("function ProductionPageInner");
         expect(src).toMatch(/export default function ProductionPage\(\) \{[\s\S]*?<Suspense\b/);
     });

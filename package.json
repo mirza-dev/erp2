@@ -23,7 +23,11 @@
     "doctor": "npx react-doctor@latest",
     "find-test-data": "tsx scripts/find-test-data.ts",
     "check:chains": "tsx scripts/check-chain-integrity.ts",
-    "parasut:gate": "tsx scripts/parasut-gate.ts"
+    "parasut:gate": "tsx scripts/parasut-gate.ts",
+    "sim": "node scripts/sim/simctl.mjs",
+    "sim:provision": "tsx scripts/sim/provision.ts",
+    "sim:snapshot": "tsx scripts/sim/snapshot.ts",
+    "sim:cleanup": "tsx scripts/sim/cleanup.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

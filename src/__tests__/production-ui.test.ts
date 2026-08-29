@@ -90,8 +90,13 @@ describe("Üretim — a11y aria-label'lar", () => {
         for (const b of buttons) expect(b).toMatch(/type="button"/);
     });
 
-    it("silme × butonu aria-label taşır", () => {
-        expect(PAGE_SRC).toMatch(/aria-label=\{`\$\{kaydi\.productName\} üretim kaydını sil`\}/);
+    it("silme × butonu aria-label taşır — ve kayıtlar arasında AYIRT EDİLEBİLİR", () => {
+        // KOBİ-sim O1: eskiden etiket yalnız ürün adıydı; aynı ürüne aynı gün
+        // iki kayıt girildiğinde iki düğmenin erişilebilir adı birebir aynı
+        // oluyordu (ekran okuyucu/klavye/otomasyon için ayırt edilemez).
+        expect(PAGE_SRC).toMatch(/üretim kaydını sil"/);
+        expect(PAGE_SRC).toMatch(/formatProductionTime\(kaydi\.createdAt\),/);
+        expect(PAGE_SRC).not.toMatch(/aria-label=\{`\$\{kaydi\.productName\} üretim kaydını sil`\}/);
     });
 
     it("ses kaydı iptal kontrolü erişilebilir ada sahiptir", () => {
@@ -101,7 +106,9 @@ describe("Üretim — a11y aria-label'lar", () => {
 
 describe("Üretim — seçili tarih aktif çalışma bağlamıdır", () => {
     it("seçilen tarih hem kaydetme payload'ına hem günlük kayıt listesine gider", () => {
-        expect(PAGE_SRC).toMatch(/tarih,\s*\n\s*girenKullanici/);
+        // KOBİ-sim O6: `girenKullanici` sabiti ("Usta") kaldırıldı — sunucu
+        // `entered_by`'ı oturumdan yazıyor. Kilit `tarih`in payload'a gitmesinde.
+        expect(PAGE_SRC).toMatch(/adet: parseInt\(line\.adet\),[\s\S]{0,400}tarih,/);
         expect(PAGE_SRC).toMatch(/const selectedDateLogs = uretimKayitlari\.filter\(k => k\.tarih === tarih\)/);
         expect(PAGE_SRC).not.toMatch(/const todayLogs =/);
     });

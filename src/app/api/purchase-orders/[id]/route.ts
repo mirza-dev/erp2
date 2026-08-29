@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import {
     dbGetPurchaseOrderById,
     dbPatchPurchaseOrder,
+    dbSetVendorInvoiceIdentity,
     isValidPoCurrency,
 } from "@/lib/supabase/purchase-orders";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
@@ -46,17 +47,62 @@ export async function PATCH(
         const existing = await dbGetPurchaseOrderById(id);
         if (!existing) return NextResponse.json({ error: "PO bulunamadı." }, { status: 404 });
 
+        const parsed = await safeParseJson(req);
+        if (!parsed.ok) return parsed.response;
+
+        const body = parsed.data as Record<string, unknown>;
+
+        // KOBİ-sim K2 — tedarikçi fatura künyesi ayrı daldan güncellenir.
+        //
+        // Draft kısıtının DIŞINDA olmak zorunda: fatura fiziksel olarak malla
+        // birlikte gelir, yani PO çoktan `received`/`partially_received`
+        // durumundadır. Mal kabulde girilmemişse (ya da yanlış girilmişse)
+        // muhasebenin künyeyi sonradan tamamlayabileceği TEK yol burasıdır —
+        // eskiden hiç yoktu, fatura kutuda kalıyordu.
+        //
+        // Dal yalnız bu iki alanı yazar; miktar/tutar/durum değiştirmez.
+        const touchesInvoice =
+            "vendor_invoice_no" in body || "vendor_invoice_date" in body;
+        if (touchesInvoice) {
+            const rawNo   = body.vendor_invoice_no;
+            const rawDate = body.vendor_invoice_date;
+            if (rawNo !== undefined && rawNo !== null) {
+                if (typeof rawNo !== "string" || rawNo.length > 100) {
+                    return NextResponse.json(
+                        { error: "vendor_invoice_no en fazla 100 karakter metin olmalıdır." },
+                        { status: 400 },
+                    );
+                }
+            }
+            if (rawDate !== undefined && rawDate !== null && rawDate !== "") {
+                if (typeof rawDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(rawDate)) {
+                    return NextResponse.json(
+                        { error: "vendor_invoice_date YYYY-MM-DD biçiminde olmalıdır." },
+                        { status: 400 },
+                    );
+                }
+            }
+            if (existing.status === "cancelled") {
+                return NextResponse.json(
+                    { error: "İptal edilmiş PO'ya fatura künyesi yazılamaz." },
+                    { status: 409 },
+                );
+            }
+            await dbSetVendorInvoiceIdentity(id, {
+                vendor_invoice_no:   typeof rawNo   === "string" ? rawNo.trim() : rawNo as null | undefined,
+                vendor_invoice_date: typeof rawDate === "string" ? (rawDate || null) : rawDate as null | undefined,
+            });
+            revalidateTag("purchase-orders", "max");
+            const refreshed = await dbGetPurchaseOrderById(id);
+            return NextResponse.json(refreshed ?? { ok: true });
+        }
+
         if (existing.status !== "draft") {
             return NextResponse.json(
                 { error: "PO sadece draft durumunda düzenlenebilir." },
                 { status: 409 },
             );
         }
-
-        const parsed = await safeParseJson(req);
-        if (!parsed.ok) return parsed.response;
-
-        const body = parsed.data as Record<string, unknown>;
 
         const lenErr = validateStringLengths(body);
         if (lenErr) return NextResponse.json({ error: lenErr }, { status: 400 });

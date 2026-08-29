@@ -46,6 +46,8 @@ const stubQuote = (status: string) => ({
     customer_name: "Acme Ltd",
     // Faz 2 (V4-A2): sendable quote için customer_address dolu olmalı.
     customer_address: "Test Mah. No:123, İstanbul",
+    // KOBİ-sim K1 (2026-08-29): send artık cari bağı istiyor (validateQuoteForSend).
+    customer_id: "cust-test-uuid",
     currency: "USD",
     grand_total: 1200,
     valid_until: null,

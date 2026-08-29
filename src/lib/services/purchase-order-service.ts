@@ -12,6 +12,7 @@ import {
 } from "@/lib/supabase/purchase-orders";
 import { dbListRecommendations, dbUpdateRecommendationStatus } from "@/lib/supabase/recommendations";
 import { dbTryResolveShortages } from "@/lib/supabase/products";
+import { serviceRunAlertScan } from "@/lib/services/alert-scan-runner";
 
 export { VALID_PO_TRANSITIONS };
 
@@ -70,6 +71,17 @@ export async function serviceRevisePO(id: string, actor?: string): Promise<Trans
 export interface ReceiveResult {
     id: string;
     status: PurchaseOrderStatus;
+    /**
+     * KOBİ-sim K2 — tedarikçi fatura künyesi yazılamadıysa true.
+     *
+     * Künye yazımı bilinçli olarak mal kabulden SONRA ve non-fatal: fatura
+     * numarası hatası stok hareketini geri almamalı. Ama eskiden hata tamamen
+     * yutuluyordu → kullanıcı "kaydedildi" görüyor, indirilecek KDV'nin resmî
+     * künyesi sessizce kayboluyordu. Özellikle mig.107 uygulanmamışsa (kolonlar
+     * yok) HER yazım sessizce düşerdi. Artık uyarı UI'a taşınır
+     * (`archiveWarning` / `reservationWarning` kalıbı).
+     */
+    invoiceWarning?: boolean;
 }
 
 export interface CreatePOFromRecsLine {
@@ -190,11 +202,13 @@ export async function serviceReceivePOLines(
     // Tedarikçi fatura künyesi — fatura fiziksel olarak malla birlikte gelir,
     // bu yüzden mal kabul anında yazılır. Stok hareketinden SONRA yazılması
     // bilinçli: künye yazımı başarısız olsa bile mal kabul geçerli kalmalı.
+    let invoiceWarning = false;
     if (invoice && (invoice.vendor_invoice_no || invoice.vendor_invoice_date)) {
         try {
             await dbSetVendorInvoiceIdentity(id, invoice);
         } catch (err) {
             console.error(JSON.stringify({ po_vendor_invoice_write_fail: String(err), poId: id }));
+            invoiceWarning = true;
         }
     }
 
@@ -218,18 +232,23 @@ export async function serviceReceivePOLines(
         // fire-and-forget; yeniden tahsisat başarısız olsa mal kabul bozulmaz
     }
 
-    // best-effort: hata olsa da mal kabul başarılıdır
+    // KOBİ-sim Y5 — mal kabul sonrası uyarı taraması.
+    //
+    // Eskiden burada kendi sunucumuza HTTP atılıyordu:
+    //   fetch(`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/alerts/scan`, …)
+    // `NEXT_PUBLIC_APP_URL` set değilken URL göreli kalıyor, Node fetch bunu
+    // ayrıştıramayıp FIRLATIYOR ve aşağıdaki boş catch yutuyordu → tarama HİÇ
+    // koşmuyordu. Sonuç: tamamen teslim alınmış PO'nun "geciken tedarik"
+    // uyarısı ekranda kalıyordu (Sibel, Gün 5).
+    //
+    // Artık servis doğrudan çağrılıyor: env bağımlılığı ve bir ağ turu yok,
+    // advisory lock semantiği korunuyor. best-effort — tarama patlasa da mal
+    // kabul geçerlidir.
     try {
-        await fetch(`${process.env.NEXT_PUBLIC_APP_URL ?? ""}/api/alerts/scan`, {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json",
-                Authorization: `Bearer ${process.env.CRON_SECRET ?? ""}`,
-            },
-        });
-    } catch {
-        // fire-and-forget; alert scan başarısız olsa kabul işlemi bozulmaz
+        await serviceRunAlertScan();
+    } catch (scanErr) {
+        console.error("[po-receive] alert scan başarısız (non-fatal)", scanErr);
     }
 
-    return { id: po.id, status: po.status };
+    return { id: po.id, status: po.status, ...(invoiceWarning ? { invoiceWarning: true } : {}) };
 }

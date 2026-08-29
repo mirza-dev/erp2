@@ -1,0 +1,197 @@
+{
+  "at": "2026-08-29T06:42:33.529Z",
+  "counts": {
+    "products": 43,
+    "customers": 23,
+    "vendors": 5,
+    "quotes": 18,
+    "sales_orders": 30,
+    "order_lines": 52,
+    "purchase_orders": 7,
+    "purchase_order_lines": 9,
+    "production_entries": 9,
+    "inventory_movements": 44,
+    "stock_reservations": 33,
+    "alerts": 126,
+    "supplier_rfqs": 2
+  },
+  "stock": {
+    "BE-SC-M24x100-B7": {
+      "on_hand": 3200,
+      "reserved": 0
+    },
+    "CKV-DD-DN150-PN16-WCB": {
+      "on_hand": 42,
+      "reserved": 3
+    },
+    "CT-PTFE-DN80-PN16": {
+      "on_hand": 400,
+      "reserved": 0
+    },
+    "DGLB-800-DN25-A105": {
+      "on_hand": 94,
+      "reserved": 0
+    },
+    "DGV-800-DN25-A105": {
+      "on_hand": 164,
+      "reserved": 0
+    },
+    "FIT-ELB90-DN100-20S": {
+      "on_hand": 640,
+      "reserved": 0
+    },
+    "FIT-RED-DN150x100-20S": {
+      "on_hand": 350,
+      "reserved": 0
+    },
+    "FIT-TEE-DN200-20S": {
+      "on_hand": 70,
+      "reserved": 0
+    },
+    "FL-PL-DN50-PN10": {
+      "on_hand": 1500,
+      "reserved": 200
+    },
+    "FL-WN-150-DN80-S20": {
+      "on_hand": 110,
+      "reserved": 36
+    },
+    "FWBV-DN400-PN80-PH": {
+      "on_hand": 17,
+      "reserved": 6
+    },
+    "GV-600-DN20-A105-STL": {
+      "on_hand": 70,
+      "reserved": 22
+    },
+    "INS-GPR-DN100": {
+      "on_hand": 66,
+      "reserved": 0
+    },
+    "INS-MNF-3W-SS304": {
+      "on_hand": 85,
+      "reserved": 0
+    },
+    "KST-600-DN20-A105-NPT": {
+      "on_hand": 320,
+      "reserved": 55
+    },
+    "KV-600-DN20-A105-SW": {
+      "on_hand": 140,
+      "reserved": 8
+    },
+    "SIM-TGAV-300-DN200-WCB": {
+      "on_hand": 0,
+      "reserved": 0
+    },
+    "SLM-GRF-BANT-25": {
+      "on_hand": 240,
+      "reserved": 50
+    },
+    "SWG-150-DN200-SS304": {
+      "on_hand": 900,
+      "reserved": 180
+    },
+    "TANK-CS-60M3": {
+      "on_hand": 0,
+      "reserved": 0
+    },
+    "TEST-1781832737662": {
+      "on_hand": 100,
+      "reserved": 0
+    },
+    "TEST-1781832774643": {
+      "on_hand": 100,
+      "reserved": 0
+    },
+    "TEST-1781832803980": {
+      "on_hand": 100,
+      "reserved": 0
+    },
+    "TEST-1781832854337": {
+      "on_hand": 100,
+      "reserved": 0
+    },
+    "TEST-1781832898019": {
+      "on_hand": 100,
+      "reserved": 0
+    },
+    "TEST-1781832941340": {
+      "on_hand": 100,
+      "reserved": 0
+    },
+    "TEST-1781832982891": {
+      "on_hand": 100,
+      "reserved": 0
+    },
+    "TEST-1781833023283": {
+      "on_hand": 100,
+      "reserved": 0
+    },
+    "TEST-1781833064269": {
+      "on_hand": 100,
+      "reserved": 0
+    },
+    "TEST-1781833103892": {
+      "on_hand": 100,
+      "reserved": 0
+    },
+    "TEST-1781833144048": {
+      "on_hand": 100,
+      "reserved": 0
+    },
+    "TEST-1781833158650": {
+      "on_hand": 100,
+      "reserved": 0
+    },
+    "TEST-1781859988927": {
+      "on_hand": 100,
+      "reserved": 0
+    },
+    "TEST-1781860012058": {
+      "on_hand": 100,
+      "reserved": 0
+    },
+    "TEST-1781860072042": {
+      "on_hand": 100,
+      "reserved": 0
+    },
+    "TEST-1781860123066": {
+      "on_hand": 100,
+      "reserved": 0
+    },
+    "TEST-1781860195778": {
+      "on_hand": 100,
+      "reserved": 0
+    },
+    "TEST-1781860237865": {
+      "on_hand": 100,
+      "reserved": 0
+    },
+    "TEST-1781860280732": {
+      "on_hand": 100,
+      "reserved": 0
+    },
+    "TEST-1781860320151": {
+      "on_hand": 100,
+      "reserved": 0
+    },
+    "TEST-1781860600064": {
+      "on_hand": 100,
+      "reserved": 0
+    },
+    "TEST-1781865645085": {
+      "on_hand": 100,
+      "reserved": 0
+    },
+    "TGAV-150-DN150-WCB": {
+      "on_hand": 48,
+      "reserved": 18
+    }
+  },
+  "revenueByCurrency": {
+    "USD": 191198.88,
+    "EUR": 7288.8,
+    "TRY": 561840
+  }
+}

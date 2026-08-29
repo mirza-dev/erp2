@@ -449,6 +449,45 @@ export async function dbUpdateOrderQuoteDeadline(
     if (error) throw new Error(error.message);
 }
 
+/**
+ * KOBİ-sim K1 onarım yolu — mevcut siparişi bir cari kaydına bağla.
+ *
+ * Cari bağı olmayan sipariş `preflightShipment` tarafından kalıcı olarak sevk
+ * dışı bırakılıyor (`order-service.ts`) ve muhasebede de görünmüyor (Y6).
+ * Yeni teklifler artık gönderimde cari zorunlu tutuluyor, ama SİMÜLASYONDAN
+ * ÖNCE oluşmuş kayıtların (canlıda `ORD-2026-0030`) arayüzde hiçbir onarım
+ * yolu yoktu — sipariş sonsuza dek stoğu tutuyordu.
+ *
+ * Cari snapshot alanları da tazelenir: sipariş belgeleri (fatura/Paraşüt) bu
+ * alanlardan beslenir, bağı kurup snapshot'ı eski serbest metinde bırakmak
+ * ikinci bir tutarsızlık üretirdi. `customer_name` cariden gelir.
+ */
+export async function dbLinkOrderCustomer(
+    orderId: string,
+    customer: {
+        id: string;
+        name: string;
+        email?: string | null;
+        country?: string | null;
+        tax_office?: string | null;
+        tax_number?: string | null;
+    }
+): Promise<void> {
+    const supabase = createServiceClient();
+    const { error } = await supabase
+        .from("sales_orders")
+        .update({
+            customer_id:         customer.id,
+            customer_name:       customer.name,
+            customer_email:      customer.email      ?? null,
+            customer_country:    customer.country    ?? null,
+            customer_tax_office: customer.tax_office ?? null,
+            customer_tax_number: customer.tax_number ?? null,
+        })
+        .eq("id", orderId);
+    if (error) throw new Error(error.message);
+}
+
 // ── Overdue Shipments ────────────────────────────────────────
 
 /** Approved, unshipped orders that are past their planned ship date
@@ -523,7 +562,10 @@ export async function dbLogOrderAction(
     orderId: string,
     action: string,
     before: Record<string, unknown>,
-    after: Record<string, unknown>
+    after: Record<string, unknown>,
+    // Vendors D1 emsali: opsiyonel actor (geriye dönük uyumlu — mevcut
+    // çağrılar imzasız kalır, yeni yazımlar oturum kullanıcısını geçirir).
+    actor?: string | null
 ): Promise<void> {
     const supabase = createServiceClient();
     await supabase.from("audit_log").insert({
@@ -533,5 +575,6 @@ export async function dbLogOrderAction(
         before_state: before,
         after_state: after,
         source: "ui",
+        ...(actor ? { actor } : {}),
     });
 }

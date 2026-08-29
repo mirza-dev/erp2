@@ -1,0 +1,199 @@
+[2026-08-28 22:24:58] OTURUM AÇILDI — Sibel Toprak (Mali İşler / Patron Asistanı)
+[2026-08-28 22:25:46] OTURUM AÇILDI — Sibel Toprak (Mali İşler / Patron Asistanı)
+[2026-08-28 22:26:43] OTURUM AÇILDI — Sibel Toprak (Mali İşler / Patron Asistanı)
+[2026-08-28 22:27:24] OTURUM AÇILDI — Sibel Toprak (Mali İşler / Patron Asistanı)
+[2026-08-28 22:36:58] > bak 
+[2026-08-28 22:36:58] SAYFA: Roven — AI Destekli ERP ⏎ ADRES: /dashboard ⏎ 
+[2026-08-28 22:37:17] > git "Satış Siparişleri"
+[2026-08-28 22:37:20] ✔ sol menüden "Satış Siparişleri" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:37:32] > tikla "Onaylı (7)"
+[2026-08-28 22:37:35] ✔ "Onaylı (7)" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:37:43] > tikla "Bekleyen (2)"
+[2026-08-28 22:37:45] ✔ "Bekleyen (2)" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:38:21] > git "Teklifler"
+[2026-08-28 22:38:24] ✔ sol menüden "Teklifler" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:38:34] > satir "TKL-2026-010"
+[2026-08-28 22:38:37] ✔ "TKL-2026-010" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:39:23] > git "Satın Alma Siparişleri"
+[2026-08-28 22:39:26] ✔ sol menüden "Satın Alma Siparişleri" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:39:50] > git "Ayarlar"
+[2026-08-28 22:39:53] ✔ sol menüden "Ayarlar" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:40:00] > git "Stok & Ürünler"
+[2026-08-28 22:40:03] ✔ sol menüden "Stok & Ürünler" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:42:06] > git "Satış Siparişleri"
+[2026-08-28 22:42:09] ✔ sol menüden "Satış Siparişleri" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:42:13] > satir "ORD-2026-0005"
+[2026-08-28 22:42:16] ✔ "ORD-2026-0005" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:42:24] > geri 
+[2026-08-28 22:42:27] ✔ bir önceki sayfaya döndüm ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:42:31] > satir "ORD-2026-0008"
+[2026-08-28 22:42:34] ✔ "ORD-2026-0008" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:42:41] > geri 
+[2026-08-28 22:42:44] ✔ bir önceki sayfaya döndüm ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:42:47] > satir "ORD-2026-0010"
+[2026-08-28 22:42:50] ✔ "ORD-2026-0010" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:42:57] > geri 
+[2026-08-28 22:43:00] ✔ bir önceki sayfaya döndüm ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:43:03] > satir "ORD-2026-0018"
+[2026-08-28 22:43:06] ✔ "ORD-2026-0018" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:43:27] > git "Uyarılar"
+[2026-08-28 22:43:30] ✔ sol menüden "Uyarılar" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:43:33] > bekle "3"
+[2026-08-28 22:43:36] ✔ 3 saniye bekledim ⏎ ⚑ ÇIKAN BİLDİRİM: ⚠AI şu an cevap veremedi — mevcut bulgular korundu× ⏎ 
+[2026-08-28 22:43:47] > tikla "◈Sipariş8"
+[2026-08-28 22:43:50] ✔ "◈Sipariş8" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:55:39] OTURUM AÇILDI — Sibel Toprak (Mali İşler / Patron Asistanı)
+[2026-08-28 22:57:44] > bak 
+[2026-08-28 22:57:44] SAYFA: Roven — AI Destekli ERP ⏎ ADRES: /dashboard ⏎ 
+[2026-08-28 22:57:49] > git "Teklifler"
+[2026-08-28 22:57:52] ✔ sol menüden "Teklifler" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:57:57] > satir "TKL-2026-015"
+[2026-08-28 22:58:00] ✔ "TKL-2026-015" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:58:08] > git "Satış Siparişleri"
+[2026-08-28 22:58:11] ✔ sol menüden "Satış Siparişleri" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:58:17] > bekle "10"
+[2026-08-28 22:58:30] ✔ 10 saniye bekledim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:58:35] > tikla "Yenile"
+[2026-08-28 22:58:37] ✔ "Yenile" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:58:42] > bekle "15"
+[2026-08-28 22:58:59] ✔ 15 saniye bekledim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:59:05] > git "Teklifler"
+[2026-08-28 22:59:08] ✔ sol menüden "Teklifler" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:59:13] > bekle "20"
+[2026-08-28 22:59:31] ✔ 20 saniye bekledim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:59:35] > bekle "30"
+[2026-08-28 22:59:52] ✔ 30 saniye bekledim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:00:00] > git "/dashboard"
+[2026-08-28 23:00:06] ✔ /dashboard adresine gittim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:00:17] > tikla "Ay"
+[2026-08-28 23:00:20] ✔ "Ay" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:00:26] > bekle "30"
+[2026-08-28 23:00:44] ✔ 30 saniye bekledim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:00:48] > git "Satış Siparişleri"
+[2026-08-28 23:00:51] ✔ sol menüden "Satış Siparişleri" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:00:58] > bekle "30"
+[2026-08-28 23:01:16] ✔ 30 saniye bekledim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:01:21] > bekle "30"
+[2026-08-28 23:01:38] ✔ 30 saniye bekledim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:01:38] > tikla "Yenile"
+[2026-08-28 23:01:41] ✔ "Yenile" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:01:45] > bekle "60"
+[2026-08-28 23:02:03] ✔ 60 saniye bekledim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:02:13] > bekle "60"
+[2026-08-28 23:02:31] ✔ 60 saniye bekledim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:02:39] > git "Teklifler"
+[2026-08-28 23:02:42] ✔ sol menüden "Teklifler" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:02:47] > bekle "60"
+[2026-08-28 23:03:05] ✔ 60 saniye bekledim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:03:08] > bekle "90"
+[2026-08-28 23:03:26] ✔ 90 saniye bekledim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:03:31] > git "Satış Siparişleri"
+[2026-08-28 23:03:34] ✔ sol menüden "Satış Siparişleri" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:03:53] > ekran 
+[2026-08-28 23:03:53] 📷 Ekran görüntüsü alındı: /Users/mirzasaribiyik/Projects/erp2/docs/sim/ekran/sibel-1787958233754.png
+[2026-08-28 23:04:12] > bekle "60"
+[2026-08-28 23:04:30] ✔ 60 saniye bekledim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:02:48] OTURUM AÇILDI — Sibel Toprak (Mali İşler / Patron Asistanı)
+[2026-08-29 06:04:27] OTURUM AÇILDI — Sibel Toprak (Mali İşler / Patron Asistanı)
+[2026-08-29 06:13:29] > bak 
+[2026-08-29 06:13:30] SAYFA: Roven — AI Destekli ERP ⏎ ADRES: /dashboard ⏎ 
+[2026-08-29 06:13:39] > git "Teklifler"
+[2026-08-29 06:13:42] ✔ sol menüden "Teklifler" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:13:47] > satir "TKL-2026-015"
+[2026-08-29 06:13:50] ✔ "TKL-2026-015" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:14:18] > bak 
+[2026-08-29 06:14:18] SAYFA: Roven — AI Destekli ERP ⏎ ADRES: /dashboard/quotes/73e675fc-62f3-41e0-a759-ea4ffa8bad3a ⏎ 
+[2026-08-29 06:14:28] > git "Satış Siparişleri"
+[2026-08-29 06:14:31] ✔ sol menüden "Satış Siparişleri" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:14:36] > satir "ORD-2026-0030"
+[2026-08-29 06:14:39] ✔ "ORD-2026-0030" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:14:44] > bak 
+[2026-08-29 06:14:44] SAYFA: Roven — AI Destekli ERP ⏎ ADRES: /dashboard/orders/30a02549-368c-47be-940a-cc7f206baec1 ⏎ 
+[2026-08-29 06:15:12] > git "/dashboard"
+[2026-08-29 06:15:19] ✔ /dashboard adresine gittim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:16:02] > git "Stok & Ürünler"
+[2026-08-29 06:16:05] ✔ sol menüden "Stok & Ürünler" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:16:13] > satir "TGAV-150-DN150-WCB"
+[2026-08-29 06:16:16] ✔ "TGAV-150-DN150-WCB" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:16:22] > tikla "Stok"
+[2026-08-29 06:16:25] ✔ "Stok" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:17:25] > git "Uyarılar"
+[2026-08-29 06:17:27] ✔ sol menüden "Uyarılar" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:17:43] > git "/dashboard/orders/30a02549-368c-47be-940a-cc7f206baec1"
+[2026-08-29 06:17:49] ✔ /dashboard/orders/30a02549-368c-47be-940a-cc7f206baec1 adresine gittim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:17:53] > tikla "Teklif Detayı →"
+[2026-08-29 06:17:55] ✔ "Teklif Detayı →" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:18:09] > git "Teklifler"
+[2026-08-29 06:18:12] ✔ sol menüden "Teklifler" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:18:17] > satir "TKL-2026-015"
+[2026-08-29 06:18:20] ✔ "TKL-2026-015" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:30:03] > bak 
+[2026-08-29 06:30:03] SAYFA: Roven — AI Destekli ERP ⏎ ADRES: /dashboard/quotes/73e675fc-62f3-41e0-a759-ea4ffa8bad3a ⏎ 
+[2026-08-29 06:30:11] > git "Dashboard"
+[2026-08-29 06:30:14] ✔ sol menüden "Dashboard" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:30:24] > tikla "Hafta"
+[2026-08-29 06:30:26] ✔ "Hafta" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:30:36] > git "Teklifler"
+[2026-08-29 06:30:39] ✔ sol menüden "Teklifler" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:30:56] > yaz "(etiketsiz)" "2026-08-23"
+[2026-08-29 06:30:56] ✖ "(etiketsiz)" adında doldurulacak alan BULAMADIM. ⏎ Ekranda şunlar var: Teklif ara · Para birimi filtresi · Sayfadaki tüm teklifleri seç · TKL-2026-016 seç · TKL-2026-014 seç · TKL-2026-012-R3 seç · TKL-2026-013 seç · TKL-2026-009 seç · TKL-2026-008-R2 seç · TKL-2026-005 seç ⏎ 
+[2026-08-29 06:31:01] > bak 
+[2026-08-29 06:31:01] SAYFA: Teklifler · Roven ⏎ ADRES: /dashboard/quotes ⏎ 
+[2026-08-29 06:31:22] > yaz "—" "2026-08-23"
+[2026-08-29 06:31:22] ✖ "—" adında doldurulacak alan BULAMADIM. ⏎ Ekranda şunlar var: Teklif ara · Para birimi filtresi · Sayfadaki tüm teklifleri seç · TKL-2026-016 seç · TKL-2026-014 seç · TKL-2026-012-R3 seç · TKL-2026-013 seç · TKL-2026-009 seç · TKL-2026-008-R2 seç · TKL-2026-005 seç ⏎ 
+[2026-08-29 06:31:29] > git "Satış Siparişleri"
+[2026-08-29 06:31:32] ✔ sol menüden "Satış Siparişleri" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:31:37] > tikla "Sevk Edildi (4)"
+[2026-08-29 06:31:40] ✔ "Sevk Edildi (4)" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:31:51] > satir "ORD-2026-0004"
+[2026-08-29 06:31:54] ✔ "ORD-2026-0004" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:32:07] > git "Satın Alma Siparişleri"
+[2026-08-29 06:32:10] ✔ sol menüden "Satın Alma Siparişleri" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:32:25] > satir "PO-2026-0003"
+[2026-08-29 06:32:28] ✔ "PO-2026-0003" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:32:31] > bekle "3"
+[2026-08-29 06:32:36] ✔ 3 saniye bekledim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:33:02] > geri 
+[2026-08-29 06:33:05] ✔ bir önceki sayfaya döndüm ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:33:08] > satir "PO-2026-0006"
+[2026-08-29 06:33:11] ✔ "PO-2026-0006" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:33:16] > geri 
+[2026-08-29 06:33:19] ✔ bir önceki sayfaya döndüm ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:33:19] > satir "PO-2026-0005"
+[2026-08-29 06:33:21] ✔ "PO-2026-0005" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:33:28] > geri 
+[2026-08-29 06:33:31] ✔ bir önceki sayfaya döndüm ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:33:31] > satir "PO-2026-0004"
+[2026-08-29 06:33:34] ✔ "PO-2026-0004" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:33:37] > bekle "2"
+[2026-08-29 06:33:42] ✔ 2 saniye bekledim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:33:58] > git "/dashboard/products/aging"
+[2026-08-29 06:34:09] ✔ /dashboard/products/aging adresine gittim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:34:18] > tikla "Ticari Eskimesi"
+[2026-08-29 06:34:20] ✔ "Ticari Eskimesi" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:34:47] > git "Dashboard"
+[2026-08-29 06:34:50] ✔ sol menüden "Dashboard" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:34:50] > tikla "Ay"
+[2026-08-29 06:34:53] ✔ "Ay" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:34:59] > tikla "Çeyrek"
+[2026-08-29 06:35:02] ✔ "Çeyrek" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:35:15] > tikla "Rapor indir"
+[2026-08-29 06:35:18] ✔ "Rapor indir" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:35:36] > bekle "2"
+[2026-08-29 06:35:40] ✔ 2 saniye bekledim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:35:41] > bak 
+[2026-08-29 06:35:41] SAYFA: Roven — AI Destekli ERP ⏎ ADRES: /dashboard ⏎ 
+[2026-08-29 06:35:47] > git "Cariler"
+[2026-08-29 06:35:50] ✔ sol menüden "Cariler" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:36:03] > ara "SIM"
+[2026-08-29 06:36:03] ✖ "arama" adında arama kutusu BULAMADIM. ⏎ Ekranda şunlar var: Müşteri ara · Sayfadaki tüm müşterileri seç · Abdi İbrahim İlaç A.Ş. seç · Aygaz Dolum Tesisleri seç · Botaş Doğalgaz İşletmeleri seç · E2E Müşteri 1781832658926 seç · E2E Müşteri 1781859925707 seç · Enerjisa Üretim Santralleri seç · PT-0108 Kazakistan Boru Hattı Konsorsiyumu seç · Star Rafineri A.Ş. seç · Test Müşterisi 1781832673980 seç · Test Müşterisi 1781832705471 seç · Test Müşterisi 1781832896569 seç · Test Müşterisi 1781832939823 seç · Test Müşterisi 1781832981233 seç · Test Müşterisi 1781833021970 seç · Test Müşterisi 1781833062865 seç · Test Müşterisi 1781833102674 seç · Test Müşterisi 1781859943475 seç · Test Müşterisi 1781860035658 seç · Test Müşterisi 1781860122020 seç · Test Müşterisi 1781860193444 seç · Test Müşterisi 1781860236472 seç · Tüpraş İzmit Rafinerisi seç · Ülker Gıda — Demo Şube seç ⏎ 
+[2026-08-29 06:36:06] > yaz "Müşteri ara" "SIM"
+[2026-08-29 06:36:09] ✔ "Müşteri ara" alanına "SIM" yazdım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:36:23] > git "Satış Siparişleri"
+[2026-08-29 06:36:26] ✔ sol menüden "Satış Siparişleri" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:36:26] > satir "ORD-2026-0030"
+[2026-08-29 06:36:29] ✔ "ORD-2026-0030" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:37:56] > git "Cariler"
+[2026-08-29 06:37:59] ✔ sol menüden "Cariler" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:37:59] > satir "Botaş Doğalgaz İşletmeleri"
+[2026-08-29 06:38:02] ✔ "Botaş Doğalgaz İşletmeleri" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 

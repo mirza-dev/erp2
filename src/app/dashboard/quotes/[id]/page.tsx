@@ -47,6 +47,10 @@ export default function QuoteDetailPage() {
 
     const [quote, setQuote] = useState<QuoteDetailWithConversion | null>(null);
     const [quoteLoading, setQuoteLoading] = useState(true);
+    // KOBİ-sim Y1: "bulunamadı" ile "yüklenemedi" ayrı durumlar. Ağ hatasında
+    // kaydın silindiğini sanmak operasyonel panik üretiyordu.
+    const [loadFailed, setLoadFailed] = useState(false);
+    const [reloadTick, setReloadTick] = useState(0);
     const [status, setStatus] = useState<QuoteStatus>("draft");
     const [loading, setLoading] = useState<string | null>(null);
     const [converting, setConverting] = useState(false);
@@ -67,8 +71,22 @@ export default function QuoteDetailPage() {
 
     // ── Fetch quote ──────────────────────────────────────────────────────────
 
+    /**
+     * KOBİ-sim Y1 — iptal edilen istek "kayıt bulunamadı" göstermemeli.
+     *
+     * Eski kod `.finally(() => setQuoteLoading(false))` kullanıyordu. `finally`
+     * iptal (AbortError) dalında da çalışır → loading iner, `quote` hâlâ null
+     * kalır → ekran "Teklif bulunamadı." yazar. Üç bağımsız tanık (Deniz,
+     * Sibel ×2) kaydın silindiğini sandı. Ayrıca gerçek ağ hatası da aynı
+     * yanlış mesajı üretiyordu.
+     *
+     * Artık bayrak yalnız başarı ve GERÇEK hata dallarında indiriliyor;
+     * iptalde hiçbir state'e dokunulmuyor (yeni istek zaten yolda).
+     */
     useEffect(() => {
         const controller = new AbortController();
+        setQuoteLoading(true);
+        setLoadFailed(false);
         fetch(`/api/quotes/${params.id}`, { signal: controller.signal })
             .then(r => {
                 if (!r.ok) throw new Error("Not found");
@@ -79,15 +97,39 @@ export default function QuoteDetailPage() {
                 setStatus(data.status);
                 setConvertedOrderId(data.convertedOrderId ?? null);
                 setConvertedOrderNumber(data.convertedOrderNumber ?? null);
+                setQuoteLoading(false);
             })
             .catch(err => {
-                if (err.name !== "AbortError") {
-                    console.error("Failed to load quote:", err);
-                }
-            })
-            .finally(() => setQuoteLoading(false));
+                if (err?.name === "AbortError") return;   // iptal → state'e DOKUNMA
+                console.error("Failed to load quote:", err);
+                setLoadFailed(true);
+                setQuoteLoading(false);
+            });
         return () => controller.abort();
-    }, [params.id]);
+    }, [params.id, reloadTick]);
+
+
+    /**
+     * KOBİ-sim O4 — geri dönüşte (bfcache) bayat durum + AKTİF aksiyon düğmesi.
+     *
+     * İlk açılış guard'lı (yükleniyor ekranı) ama tarayıcı Geri'siyle dönüldüğünde
+     * sayfa DOM'u eski state'iyle canlanıyor ve yeniden fetch tetiklenmiyordu:
+     * liste "Kabul Edildi" derken detay "Gönderildi" gösterdi ve "Kabul Et ve
+     * Siparişe Dönüştür" düğmesi aktif duruyordu. Sunucu ikinci siparişi zaten
+     * reddediyor (geçiş doğrulaması) — yani veri riski yok, ama operatör
+     * mükerrer sipariş yarattığını sanıyor. Bu görsel tutarlılık düzeltmesi.
+     */
+    useEffect(() => {
+        const yenile = () => setReloadTick(t => t + 1);
+        const onPageShow = (e: PageTransitionEvent) => { if (e.persisted) yenile(); };
+        const onVisible = () => { if (document.visibilityState === "visible") yenile(); };
+        window.addEventListener("pageshow", onPageShow);
+        document.addEventListener("visibilitychange", onVisible);
+        return () => {
+            window.removeEventListener("pageshow", onPageShow);
+            document.removeEventListener("visibilitychange", onVisible);
+        };
+    }, []);
 
     // ── Transition handlers ──────────────────────────────────────────────────
 
@@ -219,6 +261,25 @@ export default function QuoteDetailPage() {
         return (
             <div style={{ padding: "40px", textAlign: "center", color: "var(--text-secondary)", fontSize: "13px" }}>
                 Teklif yükleniyor...
+            </div>
+        );
+    }
+
+    // KOBİ-sim Y1: yükleme hatası ≠ kayıt yok. Ayrı mesaj + yeniden deneme.
+    if (loadFailed) {
+        return (
+            <div style={{ padding: "40px", textAlign: "center", color: "var(--text-secondary)", fontSize: "13px" }}>
+                <div style={{ marginBottom: "12px" }}>
+                    Teklif yüklenemedi — bağlantıyı kontrol edip tekrar deneyin.
+                </div>
+                <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
+                    <Button variant="secondary" onClick={() => setReloadTick(t => t + 1)}>
+                        Yeniden dene
+                    </Button>
+                    <Link href="/dashboard/quotes" style={{ color: "var(--accent-text)", alignSelf: "center" }}>
+                        Geri dön
+                    </Link>
+                </div>
             </div>
         );
     }

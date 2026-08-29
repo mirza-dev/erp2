@@ -43,9 +43,11 @@ describe("Diğer Günlerin Kayıtları — satır erişimi", () => {
         // Onay modalı hedefi selectedDateLogs'ta arar; oraya buton eklenirse
         // modal null döner ve silme sessizce çalışmaz.
         expect(SRC).toMatch(/const target = selectedDateLogs\.find\(k => k\.id === confirmDeleteId\)/);
-        // Yalnız otherDateLogs.map bloğu — modal (setConfirmDeleteId kullanır)
+        // Yalnız diğer-gün tablosu bloğu — modal (setConfirmDeleteId kullanır)
         // bu tablodan SONRA geldiği için dilim orada bitmeli.
-        const start = SRC.indexOf("{otherDateLogs.map(kaydi => (");
+        // KOBİ-sim O8: liste artık tarihe göre GRUPLU (`digerGunGruplari`),
+        // düz `otherDateLogs.map` değil; tek-yüzey kuralı aynen geçerli.
+        const start = SRC.indexOf("{digerGunGruplari.map(([gun, kayitlar]) => (");
         const end = SRC.indexOf("</table>", start);
         expect(start).toBeGreaterThan(0);
         expect(end).toBeGreaterThan(start);

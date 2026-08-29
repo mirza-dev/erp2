@@ -11,7 +11,7 @@ import type { Customer, Product, QuoteDetail } from "@/lib/mock-data";
 import type { CreateQuoteInput } from "@/lib/supabase/quotes";
 import type { QuoteStatus } from "@/lib/database.types";
 import { buildQuoteLineDescription } from "@/lib/quote-description-builder";
-import { findMissingHsLines, validateQuoteForSend, validateQuoteLineQuantities, MAX_QUOTE_LINE_NOTE } from "@/lib/quote-validation";
+import { findMissingHsLines, validateQuoteForSend, validateQuoteLineQuantities, MAX_QUOTE_LINE_NOTE, QUOTE_SEND_CUSTOMER_REQUIRED } from "@/lib/quote-validation";
 import { roundMoney } from "@/lib/money-utils";
 import { applySendResultToast, sendQuoteEmail } from "../_utils/send-result";
 import { applyTemplateToField, templatesForField } from "@/lib/quote-note-templates";
@@ -101,7 +101,7 @@ interface QuoteFormProps {
 
 export default function QuoteForm({ initialData, readOnly, status, enableInlineSend, onSaved }: QuoteFormProps) {
     // ── Data context ──────────────────────────────────────────────────────────
-    const { customers } = useCustomers();
+    const { customers, addCustomer } = useCustomers();
     const { products } = useProducts();
     // Global toast (dashboard layout'ta ToastProvider) — gönderim akışı mesajları
     // client-side navigasyonda da hayatta kalır (yerel showToast yalnız "Kaydet").
@@ -201,6 +201,9 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
 
     // Toast
     const [toast, setToast] = useState<{ msg: string; type: "success" | "error" } | null>(null);
+    // D1: bildirim zamanlayıcısı — üst üste kayıtta öncekini iptal etmek için.
+    const toastTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(() => () => { if (toastTimerRef.current) clearTimeout(toastTimerRef.current); }, []);
 
     // Router
     const router = useRouter();
@@ -214,6 +217,8 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
     // Autocomplete state — customer
     const [custSuggestions, setCustSuggestions] = useState<Customer[]>([]);
     const [custDropdownOpen, setCustDropdownOpen] = useState(false);
+    // KOBİ-sim K1: inline "yeni cari oluştur" akışı (satışçı formdan çıkmasın).
+    const [creatingCustomer, setCreatingCustomer] = useState(false);
 
     // Autocomplete state — product (per-row, only one open at a time)
     const [prodOpenRowId, setProdOpenRowId] = useState<number | null>(null);
@@ -418,6 +423,55 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
         setCustDropdownOpen(matches.length > 0);
     };
 
+    /**
+     * KOBİ-sim K1 — formdan çıkmadan cari aç.
+     *
+     * Simülasyonda satışçı yeni müşteri adını doğrudan teklife yazdı; teklif
+     * gönderildi, STOK REZERVE EDİLDİ, sipariş oluştu ve sevk anında kalıcı
+     * olarak reddedildi (`order-service.ts` `preflightShipment`). Artık gönderim
+     * cari istiyor — ama satışçıyı Cariler sayfasına yollamak akışı kırardı,
+     * bu yüzden cari buradan açılır ve dönen id anında `custId`'e bağlanır.
+     */
+    const handleCreateCustomerInline = async () => {
+        const name = custCompany.trim();
+        if (!name) {
+            pushToast({ type: "error", message: "Önce firma adını girin." });
+            return;
+        }
+        setCreatingCustomer(true);
+        try {
+            const created = await addCustomer({
+                name,
+                email:     custEmail.trim(),
+                phone:     custPhone.trim(),
+                address:   custAddress.trim(),
+                taxNumber: "",
+                taxOffice: "",
+                // `customers.country` char(2) — ISO 3166-1 alpha-2 (001_initial_schema).
+                // Rota da 2 karakterden uzun değeri 400'le reddeder. Canlı onarım
+                // testinde yakalandı: "Türkiye" yazmak cari oluşturmayı kırıyordu.
+                country:   "TR",
+                currency:  currency,
+                notes:     "",
+            });
+            if (!created) {
+                // demo modu (demoGuard) ya da beklenmedik boş yanıt.
+                pushToast({ type: "error", message: "Cari oluşturulamadı." });
+                return;
+            }
+            setCustId(created.id);
+            setCustCompany(created.name);
+            if (created.address && !custAddress.trim()) setCustAddress(created.address);
+            setCustDropdownOpen(false);
+            setCustSuggestions([]);
+            pushToast({ type: "success", message: `"${created.name}" cari kaydı oluşturuldu.` });
+        } catch (err) {
+            pushToast({ type: "error", message: err instanceof Error ? err.message : "Cari oluşturulamadı." });
+        } finally {
+            setCreatingCustomer(false);
+        }
+    };
+
     const handleSelectCustomer = (c: Customer) => {
         setCustCompany(c.name);
         setCustPhone(c.phone || "");
@@ -601,6 +655,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                     { role: "Manager Seal", roleTr: "Mühür Onayı", name: sig3, title: sig3Title },
                 ],
                 status: "draft",
+                quoteId,   // D2: önizlemeden forma dönüş doğru teklife gitsin
             };
             localStorage.setItem("teklif_v3_full", JSON.stringify(fullData));
         } catch { /* noop */ }
@@ -608,7 +663,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
         custCompany, custContact, custPhone, custEmail, custAddress, quoteNo, quoteDate, validUntil,
         salesRep, salesPhone, salesEmail, vatRate, ovSub, ovVat, ovGrand, discount,
         notes, deliveryMethod, paymentMethod, sig1, sig1Title, sig2, sig2Title, sig3, sig3Title,
-        descDirtyRowIds]);
+        descDirtyRowIds, quoteId]);
 
     // Saves preview data regardless of readOnly — used by preview button.
     // Does NOT write teklif_v3 (draft key) to avoid polluting the new-quote draft restore.
@@ -647,13 +702,14 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                     { role: "Manager Seal", roleTr: "Mühür Onayı", name: sig3, title: sig3Title },
                 ],
                 status: (status ?? "draft") as QuoteData["status"],
+                quoteId,   // D2: önizlemeden forma dönüş doğru teklife gitsin
             };
             localStorage.setItem("teklif_v3_full", JSON.stringify(fullData));
         } catch { /* noop */ }
     }, [status, currency, rows, sellerName, sellerTel, sellerEmail, sellerAddr, sellerTaxId, sellerWeb, logoSrc,
         custCompany, custContact, custPhone, custEmail, custAddress, quoteNo, quoteDate, validUntil,
         salesRep, salesPhone, salesEmail, vatRate, ovSub, ovVat, ovGrand, discount,
-        notes, deliveryMethod, paymentMethod, sig1, sig1Title, sig2, sig2Title, sig3, sig3Title]);
+        notes, deliveryMethod, paymentMethod, sig1, sig1Title, sig2, sig2Title, sig3, sig3Title, quoteId]);
 
     useEffect(() => { autoSave(); }, [rows, currency, autoSave]);
 
@@ -709,9 +765,24 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
         reader.readAsDataURL(file);
     }
 
+    /**
+     * KOBİ-sim D1 — "Kaydedildi" bildirimi bazen hiç çıkmıyordu.
+     *
+     * Deniz iki ayrı günde bildirdi: düğme "Kaydediliyor…" oluyor, kayıt
+     * gerçekleşiyor, ama bildirim görünmüyor ("kaydın olduğundan emin olmak için
+     * listeye dönüp kontrol etmek zorunda kaldım").
+     *
+     * Kök: zamanlayıcı hiç temizlenmiyordu. 2,5 sn içinde ikinci kez kaydedince
+     * ÖNCEKİ `setTimeout` ateşleyip yeni toast'ı anında siliyordu — bildirim
+     * görünmemiş gibi oluyordu. Ayrıca unmount'ta da temizlenmiyordu.
+     */
     function showToast(msg: string, type: "success" | "error") {
+        if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
         setToast({ msg, type });
-        setTimeout(() => setToast(null), 2500);
+        toastTimerRef.current = setTimeout(() => {
+            setToast(null);
+            toastTimerRef.current = null;
+        }, 2500);
     }
 
     function lineTotal(r: QuoteRow) { return roundMoney((parseFloat(r.qty) || 0) * (parseFloat(r.price) || 0)); }
@@ -868,7 +939,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
         }
         const qtyErr = validateQuoteLineQuantities(valLines);
         if (qtyErr) { pushToast({ type: "error", message: qtyErr }); return; }
-        const sendErr = validateQuoteForSend({ customer_address: custAddress, lines: valLines });
+        const sendErr = validateQuoteForSend({ customer_id: custId, customer_address: custAddress, lines: valLines });
         if (sendErr) { pushToast({ type: "error", message: sendErr }); return; }
         setSendStep(1);
     }
@@ -1054,18 +1125,30 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                         </Button>
                         )}
                         {/* 088: yeni-teklif inline "Gönder" — çift onay (handleRequestSend → modal). */}
-                        {enableInlineSend && !readOnly && (
-                        <Button
-                            variant="primary"
-                            size="sm"
-                            leftIcon={<Send size={14} />}
-                            onClick={handleRequestSend}
-                            disabled={saving || sending}
-                            loading={sending}
-                        >
-                            {sending ? "Gönderiliyor…" : "Gönder"}
-                        </Button>
-                        )}
+                        {enableInlineSend && !readOnly && (() => {
+                            // KOBİ-sim K1 + O2 — gönderimi engelleyen eksikler
+                            // düğmenin ÜSTÜNDE söylenir. Eskiden teklif kaydediliyor,
+                            // kullanıcı iki onay penceresini geçiyor, ancak sonra
+                            // sunucudan "adres girilmeli" / cari hatası yiyordu.
+                            const engel = !custId.trim()
+                                ? "Müşteri bir cari kaydına bağlanmalı"
+                                : !custAddress.trim()
+                                    ? "Müşteri adresi girilmeli"
+                                    : null;
+                            return (
+                                <Button
+                                    variant="primary"
+                                    size="sm"
+                                    leftIcon={<Send size={14} />}
+                                    onClick={handleRequestSend}
+                                    disabled={saving || sending || engel !== null}
+                                    loading={sending}
+                                    title={engel ? `Gönderilemez — ${engel.toLowerCase()}.` : undefined}
+                                >
+                                    {sending ? "Gönderiliyor…" : "Gönder"}
+                                </Button>
+                            );
+                        })()}
                     </div>
                 </div>
 
@@ -1216,6 +1299,50 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                                 </div>
                             </div>
 
+                            {/* KOBİ-sim K1 — cari bağı durumu.
+                                Firma adı serbest metin kalabilir (taslak çalışılabilir)
+                                ama GÖNDERİM cari ister; kural sunucuda
+                                (`validateQuoteForSend`). Burası o kuralı kullanıcıya
+                                sekiz adım önce, doğru yerde söyler. */}
+                            {!readOnly && (
+                                <div style={{
+                                    display: "grid", gridTemplateColumns: "140px 1fr",
+                                    alignItems: "center", gap: "8px", paddingBottom: "7px",
+                                    borderBottom: "0.5px solid var(--border-tertiary)",
+                                }}>
+                                    <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
+                                        Cari <span style={{ fontSize: "9px", color: "var(--text-tertiary)", display: "block", fontStyle: "normal", fontWeight: 400 }}>Müşteri Kaydı</span>
+                                    </div>
+                                    {custId ? (
+                                        <div style={{ fontSize: "11.5px", color: "var(--success-text)", display: "flex", alignItems: "center", gap: "6px" }}>
+                                            <span aria-hidden="true">✓</span>
+                                            <span>Cari kaydına bağlı</span>
+                                        </div>
+                                    ) : (
+                                        <div style={{ display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                                            <span
+                                                style={{ fontSize: "11.5px", color: "var(--warning-text)" }}
+                                                title={QUOTE_SEND_CUSTOMER_REQUIRED}
+                                            >
+                                                Cariye bağlı değil — gönderilemez
+                                            </span>
+                                            <Button
+                                                type="button"
+                                                size="xs"
+                                                variant="secondary"
+                                                onClick={handleCreateCustomerInline}
+                                                disabled={creatingCustomer || !custCompany.trim()}
+                                                title={custCompany.trim()
+                                                    ? "Formdaki bilgilerle yeni cari kaydı aç"
+                                                    : "Önce firma adını girin"}
+                                            >
+                                                {creatingCustomer ? "Oluşturuluyor…" : "+ Yeni cari oluştur"}
+                                            </Button>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
                             {/* Contact, Phone, Email, Address (Faz 1b V4-A2) */}
                             {([
                                 ["Contact",  "İrtibat Kişisi",  custContact, setCustContact, "Ad Soyad",           "text"],
@@ -1223,20 +1350,39 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                                 ["Email",    "E-posta",         custEmail,   setCustEmail,   "ornek@firma.com",    "email"],
                                 ["Address",  "Adres",           custAddress, setCustAddress, "Müşteri adresi…",    "text"],
                             ] as [string, string, string, React.Dispatch<React.SetStateAction<string>>, string, string][])
-                                .map(([en, tr, val, set, ph, type]) => (
+                                .map(([en, tr, val, set, ph, type]) => {
+                                    // KOBİ-sim O2 — adres gönderim için ZORUNLU
+                                    // (resmî belge). Kural `validateQuoteForSend`'de
+                                    // vardı ama formda hiçbir işaret yoktu: teklif
+                                    // sorunsuz kaydediliyor, zorunluluk ancak ÜÇ ADIM
+                                    // sonra onay penceresinde öğreniliyordu.
+                                    const zorunlu = en === "Address";
+                                    const eksik = zorunlu && !readOnly && !val.trim();
+                                    return (
                                     <div key={en} style={{ display: "grid", gridTemplateColumns: "140px 1fr", alignItems: "center", gap: "8px", paddingBottom: "7px", borderBottom: "0.5px solid var(--border-tertiary)" }}>
                                         <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
-                                            {en} <span style={{ fontSize: "9px", color: "var(--text-tertiary)", display: "block", fontStyle: "normal", fontWeight: 400 }}>{tr}</span>
+                                            {en}
+                                            {zorunlu && <span aria-hidden="true" style={{ color: "var(--danger-text)" }}> *</span>}
+                                            <span style={{ fontSize: "9px", color: "var(--text-tertiary)", display: "block", fontStyle: "normal", fontWeight: 400 }}>{tr}</span>
                                         </div>
-                                        <input
-                                            className="q-field-inp"
-                                            aria-label={`${en} (${tr})`}
-                                            style={fieldInput}
-                                            type={type} placeholder={ph} value={val}
-                                            onChange={e => set(e.target.value)}
-                                        />
+                                        <div>
+                                            <input
+                                                className="q-field-inp"
+                                                aria-label={`${en} (${tr})${zorunlu ? " — gönderim için zorunlu" : ""}`}
+                                                aria-required={zorunlu || undefined}
+                                                style={eksik ? { ...fieldInput, borderColor: "var(--warning-border)" } : fieldInput}
+                                                type={type} placeholder={ph} value={val}
+                                                onChange={e => set(e.target.value)}
+                                            />
+                                            {eksik && (
+                                                <div style={{ fontSize: "10.5px", color: "var(--warning-text)", marginTop: "3px" }}>
+                                                    Gönderim için zorunlu
+                                                </div>
+                                            )}
+                                        </div>
                                     </div>
-                                ))}
+                                    );
+                                })}
                         </div>
 
                         {/* Right: Quote details */}

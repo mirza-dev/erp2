@@ -72,13 +72,17 @@ export function getQuoteActions(status: QuoteStatus, quoteNumber: string): Quote
                     },
                 },
                 {
-                    // Faz 6: accept + taslak sipariş tek atomik işlem (POST /accept).
+                    // Faz 6: accept + sipariş tek atomik işlem (POST /accept).
                     transition: "accepted",
                     label: "Kabul Et ve Siparişe Dönüştür",
                     variant: "primary",
                     confirm: {
                         title: "Teklifi Kabul Et ve Siparişe Dönüştür",
-                        message: `${quoteNumber} numaralı teklif kabul edilip taslak sipariş olarak oluşturulacak. Devam etmek istiyor musunuz?`,
+                        // KOBİ-sim D3: metin "taslak sipariş" diyordu ama 088'den
+                        // beri sonuç ONAYLI + rezerveli sipariş. Deniz: "onay
+                        // mekanizmasının gerçekten çalışıp çalışmadığından emin
+                        // olamadım." Metin sonuçla hizalandı.
+                        message: `${quoteNumber} numaralı teklif kabul edilecek ve ONAYLI sipariş olarak oluşturulacak; teklifte rezerve edilen stok siparişe geçer. Devam etmek istiyor musunuz?`,
                         confirmLabel: "Kabul Et ve Dönüştür",
                     },
                 },
@@ -112,7 +116,8 @@ export function getQuoteConvertAction(quoteNumber: string): QuoteConvertInfo {
     return {
         label: "Siparişe Dönüştür",
         confirmTitle: "Teklifi Siparişe Dönüştür",
-        confirmMessage: `${quoteNumber} numaralı teklif taslak sipariş olarak oluşturulacak. Devam etmek istiyor musunuz?`,
+        // D3: aynı hizalama — dönüşüm taslak değil onaylı sipariş üretir (088).
+        confirmMessage: `${quoteNumber} numaralı teklif ONAYLI sipariş olarak oluşturulacak. Devam etmek istiyor musunuz?`,
         confirmLabel: "Evet, Dönüştür",
     };
 }

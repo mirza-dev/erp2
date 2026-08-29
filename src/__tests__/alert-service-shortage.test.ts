@@ -37,6 +37,10 @@ vi.mock("@/lib/supabase/alerts", () => ({
     dbListAlerts:             (...args: unknown[]) => mockDbListAlerts(...args),
     dbGetAlertById:           (...args: unknown[]) => mockDbGetAlertById(...args),
     dbCreateAlert:            (...args: unknown[]) => mockDbCreateAlert(...args),
+    // KOBİ-sim Y5: aktif uyarının metni artık okuma anında tazeleniyor
+    // (uyarı rakamları Stok sekmesiyle tutmuyordu). Dedup davranışı
+    // DEĞİŞMEDİ — bu testlerin ölçtüğü şey hâlâ 'create çağrılmaz'.
+    dbUpdateActiveAlertContent: vi.fn(),
     dbUpdateAlertStatus:      (...args: unknown[]) => mockDbUpdateAlertStatus(...args),
     dbDismissAlertsBySource:  (...args: unknown[]) => mockDbDismissAlertsBySource(...args),
     dbListActiveAlerts:       (...args: unknown[]) => mockDbListActiveAlerts(...args),

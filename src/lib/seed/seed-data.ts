@@ -833,11 +833,28 @@ export const SEED_POS: SeedPo[] = [
 
 // ── Tedarik taahhütleri (incoming ekseni — PO'larla hizalı) ─────────────────
 
+/**
+ * Yoldaki mal taahhütleri.
+ *
+ * KOBİ-sim O3: `poNumber` ALANI ZORUNLU. Mal kabul RPC'si commitment'ı
+ * `WHERE po_line_id = …` ile kapatır (`051_po_receive_rpc.sql`) ve `confirm_po`
+ * onu `po_line_id` ile yaratır (`052`). Seed ise commitment'ları bu bağ olmadan
+ * insert ediyordu → mal kabul UPDATE'i hiç eşleşmiyor, satır kalıcı olarak
+ * `pending` kalıyordu. Sonuç: 6/6 teslim alınmış PO'nun ürünü "Bekleyen
+ * Teslimatlar: 6 adet · pending" göstermeye devam ediyordu (iki bağımsız tanık).
+ * Uygulamadan açılan PO'da (draft → confirm → receive) zincir zaten doğruydu —
+ * bu bir SEED kusuruydu.
+ *
+ * `poNumber`/`sku` ikilisi PO satırına çözülür; eşleşme bulunamazsa seed
+ * PATLAR (sessiz yetim üretmek, bulunan kusurun aynısını geri getirirdi).
+ * `poNumber: null` yalnız İPTAL edilmiş taahhüt için geçerli — o satır zaten
+ * hiçbir mal kabulü beklemediği için "yoldaki mal" tablosunu kirletmez.
+ */
 export const SEED_COMMITMENTS = [
-    { sku: "FWBV-DN400-PN80-PH", qty: 4, date: daysLater(18), supplier: "China Langge Valve Technology Co., Ltd", status: "pending", notes: "PO-2026-0002 bakiyesi — acil kritik stok takviyesi" },
-    { sku: "INS-GPR-DN100", qty: 6, date: daysLater(35), supplier: "Albrecht-Automatik GmbH", status: "pending", notes: "PO-2026-0003 — Almanya 45 gün transit" },
-    { sku: "DGV-800-DN25-A105", qty: 40, date: daysAgo(8), supplier: "PMT Suluova Fabrikası", status: "received", notes: "PO-2026-0005 — teslim alındı, stok güncellendi" },
-    { sku: "KST-600-DN20-A105-NPT", qty: 100, date: daysAgo(15), supplier: "PMT Suluova Fabrikası", status: "cancelled", notes: "İptal — üretim planı değişti" },
+    { sku: "FWBV-DN400-PN80-PH", poNumber: "PO-2026-0002", qty: 4, date: daysLater(18), supplier: "China Langge Valve Technology Co., Ltd", status: "pending", notes: "PO-2026-0002 bakiyesi — acil kritik stok takviyesi" },
+    { sku: "INS-GPR-DN100", poNumber: "PO-2026-0003", qty: 6, date: daysLater(35), supplier: "Albrecht-Automatik GmbH", status: "pending", notes: "PO-2026-0003 — Almanya 45 gün transit" },
+    { sku: "DGV-800-DN25-A105", poNumber: "PO-2026-0005", qty: 40, date: daysAgo(8), supplier: "PMT Suluova Fabrikası", status: "received", notes: "PO-2026-0005 — teslim alındı, stok güncellendi" },
+    { sku: "KST-600-DN20-A105-NPT", poNumber: null, qty: 100, date: daysAgo(15), supplier: "PMT Suluova Fabrikası", status: "cancelled", notes: "İptal — üretim planı değişti (PO açılmadan iptal)" },
 ] as const;
 
 // ── BOM (gate valf ← conta + saplama) ───────────────────────────────────────

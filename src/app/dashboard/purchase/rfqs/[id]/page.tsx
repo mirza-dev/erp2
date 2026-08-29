@@ -172,6 +172,34 @@ export default function RfqDetailPage({ params }: { params: Promise<{ id: string
                 </div>
             </div>
 
+            {/* KOBİ-sim Y4 — teknik şartname notu.
+                Not `rfqs/new` formunda giriliyor ve API'de kaydediliyordu, ama
+                detay sayfasında HİÇ gösterilmiyordu (`notes` → 0 eşleşme). Kerem
+                "PN80 basınç sınıfı, EN 10204 3.1 sertifika zorunluluğu, hidrostatik
+                test raporu" yazdı; oluşan kayıtta hiçbir yerde göremedi. Veri
+                kaybolmuyordu, GÖRÜNMEZ oluyordu — mühendis açısından sonuç aynı:
+                teknik şartın tedarikçiye ulaşıp ulaşmadığı doğrulanamıyor. */}
+            {rfq.notes && rfq.notes.trim() && (
+                <div style={{
+                    border: "0.5px solid var(--border-tertiary)",
+                    borderRadius: "8px", padding: "14px", marginBottom: "16px",
+                    background: "var(--bg-tertiary)",
+                }}>
+                    <strong style={{ fontSize: "13px", color: "var(--text-primary)" }}>
+                        Teknik Şartname / Notlar
+                    </strong>
+                    <div style={{
+                        fontSize: "13px", color: "var(--text-secondary)",
+                        marginTop: "8px", whiteSpace: "pre-wrap", lineHeight: 1.55,
+                    }}>
+                        {rfq.notes}
+                    </div>
+                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "8px" }}>
+                        Bu not tedarikçiye gönderilen talep belgesinde de yer alır.
+                    </div>
+                </div>
+            )}
+
             {/* Vendor panel */}
             <div style={{ border: "0.5px solid var(--border-tertiary)", borderRadius: "8px", padding: "14px", marginBottom: "16px" }}>
                 <strong style={{ fontSize: "13px", color: "var(--text-primary)" }}>Tedarikçiler</strong>
@@ -377,8 +405,8 @@ function VendorQuoteModal({ rfqId, vendor, lines, onClose, onSaved }: {
                         </select>
                     </div>
                     <div>
-                        <label style={{ fontSize: "11px", color: "var(--text-tertiary)", display: "block", marginBottom: "3px" }}>Geçerlilik Tarihi</label>
-                        <input type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} style={inputStyle} />
+                        <label htmlFor="rfq-valid-until" style={{ fontSize: "11px", color: "var(--text-tertiary)", display: "block", marginBottom: "3px" }}>Geçerlilik Tarihi</label>
+                        <input id="rfq-valid-until" type="date" value={validUntil} onChange={e => setValidUntil(e.target.value)} style={inputStyle} />
                     </div>
                 </div>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "12px" }}>

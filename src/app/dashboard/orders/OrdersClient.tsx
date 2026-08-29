@@ -430,6 +430,7 @@ export default function OrdersClient(props: OrdersClientProps) {
                         type="date"
                         value={dateFrom}
                         onChange={(e) => navigate({ dateFrom: e.target.value, page: 1 })}
+                        aria-label="Sipariş tarihi — başlangıç"
                         title="Başlangıç tarihi"
                         style={{
                             fontSize: "12px",
@@ -446,6 +447,7 @@ export default function OrdersClient(props: OrdersClientProps) {
                         type="date"
                         value={dateTo}
                         onChange={(e) => navigate({ dateTo: e.target.value, page: 1 })}
+                        aria-label="Sipariş tarihi — bitiş"
                         title="Bitiş tarihi"
                         style={{
                             fontSize: "12px",

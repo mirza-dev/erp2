@@ -138,7 +138,22 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
             // Resolve any existing warning for this product (escalate)
             toResolve.push({ type: "stock_risk", entityId, reason: "escalated_to_critical" });
 
-            if (!activeMap.has(`stock_critical:${entityId}`) && !isBlockedByDismiss("stock_critical", entityId, "critical")) {
+            // KOBİ-sim Y5 — aktif uyarı varsa metni YERİNDE tazele.
+            //
+            // Eskiden aktif uyarı bulununca scan hiçbir şey yapmıyordu; metin
+            // oluşturulduğu andan kalmaydı. Üç bağımsız tanık (Kerem, Sibel,
+            // Hasan) uyarıdaki rakamların Stok sekmesiyle hiç tutmadığını
+            // bildirdi ("Mevcut stok 10 adet" derken sekmede 38/20/18). Kerem
+            // min-stok parametresini düzelttikten sonra bile uyarı eski rakamla
+            // kaldı → "uyarı listesine güvenim kalmadı" (fabrikanın ana ekranı).
+            // `order_deadline` (yukarıda) ve AI bulguları bu tazelemeyi zaten
+            // yapıyordu; kural-tabanlı stok uyarıları atlanmıştı.
+            if (activeMap.has(`stock_critical:${entityId}`)) {
+                await dbUpdateActiveAlertContent("stock_critical", entityId, {
+                    title: `Kritik Stok: ${product.name}`,
+                    description: buildStockAlertDescription(riskInputs, "critical"),
+                });
+            } else if (!isBlockedByDismiss("stock_critical", entityId, "critical")) {
                 const alert = await dbCreateAlert({
                     type: "stock_critical",
                     severity: "critical",
@@ -173,7 +188,13 @@ export async function serviceScanStockAlerts(): Promise<ScanResult> {
                 }
             }
         } else if (isWarning) {
-            if (!activeMap.has(`stock_risk:${entityId}`) && !isBlockedByDismiss("stock_risk", entityId, "warning")) {
+            // Y5 — kritik daldaki tazeleme kuralının ikizi.
+            if (activeMap.has(`stock_risk:${entityId}`)) {
+                await dbUpdateActiveAlertContent("stock_risk", entityId, {
+                    title: `Stok Uyarısı: ${product.name}`,
+                    description: buildStockAlertDescription(riskInputs, "warning"),
+                });
+            } else if (!isBlockedByDismiss("stock_risk", entityId, "warning")) {
                 const alert = await dbCreateAlert({
                     type: "stock_risk",
                     severity: "warning",

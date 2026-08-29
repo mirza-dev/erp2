@@ -507,19 +507,14 @@ export async function runSeed(supabase: Service): Promise<Record<string, unknown
         if (error) throw new Error("Production: " + error.message);
     }
 
-    const commitRows = SEED_COMMITMENTS.map(c => ({
-        product_id: bySku(c.sku).id, quantity: c.qty, expected_date: c.date,
-        supplier_name: c.supplier, status: c.status, notes: c.notes,
-        received_at: c.status === "received" ? c.date : null,
-    }));
-    if (commitRows.length > 0) {
-        const { error } = await supabase.from("purchase_commitments").insert(commitRows);
-        if (error) throw new Error("Purchase commitments: " + error.message);
-    }
+    // KOBİ-sim O3: taahhüt insert'i PO'lardan SONRAYA taşındı — `po_line_id`
+    // bağı için PO satırlarının önce var olması gerekiyor (bkz. bölüm 11 sonu).
 
     // ── 11. Purchase orders + lines (+ junction adayı) ──────────────────────
     const poIdByNumber = new Map<string, string>();
     const poLineIdForRec: string[] = [];
+    // KOBİ-sim O3: "PO-2026-0003|INS-GPR-DN100" → po_line_id
+    const poLineIdByPoSku = new Map<string, string>();
     for (const po of SEED_POS) {
         const vendorId = vendorMap.get(po.vendorName);
         if (!vendorId) throw new Error("Seed iç tutarsızlık — vendor yok: " + po.vendorName);
@@ -551,9 +546,43 @@ export async function runSeed(supabase: Service): Promise<Record<string, unknown
         if (po.linkRecommendationLineIdx != null && poLines?.[po.linkRecommendationLineIdx]) {
             poLineIdForRec.push(poLines[po.linkRecommendationLineIdx].id);
         }
+        // O3: taahhütleri satıra bağlamak için (poNumber|sku) → po_line_id.
+        po.lines.forEach((l, i) => {
+            const lineId = poLines?.[i]?.id;
+            if (lineId) poLineIdByPoSku.set(`${po.poNumber}|${l.sku}`, lineId);
+        });
     }
     await supabase.from("po_counters")
         .upsert({ year, last_seq: SEED_POS.length }, { onConflict: "year" });
+
+    // ── 11b. Yoldaki mal taahhütleri (PO satırlarına BAĞLI) ─────────────────
+    //
+    // KOBİ-sim O3: eskiden bu insert PO'lardan ÖNCE ve `po_line_id` OLMADAN
+    // koşuyordu. `receive_po_lines` taahhüdü `WHERE po_line_id = …` ile kapattığı
+    // için (051) eşleşme hiç olmuyor, satır kalıcı `pending` kalıyordu → tamamen
+    // teslim alınmış PO'nun ürünü "Bekleniyor: 6" göstermeye devam ediyordu.
+    const commitRows = SEED_COMMITMENTS.map(c => {
+        const lineId = c.poNumber ? poLineIdByPoSku.get(`${c.poNumber}|${c.sku}`) : null;
+        // İptal edilmiş taahhüt PO'suz olabilir; açık/teslim alınmış olan OLAMAZ.
+        if (!lineId && c.status !== "cancelled") {
+            throw new Error(
+                `Seed iç tutarsızlık — taahhüt PO satırına bağlanamadı: ${c.poNumber ?? "(PO yok)"} | ${c.sku}. ` +
+                "Bağsız 'pending' taahhüt mal kabulle asla kapanmaz (O3).",
+            );
+        }
+        return {
+            product_id: bySku(c.sku).id, quantity: c.qty, expected_date: c.date,
+            supplier_name: c.supplier, status: c.status, notes: c.notes,
+            po_line_id: lineId ?? null,
+            // `received` taahhüt, kapatan mal kabulüyle tutarlı olmalı.
+            received_qty: c.status === "received" ? c.qty : 0,
+            received_at: c.status === "received" ? c.date : null,
+        };
+    });
+    if (commitRows.length > 0) {
+        const { error } = await supabase.from("purchase_commitments").insert(commitRows);
+        if (error) throw new Error("Purchase commitments: " + error.message);
+    }
 
     // ── 12. Depo bakiyeleri + tedarikçi bağları (084) ───────────────────────
     const { error: slbErr } = await supabase.from("stock_location_balances").insert(

@@ -488,13 +488,16 @@ function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void 
                 setProfile(p);
                 setFullName(p.fullName);
                 savedFullNameRef.current = p.fullName;
+                setIsLoading(false);
             })
             .catch(err => {
-                if (err?.name !== "AbortError") {
-                    toast({ type: "error", message: "Profil yüklenemedi." });
-                }
-            })
-            .finally(() => setIsLoading(false));
+                // KOBİ-sim Y1 (aynı sınıf): iptalde state'e DOKUNMA. `finally`
+                // iptal dalında da çalışıp bayrağı indiriyor, form "yükleniyor"
+                // yerine BOŞ değerlerle çiziliyordu.
+                if (err?.name === "AbortError") return;
+                toast({ type: "error", message: "Profil yüklenemedi." });
+                setIsLoading(false);
+            });
         return () => ctrl.abort();
     }, [isDemo, toast]);
 
@@ -760,13 +763,14 @@ function BildirimlerTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => voi
                     setPrefs(data);
                     savedRef.current = data;
                 }
+                setIsLoading(false);
             })
             .catch(err => {
-                if (err?.name !== "AbortError") {
-                    toast({ type: "error", message: "Tercihler yüklenemedi." });
-                }
-            })
-            .finally(() => setIsLoading(false));
+                // KOBİ-sim Y1 (aynı sınıf) — yukarıdaki profil bloğuyla aynı.
+                if (err?.name === "AbortError") return;
+                toast({ type: "error", message: "Tercihler yüklenemedi." });
+                setIsLoading(false);
+            });
         return () => ctrl.abort();
     }, [isDemo, toast]);
 

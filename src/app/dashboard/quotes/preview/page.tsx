@@ -121,7 +121,17 @@ export default function QuotePreviewPage() {
                 {/* ── Toolbar (hidden on print) ── */}
                 <div className="quote-preview-toolbar" style={toolbarStyle}>
                     <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <Button variant="secondary" size="sm" leftIcon={<ArrowLeft size={14} />} onClick={() => router.push("/dashboard/quotes/new")}>
+                        {/* KOBİ-sim D2: kaydedilmiş teklif varsa ONA dön; koşulsuz
+                            /quotes/new'e gitmek boş form açıp mükerrer teklif riski
+                            üretiyordu. Kaydedilmemiş taslakta davranış eskisi gibi. */}
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            leftIcon={<ArrowLeft size={14} />}
+                            onClick={() => router.push(
+                                data?.quoteId ? `/dashboard/quotes/${data.quoteId}` : "/dashboard/quotes/new",
+                            )}
+                        >
                             Formu Düzenle
                         </Button>
                         <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>

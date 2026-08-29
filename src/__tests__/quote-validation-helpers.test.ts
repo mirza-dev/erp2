@@ -72,24 +72,28 @@ describe("validateQuoteLineQuantities (V7-A11)", () => {
 });
 
 describe("validateQuoteForSend (V4-A2 + V4-A4)", () => {
+    // KOBİ-sim K1 (2026-08-29): send-time kontrole cari zorunluluğu eklendi.
+    // Bu blok adres + ürün-bağı kurallarını ölçüyor, o yüzden fixture'larda
+    // customer_id dolu; cari kuralının kendisi sim-tur1-fixes.test.ts'te.
     it("customer_address boş → hata", () => {
-        expect(validateQuoteForSend({ customer_address: "", lines: [] })).toMatch(/müşteri adresi/i);
+        expect(validateQuoteForSend({ customer_id: "c-1", customer_address: "", lines: [] })).toMatch(/müşteri adresi/i);
     });
 
     it("customer_address null → hata", () => {
-        expect(validateQuoteForSend({ customer_address: null, lines: [] })).toMatch(/müşteri adresi/i);
+        expect(validateQuoteForSend({ customer_id: "c-1", customer_address: null, lines: [] })).toMatch(/müşteri adresi/i);
     });
 
     it("customer_address sadece boşluk → hata", () => {
-        expect(validateQuoteForSend({ customer_address: "   ", lines: [] })).toMatch(/müşteri adresi/i);
+        expect(validateQuoteForSend({ customer_id: "c-1", customer_address: "   ", lines: [] })).toMatch(/müşteri adresi/i);
     });
 
     it("adres dolu + boş satırlar → null", () => {
-        expect(validateQuoteForSend({ customer_address: "İstanbul", lines: [] })).toBeNull();
+        expect(validateQuoteForSend({ customer_id: "c-1", customer_address: "İstanbul", lines: [] })).toBeNull();
     });
 
     it("substantive satır (fiyat>0) product_id null → hata", () => {
         const err = validateQuoteForSend({
+            customer_id: "c-1",
             customer_address: "İstanbul",
             lines: [{ product_id: null, quantity: 0, unit_price: 100 }],
         });
@@ -98,6 +102,7 @@ describe("validateQuoteForSend (V4-A2 + V4-A4)", () => {
 
     it("substantive satır (qty>0) product_id null → hata", () => {
         const err = validateQuoteForSend({
+            customer_id: "c-1",
             customer_address: "İstanbul",
             lines: [{ product_id: null, quantity: 5, unit_price: 0 }],
         });
@@ -106,6 +111,7 @@ describe("validateQuoteForSend (V4-A2 + V4-A4)", () => {
 
     it("salt-açıklama satırı (qty 0, fiyat 0) product_id null → muaf (null)", () => {
         expect(validateQuoteForSend({
+            customer_id: "c-1",
             customer_address: "İstanbul",
             lines: [{ product_id: null, quantity: 0, unit_price: 0 }],
         })).toBeNull();
@@ -113,6 +119,7 @@ describe("validateQuoteForSend (V4-A2 + V4-A4)", () => {
 
     it("adres dolu + tüm substantive satırlar ürüne bağlı → null", () => {
         expect(validateQuoteForSend({
+            customer_id: "c-1",
             customer_address: "İstanbul",
             lines: [{ product_id: "p-1", quantity: 3, unit_price: 100 }],
         })).toBeNull();

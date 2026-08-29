@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useState, useCallback, useEffect, useRef } from "react";
+import { Fragment, Suspense, useState, useCallback, useEffect, useRef } from "react";
 import { useSearchParams } from "next/navigation";
 import { useProducts, useProduction, buildLoadError } from "@/lib/data-context";
 import { formatNumber, safeRandomUUID } from "@/lib/utils";
@@ -17,13 +17,18 @@ interface FormLine {
     id: string;
     productId: string;
     adet: string;
+    // KOBİ-sim Y3 — hurda/fire. Hasan 20 üretip 1'ini hurdaya ayırdı, stok TAM
+    // 20 arttı; fireyi serbest nota yazmak zorunda kaldı ("ben yazmasam hiçbir
+    // yerde görünmeyecekti"). Arka uç (0 ≤ scrap ≤ produced) baştan hazırdı.
+    hurda: string;
+    hurdaNeden: string;
     notlar: string;
     _lowConfidence?: boolean; // sesli girişten gelen, güven skoru düşük satır
     _voiceHint?: string;      // belirsiz sesli girişte Claude'un anladığı ham metin
 }
 
 function newLine(): FormLine {
-    return { id: safeRandomUUID(), productId: "", adet: "", notlar: "" };
+    return { id: safeRandomUUID(), productId: "", adet: "", hurda: "", hurdaNeden: "", notlar: "" };
 }
 
 /**
@@ -43,7 +48,7 @@ export function prefillLineFromQuery(
     if (rawQty && /^\d+(\.\d+)?$/.test(rawQty) && Number(rawQty) > 0) {
         qtyStr = rawQty;
     }
-    return { id: safeRandomUUID(), productId: rawProductId, adet: qtyStr, notlar: "" };
+    return { id: safeRandomUUID(), productId: rawProductId, adet: qtyStr, hurda: "", hurdaNeden: "", notlar: "" };
 }
 
 const today = () => {
@@ -74,6 +79,55 @@ export function formatProductionDateLabel(value: string): string {
         return value;
     }
     return productionDateFormatter.format(date);
+}
+
+/**
+ * KOBİ-sim O1 — kayıt saati.
+ *
+ * Aynı ürün için aynı gün iki kayıt olduğunda silme düğmelerinin erişilebilir
+ * adı BİREBİR AYNIYDI (`${productName} üretim kaydını sil`). Ekran okuyucu,
+ * klavye ve otomasyon için ayırt edilemez; Hasan yanlış kaydı silmemek için
+ * vazgeçti. Saat bu ayrımı yapan tek alan.
+ */
+export function formatProductionTime(createdAt?: string): string {
+    if (!createdAt) return "";
+    const d = new Date(createdAt);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleTimeString("tr-TR", { hour: "2-digit", minute: "2-digit" });
+}
+
+/**
+ * KOBİ-sim O8 — hafta/ay üretim toplamları.
+ *
+ * Ekran yalnız GÜN ekseninde çalışıyordu: seçili gün + "diğer günler" düz
+ * listesi. Vardiya sorumlusu dört ayrı denemede haftalık toplamı çıkaramadı
+ * ("haftalık toplamı veremedim"). Veri zaten 120 günlük pencerede geliyor
+ * (`productionFetchUrl`) — eksik olan yalnız toplayan görünümdü.
+ *
+ * Hafta PAZARTESİ başlar (TR iş haftası).
+ */
+export function donemBaslangici(bugun: string, donem: "hafta" | "ay"): string {
+    const [y, m, d] = bugun.split("-").map(Number);
+    const t = new Date(y, m - 1, d);
+    if (donem === "ay") return `${y}-${String(m).padStart(2, "0")}-01`;
+    const gun = (t.getDay() + 6) % 7;           // Pazartesi = 0
+    t.setDate(t.getDate() - gun);
+    return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, "0")}-${String(t.getDate()).padStart(2, "0")}`;
+}
+
+export function donemOzeti(
+    kayitlar: { tarih: string; adet: number; scrap: number }[],
+    baslangic: string,
+    bitis: string,
+): { adet: number; hurda: number; kalem: number } {
+    let adet = 0, hurda = 0, kalem = 0;
+    for (const k of kayitlar) {
+        if (k.tarih < baslangic || k.tarih > bitis) continue;
+        adet += k.adet;
+        hurda += k.scrap;
+        kalem += 1;
+    }
+    return { adet, hurda, kalem };
 }
 
 const inputStyle: React.CSSProperties = {
@@ -121,6 +175,12 @@ function ProductionPageInner() {
     const [isSaving, setIsSaving] = useState(false);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+    // KOBİ-sim Y2 — mükerrer kayıt uyarısı. Hasan 6 girip doğrusunun 8 olduğunu
+    // fark edince tekrar kaydetti; sistem üzerine YAZMADI, ikinci satır EKLEDİ
+    // (6+8=14, gerçek 8). Kerem aynı saatlerde olaydan habersiz stoğun 3→9→17
+    // arttığını bildirdi. Ekleme davranışı doğru (üretim bir olaydır) ama
+    // kullanıcı uyarılmıyordu.
+    const [duplicateWarn, setDuplicateWarn] = useState<{ productName: string; mevcut: number; kalem: number } | null>(null);
 
     const todayStr = today();
     const selectedDateLogs = uretimKayitlari.filter(k => k.tarih === tarih);
@@ -128,6 +188,19 @@ function ProductionPageInner() {
     const isTodaySelected = tarih === todayStr;
     const isPastDateSelected = tarih < todayStr;
     const selectedDateLabel = formatProductionDateLabel(tarih);
+    // O8: hafta/ay toplamları — seçili tarihe göre, bugüne kadar.
+    const haftaOzet = donemOzeti(uretimKayitlari, donemBaslangici(tarih, "hafta"), tarih);
+    // O8: diğer günler artık gün başlıklarıyla GRUPLU — düz liste hangi günün
+    // ne ürettiğini okunur biçimde vermiyordu.
+    const digerGunGruplari = Array.from(
+        otherDateLogs.reduce((acc, k) => {
+            const grup = acc.get(k.tarih) ?? [];
+            grup.push(k);
+            acc.set(k.tarih, grup);
+            return acc;
+        }, new Map<string, typeof otherDateLogs>()),
+    ).sort((a, b) => (a[0] < b[0] ? 1 : -1));
+    const ayOzet    = donemOzeti(uretimKayitlari, donemBaslangici(tarih, "ay"), tarih);
     const [voiceTranscript, setVoiceTranscript] = useState<string | null>(null);
     const transcriptTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -168,10 +241,14 @@ function ProductionPageInner() {
         const data = await res.json() as { text: string; entries: VoiceProductionEntry[]; sessionNote: string };
         setVoiceTranscript(data.text);
 
-        const newLines = data.entries.map(entry => ({
+        const newLines: FormLine[] = data.entries.map(entry => ({
             id: safeRandomUUID(),
             productId: entry.productId ?? "",
             adet: entry.quantity > 0 ? String(entry.quantity) : "",
+            // Sesli girişte fire ayrı alana AYRIŞTIRILMIYOR (V3 kararı: fireNotes
+            // nota akıyor); operatör hurdayı formdaki kutudan girer.
+            hurda: "",
+            hurdaNeden: "",
             // V3: fireNotes ("fire: N adet") notlar'a doğal Türkçe akışla concat (kullanıcı kararı 2026-05-28 — UI sütunu yok)
             notlar: mergeFireIntoNote(entry.note || data.sessionNote || "", entry.fireNotes),
             _lowConfidence: entry.confidence < 0.7,
@@ -238,14 +315,41 @@ function ProductionPageInner() {
         }
     };
 
+    /**
+     * KOBİ-sim Y2 — kaydetmeden önce mükerrer kontrolü.
+     *
+     * Seçili tarihte aynı ürün için zaten kayıt varsa kullanıcı onaylamadan
+     * ikinci satır eklenmez. Düzeltme niyetiyle tekrar kaydeden operatör
+     * eskiden sessizce stoğu iki katına çıkarıyordu.
+     */
     const handleSave = async () => {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         const valid = lines.filter(l => l.productId && parseInt(l.adet) > 0);
-        const unresolved = lines.filter(l => !l.productId && parseInt(l.adet) > 0);
         if (valid.length === 0) {
             toast({ type: "error", message: "Lütfen en az bir ürün seçin ve adet girin" });
             return;
         }
+        const dupLine = valid.find(l => selectedDateLogs.some(k => k.productId === l.productId));
+        if (dupLine) {
+            const mevcut = selectedDateLogs
+                .filter(k => k.productId === dupLine.productId)
+                .reduce((sum, k) => sum + k.adet, 0);
+            const product = products.find(p => p.id === dupLine.productId);
+            setDuplicateWarn({
+                productName: product?.name ?? "Bu ürün",
+                mevcut,
+                kalem: selectedDateLogs.filter(k => k.productId === dupLine.productId).length,
+            });
+            return;
+        }
+        await performSave();
+    };
+
+    const performSave = async () => {
+        const valid = lines.filter(l => l.productId && parseInt(l.adet) > 0);
+        const unresolved = lines.filter(l => !l.productId && parseInt(l.adet) > 0);
+        if (valid.length === 0) return;
+        setDuplicateWarn(null);
         setIsSaving(true);
         let succeeded = 0;
         let failed = 0;
@@ -262,9 +366,13 @@ function ProductionPageInner() {
                     productName: product.name,
                     productSku: product.sku,
                     adet: parseInt(line.adet),
-                    scrap: 0,
+                    scrap: parseInt(line.hurda) || 0,
+                    wasteReason: line.hurdaNeden.trim() || undefined,
                     tarih,
-                    girenKullanici: "Usta",
+                    // KOBİ-sim O6: sabit "Usta" KALDIRILDI. Sunucu `entered_by`'ı
+                    // zaten oturumdan yazıyor (`POST /api/production`); buradaki
+                    // sahte değer yalnız optimistic satırda görünüp yanıltıyordu.
+                    girenKullanici: "",
                     notlar: line.notlar,
                 });
                 succeeded++;
@@ -571,7 +679,7 @@ function ProductionPageInner() {
                                     </select>
                                     {selectedProduct && (
                                         <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "-4px" }}>
-                                            Mevcut stok: {formatNumber(selectedProduct.available_now)} {selectedProduct.unit}
+                                            Satılabilir: {formatNumber(selectedProduct.available_now)} {selectedProduct.unit}{selectedProduct.on_hand !== selectedProduct.available_now && ` · stokta ${formatNumber(selectedProduct.on_hand)}`}
                                         </div>
                                     )}
                                     {line._voiceHint && !line.productId && (
@@ -597,6 +705,17 @@ function ProductionPageInner() {
                                             style={{ ...inputStyle, width: "96px", textAlign: "right" }}
                                         />
                                         <input
+                                            type="number"
+                                            inputMode="numeric"
+                                            min={0}
+                                            max={parseInt(line.adet) || undefined}
+                                            value={line.hurda}
+                                            onChange={e => setLineField(line.id, "hurda", e.target.value)}
+                                            placeholder="Hurda"
+                                            aria-label={`${idx + 1}. satır hurda adedi`}
+                                            style={{ ...inputStyle, width: "84px", textAlign: "right" }}
+                                        />
+                                        <input
                                             type="text"
                                             value={line.notlar}
                                             onChange={e => setLineField(line.id, "notlar", e.target.value)}
@@ -618,6 +737,9 @@ function ProductionPageInner() {
                             <th style={{ ...thStyle, width: "34px" }}>#</th>
                             <th style={thStyle}>Ürün</th>
                             <th style={{ ...thStyle, width: "90px", textAlign: "right" as const }}>Adet</th>
+                            {/* KOBİ-sim Y3 — hurda/fire. Stok üretilen'den hurda
+                                düşülerek artar; eskiden fire hiçbir yerde yoktu. */}
+                            <th style={{ ...thStyle, width: "84px", textAlign: "right" as const }}>Hurda</th>
                             <th style={thStyle}>Not</th>
                             <th style={{ ...thStyle, width: "34px" }} aria-label="Satır işlemleri"></th>
                         </tr>
@@ -646,7 +768,7 @@ function ProductionPageInner() {
                                         </select>
                                         {selectedProduct && (
                                             <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "3px" }}>
-                                                Mevcut stok: {formatNumber(selectedProduct.available_now)} {selectedProduct.unit}
+                                                Satılabilir: {formatNumber(selectedProduct.available_now)} {selectedProduct.unit}{selectedProduct.on_hand !== selectedProduct.available_now && ` · stokta ${formatNumber(selectedProduct.on_hand)}`}
                                             </div>
                                         )}
                                         {line._voiceHint && !line.productId && (
@@ -672,6 +794,19 @@ function ProductionPageInner() {
                                             style={{ ...inputStyle, textAlign: "right", width: "80px" }}
                                         />
                                     </td>
+                                    <td style={{ ...tdStyle, textAlign: "right" as const }}>
+                                        <input
+                                            type="number"
+                                            inputMode="numeric"
+                                            min={0}
+                                            max={parseInt(line.adet) || undefined}
+                                            value={line.hurda}
+                                            onChange={e => setLineField(line.id, "hurda", e.target.value)}
+                                            placeholder="0"
+                                            aria-label={`${idx + 1}. satır hurda adedi`}
+                                            style={{ ...inputStyle, textAlign: "right", width: "74px" }}
+                                        />
+                                    </td>
                                     <td style={tdStyle}>
                                         <input
                                             type="text"
@@ -681,6 +816,16 @@ function ProductionPageInner() {
                                             aria-label={`${idx + 1}. satır not`}
                                             style={inputStyle}
                                         />
+                                        {(parseInt(line.hurda) || 0) > 0 && (
+                                            <input
+                                                type="text"
+                                                value={line.hurdaNeden}
+                                                onChange={e => setLineField(line.id, "hurdaNeden", e.target.value)}
+                                                placeholder="Fire nedeni"
+                                                aria-label={`${idx + 1}. satır fire nedeni`}
+                                                style={{ ...inputStyle, marginTop: "4px", fontSize: "12px" }}
+                                            />
+                                        )}
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: "center" as const }}>
                                         <button
@@ -733,6 +878,51 @@ function ProductionPageInner() {
                 </div>
             </div>
 
+            {/* KOBİ-sim O8 — dönem özeti.
+                Ekran yalnız gün ekseninde çalışıyordu; vardiya sorumlusu dört
+                ayrı denemede haftalık/aylık toplamı çıkaramadı. Veri zaten 120
+                günlük pencerede geliyordu, eksik olan toplayan görünümdü. */}
+            <div style={{
+                display: "grid",
+                gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, minmax(0, 1fr))",
+                gap: "8px",
+            }}>
+                {([
+                    ["Bu hafta", haftaOzet],
+                    ["Bu ay", ayOzet],
+                ] as const).flatMap(([etiket, ozet]) => [
+                    <div key={`${etiket}-adet`} style={{
+                        background: "var(--surface-raised)",
+                        border: "var(--line-width) solid var(--surface-border)",
+                        borderRadius: "6px", padding: "10px 12px",
+                        boxShadow: "var(--surface-shadow-sm)",
+                    }}>
+                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>{etiket} üretim</div>
+                        <div style={{ fontSize: "17px", fontWeight: 600, color: "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>
+                            {formatNumber(ozet.adet)}
+                        </div>
+                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>{ozet.kalem} kalem</div>
+                    </div>,
+                    <div key={`${etiket}-hurda`} style={{
+                        background: "var(--surface-raised)",
+                        border: "var(--line-width) solid var(--surface-border)",
+                        borderRadius: "6px", padding: "10px 12px",
+                        boxShadow: "var(--surface-shadow-sm)",
+                    }}>
+                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>{etiket} hurda</div>
+                        <div style={{
+                            fontSize: "17px", fontWeight: 600, fontVariantNumeric: "tabular-nums",
+                            color: ozet.hurda > 0 ? "var(--danger-text)" : "var(--text-secondary)",
+                        }}>
+                            {formatNumber(ozet.hurda)}
+                        </div>
+                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
+                            {ozet.adet > 0 ? `%${((ozet.hurda / ozet.adet) * 100).toFixed(1)} fire` : "—"}
+                        </div>
+                    </div>,
+                ])}
+            </div>
+
             {/* Selected date log */}
             <div style={{
                 background: "var(--surface-raised)",
@@ -774,6 +964,13 @@ function ProductionPageInner() {
                                 {!isMobile && <th style={thStyle}>SKU</th>}
                                 <th style={thStyle}>Ürün</th>
                                 <th style={{ ...thStyle, textAlign: "right" as const }}>Üretilen Adet</th>
+                                {/* KOBİ-sim Y3 — fire artık görünür (yoksa stok
+                                    sistematik olarak fazla görünüyordu). */}
+                                {!isMobile && <th style={{ ...thStyle, textAlign: "right" as const }}>Hurda</th>}
+                                {/* KOBİ-sim O6 — kaydı kimin girdiği sunucuda zaten
+                                    yazılıyordu (entered_by), ekranda hiç yoktu. */}
+                                {!isMobile && <th style={thStyle}>Giren</th>}
+                                {!isMobile && <th style={thStyle}>Saat</th>}
                                 {!isMobile && <th style={thStyle}>Not</th>}
                                 <th style={{ ...thStyle, width: "34px" }} aria-label="Kayıt işlemleri"></th>
                             </tr>
@@ -788,14 +985,45 @@ function ProductionPageInner() {
                                             SKU ve not ürün adının altına iner. */}
                                         {isMobile && (
                                             <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "2px" }}>
-                                                {kaydi.productSku}{kaydi.notlar ? ` · ${kaydi.notlar}` : ""}
+                                                {[
+                                                    kaydi.productSku,
+                                                    formatProductionTime(kaydi.createdAt),
+                                                    kaydi.scrap > 0 ? `hurda ${formatNumber(kaydi.scrap)}` : "",
+                                                    kaydi.notlar,
+                                                ].filter(Boolean).join(" · ")}
                                             </div>
                                         )}
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: "right" as const, fontWeight: 600, color: "var(--success-text)" }}>
                                         +{formatNumber(kaydi.adet)}
                                     </td>
-                                    {!isMobile && <td style={{ ...tdStyle, color: "var(--text-tertiary)", fontSize: "12px" }}>{kaydi.notlar || "—"}</td>}
+                                    {!isMobile && (
+                                        <td style={{
+                                            ...tdStyle, textAlign: "right" as const,
+                                            color: kaydi.scrap > 0 ? "var(--danger-text)" : "var(--text-tertiary)",
+                                            fontWeight: kaydi.scrap > 0 ? 600 : 400,
+                                        }}>
+                                            {kaydi.scrap > 0 ? formatNumber(kaydi.scrap) : "—"}
+                                        </td>
+                                    )}
+                                    {!isMobile && (
+                                        <td style={{ ...tdStyle, color: "var(--text-secondary)", fontSize: "12px" }}>
+                                            {kaydi.girenKullanici || "—"}
+                                        </td>
+                                    )}
+                                    {!isMobile && (
+                                        <td style={{ ...tdStyle, color: "var(--text-tertiary)", fontSize: "12px" }}>
+                                            {formatProductionTime(kaydi.createdAt) || "—"}
+                                        </td>
+                                    )}
+                                    {!isMobile && <td style={{ ...tdStyle, color: "var(--text-tertiary)", fontSize: "12px" }}>
+                                        {kaydi.notlar || "—"}
+                                        {kaydi.scrap > 0 && kaydi.wasteReason && (
+                                            <div style={{ fontSize: "11px", color: "var(--danger-text)", marginTop: "2px" }}>
+                                                Fire: {kaydi.wasteReason}
+                                            </div>
+                                        )}
+                                    </td>}
                                     <td style={{ ...tdStyle, textAlign: "center" as const }}>
                                         <Button
                                             variant="dangerSoft"
@@ -808,7 +1036,11 @@ function ProductionPageInner() {
                                                 setConfirmDeleteId(kaydi.id);
                                             }}
                                             disabled={isDemo || deletingId === kaydi.id}
-                                            aria-label={`${kaydi.productName} üretim kaydını sil`}
+                                            aria-label={[
+                                                kaydi.productName,
+                                                `${kaydi.adet} adet`,
+                                                formatProductionTime(kaydi.createdAt),
+                                            ].filter(Boolean).join(" · ") + " üretim kaydını sil"}
                                             title={isDemo ? DEMO_DISABLED_TOOLTIP : "Kaydı sil (stok geri alınır)"}
                                         />
                                     </td>
@@ -848,7 +1080,21 @@ function ProductionPageInner() {
                             </tr>
                         </thead>
                         <tbody>
-                            {otherDateLogs.map(kaydi => (
+                            {digerGunGruplari.map(([gun, kayitlar]) => (
+                            <Fragment key={gun}>
+                                <tr style={{ background: "var(--table-header-bg)" }}>
+                                    <td colSpan={isMobile ? 3 : 4} style={{
+                                        ...tdStyle, fontSize: "11.5px", fontWeight: 600,
+                                        color: "var(--text-secondary)",
+                                    }}>
+                                        {formatProductionDateLabel(gun)}
+                                        <span style={{ fontWeight: 400, color: "var(--text-tertiary)" }}>
+                                            {" · "}{formatNumber(kayitlar.reduce((t, k) => t + k.adet, 0))} adet
+                                            {" · "}{kayitlar.length} kalem
+                                        </span>
+                                    </td>
+                                </tr>
+                                {kayitlar.map(kaydi => (
                                 /* A2: geri alma (reverse_production) YALNIZ seçili günün
                                    listesinde vardı — kullanıcı hatalı kaydı burada görüyor
                                    ama üzerinde hiçbir şey yapamıyordu. Silme butonunu buraya
@@ -879,9 +1125,64 @@ function ProductionPageInner() {
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: "right" as const, color: "var(--success-text)", fontWeight: 500 }}>+{formatNumber(kaydi.adet)}</td>
                                 </tr>
+                                ))}
+                            </Fragment>
                             ))}
                         </tbody>
                     </table>
+                    </div>
+                </div>
+            )}
+
+            {/* KOBİ-sim Y2 — mükerrer üretim kaydı uyarısı.
+                Hasan 6 girdi, doğrusu 8'di, tekrar kaydetti → sistem ÜZERİNE
+                YAZMADI, ikinci satır EKLEDİ (6+8=14, gerçek 8). Ekleme davranışı
+                doğru (üretim bir olaydır, revizyon değil) ama sessizdi; tek
+                düzeltme yolu silmekti ve silme de ayırt edilemiyordu (O1). */}
+            {duplicateWarn && (
+                <div
+                    onClick={() => setDuplicateWarn(null)}
+                    style={{
+                        position: "fixed", inset: 0, zIndex: 200,
+                        background: "rgba(0,0,0,0.45)",
+                        display: "flex", alignItems: "center", justifyContent: "center",
+                        padding: "16px",
+                    }}
+                >
+                    <div
+                        role="dialog"
+                        aria-modal="true"
+                        aria-labelledby="duplicate-production-title"
+                        onClick={e => e.stopPropagation()}
+                        style={{
+                            background: "var(--surface-raised)",
+                            border: "var(--line-width) solid var(--surface-border)",
+                            borderRadius: "8px",
+                            padding: "20px",
+                            maxWidth: "440px", width: "100%",
+                            display: "flex", flexDirection: "column", gap: "12px",
+                            boxShadow: "var(--surface-shadow)",
+                        }}
+                    >
+                        <div id="duplicate-production-title" style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
+                            Bu ürün için bugün zaten kayıt var
+                        </div>
+                        <div style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.55 }}>
+                            <strong>{duplicateWarn.productName}</strong> için {selectedDateLabel} tarihinde
+                            {" "}{duplicateWarn.kalem} kayıt var, toplam <strong>{formatNumber(duplicateWarn.mevcut)} adet</strong>.
+                            <br /><br />
+                            Kaydetmeye devam ederseniz <strong>yeni bir kayıt EKLENİR</strong> — mevcut kayıt
+                            güncellenmez, adetler toplanır. Hatalı bir kaydı düzeltmek istiyorsanız
+                            önce onu silin (aşağıdaki listeden), sonra doğrusunu girin.
+                        </div>
+                        <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "4px" }}>
+                            <Button variant="secondary" onClick={() => setDuplicateWarn(null)}>
+                                Vazgeç
+                            </Button>
+                            <Button onClick={() => void performSave()}>
+                                Yeni kayıt olarak ekle
+                            </Button>
+                        </div>
                     </div>
                 </div>
             )}
@@ -922,6 +1223,12 @@ function ProductionPageInner() {
                             </div>
                             <div style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.5 }}>
                                 <strong>{target.productName}</strong> · +{formatNumber(target.adet)} {target.productSku}
+                                {/* O1: aynı gün aynı üründen birden fazla kayıt olabilir —
+                                    onay penceresi HANGİSİ olduğunu söylemeliydi. */}
+                                {formatProductionTime(target.createdAt) && (
+                                    <> · saat {formatProductionTime(target.createdAt)}</>
+                                )}
+                                {target.scrap > 0 && <> · hurda {formatNumber(target.scrap)}</>}
                                 <br />
                                 Bu kaydı silmek bitmiş ürün stoğunu düşürür ve BOM bileşenlerini geri yükler. Bu işlem geri alınamaz.
                             </div>

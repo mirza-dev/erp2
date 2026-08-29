@@ -9,6 +9,7 @@ import {
 } from "@/lib/supabase/aging";
 import { getCurrentUserPermissions } from "@/lib/auth/role-guard";
 import { handleApiError } from "@/lib/api-error";
+import { localISODate } from "@/lib/stock-utils";
 
 // GET /api/products/aging?type=manufactured|commercial|all
 // Aktif ürünler arasında on_hand > 0 olanlar için eskime raporu döner.
@@ -36,7 +37,14 @@ export async function GET(req: NextRequest) {
             dbGetLastProductionDates(productIds),
         ]);
 
-        const now = Date.now();
+        // KOBİ-sim D5 — bekleme günü negatif olamaz.
+        //
+        // Sibel bugün satılan bir üründe "Bekleme: −1 gün" gördü. Kök: hareket
+        // tarihleri (`created_at` / `received_at`) UTC damgası; `now`'dan
+        // çıkarınca yerel gün henüz dönmemişken negatif fark çıkıyordu — Y6
+        // sınıfının aynısı (UTC vs yerel takvim günü). Fark artık YEREL takvim
+        // günleri üzerinden ve tabanı 0.
+        const bugunMs = new Date(localISODate(Date.now())).getTime();
         const result = products
             .filter(p => {
                 if (type === "manufactured")  return p.product_type === "manufactured";
@@ -56,7 +64,13 @@ export async function GET(req: NextRequest) {
                     : pickMax(incomingDate, saleDate);
 
                 const daysWaiting = lastMovement
-                    ? Math.floor((now - new Date(lastMovement).getTime()) / 86_400_000)
+                    ? Math.max(
+                        0,
+                        Math.floor(
+                            (bugunMs - new Date(localISODate(new Date(lastMovement).getTime())).getTime())
+                            / 86_400_000,
+                        ),
+                    )
                     : null;
 
                 const agingCategory = computeAgingCategoryFinished(daysWaiting);

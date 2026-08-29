@@ -70,9 +70,11 @@ describe("tasarım panelleri render edilir (DashDetailed)", () => {
         expect(PAGE).toMatch(/<AiPanel/);
         expect(PAGE).toMatch(/overview-grid-1-1/);
     });
-    it("PageHeader segment + Rapor indir (dekoratif)", () => {
+    it("PageHeader segment + Raporu yazdır (dekoratif)", () => {
         expect(PAGE).toMatch(/className="seg"/);
-        expect(PAGE).toMatch(/Rapor indir/);
+        // KOBİ-sim O7: etiket "Rapor indir" → "Raporu yazdır / PDF"
+        // (düğme dosya indirmiyor, window.print() açıyor).
+        expect(PAGE).toMatch(/Raporu yazdır \/ PDF/);
         expect(PAGE).toMatch(/window\.print\(\)/);
     });
 });

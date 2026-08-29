@@ -8,8 +8,15 @@ export interface UretimKaydi {
     productName: string;
     productSku: string;
     adet: number;
-    scrap: number;          // fire adedi (production_entries.scrap_qty; çoğu kayıtta 0)
+    scrap: number;          // fire adedi (production_entries.scrap_qty)
+    // KOBİ-sim Y3: fire NEDENİ DB'de vardı (waste_reason) ama frontend tipine
+    // hiç taşınmıyordu → hurda ekranda hiç görünmüyordu.
+    wasteReason?: string;
     tarih: string;          // "YYYY-MM-DD"
+    // KOBİ-sim O1: aynı ürüne aynı gün girilen iki kaydı ayırt etmenin tek
+    // yolu kayıt saati. Silme etiketleri birebir aynıydı (ekran okuyucu,
+    // klavye ve otomasyon için ayırt edilemez).
+    createdAt?: string;
     girenKullanici: string;
     notlar: string;
 }

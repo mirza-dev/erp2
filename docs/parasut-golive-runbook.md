@@ -122,9 +122,17 @@ Mal kabul ve sevk anında zaten best-effort tetik var; CRON'lar **emniyet ağı*
 - **ERP stok otoritesidir.** Paraşüt stoğu gece mutabakatıyla ERP'ye eşitlenir.
   Paraşüt arayüzünden elle yapılan stok düzeltmeleri bir sonraki mutabakatta
   geri alınır — düzeltme ERP'de yapılmalıdır.
-- **Tedarikçi fatura numarası KDV indirimi için zorunludur.** ERP'de mal kabul
-  ekranından girilir. Boş bırakılırsa fatura yine Paraşüt'e gider ama
-  "Alış faturası künyesi eksik" uyarısı açılır → Paraşüt'te tamamlanmalı.
+- **Tedarikçi fatura numarası KDV indirimi için zorunludur.**
+  **Nerede girilir:** Satın Alma Siparişi detayı → *Mal Kabul* → "Tedarikçi
+  Fatura No" + "Fatura Tarihi". Mal kabulde boş bırakıldıysa aynı sayfadaki
+  **Tedarikçi Fatura Künyesi** panelinden sonradan tamamlanabilir (PO
+  tamamlanmış olsa da).
+  *(2026-08-29 simülasyonunda bu ekranın hiç olmadığı bulundu — aynı gün
+  eklendi. Runbook'un önceki hâli "mal kabul ekranından girilir" diyordu ve
+  o cümle o an yanlıştı; artık doğru.)*
+  ⚠️ **migration 107 uygulanmadan** künye kolonları DB'de yoktur: ekran çalışır
+  ama yazım düşer ve kullanıcıya *"tedarikçi fatura künyesi yazılamadı"* uyarısı
+  gösterilir (sessiz kayıp yok). Go-live öncesi **107 APPLY edilmelidir**.
 - **Dövizli faturada kur:** ERP, fatura tarihinin TCMB **döviz alış** kurunu
   gönderir. Kur çözülemezse alan gönderilmez ve Paraşüt kendi kurunu uygular.
 - **İade/düzeltme ERP'de YOK (v1).** Yanlış sevkiyat olursa düzeltme Paraşüt'te

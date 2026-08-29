@@ -1,0 +1,200 @@
+[2026-08-28 22:25:01] OTURUM AÇILDI — Hasan Çelik (Üretim Vardiya Sorumlusu)
+[2026-08-28 22:26:45] OTURUM AÇILDI — Hasan Çelik (Üretim Vardiya Sorumlusu)
+[2026-08-28 22:27:26] OTURUM AÇILDI — Hasan Çelik (Üretim Vardiya Sorumlusu)
+[2026-08-28 22:27:28] > bak 
+[2026-08-28 22:27:29] SAYFA: Roven — AI Destekli ERP ⏎ ADRES: /dashboard ⏎ 
+[2026-08-28 22:27:38] > bak 
+[2026-08-28 22:27:39] SAYFA: Roven — AI Destekli ERP ⏎ ADRES: /dashboard ⏎ 
+[2026-08-28 22:27:39] > git "Teklifler"
+[2026-08-28 22:27:39] ✖ "Teklifler" adında menü girdisi BULAMADIM. ⏎ Ekranda şunlar var: Dashboard · Satış Siparişleri2 · Stok & Ürünler · Üretim Girişi · Uyarılar24 · Ayarlar · Teknik Şablonlar ⏎ 
+[2026-08-28 22:36:30] > bak 
+[2026-08-28 22:36:31] SAYFA: Roven — AI Destekli ERP ⏎ ADRES: /dashboard ⏎ 
+[2026-08-28 22:36:44] > git "Üretim Girişi"
+[2026-08-28 22:36:47] ✔ sol menüden "Üretim Girişi" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:38:07] > sec "Ürün" "TGAV-150-DN150-WCB"
+[2026-08-28 22:38:19] ✖ "TGAV-150-DN150-WCB" adında "Ürün" içinde seçenek BULAMADIM. ⏎ Ekranda şunlar var: Ürün seç... · FIT-ELB90-DN100-20S — 90° Dirsek DN100 Sch40 20# Çelik · TANK-CS-60M3 — Çelik Tank V=60 m³ Yatay Karbon Çelik · CKV-DD-DN150-PN16-WCB — Çift Diskli Çekvalf DN150 PN16 WCB · DGV-800-DN25-A105 — Dövme Gate Valf 800LB DN25 A105 NPT · DGLB-800-DN25-A105 — Dövme Glob Valf 800LB DN25 A105 SW · FIT-TEE-DN200-20S — Eşit Te DN200 Sch40 20# Çelik · FWBV-DN400-PN80-PH — Fully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik · GV-600-DN20-A105-STL — Gate Valve Class 600 DN20 A105 Stellite Trim · INS-GPR-DN100 — Gaz Basınç Regülatörü DN100 Döküm Çelik · SLM-GRF-BANT-25 — Grafit Salmastra Bant 25mm · KST-600-DN20-A105-NPT — Kondenstop Class 600 DN20 A105 NPT · FIT-RED-DN150x100-20S — Konsantrik Redüksiyon DN150×100 20# Çelik · KV-600-DN20-A105-SW — Küresel Vana Class 600 DN20 A105 SW · INS-MNF-3W-SS304 — Manometre Üçyollu Vana SS304 DN15 · FL-PL-DN50-PN10 — PL Flanş DN50 PN10 A105 · CT-PTFE-DN80-PN16 — PTFE Kaplı Conta DN80 PN16 · BE-SC-M24x100-B7 — Saplama M24×100 B7 Karbon Çelik · SWG-150-DN200-SS304 — Spiral Sarımlı Conta Class 150 DN200 SS304 + Flexgrafit · TGAV-150-DN150-WCB — TGAV Gate Vana Class 150 DN150 WCB · FL-WN-150-DN80-S20 — WN Flanş RF Class 150 DN80 S-20 A105 ⏎ 
+[2026-08-28 22:38:24] > sec "Ürün" "TGAV Gate Vana Class 150 DN150 WCB"
+[2026-08-28 22:38:36] ✖ "TGAV Gate Vana Class 150 DN150 WCB" adında "Ürün" içinde seçenek BULAMADIM. ⏎ Ekranda şunlar var: Ürün seç... · FIT-ELB90-DN100-20S — 90° Dirsek DN100 Sch40 20# Çelik · TANK-CS-60M3 — Çelik Tank V=60 m³ Yatay Karbon Çelik · CKV-DD-DN150-PN16-WCB — Çift Diskli Çekvalf DN150 PN16 WCB · DGV-800-DN25-A105 — Dövme Gate Valf 800LB DN25 A105 NPT · DGLB-800-DN25-A105 — Dövme Glob Valf 800LB DN25 A105 SW · FIT-TEE-DN200-20S — Eşit Te DN200 Sch40 20# Çelik · FWBV-DN400-PN80-PH — Fully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik · GV-600-DN20-A105-STL — Gate Valve Class 600 DN20 A105 Stellite Trim · INS-GPR-DN100 — Gaz Basınç Regülatörü DN100 Döküm Çelik · SLM-GRF-BANT-25 — Grafit Salmastra Bant 25mm · KST-600-DN20-A105-NPT — Kondenstop Class 600 DN20 A105 NPT · FIT-RED-DN150x100-20S — Konsantrik Redüksiyon DN150×100 20# Çelik · KV-600-DN20-A105-SW — Küresel Vana Class 600 DN20 A105 SW · INS-MNF-3W-SS304 — Manometre Üçyollu Vana SS304 DN15 · FL-PL-DN50-PN10 — PL Flanş DN50 PN10 A105 · CT-PTFE-DN80-PN16 — PTFE Kaplı Conta DN80 PN16 · BE-SC-M24x100-B7 — Saplama M24×100 B7 Karbon Çelik · SWG-150-DN200-SS304 — Spiral Sarımlı Conta Class 150 DN200 SS304 + Flexgrafit · TGAV-150-DN150-WCB — TGAV Gate Vana Class 150 DN150 WCB · FL-WN-150-DN80-S20 — WN Flanş RF Class 150 DN80 S-20 A105 ⏎ 
+[2026-08-28 22:38:40] > sec "Ürün" "TGAV-150-DN150-WCB — TGAV Gate Vana Class 150 DN150 WCB"
+[2026-08-28 22:38:43] ✔ "Ürün" alanında "TGAV-150-DN150-WCB — TGAV Gate Vana Class 150 DN150 WCB" seçtim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:38:50] > yaz "Adet" "20"
+[2026-08-28 22:38:53] ✔ "Adet" alanına "20" yazdım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:38:58] > yaz "Not" "1 adet hurdaya çıktı"
+[2026-08-28 22:39:01] ✔ "Not" alanına "1 adet hurdaya çıktı" yazdım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:39:15] > yaz "Not" "SIM 1 adet hurdaya çıktı"
+[2026-08-28 22:39:18] ✔ "Not" alanına "SIM 1 adet hurdaya çıktı" yazdım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:39:21] > tikla "Kaydet & Stoğu Güncelle"
+[2026-08-28 22:39:23] ✔ "Kaydet & Stoğu Güncelle" düğmesine bastım ⏎ ⚑ ÇIKAN BİLDİRİM: ✓1 kalem, 20 adet üretim kaydedildi — stok güncellendi× ⏎ 
+[2026-08-28 22:39:40] > git "Stok & Ürünler"
+[2026-08-28 22:39:43] ✔ sol menüden "Stok & Ürünler" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:40:32] > tikla "Riskli"
+[2026-08-28 22:40:35] ✔ "Riskli" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:41:47] > git "Dashboard"
+[2026-08-28 22:41:50] ✔ sol menüden "Dashboard" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:41:57] > tikla "Rapor indir"
+[2026-08-28 22:42:00] ✔ "Rapor indir" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:42:31] > tikla "Ay"
+[2026-08-28 22:42:34] ✔ "Ay" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:42:43] > git "Üretim Girişi"
+[2026-08-28 22:42:46] ✔ sol menüden "Üretim Girişi" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:55:41] OTURUM AÇILDI — Hasan Çelik (Üretim Vardiya Sorumlusu)
+[2026-08-28 22:57:48] > bak 
+[2026-08-28 22:57:49] SAYFA: Roven — AI Destekli ERP ⏎ ADRES: /dashboard ⏎ 
+[2026-08-28 22:57:56] > git "Üretim Girişi"
+[2026-08-28 22:57:59] ✔ sol menüden "Üretim Girişi" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:58:06] > sec "1. satır ürün" "FWBV-DN400-PN80-PH"
+[2026-08-28 22:58:18] ✖ "FWBV-DN400-PN80-PH" adında "1. satır ürün" içinde seçenek BULAMADIM. ⏎ Ekranda şunlar var: Ürün seç... · FIT-ELB90-DN100-20S — 90° Dirsek DN100 Sch40 20# Çelik · TANK-CS-60M3 — Çelik Tank V=60 m³ Yatay Karbon Çelik · CKV-DD-DN150-PN16-WCB — Çift Diskli Çekvalf DN150 PN16 WCB · DGV-800-DN25-A105 — Dövme Gate Valf 800LB DN25 A105 NPT · DGLB-800-DN25-A105 — Dövme Glob Valf 800LB DN25 A105 SW · FIT-TEE-DN200-20S — Eşit Te DN200 Sch40 20# Çelik · FWBV-DN400-PN80-PH — Fully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik · GV-600-DN20-A105-STL — Gate Valve Class 600 DN20 A105 Stellite Trim · INS-GPR-DN100 — Gaz Basınç Regülatörü DN100 Döküm Çelik · SLM-GRF-BANT-25 — Grafit Salmastra Bant 25mm · KST-600-DN20-A105-NPT — Kondenstop Class 600 DN20 A105 NPT · FIT-RED-DN150x100-20S — Konsantrik Redüksiyon DN150×100 20# Çelik · KV-600-DN20-A105-SW — Küresel Vana Class 600 DN20 A105 SW · INS-MNF-3W-SS304 — Manometre Üçyollu Vana SS304 DN15 · FL-PL-DN50-PN10 — PL Flanş DN50 PN10 A105 · CT-PTFE-DN80-PN16 — PTFE Kaplı Conta DN80 PN16 · BE-SC-M24x100-B7 — Saplama M24×100 B7 Karbon Çelik · SIM-TGAV-300-DN200-WCB — SIM TGAV Gate Vana Class 300 DN200 WCB · SWG-150-DN200-SS304 — Spiral Sarımlı Conta Class 150 DN200 SS304 + Flexgrafit · TGAV-150-DN150-WCB — TGAV Gate Vana Class 150 DN150 WCB · FL-WN-150-DN80-S20 — WN Flanş RF Class 150 DN80 S-20 A105 ⏎ 
+[2026-08-28 22:58:24] > sec "1. satır ürün" "FWBV-DN400-PN80-PH — Fully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik"
+[2026-08-28 22:58:27] ✔ "1. satır ürün" alanında "FWBV-DN400-PN80-PH — Fully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik" seçtim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:58:32] > yaz "1. satır adet" "6"
+[2026-08-28 22:58:35] ✔ "1. satır adet" alanına "6" yazdım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:58:42] > tikla "Kaydet & Stoğu Güncelle"
+[2026-08-28 22:58:44] ✔ "Kaydet & Stoğu Güncelle" düğmesine bastım ⏎ ⚑ ÇIKAN BİLDİRİM: ✓1 kalem, 6 adet üretim kaydedildi — stok güncellendi× ⏎ 
+[2026-08-28 22:59:00] > satir "FWBV-DN400-PN80-PH"
+[2026-08-28 22:59:03] ✔ "FWBV-DN400-PN80-PH" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:59:42] > ekran 
+[2026-08-28 22:59:42] 📷 Ekran görüntüsü alındı: /Users/mirzasaribiyik/Projects/erp2/docs/sim/ekran/hasan-1787957982809.png
+[2026-08-28 23:00:03] > tikla "Fully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik üretim kaydını sil"
+[2026-08-28 23:00:04] ✔ "Fully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik üretim kaydını sil" düğmesine bastım ⏎ ⚑ ÇIKAN BİLDİRİM: Üretim kaydını silFully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik · +6 FWBV-DN400-PN80-PHBu kaydı silmek bitmiş ürün stoğunu düşürür ve BOM bileşenlerini geri yükler. Bu işlem geri alınamaz.VazgeçEvet, sil (stok geri alınır) ⏎ 
+[2026-08-28 23:00:11] > tikla "Evet, sil (stok geri alınır)"
+[2026-08-28 23:00:11] ✔ "Evet, sil (stok geri alınır)" düğmesine bastım ⏎ ⚑ ÇIKAN BİLDİRİM: Üretim kaydını silFully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik · +6 FWBV-DN400-PN80-PHBu kaydı silmek bitmiş ürün stoğunu düşürür ve BOM bileşenlerini geri yükler. Bu işlem geri alınamaz.VazgeçSiliniyor... ⏎ 
+[2026-08-28 23:00:16] > bekle "5"
+[2026-08-28 23:00:21] ✔ 5 saniye bekledim ⏎ ⚑ ÇIKAN BİLDİRİM: Üretim kaydını silFully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik · +6 FWBV-DN400-PN80-PHBu kaydı silmek bitmiş ürün stoğunu düşürür ve BOM bileşenlerini geri yükler. Bu işlem geri alınamaz.VazgeçEvet, sil (stok geri alınır) ⏎ 
+[2026-08-28 23:00:38] > tikla "Evet, sil (stok geri alınır)"
+[2026-08-28 23:00:39] ✔ "Evet, sil (stok geri alınır)" düğmesine bastım ⏎ ⚑ ÇIKAN BİLDİRİM: Üretim kaydını silFully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik · +6 FWBV-DN400-PN80-PHBu kaydı silmek bitmiş ürün stoğunu düşürür ve BOM bileşenlerini geri yükler. Bu işlem geri alınamaz.VazgeçSiliniyor... ⏎ 
+[2026-08-28 23:00:44] > bekle "10"
+[2026-08-28 23:00:54] ✔ 10 saniye bekledim ⏎ ⚑ ÇIKAN BİLDİRİM: Üretim kaydını silFully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik · +6 FWBV-DN400-PN80-PHBu kaydı silmek bitmiş ürün stoğunu düşürür ve BOM bileşenlerini geri yükler. Bu işlem geri alınamaz.VazgeçEvet, sil (stok geri alınır) ⏎ 
+[2026-08-28 23:01:15] > tikla "Vazgeç"
+[2026-08-28 23:01:17] ✔ "Vazgeç" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:01:25] > sec "1. satır ürün" "FWBV-DN400-PN80-PH — Fully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik"
+[2026-08-28 23:01:28] ✔ "1. satır ürün" alanında "FWBV-DN400-PN80-PH — Fully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik" seçtim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:01:36] > yaz "1. satır adet" "8"
+[2026-08-28 23:01:39] ✔ "1. satır adet" alanına "8" yazdım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:01:53] > tikla "Kaydet & Stoğu Güncelle"
+[2026-08-28 23:01:55] ✔ "Kaydet & Stoğu Güncelle" düğmesine bastım ⏎ ⚑ ÇIKAN BİLDİRİM: ✓1 kalem, 8 adet üretim kaydedildi — stok güncellendi× ⏎ 
+[2026-08-28 23:02:41] > git "Stok & Ürünler"
+[2026-08-28 23:02:44] ✔ sol menüden "Stok & Ürünler" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:05:10] > bak 
+[2026-08-28 23:05:11] SAYFA: Roven — AI Destekli ERP ⏎ ADRES: /dashboard/products ⏎ 
+[2026-08-29 06:02:54] OTURUM AÇILDI — Hasan Çelik (Üretim Vardiya Sorumlusu)
+[2026-08-29 06:04:29] OTURUM AÇILDI — Hasan Çelik (Üretim Vardiya Sorumlusu)
+[2026-08-29 06:07:30] > bak 
+[2026-08-29 06:07:31] SAYFA: Roven — AI Destekli ERP ⏎ ADRES: /dashboard ⏎ 
+[2026-08-29 06:07:51] > git "Üretim Girişi"
+[2026-08-29 06:07:54] ✔ sol menüden "Üretim Girişi" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:08:20] > satir "FWBV-DN400"
+[2026-08-29 06:08:23] ✔ "FWBV-DN400" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:08:40] > tikla "Fully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik üretim kaydını sil"
+[2026-08-29 06:08:41] ✔ "Fully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik üretim kaydını sil" düğmesine bastım ⏎ ⚑ ÇIKAN BİLDİRİM: Üretim kaydını silFully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik · +8 FWBV-DN400-PN80-PHBu kaydı silmek bitmiş ürün stoğunu düşürür ve BOM bileşenlerini geri yükler. Bu işlem geri alınamaz.VazgeçEvet, sil (stok geri alınır) ⏎ 
+[2026-08-29 06:08:48] > tikla "Vazgeç"
+[2026-08-29 06:08:50] ✔ "Vazgeç" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:08:58] > satir "+6"
+[2026-08-29 06:09:01] ✔ "+6" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:09:45] > tikla "Fully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik üretim kaydını sil"
+[2026-08-29 06:09:45] ✔ "Fully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik üretim kaydını sil" düğmesine bastım ⏎ ⚑ ÇIKAN BİLDİRİM: Üretim kaydını silFully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik · +8 FWBV-DN400-PN80-PHBu kaydı silmek bitmiş ürün stoğunu düşürür ve BOM bileşenlerini geri yükler. Bu işlem geri alınamaz.VazgeçEvet, sil (stok geri alınır) ⏎ 
+[2026-08-29 06:10:20] > tikla "Vazgeç"
+[2026-08-29 06:10:22] ✔ "Vazgeç" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:10:33] > sec "1. satır ürün" "CKV-DD-DN150-PN16-WCB"
+[2026-08-29 06:10:45] ✖ "CKV-DD-DN150-PN16-WCB" adında "1. satır ürün" içinde seçenek BULAMADIM. ⏎ Ekranda şunlar var: Ürün seç... · FIT-ELB90-DN100-20S — 90° Dirsek DN100 Sch40 20# Çelik · TANK-CS-60M3 — Çelik Tank V=60 m³ Yatay Karbon Çelik · CKV-DD-DN150-PN16-WCB — Çift Diskli Çekvalf DN150 PN16 WCB · DGV-800-DN25-A105 — Dövme Gate Valf 800LB DN25 A105 NPT · DGLB-800-DN25-A105 — Dövme Glob Valf 800LB DN25 A105 SW · FIT-TEE-DN200-20S — Eşit Te DN200 Sch40 20# Çelik · FWBV-DN400-PN80-PH — Fully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik · GV-600-DN20-A105-STL — Gate Valve Class 600 DN20 A105 Stellite Trim · INS-GPR-DN100 — Gaz Basınç Regülatörü DN100 Döküm Çelik · SLM-GRF-BANT-25 — Grafit Salmastra Bant 25mm · KST-600-DN20-A105-NPT — Kondenstop Class 600 DN20 A105 NPT · FIT-RED-DN150x100-20S — Konsantrik Redüksiyon DN150×100 20# Çelik · KV-600-DN20-A105-SW — Küresel Vana Class 600 DN20 A105 SW · INS-MNF-3W-SS304 — Manometre Üçyollu Vana SS304 DN15 · FL-PL-DN50-PN10 — PL Flanş DN50 PN10 A105 · CT-PTFE-DN80-PN16 — PTFE Kaplı Conta DN80 PN16 · BE-SC-M24x100-B7 — Saplama M24×100 B7 Karbon Çelik · SIM-TGAV-300-DN200-WCB — SIM TGAV Gate Vana Class 300 DN200 WCB · SWG-150-DN200-SS304 — Spiral Sarımlı Conta Class 150 DN200 SS304 + Flexgrafit · TGAV-150-DN150-WCB — TGAV Gate Vana Class 150 DN150 WCB · FL-WN-150-DN80-S20 — WN Flanş RF Class 150 DN80 S-20 A105 ⏎ 
+[2026-08-29 06:10:51] > sec "1. satır ürün" "CKV-DD-DN150-PN16-WCB — Çift Diskli Çekvalf DN150 PN16 WCB"
+[2026-08-29 06:10:53] ✔ "1. satır ürün" alanında "CKV-DD-DN150-PN16-WCB — Çift Diskli Çekvalf DN150 PN16 WCB" seçtim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:10:59] > yaz "1. satır adet" "12"
+[2026-08-29 06:11:02] ✔ "1. satır adet" alanına "12" yazdım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:11:07] > tikla "Kaydet & Stoğu Güncelle"
+[2026-08-29 06:11:09] ✔ "Kaydet & Stoğu Güncelle" düğmesine bastım ⏎ ⚑ ÇIKAN BİLDİRİM: ✓1 kalem, 12 adet üretim kaydedildi — stok güncellendi× ⏎ 
+[2026-08-29 06:11:14] > git "Uyarılar"
+[2026-08-29 06:11:17] ✔ sol menüden "Uyarılar" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:12:08] > tikla "Stok"
+[2026-08-29 06:12:10] ✔ "Stok" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:13:03] > tikla "Tümü"
+[2026-08-29 06:13:05] ✔ "Tümü" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:13:40] > tikla "Çift Diskli Çekvalf DN150 PN16 WCB"
+[2026-08-29 06:13:41] ✔ "Çift Diskli Çekvalf DN150 PN16 WCB" düğmesine bastım ⏎ ⚑ ÇIKAN BİLDİRİM: 1 Ağustos1 uyarı · 0 not◷ HdfÇift Diskli Çekvalf DN150 PN16 WCB ⏎ 
+[2026-08-29 06:14:04] > tikla "TGAV Gate Vana Class 150 DN150 WCB"
+[2026-08-29 06:14:05] ✔ "TGAV Gate Vana Class 150 DN150 WCB" düğmesine bastım ⏎ ⚑ ÇIKAN BİLDİRİM: 21 Ağustos1 uyarı · 0 not◷ HdfTGAV Gate Vana Class 150 DN150 WCB ⏎ 
+[2026-08-29 06:14:23] > tikla "Bugün"
+[2026-08-29 06:14:26] ✔ "Bugün" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:22:32] > bak 
+[2026-08-29 06:22:32] SAYFA: Roven — AI Destekli ERP ⏎ ADRES: /dashboard/alerts ⏎ 
+[2026-08-29 06:22:39] > git "Satış Siparişleri"
+[2026-08-29 06:22:42] ✔ sol menüden "Satış Siparişleri" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:22:46] > satir "ORD-2026-0030"
+[2026-08-29 06:22:49] ✔ "ORD-2026-0030" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:22:55] > tikla "Sevket"
+[2026-08-29 06:22:57] ✔ "Sevket" düğmesine bastım ⏎ ⚑ ÇIKAN BİLDİRİM: ✗Sipariş müşterisiz sevk edilemez.× ⏎ 
+[2026-08-29 06:23:02] > tikla "Sevket"
+[2026-08-29 06:23:04] ✔ "Sevket" düğmesine bastım ⏎ ⚑ ÇIKAN BİLDİRİM: ✗Sipariş müşterisiz sevk edilemez.× ⏎ 
+[2026-08-29 06:23:10] > geri 
+[2026-08-29 06:23:13] ✔ bir önceki sayfaya döndüm ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:23:17] > satir "ORD-2026-0030"
+[2026-08-29 06:23:20] ✔ "ORD-2026-0030" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:23:23] > tikla "Sevket"
+[2026-08-29 06:23:25] ✔ "Sevket" düğmesine bastım ⏎ ⚑ ÇIKAN BİLDİRİM: ✗Sipariş müşterisiz sevk edilemez.× ⏎ 
+[2026-08-29 06:23:39] > git "Stok & Ürünler"
+[2026-08-29 06:23:42] ✔ sol menüden "Stok & Ürünler" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:23:56] > satir "TGAV-150-DN150-WCB"
+[2026-08-29 06:23:59] ✔ "TGAV-150-DN150-WCB" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:24:03] > tikla "Stok"
+[2026-08-29 06:24:06] ✔ "Stok" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:24:23] > git "Üretim Girişi"
+[2026-08-29 06:24:26] ✔ sol menüden "Üretim Girişi" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:24:34] > sec "1. satır ürün" "TGAV-150-DN150-WCB"
+[2026-08-29 06:24:46] ✖ "TGAV-150-DN150-WCB" adında "1. satır ürün" içinde seçenek BULAMADIM. ⏎ Ekranda şunlar var: Ürün seç... · FIT-ELB90-DN100-20S — 90° Dirsek DN100 Sch40 20# Çelik · TANK-CS-60M3 — Çelik Tank V=60 m³ Yatay Karbon Çelik · CKV-DD-DN150-PN16-WCB — Çift Diskli Çekvalf DN150 PN16 WCB · DGV-800-DN25-A105 — Dövme Gate Valf 800LB DN25 A105 NPT · DGLB-800-DN25-A105 — Dövme Glob Valf 800LB DN25 A105 SW · FIT-TEE-DN200-20S — Eşit Te DN200 Sch40 20# Çelik · FWBV-DN400-PN80-PH — Fully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik · GV-600-DN20-A105-STL — Gate Valve Class 600 DN20 A105 Stellite Trim · INS-GPR-DN100 — Gaz Basınç Regülatörü DN100 Döküm Çelik · SLM-GRF-BANT-25 — Grafit Salmastra Bant 25mm · KST-600-DN20-A105-NPT — Kondenstop Class 600 DN20 A105 NPT · FIT-RED-DN150x100-20S — Konsantrik Redüksiyon DN150×100 20# Çelik · KV-600-DN20-A105-SW — Küresel Vana Class 600 DN20 A105 SW · INS-MNF-3W-SS304 — Manometre Üçyollu Vana SS304 DN15 · FL-PL-DN50-PN10 — PL Flanş DN50 PN10 A105 · CT-PTFE-DN80-PN16 — PTFE Kaplı Conta DN80 PN16 · BE-SC-M24x100-B7 — Saplama M24×100 B7 Karbon Çelik · SIM-TGAV-300-DN200-WCB — SIM TGAV Gate Vana Class 300 DN200 WCB · SWG-150-DN200-SS304 — Spiral Sarımlı Conta Class 150 DN200 SS304 + Flexgrafit · TGAV-150-DN150-WCB — TGAV Gate Vana Class 150 DN150 WCB · FL-WN-150-DN80-S20 — WN Flanş RF Class 150 DN80 S-20 A105 ⏎ 
+[2026-08-29 06:24:50] > sec "1. satır ürün" "TGAV-150-DN150-WCB — TGAV Gate Vana Class 150 DN150 WCB"
+[2026-08-29 06:24:53] ✔ "1. satır ürün" alanında "TGAV-150-DN150-WCB — TGAV Gate Vana Class 150 DN150 WCB" seçtim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:24:58] > yaz "1. satır adet" "10"
+[2026-08-29 06:25:01] ✔ "1. satır adet" alanına "10" yazdım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:25:05] > tikla "Kaydet & Stoğu Güncelle"
+[2026-08-29 06:25:08] ✔ "Kaydet & Stoğu Güncelle" düğmesine bastım ⏎ ⚑ ÇIKAN BİLDİRİM: ✓1 kalem, 10 adet üretim kaydedildi — stok güncellendi× ⏎ 
+[2026-08-29 06:30:25] > bak 
+[2026-08-29 06:30:26] SAYFA: Roven — AI Destekli ERP ⏎ ADRES: /dashboard/production ⏎ 
+[2026-08-29 06:31:07] > yaz "Kayıt Tarihi" "2026-08-24"
+[2026-08-29 06:31:10] ✔ "Kayıt Tarihi" alanına "2026-08-24" yazdım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:31:25] > tikla "Bugüne Dön"
+[2026-08-29 06:31:28] ✔ "Bugüne Dön" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:31:54] > git "Stok & Ürünler"
+[2026-08-29 06:31:57] ✔ sol menüden "Stok & Ürünler" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:32:02] > satir "TGAV-150-DN150-WCB"
+[2026-08-29 06:32:05] ✔ "TGAV-150-DN150-WCB" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:32:12] > tikla "Stok"
+[2026-08-29 06:32:15] ✔ "Stok" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:32:20] > tikla "Düzenle"
+[2026-08-29 06:32:23] ✔ "Düzenle" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:32:30] > tikla "İptal"
+[2026-08-29 06:32:33] ✔ "İptal" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:32:37] > tikla "Tedarik"
+[2026-08-29 06:32:39] ✔ "Tedarik" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:32:43] > tikla "Ticari"
+[2026-08-29 06:32:45] ✔ "Ticari" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:32:51] > tikla "Ekler"
+[2026-08-29 06:32:54] ✔ "Ekler" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:33:07] > geri 
+[2026-08-29 06:33:10] ✔ bir önceki sayfaya döndüm ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:33:14] > tikla "TGAV Gate Vana Class 150 DN150 WCB seç"
+[2026-08-29 06:33:14] ✖ "TGAV Gate Vana Class 150 DN150 WCB seç" adında düğme/bağlantı BULAMADIM. ⏎ Ekranda şunlar var: Roven · Temayı değiştir · SH · Dashboard · Satış Siparişleri2 · Stok & Ürünler · Üretim Girişi · Uyarılar24 · Ayarlar · Teknik Şablonlar · Çıkış Yap · Yenile · Eskime Raporu · Kategori · İmalat · Ticari · Tümü (21) · Riskli (2) · Uyarı var (7) · Öneri bekliyor (2) ⏎ 
+[2026-08-29 06:33:18] > sec "TGAV Gate Vana Class 150 DN150 WCB seç" "işaretli"
+[2026-08-29 06:33:18] ✖ "işaretli" adında "TGAV Gate Vana Class 150 DN150 WCB seç" içinde seçenek BULAMADIM. ⏎ Ekranda hiç "TGAV Gate Vana Class 150 DN150 WCB seç" içinde seçenek görünmüyor. ⏎ 
+[2026-08-29 06:33:32] > git "Ayarlar"
+[2026-08-29 06:33:35] ✔ sol menüden "Ayarlar" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:33:41] > git "Dashboard"
+[2026-08-29 06:33:44] ✔ sol menüden "Dashboard" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:34:20] > git "Uyarılar"
+[2026-08-29 06:34:23] ✔ sol menüden "Uyarılar" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:34:30] > git "Üretim Girişi"
+[2026-08-29 06:34:33] ✔ sol menüden "Üretim Girişi" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:34:38] > sec "1. satır ürün" "TGAV-150-DN150-WCB — TGAV Gate Vana Class 150 DN150 WCB"
+[2026-08-29 06:34:41] ✔ "1. satır ürün" alanında "TGAV-150-DN150-WCB — TGAV Gate Vana Class 150 DN150 WCB" seçtim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:34:45] > yaz "1. satır adet" "-2"
+[2026-08-29 06:34:48] ✔ "1. satır adet" alanına "-2" yazdım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:35:04] > tikla "Kaydet & Stoğu Güncelle"
+[2026-08-29 06:35:04] ✖ "Kaydet & Stoğu Güncelle" düğmesi ekranda var ama PASİF (tıklanamıyor). ⏎  ⏎ (Bu bir bulgu olabilir: neden pasif olduğu ekranda yazmıyorsa kullanıcı anlamaz.)
+[2026-08-29 06:35:10] > yaz "1. satır adet" "2"
+[2026-08-29 06:35:13] ✔ "1. satır adet" alanına "2" yazdım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:35:20] > tikla "×"
+[2026-08-29 06:35:20] ✖ "×" adında düğme/bağlantı BULAMADIM. ⏎ Ekranda şunlar var: Roven · Temayı değiştir · SH · Dashboard · Satış Siparişleri2 · Stok & Ürünler · Üretim Girişi · Uyarılar24 · Ayarlar · Teknik Şablonlar · Çıkış Yap · Sesli Giriş · × · + Kalem Ekle · Kaydet & Stoğu Güncelle · TGAV Gate Vana Class 150 DN150 WCB üretim kaydını sil · Fully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik üretim kaydını sil · Çift Diskli Çekvalf DN150 PN16 WCB üretim kaydını sil ⏎ 
+[2026-08-29 06:35:45] > git "Stok & Ürünler"
+[2026-08-29 06:35:48] ✔ sol menüden "Stok & Ürünler" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:36:08] > yaz "TGAV Gate Vana Class 150 DN150 WCB seç" "evet"
+[2026-08-29 06:36:11] ✔ "TGAV Gate Vana Class 150 DN150 WCB seç" alanına "evet" yazdım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:36:17] > tikla "Seçimi Temizle"
+[2026-08-29 06:36:19] ✔ "Seçimi Temizle" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 

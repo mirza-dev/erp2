@@ -66,6 +66,8 @@ const stubQuote = (over: Record<string, unknown> = {}) => ({
     status: "sent",
     customer_name: "Tüpraş",
     customer_address: "Test Mah. No:1, İstanbul",
+    // KOBİ-sim K1 (2026-08-29): send artık cari bağı istiyor (validateQuoteForSend).
+    customer_id: "cust-test-uuid",
     currency: "USD",
     grand_total: 5400,
     quote_date: "2026-05-30",

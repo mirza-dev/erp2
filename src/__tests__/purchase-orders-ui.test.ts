@@ -112,12 +112,17 @@ describe("Faz 4 follow-up — computeExpectedDate (vendor lead_time auto-fill)",
 
 describe("Faz 4 follow-up — detail page UI gap'leri kapandı", () => {
     let detailSrc = "";
+    let uiSrc = "";
 
     beforeAll(async () => {
         const fs = await import("fs/promises");
         const path = await import("path");
         detailSrc = await fs.readFile(
             path.resolve(process.cwd(), "src/app/dashboard/purchase/orders/[id]/page.tsx"),
+            "utf-8",
+        );
+        uiSrc = await fs.readFile(
+            path.resolve(process.cwd(), "src/lib/purchase-order-ui.ts"),
             "utf-8",
         );
     });
@@ -130,10 +135,15 @@ describe("Faz 4 follow-up — detail page UI gap'leri kapandı", () => {
     it("P2.3 — Audit timeline render block mevcut (aria-label: Sipariş aktivite geçmişi)", () => {
         expect(detailSrc).toContain('aria-label="Sipariş aktivite geçmişi"');
         expect(detailSrc).toContain("auditEntries.length > 0");
-        // ACTION_LABELS map: tüm PO event türleri kapsanır
-        expect(detailSrc).toContain("po_created:");
-        expect(detailSrc).toContain("po_revised:");
-        expect(detailSrc).toContain("po_cancelled:");
+        // KOBİ-sim D4: etiket sözlüğü sayfadan `purchase-order-ui.ts`'e taşındı.
+        // Sebep: sayfadaki harita `po_received` diyordu ama RPC `po_fully_received`
+        // yazıyor (051) → eşleşmeyen kod kullanıcıya HAM basılıyordu. Tek kaynak
+        // olunca migration ile sayfa bir daha ayrışamaz.
+        expect(detailSrc).toContain("poActionLabel(e.action)");
+        expect(uiSrc).toContain("po_created:");
+        expect(uiSrc).toContain("po_revised:");
+        expect(uiSrc).toContain("po_cancelled:");
+        expect(uiSrc).toContain("po_fully_received:");
     });
 
     it("P3.3 — Cancel handler 403'te tek toast (eski çift-toast pattern kaldırıldı)", () => {

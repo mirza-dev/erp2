@@ -125,15 +125,29 @@ describe("serviceCheckOverduePurchaseOrders", () => {
 });
 
 describe("scan route entegrasyonu (source-lock)", () => {
-    const SOURCE = readFileSync(join(process.cwd(), "src/app/api/alerts/scan/route.ts"), "utf8");
+    // KOBİ-sim Y5: kompozisyon route'tan `alert-scan-runner`'a taşındı; mal
+    // kabul yolu da aynı koşucuyu çağırıyor (eskiden kendi sunucusuna göreli
+    // URL ile HTTP atıp sessizce başarısız oluyordu → tarama hiç koşmuyordu).
+    const SOURCE = readFileSync(join(process.cwd(), "src/lib/services/alert-scan-runner.ts"), "utf8");
+    const ROUTE  = readFileSync(join(process.cwd(), "src/app/api/alerts/scan/route.ts"), "utf8");
 
-    it("scan route PO taramasını stok taramasıyla birlikte çağırır", () => {
+    it("tarama koşucusu PO taramasını stok taramasıyla birlikte çağırır", () => {
         expect(SOURCE).toMatch(/serviceCheckOverduePurchaseOrders/);
     });
 
     it("PO taraması non-fatal: kendi try/catch'i var (stok sonuçları yine döner)", () => {
         expect(SOURCE).toMatch(/poOverdue = await serviceCheckOverduePurchaseOrders\(\)/);
         expect(SOURCE).toMatch(/catch \(poErr\)/);
+    });
+
+    it("route koşucuya delege eder (lock tek yerde)", () => {
+        expect(ROUTE).toMatch(/serviceRunAlertScan\(force\)/);
+        expect(ROUTE).not.toMatch(/try_acquire_scan_lock/);
+    });
+
+    it("mal kabul yolu HTTP değil doğrudan koşucuyu çağırır", () => {
+        const po = readFileSync(join(process.cwd(), "src/lib/services/purchase-order-service.ts"), "utf8");
+        expect(po).toMatch(/await serviceRunAlertScan\(\)/);
     });
 });
 

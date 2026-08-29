@@ -61,14 +61,35 @@ export function validateQuoteLineQuantities(lines: QuoteLineForValidation[]): st
 }
 
 /**
- * V4-A2 + V4-A4 — send-time hard check. Sent'e geçmeden önce müşteri adresi
- * zorunlu (resmi PDF) ve her gerçek kalem bir ürüne bağlı olmalı (manuel/custom
- * satır izinsiz). Hata mesajı | null döner.
+ * KOBİ-sim K1 — teklif GÖNDERİLMEDEN önce müşteri bir cari kaydına bağlı olmalı.
+ *
+ * Neden burada: `sent` geçişi 088 RPC'siyle bağlı bir `pending_approval` sipariş
+ * yaratıp **stoğu rezerve eder**. Cari bağı yoksa o sipariş sonradan asla sevk
+ * edilemez — `preflightShipment` (`order-service.ts`) `customer_id` boşsa sevki
+ * reddeder — ve ortaya "stoğu tutan, asla sevk edilemeyen sipariş" çıkar.
+ * Kontrolü sevk anından gönderim anına çekmek zinciri **rezervasyondan önce**
+ * kırar; ayrıca cari kaydı olmayan satış muhasebede de görünmez (Y6).
+ *
+ * Taslak kaydetmeyi ENGELLEMEZ: satışçı serbest metinle çalışmaya devam eder,
+ * yalnız gönderim cari ister (form inline "yeni cari oluştur" sunar).
+ */
+export const QUOTE_SEND_CUSTOMER_REQUIRED =
+    "Teklif gönderilmeden önce müşteri bir cari kaydına bağlanmalı — " +
+    "listeden seçin ya da \"Yeni cari oluştur\" ile ekleyin.";
+
+/**
+ * V4-A2 + V4-A4 — send-time hard check. Sent'e geçmeden önce müşteri cariye
+ * bağlı (K1), müşteri adresi zorunlu (resmi PDF) ve her gerçek kalem bir ürüne
+ * bağlı olmalı (manuel/custom satır izinsiz). Hata mesajı | null döner.
  */
 export function validateQuoteForSend(quote: {
+    customer_id?: string | null;
     customer_address?: string | null;
     lines: QuoteLineForValidation[];
 }): string | null {
+    if (!quote.customer_id || !String(quote.customer_id).trim()) {
+        return QUOTE_SEND_CUSTOMER_REQUIRED;
+    }
     if (!quote.customer_address || !quote.customer_address.trim()) {
         return "Teklifi göndermeden önce müşteri adresi girilmeli.";
     }

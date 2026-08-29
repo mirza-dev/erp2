@@ -50,6 +50,8 @@ import { serviceTransitionQuote, serviceExpireQuotes, serviceCreateQuoteRevision
 const stubQuote = (over: Record<string, unknown> = {}) => ({
     id: QID, quote_number: "TKL-2026-001", status: "draft",
     customer_name: "Acme", customer_address: "Adres", currency: "USD",
+    // KOBİ-sim K1 (2026-08-29): send artık cari bağı istiyor (validateQuoteForSend).
+    customer_id: "cust-test-uuid",
     grand_total: 100, quote_date: "2026-06-01", valid_until: "2026-12-31",
     created_at: "2026-06-01T10:00:00Z", revision_no: 1, vat_rate: 20,
     subtotal: 100, vat_total: 20, discount_amount: 0, lines: [],

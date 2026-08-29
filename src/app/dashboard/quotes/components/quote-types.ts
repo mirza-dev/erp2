@@ -79,4 +79,14 @@ export interface QuoteData {
 
     // Meta
     status: "draft" | "sent" | "accepted" | "rejected" | "expired";
+    /**
+     * KOBİ-sim D2 — kaydedilmiş teklifin id'si (varsa).
+     *
+     * Önizleme ekranındaki "Formu Düzenle" koşulsuz `/quotes/new`'e gidiyordu;
+     * mevcut teklif açıkken bile BOŞ bir yeni teklif formu açılıyordu ("dikkatsizce
+     * Kaydet denirse yanlışlıkla boş/mükerrer teklif oluşabilir"). Önizleme
+     * verisi localStorage'dan okunduğu için id'yi de taşıması gerekiyor.
+     * Kaydedilmemiş taslakta undefined kalır → davranış eskisi gibi.
+     */
+    quoteId?: string | null;
 }

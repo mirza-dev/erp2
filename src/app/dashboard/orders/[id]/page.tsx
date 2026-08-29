@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { ArrowLeft, CircleOff, FileText, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { formatCurrency, maskCurrency, formatDate } from "@/lib/utils";
-import { useOrderMutations, type ShortageItem, type CommercialStatus, type FulfillmentStatus } from "@/lib/data-context";
+import { useCustomers, useOrderMutations, type ShortageItem, type CommercialStatus, type FulfillmentStatus } from "@/lib/data-context";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import { mapOrderDetail } from "@/lib/api-mappers";
 import { localISODate } from "@/lib/stock-utils";
@@ -93,12 +93,29 @@ export default function OrderDetailPage() {
     const { canViewSalesPrices, has } = usePermissions();
     const [order, setOrder] = useState<OrderDetail | null>(null);
     const [orderLoading, setOrderLoading] = useState(true);
+    // KOBİ-sim Y1: "bulunamadı" ile "yüklenemedi" ayrı durumlar.
+    const [loadFailed, setLoadFailed] = useState(false);
+    const [reloadTick, setReloadTick] = useState(0);
+    // KOBİ-sim K1 onarım yolu — cari bağı olmayan siparişi cariye bağlama.
+    const { customers } = useCustomers();
+    const [linkCustomerOpen, setLinkCustomerOpen] = useState(false);
+    const [linkCustomerId, setLinkCustomerId] = useState("");
+    const [linkingCustomer, setLinkingCustomer] = useState(false);
 
     // Fetch order from API on mount
+    /**
+     * KOBİ-sim Y1 — iptal edilen istek "kayıt bulunamadı" göstermemeli.
+     *
+     * Buradaki kusur daha sinsiydi: `catch` içinde `if (…AbortError) return;`
+     * koruması VARDI ama `finally` bloğu `return`'den SONRA da çalışır (JS
+     * semantiği) → koruma doğru görünüyor, işlemiyordu. `finally` kaldırıldı;
+     * bayrak yalnız başarı ve gerçek hata dallarında iniyor.
+     */
     useEffect(() => {
         const controller = new AbortController();
         const fetchOrder = async () => {
             setOrderLoading(true);
+            setLoadFailed(false);
             setOrder(null);
             try {
                 const res = await fetch(`/api/orders/${params.id}`, { signal: controller.signal });
@@ -107,18 +124,77 @@ export default function OrderDetailPage() {
                     setOrder(mapOrderDetail(data));
                 } else {
                     setOrder(null);
+                    // 404 = gerçekten yok; diğer HTTP hataları = yüklenemedi.
+                    if (res.status !== 404) setLoadFailed(true);
                 }
+                setOrderLoading(false);
             } catch (err) {
                 if (err instanceof DOMException && err.name === "AbortError") return;
-                setOrder(null);
                 console.error("Failed to fetch order:", err);
-            } finally {
+                setOrder(null);
+                setLoadFailed(true);
                 setOrderLoading(false);
             }
         };
         if (params.id) fetchOrder();
         return () => controller.abort();
-    }, [params.id]);
+    }, [params.id, reloadTick]);
+
+    /**
+     * KOBİ-sim K1 — siparişi cariye bağla.
+     *
+     * Cari bağı olmayan sipariş `preflightShipment` tarafından kalıcı olarak
+     * sevk dışı bırakılıyordu ve arayüzde hiçbir onarım yolu yoktu; sonuç
+     * "stoğu tutan, asla sevk edilemeyen sipariş" oluyordu.
+     */
+    const handleLinkCustomer = async () => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        if (!linkCustomerId) return;
+        setLinkingCustomer(true);
+        try {
+            const res = await fetch(`/api/orders/${params.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ customer_id: linkCustomerId }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                toast({ type: "error", message: data.error ?? "Sipariş cariye bağlanamadı." });
+                return;
+            }
+            setOrder(mapOrderDetail(data));
+            setLinkCustomerOpen(false);
+            setLinkCustomerId("");
+            toast({ type: "success", message: "Sipariş cari kaydına bağlandı — artık sevk edilebilir." });
+        } catch {
+            toast({ type: "error", message: "Beklenmeyen hata." });
+        } finally {
+            setLinkingCustomer(false);
+        }
+    };
+
+
+    /**
+     * KOBİ-sim O4 — geri dönüşte (bfcache) bayat durum + AKTİF aksiyon düğmesi.
+     *
+     * İlk açılış guard'lı (yükleniyor ekranı) ama tarayıcı Geri'siyle dönüldüğünde
+     * sayfa DOM'u eski state'iyle canlanıyor ve yeniden fetch tetiklenmiyordu:
+     * liste "Kabul Edildi" derken detay "Gönderildi" gösterdi ve "Kabul Et ve
+     * Siparişe Dönüştür" düğmesi aktif duruyordu. Sunucu ikinci siparişi zaten
+     * reddediyor (geçiş doğrulaması) — yani veri riski yok, ama operatör
+     * mükerrer sipariş yarattığını sanıyor. Bu görsel tutarlılık düzeltmesi.
+     */
+    useEffect(() => {
+        const yenile = () => setReloadTick(t => t + 1);
+        const onPageShow = (e: PageTransitionEvent) => { if (e.persisted) yenile(); };
+        const onVisible = () => { if (document.visibilityState === "visible") yenile(); };
+        window.addEventListener("pageshow", onPageShow);
+        document.addEventListener("visibilitychange", onVisible);
+        return () => {
+            window.removeEventListener("pageshow", onPageShow);
+            document.removeEventListener("visibilitychange", onVisible);
+        };
+    }, []);
 
     const [commercialStatus, setCommercialStatus] = useState<CommercialStatus>(order?.commercial_status ?? "draft");
     const [fulfillmentStatus, setFulfillmentStatus] = useState<FulfillmentStatus>(order?.fulfillment_status ?? "unallocated");
@@ -229,6 +305,25 @@ export default function OrderDetailPage() {
         return (
             <div style={{ padding: "40px", textAlign: "center", color: "var(--text-secondary)", fontSize: "13px" }}>
                 Sipariş yükleniyor...
+            </div>
+        );
+    }
+
+    // KOBİ-sim Y1: yükleme hatası ≠ kayıt yok. Ayrı mesaj + yeniden deneme.
+    if (loadFailed) {
+        return (
+            <div style={{ padding: "40px", textAlign: "center", color: "var(--text-secondary)", fontSize: "13px" }}>
+                <div style={{ marginBottom: "12px" }}>
+                    Sipariş yüklenemedi — bağlantıyı kontrol edip tekrar deneyin.
+                </div>
+                <div style={{ display: "flex", gap: "8px", justifyContent: "center" }}>
+                    <Button variant="secondary" onClick={() => setReloadTick(t => t + 1)}>
+                        Yeniden dene
+                    </Button>
+                    <Link href="/dashboard/orders" style={{ color: "var(--accent-text)", alignSelf: "center" }}>
+                        Geri dön
+                    </Link>
+                </div>
             </div>
         );
     }
@@ -599,12 +694,88 @@ export default function OrderDetailPage() {
                         >
                             <div>
                                 <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>Müşteri</div>
-                                <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "3px" }}>{order.customerName}</div>
+                                {/* KOBİ-sim Y6: bağlı cari artık tıklanabilir — muhasebe
+                                    siparişten cari ekstresine geçebiliyor. */}
+                                {order.customerId ? (
+                                    <Link
+                                        href={`/dashboard/customers?customer=${order.customerId}`}
+                                        style={{ fontSize: "13px", fontWeight: 600, color: "var(--accent-text)", marginBottom: "3px", display: "inline-block" }}
+                                    >
+                                        {order.customerName}
+                                    </Link>
+                                ) : (
+                                    <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "3px" }}>{order.customerName}</div>
+                                )}
                                 <div style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.6 }}>
                                     <div>{order.customerEmail}</div>
                                     <div>{order.customerTaxOffice} · {order.customerTaxNumber}</div>
                                     <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>{order.customerCountry} · {order.currency}</div>
                                 </div>
+
+                                {/* KOBİ-sim K1 onarım yolu — cari bağı yoksa sipariş
+                                    ASLA sevk edilemez (order-service preflightShipment).
+                                    Eskiden bu durumun arayüzde çıkışı yoktu. */}
+                                {!order.customerId && (
+                                    <div style={{
+                                        marginTop: "10px", padding: "10px 12px",
+                                        background: "var(--warning-bg)",
+                                        border: "var(--line-width) solid var(--warning-border)",
+                                        borderRadius: "6px",
+                                    }}>
+                                        <div style={{ fontSize: "12px", color: "var(--warning-text)", fontWeight: 600, marginBottom: "4px" }}>
+                                            Cari kaydına bağlı değil
+                                        </div>
+                                        <div style={{ fontSize: "11.5px", color: "var(--text-secondary)", lineHeight: 1.5, marginBottom: "8px" }}>
+                                            Müşteri adı serbest metin olarak girilmiş. Bu sipariş sevk edilemez
+                                            ve müşteri cari ekstresinde görünmez.
+                                        </div>
+                                        {!linkCustomerOpen ? (
+                                            <Button
+                                                size="xs"
+                                                variant="secondary"
+                                                onClick={() => setLinkCustomerOpen(true)}
+                                                disabled={isDemo || !has("manage_sales_orders")}
+                                                title={isDemo ? DEMO_DISABLED_TOOLTIP : "Mevcut bir cari kaydına bağla"}
+                                            >
+                                                Cariye bağla
+                                            </Button>
+                                        ) : (
+                                            <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", alignItems: "center" }}>
+                                                <select
+                                                    value={linkCustomerId}
+                                                    onChange={e => setLinkCustomerId(e.target.value)}
+                                                    aria-label="Bağlanacak cari"
+                                                    style={{
+                                                        flex: "1 1 200px", padding: "6px 8px", fontSize: "12px",
+                                                        background: "var(--input-bg)",
+                                                        border: "var(--line-width) solid var(--input-border)",
+                                                        borderRadius: "5px", color: "var(--text-primary)",
+                                                    }}
+                                                >
+                                                    <option value="">Cari seçin…</option>
+                                                    {customers.filter(c => c.isActive).map(c => (
+                                                        <option key={c.id} value={c.id}>{c.name}</option>
+                                                    ))}
+                                                </select>
+                                                <Button
+                                                    size="xs"
+                                                    onClick={handleLinkCustomer}
+                                                    disabled={!linkCustomerId || linkingCustomer}
+                                                >
+                                                    {linkingCustomer ? "Bağlanıyor…" : "Bağla"}
+                                                </Button>
+                                                <Button
+                                                    size="xs"
+                                                    variant="ghost"
+                                                    onClick={() => { setLinkCustomerOpen(false); setLinkCustomerId(""); }}
+                                                    disabled={linkingCustomer}
+                                                >
+                                                    Vazgeç
+                                                </Button>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                             </div>
                             <div>
                                 <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>Sipariş Bilgisi</div>

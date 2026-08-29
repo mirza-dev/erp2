@@ -14,6 +14,7 @@ import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-u
 import type { ProductTypeRow, ProductTypeFieldRow } from "@/lib/database.types";
 import { DynamicFieldEdit, FieldEdit } from "@/components/products/DynamicFieldEdit";
 import SupplierPricesPanel from "@/components/products/SupplierPricesPanel";
+import ProductVendorsPanel from "@/components/products/ProductVendorsPanel";
 import { missingRequiredTechnicalFields } from "@/lib/technical-templates";
 import { fieldStyle } from "@/components/ui/Input";
 
@@ -337,6 +338,14 @@ export default function ProductDetailPage() {
     const [typeFieldsLoading, setTypeFieldsLoading] = useState(false);
     const [pendingTypeChange, setPendingTypeChange] = useState<{ newTypeId: string; newFields: ProductTypeFieldRow[]; lostKeys: string[] } | null>(null);
 
+    // KOBİ-sim K3 — fiziksel stok sayımı düzeltmesi.
+    // `recount_stock` RPC'si (mig.105) vardı ama tek çağıranı Excel import'tu;
+    // vardiya sorumlusunun sayım farkını girecek HİÇBİR ekranı yoktu.
+    const [countOpen, setCountOpen] = useState(false);
+    const [countedQty, setCountedQty] = useState("");
+    const [countNote, setCountNote] = useState("");
+    const [countSaving, setCountSaving] = useState(false);
+
     // Contextual sections
     const [alerts, setAlerts] = useState<AlertItem[]>([]);
     const [commitments, setCommitments] = useState<CommitmentRow[]>([]);
@@ -431,6 +440,56 @@ export default function ProductDetailPage() {
     }, [activeTypeId]);
 
     const editableTypeFields = activeTypeFields.filter(f => f.is_active);
+
+    /**
+     * KOBİ-sim K3 — sayım sonucunu kaydet.
+     *
+     * RPC MUTLAK atama yapar (`on_hand = sayılan`); delta transaction içinde
+     * `for update` kilidiyle hesaplanır → eşzamanlı hareket varken de doğru.
+     * Bu yüzden burada delta HESAPLANMAZ, yalnız kullanıcıya gösterilir.
+     */
+    const handleSaveCount = async () => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        if (!product) return;
+        const counted = parseInt(countedQty, 10);
+        if (!Number.isInteger(counted) || counted < 0) {
+            toast({ type: "error", message: "Sayılan adet 0 veya pozitif tam sayı olmalı." });
+            return;
+        }
+        setCountSaving(true);
+        try {
+            const res = await fetch("/api/inventory/recount", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    product_id:  product.id,
+                    counted_qty: counted,
+                    notes:       countNote.trim() || undefined,
+                }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                toast({ type: "error", message: data.error ?? "Sayım kaydedilemedi." });
+                return;
+            }
+            const delta = Number(data.delta ?? 0);
+            const yon = delta > 0 ? `+${delta}` : String(delta);
+            toast({
+                type: "success",
+                message: delta === 0
+                    ? "Sayım kaydedildi — fark yok."
+                    : `Sayım kaydedildi — stok ${yon} düzeltildi (yeni: ${data.new_on_hand}).`,
+            });
+            setCountOpen(false);
+            setCountedQty("");
+            setCountNote("");
+            await fetchProduct();
+        } catch {
+            toast({ type: "error", message: "Beklenmeyen hata." });
+        } finally {
+            setCountSaving(false);
+        }
+    };
 
     // Fetch contextual sections (alerts/commitments/quotes) once product is loaded
     useEffect(() => {
@@ -1255,6 +1314,95 @@ export default function ProductDetailPage() {
                             )}
                         </div>
 
+                        {/* KOBİ-sim K3 — Sayım / Stok Düzelt.
+                            Fabrikada haftalık rutin; eskiden bu farkı sisteme
+                            girmenin TEK yolu Excel hazırlayıp import sihirbazından
+                            geçmekti (pratikte yapılmaz → stok kayması kalıcılaşır). */}
+                        <div style={cardStyle}>
+                            <div style={sectionTitleStyle}>Sayım / Stok Düzelt</div>
+                            {!countOpen ? (
+                                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
+                                    <div style={{ fontSize: "12px", color: "var(--text-tertiary)", lineHeight: 1.5 }}>
+                                        Sistemde <strong style={{ color: "var(--text-primary)" }}>{formatNumber(product.on_hand)}</strong> {product.unit} görünüyor.
+                                        Depoda saydığın adet farklıysa buradan düzelt.
+                                    </div>
+                                    <Button
+                                        variant="secondary"
+                                        size="sm"
+                                        onClick={() => { setCountedQty(String(product.on_hand)); setCountOpen(true); }}
+                                        disabled={isDemo}
+                                        title={isDemo ? DEMO_DISABLED_TOOLTIP : "Fiziksel sayım sonucunu gir"}
+                                    >
+                                        Sayım gir
+                                    </Button>
+                                </div>
+                            ) : (
+                                <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
+                                    <FieldEdit label="Sistemdeki Adet">
+                                        <div style={{ fontSize: "13px", color: "var(--text-secondary)", fontVariantNumeric: "tabular-nums" }}>
+                                            {formatNumber(product.on_hand)} {product.unit}
+                                        </div>
+                                    </FieldEdit>
+                                    <FieldEdit label="Sayılan Adet">
+                                        <input
+                                            type="number"
+                                            min={0}
+                                            value={countedQty}
+                                            onChange={e => setCountedQty(e.target.value)}
+                                            style={inputStyle}
+                                            aria-label="Sayılan adet"
+                                            autoFocus
+                                        />
+                                    </FieldEdit>
+                                    <FieldEdit label="Fark">
+                                        {(() => {
+                                            const counted = parseInt(countedQty, 10);
+                                            if (!Number.isInteger(counted)) {
+                                                return <div style={{ fontSize: "13px", color: "var(--text-tertiary)" }}>—</div>;
+                                            }
+                                            const delta = counted - product.on_hand;
+                                            const renk = delta === 0
+                                                ? "var(--text-tertiary)"
+                                                : delta > 0 ? "var(--success-text)" : "var(--danger-text)";
+                                            return (
+                                                <div style={{ fontSize: "13px", fontWeight: 600, color: renk, fontVariantNumeric: "tabular-nums" }}>
+                                                    {delta > 0 ? `+${delta}` : delta} {product.unit}
+                                                </div>
+                                            );
+                                        })()}
+                                    </FieldEdit>
+                                    <FieldEdit label="Neden">
+                                        <input
+                                            value={countNote}
+                                            onChange={e => setCountNote(e.target.value)}
+                                            style={inputStyle}
+                                            maxLength={500}
+                                            placeholder="Örn. yıl sonu sayımı, hasarlı ürün ayrıldı…"
+                                            aria-label="Sayım nedeni"
+                                        />
+                                    </FieldEdit>
+                                    <div style={{ display: "flex", gap: "8px" }}>
+                                        <Button
+                                            size="sm"
+                                            onClick={handleSaveCount}
+                                            disabled={countSaving || !Number.isInteger(parseInt(countedQty, 10)) || parseInt(countedQty, 10) === product.on_hand}
+                                            title={parseInt(countedQty, 10) === product.on_hand ? "Fark yok" : undefined}
+                                        >
+                                            {countSaving ? "Kaydediliyor…" : "Sayımı Kaydet"}
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            variant="secondary"
+                                            onClick={() => { setCountOpen(false); setCountedQty(""); setCountNote(""); }}
+                                            disabled={countSaving}
+                                        >
+                                            Vazgeç
+                                        </Button>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+
                         {/* Pending commitments */}
                         <div style={cardStyle}>
                             <div style={sectionTitleStyle}>Bekleyen Teslimatlar ({commitments.length})</div>
@@ -1316,6 +1464,8 @@ export default function ProductDetailPage() {
                                 <FieldView label="Para Birimi" value={product.currency} />
                             </>
                         )}
+                        {/* KOBİ-sim O5 — alternatif tedarikçiler (tek-kaynak riski). */}
+                        <ProductVendorsPanel productId={product.id} onChanged={fetchProduct} />
                         <SupplierPricesPanel productId={product.id} />
                     </div>
                 )}

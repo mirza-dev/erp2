@@ -367,6 +367,7 @@ export default function QuotesClient(props: QuotesClientProps) {
                         type="date"
                         value={dateFrom}
                         onChange={(e) => navigate({ dateFrom: e.target.value, page: 1 })}
+                        aria-label="Teklif tarihi — başlangıç"
                         title="Başlangıç tarihi"
                         style={{
                             fontSize: "12px",
@@ -383,6 +384,7 @@ export default function QuotesClient(props: QuotesClientProps) {
                         type="date"
                         value={dateTo}
                         onChange={(e) => navigate({ dateTo: e.target.value, page: 1 })}
+                        aria-label="Teklif tarihi — bitiş"
                         title="Bitiş tarihi"
                         style={{
                             fontSize: "12px",

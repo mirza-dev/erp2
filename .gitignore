@@ -55,3 +55,12 @@ results/
 
 # Gerçek PMT katalog/sertifika dosyaları — public repo'ya GİRMEZ (seed bunlardan türetildi)
 pmt/
+
+# Yerel çalışma alanları — repoya girmemeli.
+# (gitignore satır-sonu yorumu desteklemez; yorumlar kendi satırında.)
+# git worktree checkout'ları — 270MB
+/.claude/worktrees/
+# KOBİ simülasyon harness çalışma durumu (Chromium profilleri) — 38MB
+/.sim/
+# editör yapılandırması
+/.obsidian/

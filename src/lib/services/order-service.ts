@@ -18,6 +18,8 @@ import {
     dbCancelOrder,
     dbUpdateOrderQuoteDeadline,
     dbUpdateOrderWithLines,
+    dbLinkOrderCustomer,
+    dbLogOrderAction,
     type CreateOrderInput,
     type UpdateOrderInput,
     type ListOrdersFilter,
@@ -461,6 +463,54 @@ export async function serviceUpdateQuoteDeadline(
     if (quoteValidUntil && quoteValidUntil >= today) {
         await resolveQuoteExpiredAlerts(orderId);
     }
+}
+
+/**
+ * KOBİ-sim K1 onarım yolu — cari bağı olmayan siparişi bir cariye bağla.
+ *
+ * `preflightShipment` `customer_id` boş siparişin sevkini reddediyor. Yeni
+ * teklifler artık gönderimde cari zorunlu tutuyor (`validateQuoteForSend`), ama
+ * o kural yürürlüğe girmeden önce oluşmuş sipariş arayüzde onarılamıyordu ve
+ * stoğu kalıcı olarak tutuyordu. Bu fonksiyon o tek kapıyı açar.
+ *
+ * Zaten bir cariye bağlı siparişi DEĞİŞTİRMEZ: müşteri değiştirmek ayrı bir iş
+ * kararıdır (fatura/Paraşüt/ciro atfını değiştirir), onarım yolu olarak sunulmaz.
+ */
+export async function serviceLinkOrderCustomer(
+    orderId: string,
+    customerId: string,
+    actor?: string | null
+): Promise<{ success: boolean; error?: string }> {
+    const order = await dbGetOrderById(orderId);
+    if (!order) return { success: false, error: "Sipariş bulunamadı." };
+    if (order.customer_id) {
+        return { success: false, error: "Sipariş zaten bir cari kaydına bağlı." };
+    }
+
+    const customer = await dbGetCustomerById(customerId);
+    if (!customer) return { success: false, error: "Cari kaydı bulunamadı." };
+    if (customer.is_active === false) {
+        return { success: false, error: "Pasif cariye bağlanamaz — önce cariyi aktif edin." };
+    }
+
+    await dbLinkOrderCustomer(orderId, {
+        id:         customer.id,
+        name:       customer.name,
+        email:      customer.email,
+        country:    customer.country,
+        tax_office: customer.tax_office,
+        tax_number: customer.tax_number,
+    });
+
+    await dbLogOrderAction(
+        orderId,
+        "order_customer_linked",
+        { customer_id: null, customer_name: order.customer_name },
+        { customer_id: customer.id, customer_name: customer.name },
+        actor ?? null,
+    );
+
+    return { success: true };
 }
 
 // ── Quote Expiry ─────────────────────────────────────────────

@@ -4,6 +4,7 @@ import {
     serviceTransitionOrder,
     serviceUpdateQuoteDeadline,
     serviceUpdateOrderLines,
+    serviceLinkOrderCustomer,
     type OrderTransition,
 } from "@/lib/services/order-service";
 import { serviceSyncOrderToParasut } from "@/lib/services/parasut-service";
@@ -20,7 +21,10 @@ import {
 import { redactOrderForPerms } from "@/lib/auth/redact";
 import { revalidateTag } from "next/cache";
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
 // GET /api/orders/[id]
+
 export async function GET(
     _req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
@@ -55,6 +59,34 @@ export async function PATCH(
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;
         const body = parsed.data as Record<string, unknown>;
+
+        // KOBİ-sim K1 onarım yolu — cari bağı olmayan siparişi cariye bağla.
+        // Ayrı dal: durum makinesi geçişi DEĞİL, veri onarımı. manage_sales_orders
+        // yeterli (aynı rol siparişin müşterisini zaten oluştururken belirliyor).
+        if ("customer_id" in body) {
+            const guard = await requirePermission(req, "manage_sales_orders");
+            if (guard) return guard;
+            const customerId = body.customer_id;
+            if (typeof customerId !== "string" || !UUID_RE.test(customerId)) {
+                return NextResponse.json(
+                    { error: "customer_id geçerli bir UUID olmalıdır." },
+                    { status: 400 },
+                );
+            }
+            const linkAuth = await resolveAuthContext();
+            const linkActor = actorFromAuthContext(linkAuth);
+            const linked = await serviceLinkOrderCustomer(
+                id, customerId, linkActor.label ?? linkActor.userId,
+            );
+            if (!linked.success) {
+                return NextResponse.json({ error: linked.error }, { status: 400 });
+            }
+            revalidateTag("customers", "max");
+            const relinked = await serviceGetOrder(id);
+            return NextResponse.json(
+                relinked ? redactOrderForPerms(relinked, linkAuth.perms) : { ok: true },
+            );
+        }
 
         // Quote deadline update — separate from state-machine transitions.
         // manage_sales_orders yeterli (sales teklif vadesini yönetir).

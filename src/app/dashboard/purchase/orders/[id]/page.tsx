@@ -9,6 +9,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import type { PurchaseOrderRow, PurchaseOrderLineRow, PurchaseOrderStatus, VendorRow, ProductRow } from "@/lib/database.types";
 import type { AuditEntry } from "@/lib/supabase/audit-log";
+import { poActionLabel, poActorLabel } from "@/lib/purchase-order-ui";
 
 const thStyle: React.CSSProperties = {
     textAlign: "left", padding: "10px 14px", fontSize: "12px", fontWeight: 500,
@@ -30,17 +31,6 @@ const STATUS_BG: Record<PurchaseOrderStatus, { bg: string; text: string }> = {
 const STATUS_LABEL: Record<PurchaseOrderStatus, string> = {
     draft: "Taslak", sent: "Gönderildi", confirmed: "Onaylandı",
     partially_received: "Kısmi Kabul", received: "Tamamlandı", cancelled: "İptal",
-};
-
-const ACTION_LABELS: Record<string, string> = {
-    po_created:             "Sipariş oluşturuldu",
-    po_sent:                "Tedarikçiye gönderildi",
-    po_confirmed:           "Onaylandı",
-    po_partially_received:  "Kısmi mal kabul",
-    po_received:            "Tamamen alındı",
-    po_cancelled:           "İptal edildi",
-    po_revised:             "Taslağa geri alındı (revize)",
-    po_lines_replaced:      "Satırlar güncellendi",
 };
 
 interface POWithLines extends PurchaseOrderRow {
@@ -75,6 +65,13 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
     const [receiveMode, setReceiveMode] = useState(false);
     // line_id → qty to receive
     const [receiveQtys, setReceiveQtys] = useState<Record<string, string>>({});
+    // KOBİ-sim K2 — tedarikçi fatura künyesi (indirilecek KDV'nin resmî kimliği).
+    // Arka uç Faz 13'te hazırdı (route + servis + mig.107), ekran hiç yapılmamıştı:
+    // fatura kutuda kalıyor, KDV indirimi ERP'ye hiç girmiyordu.
+    const [vendorInvoiceNo, setVendorInvoiceNo] = useState("");
+    const [vendorInvoiceDate, setVendorInvoiceDate] = useState("");
+    const [invoiceEditOpen, setInvoiceEditOpen] = useState(false);
+    const [savingInvoice, setSavingInvoice] = useState(false);
 
     const loadPO = useCallback(async () => {
         setLoading(true);
@@ -189,7 +186,11 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
             const res = await fetch(`/api/purchase-orders/${id}/receive`, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ lines }),
+                body: JSON.stringify({
+                    lines,
+                    vendor_invoice_no:   vendorInvoiceNo.trim()   || undefined,
+                    vendor_invoice_date: vendorInvoiceDate.trim() || undefined,
+                }),
             });
             const data = await res.json();
             if (!res.ok) {
@@ -199,14 +200,57 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                 toast({ type: "error", message: msg });
                 return;
             }
-            toast({ type: "success", message: "Mal kabul kaydedildi." });
+            // K2: künye yazımı non-fatal ama artık SESSİZ DEĞİL. mig.107
+            // uygulanmamışsa (kolonlar yok) yazım düşer — kullanıcı bunu görmeli,
+            // yoksa KDV künyesini girdiğini sanır.
+            if (data?.invoiceWarning) {
+                toast({ type: "warning", message: "Mal kabul kaydedildi ancak tedarikçi fatura künyesi yazılamadı — muhasebeye bildirin." });
+            } else {
+                toast({ type: "success", message: "Mal kabul kaydedildi." });
+            }
             setReceiveMode(false);
             setReceiveQtys({});
+            setVendorInvoiceNo("");
+            setVendorInvoiceDate("");
             await loadPO();
         } catch {
             toast({ type: "error", message: "Beklenmeyen hata." });
         } finally {
             setActionBusy(null);
+        }
+    };
+
+    /**
+     * KOBİ-sim K2 — künyeyi sonradan tamamla / düzelt.
+     *
+     * Fatura malla birlikte gelir; mal kabulde girilmediyse (ya da yanlış
+     * girildiyse) muhasebenin bunu düzeltebileceği tek yol burasıydı ve hiç
+     * yoktu. PATCH dalı draft kısıtının dışında çalışır (PO çoktan `received`).
+     */
+    const handleSaveInvoiceIdentity = async () => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        setSavingInvoice(true);
+        try {
+            const res = await fetch(`/api/purchase-orders/${id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({
+                    vendor_invoice_no:   vendorInvoiceNo.trim() || null,
+                    vendor_invoice_date: vendorInvoiceDate.trim() || null,
+                }),
+            });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                toast({ type: "error", message: data.error ?? "Fatura künyesi kaydedilemedi." });
+                return;
+            }
+            toast({ type: "success", message: "Tedarikçi fatura künyesi kaydedildi." });
+            setInvoiceEditOpen(false);
+            await loadPO();
+        } catch {
+            toast({ type: "error", message: "Beklenmeyen hata." });
+        } finally {
+            setSavingInvoice(false);
         }
     };
 
@@ -373,6 +417,57 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                             );
                         })}
                     </div>
+                    {/* KOBİ-sim K2 — tedarikçi fatura künyesi. Fatura fiziksel olarak
+                        malla birlikte gelir; künye burada girilmezse indirilecek KDV'nin
+                        resmî kimliği ERP'ye hiç girmez. Boş bırakılabilir (mal kabul
+                        bloklanmaz), ama artık sorulur. */}
+                    <div style={{
+                        display: "flex", gap: "12px", flexWrap: "wrap",
+                        padding: "10px 12px", marginBottom: "12px",
+                        background: "var(--bg-secondary)",
+                        border: "0.5px solid var(--border-tertiary)",
+                        borderRadius: "6px",
+                    }}>
+                        <div style={{ flex: "1 1 180px" }}>
+                            <label htmlFor="vendor-invoice-no" style={{ display: "block", fontSize: "11px", color: "var(--text-secondary)", marginBottom: "4px" }}>
+                                Tedarikçi Fatura No
+                            </label>
+                            <input
+                                id="vendor-invoice-no"
+                                type="text"
+                                maxLength={100}
+                                value={vendorInvoiceNo}
+                                onChange={e => setVendorInvoiceNo(e.target.value)}
+                                placeholder="Örn. ABC2026000123"
+                                style={{
+                                    width: "100%", padding: "6px 8px", fontSize: "13px",
+                                    border: "0.5px solid var(--border-secondary)", borderRadius: "5px",
+                                    background: "var(--bg-primary)", color: "var(--text-primary)",
+                                }}
+                            />
+                        </div>
+                        <div style={{ flex: "1 1 140px" }}>
+                            <label htmlFor="vendor-invoice-date" style={{ display: "block", fontSize: "11px", color: "var(--text-secondary)", marginBottom: "4px" }}>
+                                Fatura Tarihi
+                            </label>
+                            <input
+                                id="vendor-invoice-date"
+                                type="date"
+                                value={vendorInvoiceDate}
+                                onChange={e => setVendorInvoiceDate(e.target.value)}
+                                style={{
+                                    width: "100%", padding: "6px 8px", fontSize: "13px",
+                                    border: "0.5px solid var(--border-secondary)", borderRadius: "5px",
+                                    background: "var(--bg-primary)", color: "var(--text-primary)",
+                                }}
+                            />
+                        </div>
+                        <div style={{ flexBasis: "100%", fontSize: "11px", color: "var(--text-tertiary)" }}>
+                            İndirilecek KDV&apos;nin resmî künyesi tedarikçinin kendi fatura numarasıdır.
+                            Şimdi boş bırakılırsa sonradan bu sayfadan eklenebilir.
+                        </div>
+                    </div>
+
                     <div aria-live="polite" />
                     <Button onClick={handleReceive}
                         disabled={isDemo || actionBusy !== null}
@@ -431,6 +526,97 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                 )}
             </div>
 
+            {/* KOBİ-sim K2 — tedarikçi fatura künyesi paneli.
+                Mal kabul yapılmış her PO'da görünür: künye varsa gösterir,
+                yoksa eksikliği söyler ve tamamlama yolu sunar. */}
+            {(po.status === "received" || po.status === "partially_received") && (
+                <div style={{
+                    background: "var(--bg-primary)",
+                    border: `0.5px solid ${po.vendor_invoice_no ? "var(--border-tertiary)" : "var(--warning-border)"}`,
+                    borderRadius: "8px", padding: "12px 14px", marginBottom: "16px",
+                }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
+                        <div>
+                            <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "4px" }}>
+                                Tedarikçi Fatura Künyesi
+                            </div>
+                            {po.vendor_invoice_no ? (
+                                <div style={{ fontSize: "13px", color: "var(--text-primary)" }}>
+                                    {po.vendor_invoice_no}
+                                    {po.vendor_invoice_date && (
+                                        <span style={{ color: "var(--text-tertiary)" }}> · {po.vendor_invoice_date}</span>
+                                    )}
+                                </div>
+                            ) : (
+                                <div style={{ fontSize: "12.5px", color: "var(--warning-text)" }}>
+                                    Girilmemiş — indirilecek KDV bu künye olmadan belgelenemez.
+                                </div>
+                            )}
+                        </div>
+                        {!invoiceEditOpen && (
+                            <Button
+                                variant="secondary"
+                                onClick={() => {
+                                    setVendorInvoiceNo(po.vendor_invoice_no ?? "");
+                                    setVendorInvoiceDate(po.vendor_invoice_date ?? "");
+                                    setInvoiceEditOpen(true);
+                                }}
+                                disabled={isDemo}
+                                title={isDemo ? DEMO_DISABLED_TOOLTIP : "Fatura künyesini gir / düzelt"}
+                            >
+                                {po.vendor_invoice_no ? "Düzelt" : "Fatura künyesi gir"}
+                            </Button>
+                        )}
+                    </div>
+
+                    {invoiceEditOpen && (
+                        <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", marginTop: "12px", alignItems: "flex-end" }}>
+                            <div style={{ flex: "1 1 180px" }}>
+                                <label htmlFor="po-invoice-no" style={{ display: "block", fontSize: "11px", color: "var(--text-secondary)", marginBottom: "4px" }}>
+                                    Fatura No
+                                </label>
+                                <input
+                                    id="po-invoice-no"
+                                    type="text"
+                                    maxLength={100}
+                                    value={vendorInvoiceNo}
+                                    onChange={e => setVendorInvoiceNo(e.target.value)}
+                                    style={{
+                                        width: "100%", padding: "6px 8px", fontSize: "13px",
+                                        border: "0.5px solid var(--border-secondary)", borderRadius: "5px",
+                                        background: "var(--bg-primary)", color: "var(--text-primary)",
+                                    }}
+                                />
+                            </div>
+                            <div style={{ flex: "1 1 140px" }}>
+                                <label htmlFor="po-invoice-date" style={{ display: "block", fontSize: "11px", color: "var(--text-secondary)", marginBottom: "4px" }}>
+                                    Fatura Tarihi
+                                </label>
+                                <input
+                                    id="po-invoice-date"
+                                    type="date"
+                                    value={vendorInvoiceDate}
+                                    onChange={e => setVendorInvoiceDate(e.target.value)}
+                                    style={{
+                                        width: "100%", padding: "6px 8px", fontSize: "13px",
+                                        border: "0.5px solid var(--border-secondary)", borderRadius: "5px",
+                                        background: "var(--bg-primary)", color: "var(--text-primary)",
+                                    }}
+                                />
+                            </div>
+                            <div style={{ display: "flex", gap: "6px" }}>
+                                <Button onClick={handleSaveInvoiceIdentity} disabled={savingInvoice}>
+                                    {savingInvoice ? "Kaydediliyor…" : "Kaydet"}
+                                </Button>
+                                <Button variant="secondary" onClick={() => setInvoiceEditOpen(false)} disabled={savingInvoice}>
+                                    Vazgeç
+                                </Button>
+                            </div>
+                        </div>
+                    )}
+                </div>
+            )}
+
             {/* Notes */}
             {po.notes && (
                 <div style={{
@@ -479,11 +665,11 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                                     {new Date(e.occurred_at).toLocaleString("tr-TR")}
                                 </span>
                                 <span style={{ color: "var(--text-primary)" }}>
-                                    {ACTION_LABELS[e.action] ?? e.action}
+                                    {poActionLabel(e.action)}
                                 </span>
-                                {e.actor && (
+                                {poActorLabel(e.actor) && (
                                     <span style={{ color: "var(--text-tertiary)", marginLeft: "auto", fontSize: "11px" }}>
-                                        {e.actor}
+                                        {poActorLabel(e.actor)}
                                     </span>
                                 )}
                             </li>

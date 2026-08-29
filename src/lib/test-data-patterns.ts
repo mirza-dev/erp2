@@ -21,6 +21,12 @@ export const TEST_DATA_PATTERNS: TestDataPattern[] = [
     { label: "E2E Müşteri <timestamp>", re: /^E2E (Müşteri|Customer) \d{10,}/i },
     { label: "test-<timestamp>@…", re: /^test-\d{10,}@/i },
     { label: "playwright/vitest damgası", re: /(playwright|vitest|__test__)/i },
+    // KOBİ simülasyonu (2026-08) — dört yapay çalışanın canlı veride bıraktığı
+    // kayıtlar. İmza baştaki "SIM" damgası; `scripts/sim/cleanup.ts` de aynı
+    // deseni arar. Gerçek firma adını yakalamaması için sözcük sınırı şart:
+    // "Simge Mühendislik" eşleşmemeli.
+    { label: "SIM simülasyon kaydı", re: /^SIM[\s\-]/ },
+    { label: "sim çalışan hesabı", re: /@pmt-sim\.test$/i },
 ];
 
 /** Eşleşen desenin etiketi, yoksa null. */

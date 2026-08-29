@@ -33,9 +33,12 @@ describe("QuoteForm.tsx — inline Gönder butonu gating", () => {
         expect(src).toMatch(/onClick=\{handleRequestSend\}/);
     });
 
-    it("ön-validasyon sunucu helper'larını aynalar (manuel-kod/adres-yok bloğu)", () => {
+    it("ön-validasyon sunucu helper'larını aynalar (cari/manuel-kod/adres-yok bloğu)", () => {
         expect(src).toMatch(/validateQuoteLineQuantities/);
-        expect(src).toMatch(/validateQuoteForSend\(\{\s*customer_address:\s*custAddress/);
+        // KOBİ-sim K1: helper artık cari bağını da istiyor → ön-validasyon
+        // customer_id'yi de geçirmeli, yoksa kullanıcı iki onay penceresini
+        // geçip 422 yiyordu.
+        expect(src).toMatch(/validateQuoteForSend\(\{\s*customer_id:\s*custId,\s*customer_address:\s*custAddress/);
     });
 
     it("çift onay: sendStep 0→1→2 ve son onayda handleSendInline", () => {

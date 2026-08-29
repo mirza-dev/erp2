@@ -90,6 +90,30 @@ async function main() {
     for (const p of badProducts) console.log(`  · ${p.sku} — ${p.name}`);
     total += badProducts.length;
 
+    // ── Yetim taahhütler (KOBİ-sim O3) ──────────────────────────────────────
+    //
+    // Test artığı DEĞİL — veri bütünlüğü kusuru; ama aynı sınıfta: canlıda
+    // sessizce duruyor ve ekranda yanlış bilgi üretiyor. Mal kabul RPC'si
+    // taahhüdü `WHERE po_line_id = …` ile kapatır (051); `po_line_id` boş bir
+    // 'pending' taahhüt ASLA kapanmaz → ürün kartında "Bekleniyor: N" kalıcı
+    // olarak yanlış görünür. Simülasyonda iki tanık bunu bildirdi; kökü seed'di.
+    const { data: commitments, error: cmErr } = await sb
+        .from("purchase_commitments")
+        .select("id,product_id,quantity,expected_date,supplier_name,status,po_line_id");
+    if (cmErr) throw new Error(`purchase_commitments: ${cmErr.message}`);
+    const orphanCommitments = (commitments ?? []).filter(
+        c => c.status === "pending" && !c.po_line_id,
+    );
+    console.log(`\nYETİM TAAHHÜTLER: ${orphanCommitments.length} / ${commitments?.length ?? 0} (po_line_id boş + pending)`);
+    if (orphanCommitments.length > 0) {
+        const skuById = new Map((products ?? []).map(p => [p.id, p.sku]));
+        for (const c of orphanCommitments) {
+            console.log(`  · ${skuById.get(c.product_id) ?? c.product_id.slice(0, 8)} — ${c.quantity} adet, beklenen ${c.expected_date}, ${c.supplier_name ?? "—"}  [${c.id.slice(0, 8)}]`);
+        }
+        console.log("    ⚠ Bu satırlar mal kabulle KAPANMAZ — ürün kartında kalıcı 'Bekleniyor' üretir.");
+    }
+    total += orphanCommitments.length;
+
     console.log(`\n${"─".repeat(60)}`);
     console.log(`TOPLAM ŞÜPHELİ KAYIT: ${total}`);
     console.log(`

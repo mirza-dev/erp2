@@ -86,9 +86,10 @@ describe("QuoteForm Faz 4b integration — auto-build description + dirty tracki
     });
 
     it("Review P2-B: autoSave useCallback dep array'inde descDirtyRowIds var (stale closure önlenir)", () => {
-        // autoSave deps son satırına eklenmiş (sig3Title sonrasında)
+        // KOBİ-sim D2: deps listesine `quoteId` de eklendi (önizlemeden forma
+        // dönüş doğru teklife gitsin) — `descDirtyRowIds` artık son eleman değil.
         expect(SOURCE).toMatch(
-            /sig3Title\s*,\s*\n?\s*descDirtyRowIds\]\)/,
+            /sig3Title\s*,\s*\n?\s*descDirtyRowIds\s*,\s*quoteId\]\)/,
         );
     });
 });

@@ -126,6 +126,27 @@ export default function DashboardPage() {
         return listUnconvertibleCurrencies(curs, reporting, rates);
     }, [ratesResolved, orders, products, quotes, purchaseOrders, reporting, rates]);
 
+    /**
+     * Kur künyesi: "TCMB 29.08.2026 · 1 USD = 48,11 ₺".
+     *
+     * `useExchangeRates` kaynağı ve tarihi zaten taşıyor (üst bardaki Ticker
+     * gösteriyor); dashboard bunu hiç yazmıyordu. Raporlama para birimi TRY
+     * değilse tek tek kur satırı anlamsızlaşır → yalnız kaynak+tarih yazılır.
+     */
+    const rateStamp = useMemo(() => {
+        if (!ratesResolved || !rates) return null;
+        const kaynak = (rates as { source?: string }).source;
+        const tarih = (rates as { date?: string }).date;
+        if (!kaynak || !tarih) return null;
+        const [y, m, d] = tarih.split("-");
+        const trTarih = y && m && d ? `${d}.${m}.${y}` : tarih;
+        const usd = rates.rates?.USD?.buying;
+        const kurSatiri = reporting === "TRY" || !usd
+            ? ""
+            : ` · 1 USD = ${usd.toLocaleString("tr-TR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ₺`;
+        return `${kaynak === "TCMB" ? "TCMB" : "Live-Rates"} ${trTarih}${kurSatiri}`;
+    }, [ratesResolved, rates, reporting]);
+
     // ── Trend (ciro + maliyet + sipariş) — seçili döneme göre ──
     const revenueSeries = useMemo(
         () => (canViewSalesPrices ? revenueByPeriod(orders, reporting, rates, period) : null),
@@ -202,9 +223,15 @@ export default function DashboardPage() {
                             <button key={r} className={range === r ? "is-active" : ""} aria-pressed={range === r} onClick={() => setRange(r)} type="button">{r}</button>
                         ))}
                     </div>
+                    {/* KOBİ-sim O7 — etiket yaptığı işi anlatmalı.
+                        İki tanık "hiçbir şey olmuyor" bildirdi; asıl sebep
+                        harness'tı (headless Chromium'da window.print() no-op).
+                        Geriye kalan gerçek kusur: düğme "indir" diyor ama dosya
+                        indirmiyor, yazdırma penceresi açıyor. */}
                     <button
                         type="button"
                         onClick={() => window.print()}
+                        title="Yazdırma penceresi açılır — oradan PDF olarak kaydedebilirsiniz"
                         style={{
                             display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600,
                             padding: "6px 12px", borderRadius: 7, cursor: "pointer", color: "#fff",
@@ -212,9 +239,9 @@ export default function DashboardPage() {
                         }}
                     >
                         <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                            <path d="M8 2v7m0 0L5 6m3 3l3-3M3 12v2h10v-2" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
+                            <path d="M4 6V2h8v4M4 12H3a1 1 0 01-1-1V7a1 1 0 011-1h10a1 1 0 011 1v4a1 1 0 01-1 1h-1M4 10h8v4H4z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
                         </svg>
-                        Rapor indir
+                        Raporu yazdır / PDF
                     </button>
                 </div>
             </div>
@@ -228,10 +255,27 @@ export default function DashboardPage() {
             >
                 {kpis.map((k) => <KpiCard key={k.id} kpi={k} />)}
             </div>
-            {unconvertible.length > 0 && (
-                <div role="status" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--warning-text)", marginBottom: gap }}>
-                    <span aria-hidden="true">⚠</span>
-                    Kur verisi alınamadı — {unconvertible.join(", ")} tutarları toplamlara dahil edilemedi.
+            {/* KOBİ-sim — KUR ŞEFFAFLIĞI.
+                Bu bulgu elenen bir iddiadan türedi: Sibel "Teklif Hattı $878 ama
+                teklif ₺42.240, tutmuyor" dedi. Doğrulamada 42.240 ÷ 878 = 48,11
+                çıktı — makul bir TRY/USD kuru, yani dashboard DOĞRU çeviriyordu.
+                Ama ikinci cümlesi geçerliydi: "kur şeffaflığı olmadan bu rakamlara
+                tam güvenemem." Hangi para birimi ve hangi kurla toplandığı
+                hiçbir yerde yazmıyordu. Açık siparişlerin 5'i USD, 2'si TRY,
+                2'si EUR — bu bilgi olmadan toplam denetlenemez. */}
+            {(unconvertible.length > 0 || rateStamp) && (
+                <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10, marginBottom: gap }}>
+                    {rateStamp && (
+                        <div style={{ fontSize: 11.5, color: "var(--text-tertiary)" }}>
+                            Tutarlar <strong style={{ color: "var(--text-secondary)" }}>{reporting}</strong> cinsinden · {rateStamp}
+                        </div>
+                    )}
+                    {unconvertible.length > 0 && (
+                        <div role="status" style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11.5, color: "var(--warning-text)" }}>
+                            <span aria-hidden="true">⚠</span>
+                            Kur verisi alınamadı — {unconvertible.join(", ")} tutarları toplamlara dahil edilemedi.
+                        </div>
+                    )}
                 </div>
             )}
 
@@ -287,7 +331,7 @@ export default function DashboardPage() {
             </div>
         </div>
 
-        {/* Yazdırılabilir rapor — ekranda gizli, yalnız baskıda (Rapor indir → PDF) */}
+        {/* Yazdırılabilir rapor — ekranda gizli, yalnız baskıda (Raporu yazdır / PDF) */}
         <DashboardReport
             range={range}
             dateStr={dateStr}

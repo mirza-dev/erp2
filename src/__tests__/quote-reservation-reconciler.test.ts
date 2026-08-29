@@ -103,11 +103,14 @@ describe("serviceReconcileQuoteReservations", () => {
     });
 });
 
-describe("scan route reconciler kompozisyonu (kaynak kilidi)", () => {
-    const route = readFileSync("src/app/api/alerts/scan/route.ts", "utf8");
+describe("tarama kompozisyonu — reconciler (kaynak kilidi)", () => {
+    // KOBİ-sim Y5: lock + kompozisyon route'tan `alert-scan-runner`'a taşındı.
+    const runner = readFileSync("src/lib/services/alert-scan-runner.ts", "utf8");
     it("reconciler aynı lock altında, non-fatal çağrılır", () => {
-        expect(route).toMatch(/serviceReconcileQuoteReservations\(\)/);
-        expect(route).toMatch(/quoteReconcile/);
+        expect(runner).toMatch(/serviceReconcileQuoteReservations\(\)/);
+        expect(runner).toMatch(/quoteReconcile/);
+        expect(runner).toMatch(/try_acquire_scan_lock/);
+        expect(runner).toMatch(/release_scan_lock/);
     });
 });
 

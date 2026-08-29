@@ -76,9 +76,11 @@ describe("page.tsx — yazdırılabilir rapor (ekran görüntüsü değil)", () 
         expect(PAGE).toMatch(/orderRows=\{reportOrderRows\}/);
     });
 
-    it("Rapor indir butonu window.print çağırır (artık rapor basılır)", () => {
+    it("Raporu yazdır butonu window.print çağırır (artık rapor basılır)", () => {
         expect(PAGE).toMatch(/onClick=\{\(\) => window\.print\(\)\}/);
-        expect(PAGE).toMatch(/Rapor indir/);
+        // KOBİ-sim O7: etiket "Rapor indir" → "Raporu yazdır / PDF"
+        // (düğme dosya indirmiyor, window.print() açıyor).
+        expect(PAGE).toMatch(/Raporu yazdır \/ PDF/);
     });
 });
 

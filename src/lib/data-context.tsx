@@ -92,7 +92,7 @@ interface DataContextValue {
   uretimKayitlari: UretimKaydi[];
   addCustomer: (
     c: Omit<Customer, "id" | "totalOrders" | "totalRevenue" | "revenueByCurrency" | "lastOrderDate" | "isActive">
-  ) => Promise<void>;
+  ) => Promise<Customer | undefined>;
   updateCustomer: (id: string, updates: Partial<Customer>) => Promise<Customer | undefined>;
   deleteCustomer: (id: string) => Promise<void>;
   addProduct: (
@@ -223,10 +223,13 @@ export function useCustomers() {
   const { data, isLoading, error } = useSWR<Customer[]>(CUSTOMERS_KEY, customersFetcher, SWR_DEFAULTS);
   const { mutate } = useSWRConfig();
 
+  // KOBİ-sim K1: dönüş tipi void → `Customer | undefined` (updateCustomer emsali).
+  // Teklif formu inline cari açtığında oluşan kaydın id'sini ANINDA `customer_id`
+  // olarak bağlaması gerekiyor; ikinci bir arama turu yapmak yarış açardı.
   const addCustomer = useCallback(async (
     fields: Omit<Customer, "id" | "totalOrders" | "totalRevenue" | "revenueByCurrency" | "lastOrderDate" | "isActive">
-  ) => {
-    if (demoGuard()) return;
+  ): Promise<Customer | undefined> => {
+    if (demoGuard()) return undefined;
     try {
       const body = {
         name: fields.name,
@@ -246,9 +249,11 @@ export function useCustomers() {
       });
       if (res.ok) {
         const data = await res.json();
+        const created = mapCustomer(data);
         await mutate(CUSTOMERS_KEY,
-          (prev: Customer[] | undefined) => [mapCustomer(data), ...(prev ?? [])],
+          (prev: Customer[] | undefined) => [created, ...(prev ?? [])],
           { revalidate: false });
+        return created;
       } else {
         // route { error } JSON döndürür — kullanıcıya ham {"error":...} stringi
         // değil mesajı göster (updateCustomer/deleteCustomer paterni).
@@ -539,9 +544,17 @@ export function useProduction() {
   const addUretimKaydi = useCallback(async (k: Omit<UretimKaydi, "id">): Promise<{ refetchFailed?: boolean; entry?: UretimKaydi }> => {
     if (demoGuard()) return {};
     try {
+      // KOBİ-sim Y3 — hurda/fire ASIL KÖK burasıydı.
+      //
+      // Rapor `production/page.tsx:265`'teki `scrap: 0` sabitini suçluyordu, ama
+      // o sabit zaten ölü koddu: gövde `scrap`'i HİÇ TAŞIMIYORDU. Sayfaya alan
+      // eklemek tek başına hiçbir şey değiştirmezdi — API ve servis (0 ≤ scrap
+      // ≤ produced doğrulamasıyla) baştan hazırdı, aradaki taşıma katmanı yoktu.
       const body = {
         product_id: k.productId,
         produced_qty: k.adet,
+        scrap_qty: k.scrap,
+        waste_reason: k.wasteReason,
         production_date: k.tarih,
         notes: k.notlar,
       };

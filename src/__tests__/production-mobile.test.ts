@@ -71,7 +71,15 @@ describe("gizlenen kolonların bilgisi kaybolmaz", () => {
     });
 
     it("not da dar ekranda satır altına taşınır (kaybolmaz)", () => {
-        expect(SRC).toMatch(/\{kaydi\.productSku\}\{kaydi\.notlar \? ` · \$\{kaydi\.notlar\}` : ""\}/);
+        // KOBİ-sim Y3/O1/O6: alt satır artık saat ve hurdayı da taşıyor
+        // (aynı ürünün iki kaydını ayırt etmek + fireyi görünür kılmak için),
+        // bu yüzden sabit dizgi yerine parça-parça doğrulanıyor.
+        expect(SRC).toMatch(/kaydi\.notlar,\s*\]\.filter\(Boolean\)\.join\(" · "\)/);
+    });
+
+    it("dar ekranda saat ve hurda da alt satıra iner", () => {
+        expect(SRC).toMatch(/formatProductionTime\(kaydi\.createdAt\),/);
+        expect(SRC).toMatch(/hurda \$\{formatNumber\(kaydi\.scrap\)\}/);
     });
 
     it("geçmiş gün satırının tıklanabilirliği korunur (A2 kazanımı)", () => {

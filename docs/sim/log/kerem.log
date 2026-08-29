@@ -1,0 +1,209 @@
+[2026-08-28 22:24:54] OTURUM AÇILDI — Kerem Aydın (Makine Mühendisi)
+[2026-08-28 22:25:11] > bak 
+[2026-08-28 22:26:18] > bak 
+[2026-08-28 22:26:18] ✖ Bu çalışanın tarayıcısı açık değil.
+[2026-08-28 22:26:41] OTURUM AÇILDI — Kerem Aydın (Makine Mühendisi)
+[2026-08-28 22:26:51] > bak 
+[2026-08-28 22:26:51] SAYFA: Roven — AI Destekli ERP ⏎ ADRES: /dashboard ⏎ 
+[2026-08-28 22:27:22] OTURUM AÇILDI — Kerem Aydın (Makine Mühendisi)
+[2026-08-28 22:37:26] > bak 
+[2026-08-28 22:37:27] SAYFA: Roven — AI Destekli ERP ⏎ ADRES: /dashboard ⏎ 
+[2026-08-28 22:37:37] > git "Stok & Ürünler"
+[2026-08-28 22:37:40] ✔ sol menüden "Stok & Ürünler" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:37:44] > tikla "Yeni Ürün"
+[2026-08-28 22:37:45] ✔ "Yeni Ürün" düğmesine bastım ⏎ ⚑ ÇIKAN BİLDİRİM: Yeni Ürün×Ürün Adı*SKU*KategoriBirim FiyatPara BirimiUSDTRYEURBirimadetkgmlitretakımBaşlangıç StoğuMin. Stok SeviyesiÜrün TipiİmalatTicariDepoKimlik Bilgileri (isteğe bağlı)Malzeme KalitesiMenşei ÜlkeÜretim TesisiSektörlerKullanım AlanlarıStandartlarSertifikalarÜrün NotlarıTeknik Şablon (isteğe bağlı)Teknik Şablon— Teknik şablon seçili değil —mrzVanaContaFlansFittingBağlantı ElemanıEnstrümanSızdırmazlık MalzemesiDiğerİptalÜrün Oluştur ⏎ 
+[2026-08-28 22:37:55] > yaz "Ürün Adı" "SIM TGAV Gate Vana Class 300 DN200 WCB"
+[2026-08-28 22:38:11] ✖ "Ürün Adı" adında doldurulacak alan BULAMADIM. ⏎ Ekranda şunlar var: Ürün adı veya SKU... · Pasifleri göster · Sayfadaki tüm ürünleri seç · 90° Dirsek DN100 Sch40 20# Çelik seç · Çelik Tank V=60 m³ Yatay Karbon Çelik seç · Çift Diskli Çekvalf DN150 PN16 WCB seç · Dövme Gate Valf 800LB DN25 A105 NPT seç · Dövme Glob Valf 800LB DN25 A105 SW seç · Eşit Te DN200 Sch40 20# Çelik seç · Fully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik seç · Gate Valve Class 600 DN20 A105 Stellite Trim seç · Gaz Basınç Regülatörü DN100 Döküm Çelik seç · Grafit Salmastra Bant 25mm seç · Kondenstop Class 600 DN20 A105 NPT seç · Konsantrik Redüksiyon DN150×100 20# Çelik seç · Küresel Vana Class 600 DN20 A105 SW seç · Manometre Üçyollu Vana SS304 DN15 seç · PL Flanş DN50 PN10 A105 seç · PTFE Kaplı Conta DN80 PN16 seç · Saplama M24×100 B7 Karbon Çelik seç · Spiral Sarımlı Conta Class 150 DN200 SS304 + Flexgrafit seç · TGAV Gate Vana Class 150 DN150 WCB seç · WN Flanş RF Class 150 DN80 S-20 A105 seç · 3 Parçalı Küresel Vana DN25 · KV-3P-DN25 · Kategori seç veya yaz... · CF8M, WCB, 316SS... · Türkiye, İtalya... · Tesis adı veya şehir · Petrokimya, Denizcilik... · Akış kontrolü, izolasyon... · DIN, ANSI, EN... · ISO 9001, CE, ATEX... · Özel kullanım notları, uyarılar... · Teknik şablon ⏎ 
+[2026-08-28 22:38:15] > yaz "3 Parçalı Küresel Vana DN25" "SIM TGAV Gate Vana Class 300 DN200 WCB"
+[2026-08-28 22:38:17] ✔ "3 Parçalı Küresel Vana DN25" alanına "SIM TGAV Gate Vana Class 300 DN200 WCB" yazdım ⏎ ⚑ ÇIKAN BİLDİRİM: Yeni Ürün×Ürün Adı*SKU*KategoriBirim FiyatPara BirimiUSDTRYEURBirimadetkgmlitretakımBaşlangıç StoğuMin. Stok SeviyesiÜrün TipiİmalatTicariDepoKimlik Bilgileri (isteğe bağlı)Malzeme KalitesiMenşei ÜlkeÜretim TesisiSektörlerKullanım AlanlarıStandartlarSertifikalarÜrün NotlarıTeknik Şablon (isteğe bağlı)Teknik Şablon— Teknik şablon seçili değil —mrzVanaContaFlansFittingBağlantı ElemanıEnstrümanSızdırmazlık MalzemesiDiğerİptalÜrün Oluştur ⏎ 
+[2026-08-28 22:38:21] > yaz "KV-3P-DN25" "SIM-TGAV-300-DN200-WCB"
+[2026-08-28 22:38:22] ✔ "KV-3P-DN25" alanına "SIM-TGAV-300-DN200-WCB" yazdım ⏎ ⚑ ÇIKAN BİLDİRİM: Yeni Ürün×Ürün Adı*SKU*KategoriBirim FiyatPara BirimiUSDTRYEURBirimadetkgmlitretakımBaşlangıç StoğuMin. Stok SeviyesiÜrün TipiİmalatTicariDepoKimlik Bilgileri (isteğe bağlı)Malzeme KalitesiMenşei ÜlkeÜretim TesisiSektörlerKullanım AlanlarıStandartlarSertifikalarÜrün NotlarıTeknik Şablon (isteğe bağlı)Teknik Şablon— Teknik şablon seçili değil —mrzVanaContaFlansFittingBağlantı ElemanıEnstrümanSızdırmazlık MalzemesiDiğerİptalÜrün Oluştur ⏎ 
+[2026-08-28 22:38:26] > yaz "Kategori seç veya yaz..." "Vana"
+[2026-08-28 22:38:27] ✔ "Kategori seç veya yaz..." alanına "Vana" yazdım ⏎ ⚑ ÇIKAN BİLDİRİM: Yeni Ürün×Ürün Adı*SKU*KategoriBirim FiyatPara BirimiUSDTRYEURBirimadetkgmlitretakımBaşlangıç StoğuMin. Stok SeviyesiÜrün TipiİmalatTicariDepoKimlik Bilgileri (isteğe bağlı)Malzeme KalitesiMenşei ÜlkeÜretim TesisiSektörlerKullanım AlanlarıStandartlarSertifikalarÜrün NotlarıTeknik Şablon (isteğe bağlı)Teknik Şablon— Teknik şablon seçili değil —mrzVanaContaFlansFittingBağlantı ElemanıEnstrümanSızdırmazlık MalzemesiDiğerİptalÜrün Oluştur ⏎ 
+[2026-08-28 22:39:11] > sec "Teknik şablon" "Vana"
+[2026-08-28 22:39:12] ✔ "Teknik şablon" alanında "Vana" seçtim ⏎ ⚑ ÇIKAN BİLDİRİM: Yeni Ürün×Ürün Adı*SKU*KategoriBirim FiyatPara BirimiUSDTRYEURBirimadetkgmlitretakımBaşlangıç StoğuMin. Stok SeviyesiÜrün TipiİmalatTicariDepoKimlik Bilgileri (isteğe bağlı)Malzeme KalitesiMenşei ÜlkeÜretim TesisiSektörlerKullanım AlanlarıStandartlarSertifikalarÜrün NotlarıTeknik Şablon (isteğe bağlı)Teknik Şablon— Teknik şablon seçili değil —mrzVanaContaFlansFittingBağlantı ElemanıEnstrümanSızdırmazlık MalzemesiDiğerAlanlar yükleniyor…İptalÜrün Oluştur ⏎ 
+[2026-08-28 22:39:16] > bekle "2"
+[2026-08-28 22:39:21] ✔ 2 saniye bekledim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:40:42] > yaz "DN (Nominal Çap)" "200"
+[2026-08-28 22:40:45] ✔ "DN (Nominal Çap)" alanına "200" yazdım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:40:53] > sec "PN / Sınıf" "300LB"
+[2026-08-28 22:40:56] ✔ "PN / Sınıf" alanında "300LB" seçtim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:41:00] > sec "Vana Tipi" "Sürgülü (Gate)"
+[2026-08-28 22:41:03] ✔ "Vana Tipi" alanında "Sürgülü (Gate)" seçtim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:41:08] > sec "Bağlantı Tipi" "Flanşlı (Flanged)"
+[2026-08-28 22:41:11] ✔ "Bağlantı Tipi" alanında "Flanşlı (Flanged)" seçtim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:41:15] > yaz "Gövde Malzemesi" "WCB"
+[2026-08-28 22:41:18] ✔ "Gövde Malzemesi" alanına "WCB" yazdım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:41:24] > yaz "CF8M, WCB, 316SS..." "WCB"
+[2026-08-28 22:41:27] ✔ "CF8M, WCB, 316SS..." alanına "WCB" yazdım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:41:31] > yaz "Türkiye, İtalya..." "Türkiye"
+[2026-08-28 22:41:34] ✔ "Türkiye, İtalya..." alanına "Türkiye" yazdım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:41:38] > yaz "Tesis adı veya şehir" "PMT Suluova Fabrikası"
+[2026-08-28 22:41:42] ✔ "Tesis adı veya şehir" alanına "PMT Suluova Fabrikası" yazdım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:41:49] > isaretle "ASME B16.34"
+[2026-08-28 22:41:49] ✖ "ASME B16.34" adında kutucuk BULAMADIM. ⏎ Ekranda şunlar var: Ürün adı veya SKU... · Pasifleri göster · Sayfadaki tüm ürünleri seç · 90° Dirsek DN100 Sch40 20# Çelik seç · Çelik Tank V=60 m³ Yatay Karbon Çelik seç · Çift Diskli Çekvalf DN150 PN16 WCB seç · Dövme Gate Valf 800LB DN25 A105 NPT seç · Dövme Glob Valf 800LB DN25 A105 SW seç · Eşit Te DN200 Sch40 20# Çelik seç · Fully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik seç · Gate Valve Class 600 DN20 A105 Stellite Trim seç · Gaz Basınç Regülatörü DN100 Döküm Çelik seç · Grafit Salmastra Bant 25mm seç · Kondenstop Class 600 DN20 A105 NPT seç · Konsantrik Redüksiyon DN150×100 20# Çelik seç · Küresel Vana Class 600 DN20 A105 SW seç · Manometre Üçyollu Vana SS304 DN15 seç · PL Flanş DN50 PN10 A105 seç · PTFE Kaplı Conta DN80 PN16 seç · Saplama M24×100 B7 Karbon Çelik seç · Spiral Sarımlı Conta Class 150 DN200 SS304 + Flexgrafit seç · TGAV Gate Vana Class 150 DN150 WCB seç · WN Flanş RF Class 150 DN80 S-20 A105 seç · 3 Parçalı Küresel Vana DN25 · KV-3P-DN25 · Kategori seç veya yaz... · CF8M, WCB, 316SS... · Türkiye, İtalya... · Tesis adı veya şehir · Petrokimya, Denizcilik... · Akış kontrolü, izolasyon... · DIN, ANSI, EN... · ISO 9001, CE, ATEX... · Özel kullanım notları, uyarılar... · Teknik şablon · DN (Nominal Çap) · PN / Sınıf · Vana Tipi · Bağlantı Tipi · Aktüatör · Gövde Malzemesi · Trim Malzemesi · Sızdırmazlık Yatak Malzemesi · Mil Malzemesi · Maks. Sıcaklık · Maks. Basınç · Test Basıncı · Yüz-Yüz Boyu · Conta Tipi ⏎ 
+[2026-08-28 22:42:08] > tikla "ASME B16.34"
+[2026-08-28 22:42:10] ✔ "ASME B16.34" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:42:20] > ekran 
+[2026-08-28 22:42:20] 📷 Ekran görüntüsü alındı: /Users/mirzasaribiyik/Projects/erp2/docs/sim/ekran/kerem-1787956940622.png
+[2026-08-28 22:42:33] > tikla "API 600"
+[2026-08-28 22:42:36] ✔ "API 600" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:42:40] > ekran 
+[2026-08-28 22:42:40] 📷 Ekran görüntüsü alındı: /Users/mirzasaribiyik/Projects/erp2/docs/sim/ekran/kerem-1787956960331.png
+[2026-08-28 22:42:54] > tikla "API 600"
+[2026-08-28 22:42:57] ✔ "API 600" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:43:01] > ekran 
+[2026-08-28 22:43:01] 📷 Ekran görüntüsü alındı: /Users/mirzasaribiyik/Projects/erp2/docs/sim/ekran/kerem-1787956981364.png
+[2026-08-28 22:43:29] > yaz "Min. Stok Seviyesi" "2"
+[2026-08-28 22:43:29] ✖ "Min. Stok Seviyesi" adında doldurulacak alan BULAMADIM. ⏎ Ekranda şunlar var: Ürün adı veya SKU... · Pasifleri göster · Sayfadaki tüm ürünleri seç · 90° Dirsek DN100 Sch40 20# Çelik seç · Çelik Tank V=60 m³ Yatay Karbon Çelik seç · Çift Diskli Çekvalf DN150 PN16 WCB seç · Dövme Gate Valf 800LB DN25 A105 NPT seç · Dövme Glob Valf 800LB DN25 A105 SW seç · Eşit Te DN200 Sch40 20# Çelik seç · Fully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik seç · Gate Valve Class 600 DN20 A105 Stellite Trim seç · Gaz Basınç Regülatörü DN100 Döküm Çelik seç · Grafit Salmastra Bant 25mm seç · Kondenstop Class 600 DN20 A105 NPT seç · Konsantrik Redüksiyon DN150×100 20# Çelik seç · Küresel Vana Class 600 DN20 A105 SW seç · Manometre Üçyollu Vana SS304 DN15 seç · PL Flanş DN50 PN10 A105 seç · PTFE Kaplı Conta DN80 PN16 seç · Saplama M24×100 B7 Karbon Çelik seç · Spiral Sarımlı Conta Class 150 DN200 SS304 + Flexgrafit seç · TGAV Gate Vana Class 150 DN150 WCB seç · WN Flanş RF Class 150 DN80 S-20 A105 seç · 3 Parçalı Küresel Vana DN25 · KV-3P-DN25 · Kategori seç veya yaz... · CF8M, WCB, 316SS... · Türkiye, İtalya... · Tesis adı veya şehir · Petrokimya, Denizcilik... · Akış kontrolü, izolasyon... · DIN, ANSI, EN... · ISO 9001, CE, ATEX... · Özel kullanım notları, uyarılar... · Teknik şablon · DN (Nominal Çap) · PN / Sınıf · Vana Tipi · Bağlantı Tipi · Aktüatör · Gövde Malzemesi · Trim Malzemesi · Sızdırmazlık Yatak Malzemesi · Mil Malzemesi · Maks. Sıcaklık · Maks. Basınç · Test Basıncı · Yüz-Yüz Boyu · Conta Tipi ⏎ 
+[2026-08-28 22:43:40] > bak 
+[2026-08-28 22:43:41] SAYFA: Roven — AI Destekli ERP ⏎ ADRES: /dashboard/products ⏎ 
+[2026-08-28 22:43:47] > yaz "Min. Stok Seviyesi" "2"
+[2026-08-28 22:43:47] ✖ "Min. Stok Seviyesi" adında doldurulacak alan BULAMADIM. ⏎ Ekranda şunlar var: Ürün adı veya SKU... · Pasifleri göster · Sayfadaki tüm ürünleri seç · 90° Dirsek DN100 Sch40 20# Çelik seç · Çelik Tank V=60 m³ Yatay Karbon Çelik seç · Çift Diskli Çekvalf DN150 PN16 WCB seç · Dövme Gate Valf 800LB DN25 A105 NPT seç · Dövme Glob Valf 800LB DN25 A105 SW seç · Eşit Te DN200 Sch40 20# Çelik seç · Fully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik seç · Gate Valve Class 600 DN20 A105 Stellite Trim seç · Gaz Basınç Regülatörü DN100 Döküm Çelik seç · Grafit Salmastra Bant 25mm seç · Kondenstop Class 600 DN20 A105 NPT seç · Konsantrik Redüksiyon DN150×100 20# Çelik seç · Küresel Vana Class 600 DN20 A105 SW seç · Manometre Üçyollu Vana SS304 DN15 seç · PL Flanş DN50 PN10 A105 seç · PTFE Kaplı Conta DN80 PN16 seç · Saplama M24×100 B7 Karbon Çelik seç · Spiral Sarımlı Conta Class 150 DN200 SS304 + Flexgrafit seç · TGAV Gate Vana Class 150 DN150 WCB seç · WN Flanş RF Class 150 DN80 S-20 A105 seç · 3 Parçalı Küresel Vana DN25 · KV-3P-DN25 · Kategori seç veya yaz... · CF8M, WCB, 316SS... · Türkiye, İtalya... · Tesis adı veya şehir · Petrokimya, Denizcilik... · Akış kontrolü, izolasyon... · DIN, ANSI, EN... · ISO 9001, CE, ATEX... · Özel kullanım notları, uyarılar... · Teknik şablon · DN (Nominal Çap) · PN / Sınıf · Vana Tipi · Bağlantı Tipi · Aktüatör · Gövde Malzemesi · Trim Malzemesi · Sızdırmazlık Yatak Malzemesi · Mil Malzemesi · Maks. Sıcaklık · Maks. Basınç · Test Basıncı · Yüz-Yüz Boyu · Conta Tipi ⏎ 
+[2026-08-28 22:44:01] > yaz "MİN. STOK SEVİYESİ" "2"
+[2026-08-28 22:44:01] ✖ "MİN. STOK SEVİYESİ" adında doldurulacak alan BULAMADIM. ⏎ Ekranda şunlar var: Ürün adı veya SKU... · Pasifleri göster · Sayfadaki tüm ürünleri seç · 90° Dirsek DN100 Sch40 20# Çelik seç · Çelik Tank V=60 m³ Yatay Karbon Çelik seç · Çift Diskli Çekvalf DN150 PN16 WCB seç · Dövme Gate Valf 800LB DN25 A105 NPT seç · Dövme Glob Valf 800LB DN25 A105 SW seç · Eşit Te DN200 Sch40 20# Çelik seç · Fully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik seç · Gate Valve Class 600 DN20 A105 Stellite Trim seç · Gaz Basınç Regülatörü DN100 Döküm Çelik seç · Grafit Salmastra Bant 25mm seç · Kondenstop Class 600 DN20 A105 NPT seç · Konsantrik Redüksiyon DN150×100 20# Çelik seç · Küresel Vana Class 600 DN20 A105 SW seç · Manometre Üçyollu Vana SS304 DN15 seç · PL Flanş DN50 PN10 A105 seç · PTFE Kaplı Conta DN80 PN16 seç · Saplama M24×100 B7 Karbon Çelik seç · Spiral Sarımlı Conta Class 150 DN200 SS304 + Flexgrafit seç · TGAV Gate Vana Class 150 DN150 WCB seç · WN Flanş RF Class 150 DN80 S-20 A105 seç · 3 Parçalı Küresel Vana DN25 · KV-3P-DN25 · Kategori seç veya yaz... · CF8M, WCB, 316SS... · Türkiye, İtalya... · Tesis adı veya şehir · Petrokimya, Denizcilik... · Akış kontrolü, izolasyon... · DIN, ANSI, EN... · ISO 9001, CE, ATEX... · Özel kullanım notları, uyarılar... · Teknik şablon · DN (Nominal Çap) · PN / Sınıf · Vana Tipi · Bağlantı Tipi · Aktüatör · Gövde Malzemesi · Trim Malzemesi · Sızdırmazlık Yatak Malzemesi · Mil Malzemesi · Maks. Sıcaklık · Maks. Basınç · Test Basıncı · Yüz-Yüz Boyu · Conta Tipi ⏎ 
+[2026-08-28 22:44:31] > yaz "Özel kullanım notları, uyarılar..." "Musteri talebi: Class 300 DN200 WCB gate vana. Baglanti tipi musteri tarafindan belirtilmedi, Flansli (RF, ASME B16.5 Class 300 standart uygulama) varsayildi - siparis oncesi teyit edilmeli. Trim malzemesi, maks. sicaklik/basinc, test basinci ve conta tipi musteri talebinde yoktu, siparis ozel sartnamesi gelince guncellenecek."
+[2026-08-28 22:44:42] ✔ "Özel kullanım notları, uyarılar..." alanına "Musteri talebi: Class 300 DN200 WCB gate vana. Baglanti tipi musteri tarafindan belirtilmedi, Flansli (RF, ASME B16.5 Class 300 standart uygulama) varsayildi - siparis oncesi teyit edilmeli. Trim malzemesi, maks. sicaklik/basinc, test basinci ve conta tipi musteri talebinde yoktu, siparis ozel sartnamesi gelince guncellenecek." yazdım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:44:56] > tikla "Ürün Oluştur"
+[2026-08-28 22:44:58] ✔ "Ürün Oluştur" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:45:03] > bekle "2"
+[2026-08-28 22:45:07] ✔ 2 saniye bekledim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:45:24] > satir "SIM-TGAV-300-DN200-WCB"
+[2026-08-28 22:45:27] ✔ "SIM-TGAV-300-DN200-WCB" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:45:30] > bekle "2"
+[2026-08-28 22:45:35] ✔ 2 saniye bekledim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:45:41] > tikla "Teknik"
+[2026-08-28 22:45:44] ✔ "Teknik" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:45:58] > ekran 
+[2026-08-28 22:45:58] 📷 Ekran görüntüsü alındı: /Users/mirzasaribiyik/Projects/erp2/docs/sim/ekran/kerem-1787957158322.png
+[2026-08-28 22:46:11] > satir "Vana"
+[2026-08-28 22:46:14] ✔ "Vana" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:46:58] > git "/dashboard/products/ae8c7f53-aa8a-4018-8ad1-756bc2ec35cf"
+[2026-08-28 22:47:06] ✔ /dashboard/products/ae8c7f53-aa8a-4018-8ad1-756bc2ec35cf adresine gittim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:47:23] > tikla "Teknik"
+[2026-08-28 22:47:26] ✔ "Teknik" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:47:47] > git "/dashboard/products/ae8c7f53-aa8a-4018-8ad1-756bc2ec35cf"
+[2026-08-28 22:47:54] ✔ /dashboard/products/ae8c7f53-aa8a-4018-8ad1-756bc2ec35cf adresine gittim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:47:58] > tikla "Teknik"
+[2026-08-28 22:48:01] ✔ "Teknik" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:48:16] > git "Stok & Ürünler"
+[2026-08-28 22:48:18] ✔ sol menüden "Stok & Ürünler" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:48:25] > satir "TGAV-150-DN150-WCB"
+[2026-08-28 22:48:28] ✔ "TGAV-150-DN150-WCB" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:49:16] > tikla "Stok"
+[2026-08-28 22:49:18] ✔ "Stok" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:49:26] > satir "TGAV-150-DN150-WCB"
+[2026-08-28 22:49:29] ✔ "TGAV-150-DN150-WCB" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:49:32] > tikla "Tedarik"
+[2026-08-28 22:49:35] ✔ "Tedarik" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:49:56] > git "/dashboard/products/ae8c7f53-aa8a-4018-8ad1-756bc2ec35cf"
+[2026-08-28 22:50:11] ✔ /dashboard/products/ae8c7f53-aa8a-4018-8ad1-756bc2ec35cf adresine gittim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:50:21] > tikla "Düzenle"
+[2026-08-28 22:50:27] ✔ "Düzenle" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:51:02] > yaz "Standartlar" "ASME B16.34"
+[2026-08-28 22:51:05] ✔ "Standartlar" alanına "ASME B16.34" yazdım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:51:08] > tikla "Kaydet"
+[2026-08-28 22:51:11] ✔ "Kaydet" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:51:14] > bekle "2"
+[2026-08-28 22:51:19] ✔ 2 saniye bekledim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:55:38] OTURUM AÇILDI — Kerem Aydın (Makine Mühendisi)
+[2026-08-28 22:55:51] > git "/dashboard/products"
+[2026-08-28 22:56:06] ✔ /dashboard/products adresine gittim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:56:06] > satir "SIM-TGAV-300-DN200-WCB"
+[2026-08-28 22:56:14] ✔ "SIM-TGAV-300-DN200-WCB" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:56:14] > tikla "Teknik"
+[2026-08-28 22:56:16] ✔ "Teknik" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:56:23] > bak 
+[2026-08-28 22:56:24] SAYFA: Roven — AI Destekli ERP ⏎ ADRES: /dashboard/products/ae8c7f53-aa8a-4018-8ad1-756bc2ec35cf ⏎ 
+[2026-08-28 22:58:07] > bak 
+[2026-08-28 22:58:07] SAYFA: Roven — AI Destekli ERP ⏎ ADRES: /dashboard/products/ae8c7f53-aa8a-4018-8ad1-756bc2ec35cf ⏎ 
+[2026-08-28 22:58:23] > git "Stok & Ürünler"
+[2026-08-28 22:58:26] ✔ sol menüden "Stok & Ürünler" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:58:31] > satir "FWBV-DN400"
+[2026-08-28 22:58:34] ✔ "FWBV-DN400" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:58:44] > tikla "Stok"
+[2026-08-28 22:58:46] ✔ "Stok" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:59:00] > tikla "Tedarik"
+[2026-08-28 22:59:02] ✔ "Tedarik" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 22:59:08] > bekle "3"
+[2026-08-28 22:59:13] ✔ 3 saniye bekledim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:00:01] > tikla "Stok"
+[2026-08-28 23:00:03] ✔ "Stok" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:00:07] > tikla "Düzenle"
+[2026-08-28 23:00:09] ✔ "Düzenle" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:00:39] > yaz "Min stok seviyesi" "70"
+[2026-08-28 23:00:41] ✔ "Min stok seviyesi" alanına "70" yazdım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:00:45] > yaz "Yeniden sipariş adedi" "60"
+[2026-08-28 23:00:48] ✔ "Yeniden sipariş adedi" alanına "60" yazdım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:00:51] > tikla "Kaydet"
+[2026-08-28 23:00:54] ✔ "Kaydet" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:00:57] > bekle "2"
+[2026-08-28 23:01:01] ✔ 2 saniye bekledim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:01:22] > geri 
+[2026-08-28 23:01:25] ✔ bir önceki sayfaya döndüm ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:01:29] > satir "TGAV-150-DN150-WCB"
+[2026-08-28 23:01:32] ✔ "TGAV-150-DN150-WCB" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:01:38] > tikla "Stok"
+[2026-08-28 23:01:40] ✔ "Stok" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:02:16] > tikla "Tedarik"
+[2026-08-28 23:02:18] ✔ "Tedarik" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:02:55] > tikla "Stok"
+[2026-08-28 23:02:58] ✔ "Stok" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:03:01] > tikla "Düzenle"
+[2026-08-28 23:03:04] ✔ "Düzenle" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:03:20] > yaz "Min stok seviyesi" "25"
+[2026-08-28 23:03:23] ✔ "Min stok seviyesi" alanına "25" yazdım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:03:26] > yaz "Yeniden sipariş adedi" "25"
+[2026-08-28 23:03:29] ✔ "Yeniden sipariş adedi" alanına "25" yazdım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:03:32] > tikla "Kaydet"
+[2026-08-28 23:03:35] ✔ "Kaydet" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-28 23:03:38] > bekle "2"
+[2026-08-28 23:03:40] ✔ 2 saniye bekledim ⏎ ⚑ ÇIKAN BİLDİRİM: ✓Ürün bilgileri güncellendi.× ⏎ 
+[2026-08-28 23:03:48] > geri 
+[2026-08-28 23:03:51] ✔ bir önceki sayfaya döndüm ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:02:43] OTURUM AÇILDI — Kerem Aydın (Makine Mühendisi)
+[2026-08-29 06:04:25] OTURUM AÇILDI — Kerem Aydın (Makine Mühendisi)
+[2026-08-29 06:07:39] > bak 
+[2026-08-29 06:07:39] SAYFA: Roven — AI Destekli ERP ⏎ ADRES: /dashboard ⏎ 
+[2026-08-29 06:07:45] > git "Tedarikçiler"
+[2026-08-29 06:07:48] ✔ sol menüden "Tedarikçiler" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:07:54] > satir "China Langge"
+[2026-08-29 06:07:57] ✔ "China Langge" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:08:10] > tikla "Fully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik"
+[2026-08-29 06:08:12] ✔ "Fully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:08:16] > tikla "Tedarik"
+[2026-08-29 06:08:19] ✔ "Tedarik" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:08:25] > tikla "Düzenle"
+[2026-08-29 06:08:27] ✔ "Düzenle" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:08:47] > yaz "Tercihli tedarikçi" "Garlock Türkiye"
+[2026-08-29 06:08:50] ✔ "Tercihli tedarikçi" alanına "Garlock Türkiye" yazdım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:08:56] > tikla "İptal"
+[2026-08-29 06:08:58] ✔ "İptal" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:09:04] > git "Fiyat Talepleri"
+[2026-08-29 06:09:07] ✔ sol menüden "Fiyat Talepleri" bölümüne girdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:09:11] > satir "RFQ-2026-0001"
+[2026-08-29 06:09:14] ✔ "RFQ-2026-0001" satırını açtım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:09:18] > bekle "2"
+[2026-08-29 06:09:22] ✔ 2 saniye bekledim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:09:28] > tikla "Belge"
+[2026-08-29 06:09:31] ✔ "Belge" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:09:36] > geri 
+[2026-08-29 06:09:39] ✔ bir önceki sayfaya döndüm ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:09:43] > tikla "Yeni Fiyat Talebi"
+[2026-08-29 06:09:45] ✔ "Yeni Fiyat Talebi" düğmesine bastım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:09:54] > bekle "2"
+[2026-08-29 06:09:58] ✔ 2 saniye bekledim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:10:09] > sec "Kalem 1 ürün" "FWBV-DN400-PN80-PH — Fully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik"
+[2026-08-29 06:10:11] ✔ "Kalem 1 ürün" alanında "FWBV-DN400-PN80-PH — Fully Welded Ball Valve DN400 PN80 Pnömatik-Hidrolik" seçtim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:10:24] > yaz "Başlık" "SIM Test RFQ - FWBV-DN400 teknik şartname denemesi"
+[2026-08-29 06:10:28] ✔ "Başlık" alanına "SIM Test RFQ - FWBV-DN400 teknik şartname denemesi" yazdım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:10:34] > yaz "Notlar" "Teknik şartname: PN80 basınç sınıfı, tam kaynaklı gövde, pnömatik-hidrolik aktüatörlü. Malzeme sertifikası EN 10204 3.1 zorunlu. Hidrostatik test raporu talep edilir."
+[2026-08-29 06:10:41] ✔ "Notlar" alanına "Teknik şartname: PN80 basınç sınıfı, tam kaynaklı gövde, pnömatik-hidrolik aktüatörlü. Malzeme sertifikası EN 10204 3.1 zorunlu. Hidrostatik test raporu talep edilir." yazdım ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:10:48] > isaretle "China Langge Valve Technology Co., LtdÖnerilen"
+[2026-08-29 06:10:48] ✖ "China Langge Valve Technology Co., LtdÖnerilen" adında kutucuk BULAMADIM. ⏎ Ekranda şunlar var: Başlık · Para Birimi · Yanıt Son Tarihi · Kalem 1 ürün · Kalem 1 miktar · Kalem 1 birim · Kalem 1 teslim · Albrecht-Automatik GmbH · Bulonsan A.Ş. · China Langge Valve Technology Co., LtdÖnerilen · Garlock Türkiye · PMT Suluova Fabrikası · Notlar ⏎ 
+[2026-08-29 06:10:54] > isaretle "China Langge"
+[2026-08-29 06:10:56] ✔ "China Langge" kutucuğunu değiştirdim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
+[2026-08-29 06:11:01] > tikla "Talep Oluştur"
+[2026-08-29 06:11:03] ✔ "Talep Oluştur" düğmesine bastım ⏎ ⚑ ÇIKAN BİLDİRİM: ✓Fiyat talebi oluşturuldu: RFQ-2026-0003× ⏎ 
+[2026-08-29 06:11:08] > bekle "2"
+[2026-08-29 06:11:12] ✔ 2 saniye bekledim ⏎ (hiçbir bildirim çıkmadı) ⏎ 
