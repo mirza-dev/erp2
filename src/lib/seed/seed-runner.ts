@@ -601,6 +601,26 @@ export async function runSeed(supabase: Service): Promise<Record<string, unknown
     );
     if (pvlErr) throw new Error("Product vendor links: " + pvlErr.message);
 
+    // Tercihli tedarikçinin İKİ temsili var ve senkron kalmak zorunda:
+    // `product_vendor_links.is_preferred` (gerçek kayıt) ve
+    // `products.preferred_vendor_id` (denormalize — satın alma ÖNERİSİ bunu okur,
+    // purchase/suggested/page.tsx:1239 tedarikçiye göre gruplar).
+    // `dbUpsertProductVendorLink` ikisini birlikte yazar; seed alt tabloya
+    // doğrudan insert ettiği için senkronu ATLIYORDU. Sonuç: ürün kartında
+    // tedarikçi adı doğru görünüyor (seed `preferred_vendor` metnini yazıyor)
+    // ama ID boş kalıyor → öneri tedarikçiyi göremiyor, HER kalem "tedarikçisiz"
+    // kovasına düşüyor. Canlıda 6 üründe bu ayrışma vardı (2026-08-29).
+    // `check:chains` 5. zinciri bu ayrışmayı artık yakalar.
+    for (const l of SEED_VENDOR_LINKS.filter(v => v.preferred)) {
+        const vendorId = vendorMap.get(l.vendor);
+        if (!vendorId) throw new Error(`Tercihli tedarikçi çözülemedi: ${l.vendor} (${l.sku})`);
+        const { error: prefErr } = await supabase
+            .from("products")
+            .update({ preferred_vendor_id: vendorId, preferred_vendor: l.vendor })
+            .eq("id", bySku(l.sku).id);
+        if (prefErr) throw new Error(`Tercihli tedarikçi senkronu (${l.sku}): ${prefErr.message}`);
+    }
+
     // ── 13. Hareketler (üretim + PO teslim + sevkiyat + sayım) ──────────────
     const movementRows: Array<Record<string, unknown>> = [];
     for (const e of SEED_PRODUCTION) {

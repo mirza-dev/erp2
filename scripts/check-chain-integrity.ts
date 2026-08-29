@@ -109,6 +109,33 @@ async function main() {
     if (producedTotal === productionMvTotal) ok(`üretim (${producedTotal}) = production hareketi (${productionMvTotal})`);
     else bad(`üretim ${producedTotal} ≠ production hareketi ${productionMvTotal}`);
 
+    // ── 5. Tercihli tedarikçi → satın alma önerisi ───────────────────────────
+    // İki temsil var ve senkron kalmak ZORUNDA:
+    //   product_vendor_links.is_preferred  (ilişki tablosu — gerçek kayıt)
+    //   products.preferred_vendor_id       (denormalize — öneri BUNU okur)
+    // `dbUpsertProductVendorLink` ikisini birlikte yazar, ama alt tabloya
+    // DOĞRUDAN insert eden her yol (seed gibi) senkronu atlar. Ayrıştıklarında
+    // satın alma önerisi tedarikçiyi göremez, her kalem "tedarikçisiz" kovasına
+    // düşer ve kullanıcı elle seçmek zorunda kalır (2026-08-29: 6 bağ işaretli,
+    // 0 üründe kolon doluydu).
+    console.log("\n5) Tercihli tedarikçi → satın alma önerisi");
+    const { data: prefLinks } = await sb
+        .from("product_vendor_links")
+        .select("product_id,vendor_id")
+        .eq("is_preferred", true);
+    const { data: prefProducts } = await sb
+        .from("products")
+        .select("id,preferred_vendor_id");
+    const prefById = new Map((prefProducts ?? []).map(p => [p.id as string, p.preferred_vendor_id as string | null]));
+    const ayrisan = (prefLinks ?? []).filter(l => prefById.get(l.product_id as string) !== l.vendor_id);
+    if (ayrisan.length === 0) {
+        ok(`tercihli bağ (${(prefLinks ?? []).length}) = products.preferred_vendor_id`);
+    } else {
+        bad(`${ayrisan.length} üründe tercihli bağ var ama products.preferred_vendor_id tutmuyor ` +
+            `→ satın alma önerisi tedarikçiyi göremez ` +
+            `(onarım: npx tsx scripts/repair-preferred-vendor.ts)`);
+    }
+
     console.log(`\n${"─".repeat(60)}`);
     if (failures === 0) {
         console.log("TÜM ZİNCİRLER TUTUYOR ✅");
