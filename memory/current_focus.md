@@ -21,8 +21,17 @@ tsc 0 · lint 0 · **460 dosya / 6353 test** (+148) · build 0 · migration YOK.
 Canlı kanıt: şablon turu **10 sütun elle → 0**; gerçek ürün+tedarikçi ile 7/7
 alan eşleşti, AI olmadan.
 
-**AÇIK:** ANTHROPIC_API_KEY yenileme (kullanıcı) · mig.107 APPLY ·
-`view_import` yalnız admin+satınalma (karar bekliyor) · commit+push yapılmadı.
+**Ardından canlı veri onarımı** (`f7cf988`): 2 yetim taahhüt bağlandı (biri
+"mal geldi" olarak kapandı — stok değişmedi, yalnız künye) + 6 üründe tercihli
+tedarikçi ayrışması giderildi. **Ders: seed alt tabloya doğrudan yazıp
+uygulamanın senkronunu atlıyordu; tedarikçi ADI doğru görünüyordu ama ID boştu
+→ UI doğru, otomasyon kör.** `check:chains` 5. zincir bunu artık yakalar.
+461 dosya / 6363 test · beş zincir yeşil · şüpheli kayıt 27→25.
+
+**AÇIK:** ANTHROPIC_API_KEY yenileme (kullanıcı) · mig.106/107/108 APPLY ·
+`view_import` yalnız admin+satınalma (karar bekliyor) · geçmiş veri göçü
+(sipariş/teklif/fatura — kurulum günü sorusu) · **3 commit main'de, PUSH
+EDİLMEDİ** (`9585c2b` sim · `b7db679` içe aktarım · `f7cf988` veri onarımı).
 
 Detay: [[project_import_module]] · `docs/veri-aktarim-merkezi.md`
 
