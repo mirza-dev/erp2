@@ -12,6 +12,7 @@ import { parseRoles, permissionsForRoles, isProvisionedUser } from "@/lib/auth/p
 import { REMEMBER_COOKIE, shouldPersistSession, applySessionPersistence } from "@/lib/auth/remember";
 import { canAccessPath } from "@/lib/auth/page-access";
 import { hasInternalOperatorAccess } from "@/lib/auth/internal-access";
+import { REQUEST_ID_HEADER, newRequestId } from "@/lib/telemetry/request-id";
 
 // Hiç auth kontrolü yapılmayan path'ler (login'i dahil etmiyoruz — auth'd user redirect için)
 // Not: /api/seed kendi içinde CRON_SECRET veya session kontrolü yapar
@@ -21,7 +22,13 @@ import { hasInternalOperatorAccess } from "@/lib/auth/internal-access";
 // Uyarılar sayfasındaki "AI Öner" butonu bunu tarayıcıdan çağırıyor ama CRON_PATHS'te
 // olduğu için her tık 401 alıyordu; AI bulguları kullanıcıya HİÇ ulaşmıyordu.
 // Route kendi içinde CRON_SECRET OR (oturum + view_alerts) doğrular.
-const ALWAYS_PUBLIC = ["/api/health", "/api/auth/demo", "/api/seed", "/api/alerts/scan", "/api/alerts/ai-suggest", "/api/ai/purchase-copilot", "/api/parasut/oauth/callback", "/api/email/webhooks/resend", "/auth/callback", "/api/quotes/shared"];
+// /api/developer/retention: /api/alerts/scan ile AYNI sınıf — hem saatlik cron
+// (Bearer CRON_SECRET) hem Tanılama ekranındaki "Şimdi temizle" (oturumlu
+// internalOperator) çağırır. Route kendi içinde ikisinden birini doğrular;
+// ikisi de yoksa 401/403 döner. CRON_PATHS'e konulsaydı oturum yolu 401 yerdi.
+// DİKKAT: yalnız bu TEK yol açık — diğer /api/developer/* uçları normal
+// oturum + internalOperator kapısından geçer.
+const ALWAYS_PUBLIC = ["/api/health", "/api/auth/demo", "/api/seed", "/api/alerts/scan", "/api/alerts/ai-suggest", "/api/ai/purchase-copilot", "/api/parasut/oauth/callback", "/api/email/webhooks/resend", "/auth/callback", "/api/quotes/shared", "/api/developer/retention"];
 
 // Sadece CRON_SECRET Bearer token ile erişilir — session bypass YOK
 // Not: /api/alerts/scan ve /api/alerts/ai-suggest buraya dahil DEĞİL — ikisi de
@@ -39,13 +46,34 @@ const CRON_PATHS = [
 ];
 
 /**
+ * Yalnız internal operator'a açık sayfa önekleri.
+ *
+ * Bunlar `page-access.ts` matrisinden AYRI tutulur çünkü matris bir Permission
+ * ister; internalOperator ise permission DEĞİL — müşteriye atanabilen bir rolle
+ * elde edilemeyen, e-posta allowlist'ine bağlı ve `INTERNAL_OPERATOR_EMAILS`
+ * tanımsızken fail-closed olan ayrı bir sinyaldir. Matris kaba ilk kapı
+ * (view_settings), burası ince kapı.
+ */
+const INTERNAL_ONLY_PREFIXES = [
+    "/dashboard/settings/email-deliveries",
+    "/dashboard/developer",
+];
+
+/**
  * M-3 Review (2026-05-25): rate-limit allow path'lerinin TÜMÜNE X-RateLimit-*
  * observability header ekler — NextResponse.next / redirect / 401 ayrımı yok.
  * 429 response zaten kendi header set'iyle dönüyor; bu helper başarılı yol için.
  */
-function withRateHeaders(response: NextResponse, rate: RateCheckResult): NextResponse {
+function withRateHeaders(
+    response: NextResponse,
+    rate: RateCheckResult,
+    requestId: string,
+): NextResponse {
     response.headers.set("X-RateLimit-Limit", String(rate.limit));
     response.headers.set("X-RateLimit-Remaining", String(rate.remaining));
+    // Developer Console §13 — kullanıcı/tarayıcı aynı ID'yi görsün; bir hata
+    // bildirildiğinde "şu isteğe bak" demek için tek referans.
+    response.headers.set(REQUEST_ID_HEADER, requestId);
     return response;
 }
 
@@ -64,6 +92,7 @@ function pageGateRedirect(
     pathname: string,
     perms: Set<import("@/lib/auth/permissions").Permission>,
     rate: RateCheckResult,
+    requestId: string,
     isAdmin = false,
 ): NextResponse | null {
     if (!pathname.startsWith("/dashboard")) return null;
@@ -71,7 +100,7 @@ function pageGateRedirect(
     const url = request.nextUrl.clone();
     url.pathname = "/dashboard";
     url.searchParams.set("forbidden", pathname);
-    return withRateHeaders(NextResponse.redirect(url), rate);
+    return withRateHeaders(NextResponse.redirect(url), rate, requestId);
 }
 
 // proxy.ts convention: Next 16 named export `proxy` veya default export bekler.
@@ -80,12 +109,26 @@ function pageGateRedirect(
 export async function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;
 
+    // ── 0. Request ID (Developer Console §13) ───────────────────────────────
+    // Bu projede korelasyon kimliği HİÇ yoktu: bir hatayla o hataya yol açan
+    // isteği bağlamanın yolu yoktu. ID burada üretilir ve İSTEK başlığına
+    // yazılır; route handler'lar `next/headers` ile okur. Böylece 148 route'un
+    // hiçbirinin imzası değişmez (§21). Yanıt başlığına da basılır.
+    const requestId = newRequestId();
+    const requestHeaders = new Headers(request.headers);
+    requestHeaders.set(REQUEST_ID_HEADER, requestId);
+    const forward = (): NextResponse => {
+        const res = NextResponse.next({ request: { headers: requestHeaders } });
+        res.headers.set(REQUEST_ID_HEADER, requestId);
+        return res;
+    };
+
     // ── 1. /api/health — ABSOLUTE bypass (monitoring, k6 smoke) ─────────────
     // Coolify/UptimeRobot health check 30-60sn/IP frekans — rate limit'e takılırsa
     // izleme kırılır. Diğer eski ALWAYS_PUBLIC endpoint'leri (auth/demo, ai/*) artık
     // rate limit'e tabi (M-3) ama auth gate'i aşağıda atlamaya devam eder.
     if (pathname === "/api/health") {
-        return NextResponse.next();
+        return forward();
     }
 
     // ── 2. CRON_SECRET Bearer — server-to-server bypass ─────────────────────
@@ -95,7 +138,7 @@ export async function proxy(request: NextRequest) {
     const authHeader = request.headers.get("authorization");
     const hasCronSecret = Boolean(cronSecret) && authHeader === `Bearer ${cronSecret}`;
     if (hasCronSecret && CRON_PATHS.some(p => pathname === p)) {
-        return NextResponse.next();
+        return forward();
     }
 
     // ── 3. Rate limit (M-3) — auth-cookie hibrit policy, IP-based key ───────
@@ -132,7 +175,7 @@ export async function proxy(request: NextRequest) {
 
     // ── 4. ALWAYS_PUBLIC bypass (rate limit'ten geçti) ──────────────────────
     if (ALWAYS_PUBLIC.some(p => pathname === p || pathname.startsWith(p + "/"))) {
-        return withRateHeaders(NextResponse.next(), rate);
+        return withRateHeaders(forward(), rate, requestId);
     }
 
     // ── 5. CRON path ama CRON_SECRET yoksa 401 (mevcut M-1 invariant) ──────
@@ -140,11 +183,12 @@ export async function proxy(request: NextRequest) {
         return withRateHeaders(
             NextResponse.json({ error: "CRON_SECRET gerekli." }, { status: 401 }),
             rate,
+            requestId,
         );
     }
 
     // ── 6. Supabase session kontrolü ────────────────────────────────────────
-    let supabaseResponse = NextResponse.next({ request });
+    let supabaseResponse = NextResponse.next({ request: { headers: requestHeaders } });
 
     // C-1: Turbopack Edge Runtime'da createServerClient başarısız olabilir.
     // try-catch ile sarıyoruz — hata durumunda user=null → kimliksiz olarak işlenir.
@@ -162,7 +206,7 @@ export async function proxy(request: NextRequest) {
                         cookiesToSet.forEach(({ name, value }) =>
                             request.cookies.set(name, value)
                         );
-                        supabaseResponse = NextResponse.next({ request });
+                        supabaseResponse = NextResponse.next({ request: { headers: requestHeaders } });
                         // "Beni hatırla" kapalıysa token-refresh yazımları da session cookie kalır.
                         const persist = shouldPersistSession(request.cookies.get(REMEMBER_COOKIE)?.value);
                         cookiesToSet.forEach(({ name, value, options }) =>
@@ -197,25 +241,27 @@ export async function proxy(request: NextRequest) {
                 return withRateHeaders(
                     NextResponse.json({ error: "Bu kaynak için kimlik doğrulama gerekiyor." }, { status: 401 }),
                     rate,
+                    requestId,
                 );
             }
             // Dashboard sayfaları → izin ver (RBAC: demo = viewer muamelesi;
             // viewer'a kapalı sayfalar — settings/parasut/import vb. — demo'ya da kapalı)
             if (pathname.startsWith("/dashboard")) {
                 const demoPerms = permissionsForRoles(["viewer"]);
-                const gated = pageGateRedirect(request, pathname, demoPerms, rate);
+                const gated = pageGateRedirect(request, pathname, demoPerms, rate, requestId);
                 if (gated) return gated;
-                return withRateHeaders(NextResponse.next(), rate);
+                return withRateHeaders(forward(), rate, requestId);
             }
             // GET API → izin ver (DataProvider veri çekebilsin)
             if (pathname.startsWith("/api/") && request.method === "GET") {
-                return withRateHeaders(NextResponse.next(), rate);
+                return withRateHeaders(forward(), rate, requestId);
             }
             // Non-GET API (POST/PATCH/DELETE) → 403
             if (pathname.startsWith("/api/")) {
                 return withRateHeaders(
                     NextResponse.json({ error: "Demo modunda değişiklik yapılamaz." }, { status: 403 }),
                     rate,
+                    requestId,
                 );
             }
             // / veya /login → mevcut davranışa düş
@@ -223,19 +269,20 @@ export async function proxy(request: NextRequest) {
 
         // Public sayfalar — auth gerektirmiyor
         if (pathname === "/login" || pathname === "/") {
-            return withRateHeaders(NextResponse.next(), rate);
+            return withRateHeaders(forward(), rate, requestId);
         }
         // API → 401 JSON
         if (pathname.startsWith("/api/")) {
             return withRateHeaders(
                 NextResponse.json({ error: "Yetkisiz erişim." }, { status: 401 }),
                 rate,
+                requestId,
             );
         }
         // Diğer sayfalar → /login'e yönlendir
         const url = request.nextUrl.clone();
         url.pathname = "/login";
-        return withRateHeaders(NextResponse.redirect(url), rate);
+        return withRateHeaders(NextResponse.redirect(url), rate, requestId);
     }
 
     // ── Davetiye-bazlı erişim kilidi (yalnız bizim oluşturduğumuz kullanıcılar) ──
@@ -250,23 +297,24 @@ export async function proxy(request: NextRequest) {
             return withRateHeaders(
                 NextResponse.json({ error: "Hesabınız yetkili değil. Yöneticinizle iletişime geçin." }, { status: 403 }),
                 rate,
+                requestId,
             );
         }
         // /login → hata mesajıyla göster (döngü yok); diğer tüm sayfalar → /login?error=unauthorized
         if (pathname === "/login") {
-            return withRateHeaders(NextResponse.next(), rate);
+            return withRateHeaders(forward(), rate, requestId);
         }
         const url = request.nextUrl.clone();
         url.pathname = "/login";
         url.searchParams.set("error", "unauthorized");
-        return withRateHeaders(NextResponse.redirect(url), rate);
+        return withRateHeaders(NextResponse.redirect(url), rate, requestId);
     }
 
     // Auth'lu kullanıcı /login veya / → dashboard'a yönlendir
     if (pathname === "/login" || pathname === "/") {
         const url = request.nextUrl.clone();
         url.pathname = "/dashboard";
-        return withRateHeaders(NextResponse.redirect(url), rate);
+        return withRateHeaders(NextResponse.redirect(url), rate, requestId);
     }
 
     // RBAC Faz 2 page-gate — auth'lu kullanıcının rol→permission'ına göre
@@ -274,18 +322,18 @@ export async function proxy(request: NextRequest) {
     const roles = parseRoles(user.app_metadata, user.email, adminEmailsFromEnv());
     const perms = permissionsForRoles(roles);
     if (
-        pathname.startsWith("/dashboard/settings/email-deliveries")
+        INTERNAL_ONLY_PREFIXES.some(p => pathname === p || pathname.startsWith(p + "/"))
         && !hasInternalOperatorAccess(user.email, perms)
     ) {
         const url = request.nextUrl.clone();
         url.pathname = "/dashboard";
         url.searchParams.set("forbidden", pathname);
-        return withRateHeaders(NextResponse.redirect(url), rate);
+        return withRateHeaders(NextResponse.redirect(url), rate, requestId);
     }
-    const gated = pageGateRedirect(request, pathname, perms, rate, roles.includes("admin"));
+    const gated = pageGateRedirect(request, pathname, perms, rate, requestId, roles.includes("admin"));
     if (gated) return gated;
 
-    return withRateHeaders(supabaseResponse, rate);
+    return withRateHeaders(supabaseResponse, rate, requestId);
 }
 
 // Backward-compat alias — mevcut testler `import { middleware } from "../../middleware"`

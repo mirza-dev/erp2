@@ -153,12 +153,26 @@ jobs:
             -X POST "$APP_URL/api/parasut/poll-e-documents" \
             -H "Authorization: Bearer $CRON_SECRET"
 
+      # Developer Console telemetri retention (migration 109). Süresi dolmuş
+      # hata olayları / sistem olayları / istek metrikleri silinir; kapalı ve
+      # hiçbir bug'a bağlı olmayan eski hata grupları düşer. Bu adım olmadan
+      # telemetri tabloları sınırsız büyür.
+      - name: Telemetri — retention temizliği
+        id: telemetry_retention
+        continue-on-error: true
+        timeout-minutes: 5
+        run: |
+          curl --retry 3 --retry-delay 20 --max-time 60 -fsSL \
+            -X POST "$APP_URL/api/developer/retention" \
+            -H "Authorization: Bearer $CRON_SECRET"
+
       - name: Summary (fail job if any step failed)
         if: always()
         env:
           OUTCOMES: |
             email_retry=${{ steps.email_retry.outcome }}
             parasut_poll=${{ steps.parasut_poll.outcome }}
+            telemetry_retention=${{ steps.telemetry_retention.outcome }}
         run: |
           echo "$OUTCOMES"
           fails=$(echo "$OUTCOMES" | grep -c "=failure" || true)

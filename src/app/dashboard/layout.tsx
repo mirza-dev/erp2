@@ -10,6 +10,7 @@ import { ToastProvider } from "@/components/ui/Toast";
 import { ThemeProvider } from "@/lib/theme/use-theme";
 import DemoBanner from "@/components/ui/DemoBanner";
 import RealtimeSyncBridge from "@/components/layout/RealtimeSyncBridge";
+import TelemetryBridge from "@/components/layout/TelemetryBridge";
 import ForbiddenBanner from "@/components/ui/ForbiddenBanner";
 import { isDemoMode, clearDemoMode } from "@/lib/demo-utils";
 import { useRouter } from "next/navigation";
@@ -37,6 +38,9 @@ export default function DashboardLayout({
             {/* Başka kullanıcıların değişikliklerini bu sekmeye canlı yansıtır.
                 SWRConfig sınırının İÇİNDE olmak zorunda — hiçbir şey çizmez. */}
             <RealtimeSyncBridge />
+            {/* Developer Console RUM toplayıcısı — global fetch'i sarar,
+                hiçbir şey çizmez. Kapsam bilinçli olarak dashboard. */}
+            <TelemetryBridge />
             <PermissionProvider>
             <ToastProvider>
                 <div

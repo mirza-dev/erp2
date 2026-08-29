@@ -1,9 +1,29 @@
 # Roven — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-08-29_
+_Son güncelleme: 2026-08-30_
 
 > Bu bölüm yalnız **güncel durumu + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda ve `memory/current_focus.md`'de. Aşağıdaki indeks son dönem oturumlarına (commit + konu) hızlı bakış içindir; daha eski dönemler (Faz 2–3d AI Import, Sprint A–C, M-3 Rate Limiting, React Doctor, Teklif V2–V7 plan turları, Paraşüt Faz 1–11) git geçmişinde.
+
+**Son tamamlanan iş:** **Developer Console / System Health Panel** (2026-08-30; GREEN; **migration 109 — APPLY BEKLİYOR**; 6713 test; **yeni bağımlılık 0**). 30 maddelik şartname; #0 kodlamadan önce tam repo denetimi istiyordu ve **denetimin asıl çıktısı ne KURULMAYACAĞI oldu.**
+
+**Kurulmayanlar.** Sentry v10.48 ZATEN kuruluydu (3 kök config + `sentry-scrub.ts`) → §27 gereği entegre edildi, ikinci monitoring kurulmadı. `internalOperator` (`INTERNAL_OPERATOR_EMAILS` allowlist ∧ `view_settings`, env boşsa fail-closed) tam olarak istenen "developer rolü"ydü → **yeni rol/permission icat edilmedi**; `/dashboard/settings/email-deliveries` de aranan 4 katmanlı kalıbın çalışan örneğiydi, birebir genişletildi. Gerçekten yoktu: **request/correlation ID** ve yapısal log.
+
+**Güvenlik 4 katman:** `proxy.ts` `INTERNAL_ONLY_PREFIXES` · `page-access.ts` (`view_settings`) · her route `requireInternalOperatorFor` · RLS `service_role`-only. Test `/api/developer` dizinini **enumerate eder** → guard'sız yeni uç eklenemez.
+
+**Üç kanca, iş mantığına sıfır dokunuş (§21).** `handleApiError` 115/148 route; kalan 33'ü kendi try/catch'ini yazıp hatayı yutuyordu → YENİ `src/instrumentation.ts` `onRequestError` (önce `Sentry.captureRequestError`, sonra `recordError`; **`register()` export ETMEZ** — kök Sentry kurulumu devralınmasın). Request ID `proxy.ts`'te üretilip **İSTEK başlığına** yazılıyor, `handleApiError` `next/headers` ile okuyor → **148 route'un hiçbirinin imzası değişmedi**; bir test iş modüllerinde `recordError` ararsa kırılıyor.
+
+**Performans = istemci RUM (mimari kısıt).** Next.js middleware handler'dan ÖNCE bitiyor, yanıt süresini/status'u göremiyor. `jsonFetcher` yalnız 2 dosyada (ham `fetch` 58 dosyada) → global `fetch` tek noktadan sarıldı (`TelemetryBridge`). Panel bunu açıkça yazıyor: ağ süresi dahil, yalnız UI'ın çağırdığı uçlar.
+
+**Migration 109** — 6 tablo + 3 RPC. `fingerprint` UNIQUE + `on conflict do update`; ciddiyet yalnız YUKARI çıkar; çözülmüş grup yeniden patlarsa **yeniden açılır**. Büyüme: grup başına **saatte 20 olay** örneklenir (`occurrence_count` tam), `expires_at` + saatlik cron purge, bug'a bağlı grup asla silinmez. Kayıtlar YENİ log borusu kurmuyor — `audit_log`/`integration_sync_logs`/`email_logs`/`maintenance_incidents` + telemetri **okurken** birleşiyor.
+
+**Build iki gerçek kusur yakaladı:** `node:crypto` hem Edge derlemesine hem **istemci bundle'ına** sızıyordu → fingerprint **FNV-1a 64** (bağımlılıksız, sync) + sabitler `telemetry/console-types.ts`'e; bug sabitleri istemci sayfasında sunucu modülünden geliyordu → service-role istemcisi tarayıcıya gidecekti, aynı modül kapattı (test kilitliyor). **Redaksiyonda üç açık testle bulundu** (kod açığı, test hatası değil): JSON-tırnaklı anahtar · Türkçe `parola`/`şifre` (JS'te `\w` ASCII → `\bşifre` asla eşleşmez) · `Bearer` şemasının de yenmesi. **Mevcut iki test haklı olarak kırıldı** ve sözleşmeleri yeni konumunda korundu: `topbar-title.ts` kaydı · `reliable-internal-email` proxy literali.
+
+tsc 0 · lint 0 · **476 dosya / 6713 test** (+209) · build **0 uyarı** · migration 109.
+
+**AÇIK (kullanıcı tarafı):** **migration 109 APPLY** · **`INTERNAL_OPERATOR_EMAILS` set edilmeden panel fail-closed** (kimse giremez) · tarayıcı turu.
+
+<details><summary>Önceki: Ayarlar üçlüsü — eleştirel inceleme + 5 blok</summary>
 
 **Son tamamlanan iş:** **Ayarlar üçlüsü — eleştirel inceleme + 5 blok** (2026-08-29; GREEN; **migration YOK**; 6504 test). Kullanıcı Ayarlar / Teknik Şablonlar / Not Şablonları'nı gösterip *"tamamen objektif ve eleştirel ol, işlevsel mi gereksiz mi"* dedi; inceleme 8 bulgu çıkardı, bloklar hâlinde kapatıldı.
 
@@ -22,6 +42,8 @@ _Son güncelleme: 2026-08-29_
 tsc 0 · lint 0 · **467 dosya / 6504 test** · build 0 · **migration YOK**.
 
 **AÇIK:** tarayıcı turu (modal Escape/focus tuzağı · yazılı onay · PageHeader · test e-postası butonu) · `ANTHROPIC_API_KEY` yenileme · kalan **14 dialog yüzeyi** (kritik akışlar, teslim öncesi bilinçli ertelendi).
+
+</details>
 
 <details><summary>Önceki: Veri Aktarım Merkezi — kurulum aracına dönüştürme</summary>
 

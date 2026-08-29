@@ -5,6 +5,78 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-08-30 — Developer Console / System Health Panel (migration 109)
+
+Kullanıcı 30 maddelik bir şartname verdi: yalnız geliştiricinin eriştiği bir
+observability paneli, "ERP'yi yeniden yazma projesine dönüşmeden". Şart #0
+kodlamadan önce tam repo denetimi istiyordu ve **denetimin asıl çıktısı ne
+KURULMAYACAĞI oldu**.
+
+**Zaten var olanlar (yenisi kurulmadı).** Sentry v10.48 kuruluydu (3 kök config
++ `sentry-scrub.ts` PII temizliği + release workflow) → §27 gereği entegre
+edildi, ikinci monitoring kurulmadı. `internalOperator`
+(`INTERNAL_OPERATOR_EMAILS` allowlist ∧ `view_settings`, env boşsa fail-closed)
+tam olarak istenen "developer rolü"ydü → yeni rol/permission İCAT EDİLMEDİ.
+`/dashboard/settings/email-deliveries` de aranan 4 katmanlı kalıbın çalışan
+örneğiydi → birebir genişletildi. **Gerçekten yoktu:** request/correlation ID
+(grep ile doğrulandı) ve yapısal log.
+
+**Kullanıcı kararları (AskUserQuestion):** tek turda 6 ekran · performans =
+istemci RUM · yakalama = `handleApiError` + `onRequestError` (istemci hata
+ingest'i YOK) · panel dili Türkçe.
+
+**Üç kanca, iş mantığına sıfır dokunuş (§21).** `handleApiError` 115/148
+route'u kapsıyor; kalan 33'ü kendi try/catch'ini yazıp hatayı yutuyordu →
+YENİ `src/instrumentation.ts` `onRequestError` (önce
+`Sentry.captureRequestError`, sonra `recordError`; **`register()` export
+ETMEZ** — kök Sentry kurulumu devralınmasın). Request ID `proxy.ts`'te üretilip
+İSTEK başlığına yazılıyor, `handleApiError` `next/headers` ile okuyor →
+**148 route'un hiçbirinin imzası değişmedi.** Bir test bu sınırı kilitliyor:
+iş modüllerinde `recordError` çağrısı ararsa kırılıyor.
+
+**Performans ölçümünün mimari kısıtı.** Next.js middleware handler'dan ÖNCE
+çalışıp bitiyor — yanıt süresini ve status'u göremiyor. Sunucu latency'sini
+148 route'a dokunmadan ölçmenin yolu yok; bu yüzden istemci RUM seçildi.
+`jsonFetcher` yalnız 2 dosyada kullanılıyordu (ham `fetch` 58 dosyada) →
+fetcher'ı sarmak paneli neredeyse boş bırakırdı; global `fetch` tek noktadan
+sarıldı (`TelemetryBridge`, dashboard layout). Panel bunu açıkça yazıyor:
+"ağ süresi dahildir, yalnız UI'ın çağırdığı uçlar".
+
+**Migration 109** — 6 tablo + 3 RPC. Hata gruplama `fingerprint` UNIQUE +
+`on conflict do update`; ciddiyet yalnız YUKARI çıkar; çözülmüş grup yeniden
+patlarsa yeniden açılır. Büyüme kontrolü: grup başına **saatte 20 olay**
+örneklenir (`occurrence_count` tam kalır), `expires_at` + saatlik cron purge,
+bug'a bağlı grup asla silinmez. Kayıtlar ekranı YENİ bir log borusu kurmuyor —
+`audit_log` · `integration_sync_logs` · `email_logs` ·
+`maintenance_incidents` + telemetri okurken birleştiriliyor (sıfır yazma yükü).
+
+**Build iki gerçek kusur yakaladı.** (1) `node:crypto` hem Edge instrumentation
+derlemesine hem **istemci bundle'ına** sızıyordu (ciddiyet sabiti `fingerprint.ts`'ten
+import ediliyordu) → parmak izi **FNV-1a 64**'e döndü (bağımlılıksız, sync, her
+runtime'da aynı; kriptografik güç gereksiz) ve sabitler
+`telemetry/console-types.ts`'e taşındı. (2) Bug sabitleri istemci sayfasında
+sunucu modülünden import ediliyordu → service-role Supabase istemcisi tarayıcı
+bundle'ına gidecekti; aynı ortak tip modülü bunu da kapattı. Bir test artık
+istemci sayfalarının `@/lib/supabase/*` import etmediğini kilitliyor.
+
+**Redaksiyonda üç gerçek açık testle bulundu** (test hatası değil, kod açığı):
+JSON-tırnaklı anahtar (`{"password":"x"}`) eşleşmiyordu · Türkçe anahtar
+sözcükleri (`parola`, `şifre`) listede yoktu — Türkçe bir uygulamada gerçek
+vaka · `Authorization: Bearer` şeması da yeniyordu. Üçü de düzeltildi;
+`\b` yerine açık sınır grubu kullanıldı (JS'te `\w` yalnız ASCII, `\bşifre`
+asla eşleşmez).
+
+**Mevcut iki test kırıldı, ikisi de haklıydı** ve sözleşmeleri yeni konumunda
+korunarak güncellendi: yeni sayfalar `topbar-title.ts`'e kaydedilmemişti ·
+`reliable-internal-email` proxy'deki tek koşulun literalini kilitliyordu
+(artık `INTERNAL_ONLY_PREFIXES` listesi).
+
+tsc 0 · lint 0 · **476 dosya / 6713 test** (+209) · build 0 uyarı ·
+**yeni bağımlılık 0**.
+
+**AÇIK (kullanıcı tarafı):** migration 109 APPLY · `INTERNAL_OPERATOR_EMAILS`
+set edilmeden panel fail-closed (kimse giremez) · tarayıcı turu.
+
 ## 2026-08-29 — Ayarlar üçlüsü: eleştirel inceleme + 5 blok (Blok 0-4)
 
 Kullanıcı üç sidebar satırını gösterip *"tamamen objektif ve eleştirel ol, ne

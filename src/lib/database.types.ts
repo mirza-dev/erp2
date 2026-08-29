@@ -1068,3 +1068,97 @@ export interface MaintenanceIncidentRow {
     resolved_by:  string | null
     updated_at:   string
 }
+
+// ── Developer Console / telemetri (migration 109) ─────────────────────────
+
+export type TelemetrySeverity = "info" | "warning" | "error" | "critical"
+export type ErrorGroupStatus = "open" | "investigating" | "ignored" | "resolved"
+export type DeveloperBugStatus =
+    "open" | "investigating" | "in_progress" | "fixed" | "closed" | "ignored"
+export type DeveloperBugPriority = "low" | "medium" | "high" | "critical"
+
+export interface SystemErrorGroupRow {
+    id:                 string
+    fingerprint:        string
+    title:              string
+    error_type:         string | null
+    normalized_message: string
+    severity:           TelemetrySeverity
+    module:             string | null
+    endpoint:           string | null
+    environment:        string
+    status:             ErrorGroupStatus
+    occurrence_count:   number
+    first_seen_at:      string
+    last_seen_at:       string
+    resolved_at:        string | null
+    resolved_by:        string | null
+    updated_at:         string
+}
+
+export interface SystemErrorEventRow {
+    id:          string
+    group_id:    string
+    occurred_at: string
+    request_id:  string | null
+    endpoint:    string | null
+    method:      string | null
+    status_code: number | null
+    user_id:     string | null
+    environment: string
+    user_agent:  string | null
+    stack:       string | null
+    context:     Json | null
+    expires_at:  string
+}
+
+export interface SystemEventRow {
+    id:          string
+    occurred_at: string
+    level:       TelemetrySeverity
+    message:     string
+    module:      string | null
+    endpoint:    string | null
+    request_id:  string | null
+    user_id:     string | null
+    environment: string
+    context:     Json | null
+    expires_at:  string
+}
+
+export interface DeveloperBugRow {
+    id:              string
+    title:           string
+    description:     string | null
+    status:          DeveloperBugStatus
+    priority:        DeveloperBugPriority
+    developer_notes: string | null
+    created_by:      string | null
+    assigned_to:     string | null
+    created_at:      string
+    updated_at:      string
+    closed_at:       string | null
+}
+
+export interface DeveloperBugErrorRow {
+    bug_id:         string
+    error_group_id: string
+    linked_at:      string
+}
+
+export interface RequestMetricRow {
+    id:           string
+    bucket_at:    string
+    endpoint:     string
+    method:       string
+    sample_count: number
+    sum_ms:       number
+    max_ms:       number
+    histogram:    number[]
+    status_2xx:   number
+    status_3xx:   number
+    status_4xx:   number
+    status_5xx:   number
+    expires_at:   string
+    updated_at:   string
+}

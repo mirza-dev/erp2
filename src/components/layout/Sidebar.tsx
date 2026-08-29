@@ -16,12 +16,13 @@ import {
     Settings,
     ShoppingBag,
     SlidersHorizontal,
+    TerminalSquare,
     TrendingUp,
     TriangleAlert,
     Truck,
+    type LucideIcon,
     UploadCloud,
     Users,
-    type LucideIcon,
 } from "lucide-react";
 import { useDashboardCounters } from "@/lib/data-context";
 import { isDemoMode, clearDemoMode } from "@/lib/demo-utils";
@@ -133,7 +134,10 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
                 { label: "Ayarlar", href: "/dashboard/settings", icon: Settings, exact: true },
                 { label: "Kullanıcılar", href: "/dashboard/settings/users", icon: Users },
                 ...(internalOperator
-                    ? [{ label: "E-posta Teslimatları", href: "/dashboard/settings/email-deliveries", icon: MailCheck }]
+                    ? [
+                        { label: "E-posta Teslimatları", href: "/dashboard/settings/email-deliveries", icon: MailCheck },
+                        { label: "Developer Console", href: "/dashboard/developer", icon: TerminalSquare },
+                    ]
                     : []),
             ],
         },

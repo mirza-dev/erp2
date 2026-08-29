@@ -92,8 +92,16 @@ describe("reliable internal email source invariants", () => {
         }
         expect(page).toContain('aria-label="E-posta teslimat detayı"');
         expect(page).toContain("Güvenli hata özeti");
+        // 2026-08-30 — Developer Console eklenirken tek koşul bir LİSTEYE
+        // dönüştü (INTERNAL_ONLY_PREFIXES). Sözleşme aynı: bu sayfa middleware
+        // seviyesinde internalOperator olmadan açılamaz — iddia yeni konumunda
+        // doğrulanıyor, gevşetilmiyor.
         const proxy = source("src/proxy.ts");
-        expect(proxy).toContain('pathname.startsWith("/dashboard/settings/email-deliveries")');
+        expect(proxy).toContain("INTERNAL_ONLY_PREFIXES");
+        expect(proxy).toContain('"/dashboard/settings/email-deliveries"');
+        expect(proxy).toMatch(
+            /INTERNAL_ONLY_PREFIXES\.some\(p => pathname === p \|\| pathname\.startsWith\(p \+ "\/"\)\)/,
+        );
         expect(proxy).toContain("!hasInternalOperatorAccess(user.email, perms)");
     });
 });

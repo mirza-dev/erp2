@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { ConfigError } from "@/lib/supabase/service";
+import { recordError, scheduleTelemetry } from "@/lib/telemetry/record";
 
 /**
  * Central error handler for API routes.
@@ -17,6 +18,7 @@ import { ConfigError } from "@/lib/supabase/service";
 export function handleApiError(err: unknown, label: string): NextResponse {
     if (err instanceof ConfigError) {
         console.error(`[CONFIG_ERROR] ${label}`, err.message);
+        capture(err, label, 503);
         return NextResponse.json(
             {
                 error: "Sunucu yapılandırma hatası. Ortam değişkenlerini kontrol edin.",
@@ -38,6 +40,7 @@ export function handleApiError(err: unknown, label: string): NextResponse {
     // teşhis için prod yanıtına da konur (mesaj prod'da gizli kalır).
     const { msg: internalMsg, code: pgCode } = describeError(err);
     console.error(`[${label}]`, pgCode ? `[${pgCode}]` : "", internalMsg);
+    capture(err, label, 500);
 
     // Production: iç hata mesajı sızmasın (yalnız güvenli SQLSTATE kodu)
     const isProduction = process.env.NODE_ENV === "production";
@@ -47,6 +50,26 @@ export function handleApiError(err: unknown, label: string): NextResponse {
         pgCode ? { error: clientMsg, code: pgCode } : { error: clientMsg },
         { status: 500 },
     );
+}
+
+/**
+ * Developer Console telemetri kancası (§21 — merkezi nokta, route'lara dokunmadan).
+ *
+ * Bu fonksiyon 148 route'un 115'inin catch bloğunda çalışıyor; kaydı BURADAN
+ * almak, aynı üç satırı 115 dosyaya kopyalamanın alternatifidir. Kalan 33
+ * route (kendi try/catch'ini yazanlar) + RSC hataları `instrumentation.ts`'in
+ * `onRequestError` kancasından geçer.
+ *
+ * `scheduleTelemetry` yanıt gönderildikten sonra çalışır → istek gecikmez.
+ * `recordError` hiçbir koşulda throw etmez → telemetri arızası ERP'yi bozmaz.
+ *
+ * 400 (numeric overflow) BİLİNÇLİ olarak kaydedilmez: o bir kullanıcı girdisi
+ * doğrulaması, sistem kusuru değil. Her doğrulama reddini hata merkezine
+ * yazmak gerçek hataları gürültüye gömerdi. 4xx sayımı Performans ekranında
+ * (RUM) zaten var.
+ */
+function capture(err: unknown, label: string, statusCode: number): void {
+    scheduleTelemetry(() => recordError({ error: err, label, statusCode }));
 }
 
 /**

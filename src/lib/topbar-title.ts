@@ -24,6 +24,12 @@ const ROUTE_TITLES: Record<string, string> = {
     "/dashboard/settings/note-templates": "Not Şablonları",
     "/dashboard/settings/users": "Kullanıcılar",
     "/dashboard/settings/email-deliveries": "E-posta Teslimatları",
+    "/dashboard/developer": "Developer Console",
+    "/dashboard/developer/errors": "Hatalar",
+    "/dashboard/developer/logs": "Kayıtlar",
+    "/dashboard/developer/bugs": "Bug Takibi",
+    "/dashboard/developer/performance": "Performans",
+    "/dashboard/developer/diagnostics": "Tanılama",
 };
 
 export function getTopbarTitle(pathname: string | null | undefined): string {
@@ -38,5 +44,6 @@ export function getTopbarTitle(pathname: string | null | undefined): string {
     if (/^\/dashboard\/purchase\/rfqs\/[^/]+$/.test(path)) return "Fiyat Talebi Detayı";
     if (/^\/dashboard\/settings\/product-types\/[^/]+$/.test(path)) return "Teknik Şablon Detayı";
     if (/^\/dashboard\/import\/extract\/[^/]+$/.test(path)) return "Veri İnceleme";
+    if (/^\/dashboard\/developer\/errors\/[^/]+$/.test(path)) return "Hata Detayı";
     return "Roven";
 }

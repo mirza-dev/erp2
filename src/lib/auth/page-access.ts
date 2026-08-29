@@ -23,6 +23,11 @@ export interface PageAccessRule {
  * /dashboard exact ayrı ele alınır (aşağıda), çünkü her şey startsWith eder.
  */
 export const PAGE_ACCESS: PageAccessRule[] = [
+    // Developer Console — KABA ilk kapı. Gerçek kapı `proxy.ts`'teki
+    // INTERNAL_ONLY_PREFIXES + internalOperator kontrolü; buradaki satır
+    // matrisin "bilinmeyen /dashboard/* → yalnız admin" fail-closed'ına
+    // güvenmek yerine niyeti AÇIKÇA yazar (yeni sayfa sessizce sızmasın).
+    { prefix: "/dashboard/developer", permission: "view_settings" },
     { prefix: "/dashboard/settings/email-deliveries", permission: "view_settings" },
     { prefix: "/dashboard/settings/users", permission: "view_users" },
     // 2026-08-29 — `view_products` idi. O izin satış/üretim/viewer'da da var, oysa
