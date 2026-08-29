@@ -3,6 +3,7 @@ import { dbRecountStock, dbTryResolveShortages } from "@/lib/supabase/products";
 import { safeParseJson } from "@/lib/api-error";
 import { requirePermission, getCurrentUserId } from "@/lib/auth/role-guard";
 import { revalidateTag } from "next/cache";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -76,6 +77,8 @@ export async function POST(req: NextRequest) {
         }
 
         revalidateTag("products", "max");
+        // Diğer kullanıcıların ekranları anında tazelensin (ateşle-unut).
+        void broadcastDataChange(["products"]);
         return NextResponse.json({
             ok: true,
             new_on_hand: result.new_on_hand,

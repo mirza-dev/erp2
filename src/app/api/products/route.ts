@@ -9,6 +9,7 @@ import { getCurrentUserPermissions, requirePermission } from "@/lib/auth/role-gu
 import { redactProductsForPerms } from "@/lib/auth/redact";
 import { unstable_cache, revalidateTag } from "next/cache";
 import { appendServerTiming, startSpan } from "@/lib/server-timing";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 type EnrichedProduct = Awaited<ReturnType<typeof dbListProducts>>[number] & {
     quoted: number;
@@ -183,6 +184,8 @@ export async function POST(req: NextRequest) {
         const enriched = enrichProducts([product], quotedMap, incomingMap)[0];
         // RBAC R3: yeni ürün response'unda yetkisiz fiyat/maliyet sızmasın.
         const perms = await getCurrentUserPermissions(req);
+        // Diğer kullanıcıların ekranları anında tazelensin (ateşle-unut).
+        void broadcastDataChange(["products"]);
         return NextResponse.json(redactProductsForPerms([enriched], perms)[0], { status: 201 });
     } catch (err: unknown) {
         // ConfigError (missing env) → 503 before anything else

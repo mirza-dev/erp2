@@ -4,6 +4,7 @@ import { dbListProductionEntries } from "@/lib/supabase/production";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { revalidateTag } from "next/cache";
 import { resolveAuthContext, requirePermissionFor } from "@/lib/auth/role-guard";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 // GET /api/production?product_id=xxx&limit=50&since=YYYY-MM-DD
 export async function GET(req: NextRequest) {
@@ -60,6 +61,8 @@ export async function POST(req: NextRequest) {
         }
 
         revalidateTag("products", "max");
+        // Diğer kullanıcıların ekranları anında tazelensin (ateşle-unut).
+        void broadcastDataChange(["production", "products"]);
         return NextResponse.json({ entry_id: result.entry_id }, { status: 201 });
     } catch (err) {
         return handleApiError(err, "POST /api/production");

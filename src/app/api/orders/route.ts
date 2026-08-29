@@ -15,6 +15,7 @@ import { actorFromAuthContext, resolveAuthContext, requirePermissionFor } from "
 import { redactOrdersForPerms } from "@/lib/auth/redact";
 import { revalidateTag } from "next/cache";
 import { appendServerTiming, startSpan } from "@/lib/server-timing";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 // GET /api/orders?commercial_status=approved&customer_id=xxx&page=1
 // GET /api/orders?all=1[&commercial_status=...&customer_id=...]
@@ -113,6 +114,8 @@ export async function POST(req: NextRequest) {
         );
 
         revalidateTag("products", "max");
+        // Diğer kullanıcıların ekranları anında tazelensin (ateşle-unut).
+        void broadcastDataChange(["orders", "products"]);
         return NextResponse.json(
             submitError ? { ...result, submitError }
                 : createShortages?.length ? { ...finalOrder, shortages: createShortages }

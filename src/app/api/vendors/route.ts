@@ -3,6 +3,7 @@ import { dbListVendors, dbCreateVendor } from "@/lib/supabase/vendors";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 import { requirePermission, getCurrentUserId } from "@/lib/auth/role-guard";
 import { unstable_cache, revalidateTag } from "next/cache";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 const getCachedVendors = unstable_cache(
     () => dbListVendors({ isActive: true }),
@@ -63,6 +64,8 @@ export async function POST(req: NextRequest) {
         }, await getCurrentUserId());
 
         revalidateTag("vendors", "max");
+        // Diğer kullanıcıların ekranları anında tazelensin (ateşle-unut).
+        void broadcastDataChange(["vendors"]);
         return NextResponse.json(vendor, { status: 201 });
     } catch (err) {
         if (err instanceof Error && (

@@ -7,6 +7,7 @@ import {
 } from "@/lib/supabase/products";
 import { safeParseJson } from "@/lib/api-error";
 import { requirePermission } from "@/lib/auth/role-guard";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 // GET /api/inventory/movements?product_id=xxx&limit=50
 export async function GET(req: NextRequest) {
@@ -68,6 +69,8 @@ export async function POST(req: NextRequest) {
             }
         }
 
+        // Diğer kullanıcıların ekranları anında tazelensin (ateşle-unut).
+        void broadcastDataChange(["products"]);
         return NextResponse.json({ ok: true, new_on_hand: result.new_on_hand }, { status: 201 });
     } catch (err) {
         console.error("[POST /api/inventory/movements]", err);

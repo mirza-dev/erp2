@@ -4,6 +4,7 @@ import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-
 import { getCurrentUserPermissions, requirePermission } from "@/lib/auth/role-guard";
 import { redactCustomersForPerms } from "@/lib/auth/redact";
 import { unstable_cache, revalidateTag } from "next/cache";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 const getCachedCustomers = unstable_cache(
     () => dbListCustomers(),
@@ -50,6 +51,8 @@ export async function POST(req: NextRequest) {
         }
         const customer = await dbCreateCustomer(body);
         revalidateTag("customers", "max");
+        // Diğer kullanıcıların ekranları anında tazelensin (ateşle-unut).
+        void broadcastDataChange(["customers"]);
         return NextResponse.json(customer, { status: 201 });
     } catch (err) {
         return handleApiError(err, "POST /api/customers");
