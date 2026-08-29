@@ -12,7 +12,9 @@ export type ExcelImportTemplateKind =
     | "vendor"
     | "stock_count"
     | "stock_movement"
-    | "vendor_product_relation";
+    | "vendor_product_relation"
+    | "order"
+    | "order_line";
 
 export type ClassicImportEntityType =
     | "product"
@@ -122,7 +124,9 @@ export interface ExcelTemplateColumn {
 
 export interface ExcelTemplateDefinition {
     kind: ExcelImportTemplateKind;
-    entityType: ClassicImportEntityType;
+    // ManualSheetType — otomatik tespit edilebilen 4 tipten geniş: sipariş
+    // şablonları da burada tanımlanıyor (import-service onları işliyor).
+    entityType: ManualSheetType;
     operationType: string;
     title: string;
     sheetName: string;
@@ -207,6 +211,39 @@ const vendorProductColumns: ExcelTemplateColumn[] = [
     { field: "notes", label: "Tedarikçi Notu", required: false, example: "Ana tedarik ilişkisi", note: "Tedarikçi-ürün ilişkisine yazılır; ürünün kendi notu değildir." },
 ];
 
+/**
+ * Sipariş başlığı — açık siparişlerin sisteme taşınması için (kurulum günü).
+ *
+ * `import-service.ts` sipariş dalı bunları okuyor: cariyi ÖNCE müşteri koduyla,
+ * bulamazsa adıyla eşleştiriyor; `quote_number` verilirse teklife bağlıyor;
+ * KDV'yi genel toplamdan ayrıştırıyor.
+ *
+ * DOMAIN KURALI: içe aktarılan sipariş HER ZAMAN taslak açılır, asla onaylı
+ * değil — bu yüzden stok rezerve edilmez. Onay ekrandan verilir, rezervasyon
+ * o an oluşur.
+ */
+const orderColumns: ExcelTemplateColumn[] = [
+    { field: "original_order_number", label: "Sipariş No", required: false, example: "SIP-2026-0142", note: "Kendi sipariş numaranız. Sipariş Kalemleri sayfası bununla eşleşir." },
+    { field: "customer_code", label: "Müşteri Kodu", required: false, example: "C-1001", note: "En güçlü eşleşme sinyali; yoksa firma adı kullanılır." },
+    { field: "customer_name", label: "Müşteri Adı", required: true, example: "Star Rafineri A.Ş.", note: "Cariyle eşleşmezse sipariş 'Bilinmeyen Müşteri' ile açılır." },
+    { field: "currency", label: "Para Birimi", required: false, example: "USD", note: "TRY, USD veya EUR." },
+    { field: "grand_total", label: "Toplam Tutar", required: false, example: 33600, note: "KDV DAHİL genel toplam. KDV otomatik ayrıştırılır." },
+    { field: "incoterm", label: "Incoterm", required: false, example: "EXW", note: "Opsiyonel." },
+    { field: "planned_shipment_date", label: "Planlanan Sevk Tarihi", required: false, example: "2026-09-30", note: "YYYY-AA-GG." },
+    { field: "quote_number", label: "Teklif No", required: false, example: "TKL-2026-015", note: "Varsa siparişi o teklife bağlar." },
+    { field: "notes", label: "Notlar", required: false, example: "Eski sistemden aktarıldı", note: "Opsiyonel." },
+];
+
+/** Sipariş kalemleri — Sipariş No ile başlık sayfasına bağlanır. */
+const orderLineColumns: ExcelTemplateColumn[] = [
+    { field: "order_number", label: "Sipariş No", required: true, example: "SIP-2026-0142", note: "Siparişler sayfasındaki numarayla birebir aynı olmalı." },
+    { field: "product_sku", label: "Ürün SKU", required: true, example: "GV-A105-600", note: "Ürün kartıyla eşleşmezse satır reddedilir." },
+    { field: "quantity", label: "Miktar", required: false, example: 12, note: "Adet." },
+    { field: "unit", label: "Birim", required: false, example: "adet", note: "Boşsa ürünün kendi birimi kullanılır." },
+    { field: "unit_price", label: "Birim Fiyat", required: false, example: 1200, note: "KDV hariç birim fiyat." },
+    { field: "line_total", label: "Toplam", required: false, example: 14400, note: "Boşsa miktar × birim fiyattan hesaplanır." },
+];
+
 export const EXCEL_IMPORT_TEMPLATES: Record<ExcelImportTemplateKind, ExcelTemplateDefinition> = {
     product: {
         kind: "product",
@@ -252,6 +289,24 @@ export const EXCEL_IMPORT_TEMPLATES: Record<ExcelImportTemplateKind, ExcelTempla
         sheetName: "Stok_Hareketleri",
         description: "Giriş, çıkış veya transfer stok hareketlerini işlemek için.",
         columns: stockMovementColumns,
+    },
+    order: {
+        kind: "order",
+        entityType: "order",
+        operationType: "order_import",
+        title: "Siparişler",
+        sheetName: "Siparisler",
+        description: "Devam eden açık siparişleri sisteme taşımak için. Siparişler TASLAK açılır — stok rezerve edilmez, onayı siz verirsiniz.",
+        columns: orderColumns,
+    },
+    order_line: {
+        kind: "order_line",
+        entityType: "order_line",
+        operationType: "order_line_import",
+        title: "Sipariş Kalemleri",
+        sheetName: "Siparis_Kalemleri",
+        description: "Sipariş satırları. Siparişler sayfasıyla AYNI dosyada olmalı — başlıklar önce, kalemler sonra işlenir.",
+        columns: orderLineColumns,
     },
     vendor_product_relation: {
         kind: "vendor_product_relation",
@@ -495,15 +550,15 @@ export function mapHeaderToField(header: string, entityType: string): string | n
  */
 export function applyManualSheetEntityType<
     T extends { entityType: string | null; displayName: string; entity: string; status: string; selected: boolean },
->(sheet: T, entityType: ClassicImportEntityType | null): T {
+>(sheet: T, entityType: ManualSheetType | null): T {
     if (!entityType) {
         return { ...sheet, entityType: null, status: "unsupported", selected: false };
     }
     return {
         ...sheet,
         entityType,
-        displayName: CLASSIC_IMPORT_ENTITY_LABELS[entityType],
-        entity: CLASSIC_IMPORT_ENTITY_LABELS[entityType],
+        displayName: MANUAL_SHEET_TYPE_LABELS[entityType],
+        entity: MANUAL_SHEET_TYPE_LABELS[entityType],
         status: "importable",
         selected: true,
     };
@@ -516,6 +571,54 @@ export const CLASSIC_IMPORT_ENTITY_LABELS: Record<ClassicImportEntityType, strin
     vendor: "Tedarikçiler",
     stock: "Stok",
 };
+
+/**
+ * Aktarım servisinin İŞLEDİĞİ tüm sheet türleri.
+ *
+ * `EXCEL_IMPORT_ENTITY_TYPES` (4 tip) ile karıştırılmamalı — o liste OTOMATİK
+ * TESPİT skorlaması için; alias tabloları yalnız o dördü kapsıyor. Buradaki
+ * liste kullanıcının ELLE atayabileceği türler: `import-service.ts` sipariş,
+ * sipariş kalemi, teklif, sevkiyat, fatura ve tahsilat dallarını da işliyor
+ * (`entity_type === "order"` vb.), ama sheet adı tam `Siparisler` /
+ * `Siparis_Kalemleri` gibi bilinen bir ad değilse kullanıcının bunu söylemesinin
+ * hiçbir yolu yoktu — "Sayfa1" adlı bir sipariş dosyası kolon sinyaliyle
+ * `customer` sanılıyordu (2026-08-29).
+ *
+ * Sıra ekranda göründüğü sıradır: önce kurulum akışının dört tipi, sonra
+ * geçmiş/işlem verisi.
+ */
+export const MANUAL_SHEET_TYPES = [
+    "product",
+    "customer",
+    "vendor",
+    "stock",
+    "quote",
+    "order",
+    "order_line",
+    "shipment",
+    "invoice",
+    "payment",
+] as const;
+
+export type ManualSheetType = (typeof MANUAL_SHEET_TYPES)[number];
+
+/** Elle atanabilen her türün kullanıcıya görünen adı. */
+export const MANUAL_SHEET_TYPE_LABELS: Record<ManualSheetType, string> = {
+    product: "Ürünler",
+    customer: "Müşteriler",
+    vendor: "Tedarikçiler",
+    stock: "Stok",
+    quote: "Teklifler",
+    order: "Siparişler",
+    order_line: "Sipariş Kalemleri",
+    shipment: "Sevkiyatlar",
+    invoice: "Faturalar",
+    payment: "Tahsilatlar",
+};
+
+export function isManualSheetType(value: unknown): value is ManualSheetType {
+    return typeof value === "string" && (MANUAL_SHEET_TYPES as readonly string[]).includes(value);
+}
 
 export function detectSheetEntityType(
     sheetName: string,

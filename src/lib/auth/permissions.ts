@@ -96,6 +96,11 @@ const PRODUCTION_PERMS: Permission[] = [
     "stock_adjust_general",
     "view_production", "manage_production", "delete_production",
     "view_sales_orders", "ship_sales_orders",
+    // Kurulum günü kararı (2026-08-29): vardiya sorumlusu dönemsel stok sayım
+    // dosyasını kendisi yükleyebilsin. Finansal alanlar bu rolde ZATEN kapalı
+    // (view_sales_prices/view_purchase_costs yok) — aktarım da onları yazamaz,
+    // import-center FINANCIAL_IMPORT_FIELDS ile ayrı kapıda süzüyor.
+    "view_import", "manage_import",
     "view_alerts", "manage_alerts",
 ];
 
@@ -108,6 +113,10 @@ const ACCOUNTING_PERMS: Permission[] = [
     "view_customers",
     "view_vendors",
     "view_parasut", "manage_parasut",
+    // Kurulum günü kararı (2026-08-29): muhasebeci cari/tedarikçi listesini
+    // kendisi yükleyebilsin — kurulumda dosya yükleme tek kişide sıkışmasın.
+    // Risk dar: aktarımda her satır onaydan geçer ve muhasebe zaten fiyat görüyor.
+    "view_import", "manage_import",
     "view_sales_prices", "view_purchase_costs", "view_financial_summary",
 ];
 

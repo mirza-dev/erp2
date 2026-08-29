@@ -24,12 +24,13 @@ import { stashImportFile, takeImportFile } from "@/lib/import-file-transfer";
 import {
     applyManualSheetEntityType,
     CLASSIC_IMPORT_ENTITY_LABELS,
+    MANUAL_SHEET_TYPES,
+    MANUAL_SHEET_TYPE_LABELS,
+    type ManualSheetType,
     detectSheetEntityType,
-    EXCEL_IMPORT_ENTITY_TYPES,
     EXCEL_IMPORT_TEMPLATES,
     FINANCIAL_IMPORT_FIELDS,
     isExcelImportTemplateKind,
-    type ClassicImportEntityType,
     type ExcelImportTemplateKind,
     type ImportFieldApproval,
 } from "@/lib/import-center";
@@ -352,7 +353,7 @@ export default function ImportExcelWizardPage() {
      *
      * `null` → "Aktarma" (sheet devre dışı, örn. kapak/açıklama sayfası).
      */
-    const setSheetEntityType = (idx: number, entityType: ClassicImportEntityType | null) => {
+    const setSheetEntityType = (idx: number, entityType: ManualSheetType | null) => {
         setSheets(prev => prev.map((s, i) => i === idx ? applyManualSheetEntityType(s, entityType) : s));
         // Tür değişti → o sheet için önceden hesaplanmış kolon eşleştirmesi
         // artık başka bir entity'ye aitti, geçersiz.
@@ -930,7 +931,7 @@ export default function ImportExcelWizardPage() {
                                         onChange={e => {
                                             e.stopPropagation();
                                             const v = e.target.value;
-                                            setSheetEntityType(idx, v === "" ? null : (v as ClassicImportEntityType));
+                                            setSheetEntityType(idx, v === "" ? null : (v as ManualSheetType));
                                         }}
                                         style={{
                                             fontSize: "11px", padding: "3px 6px", borderRadius: "4px",
@@ -940,8 +941,8 @@ export default function ImportExcelWizardPage() {
                                         }}
                                     >
                                         <option value="">— Aktarma —</option>
-                                        {EXCEL_IMPORT_ENTITY_TYPES.map(t => (
-                                            <option key={t} value={t}>{CLASSIC_IMPORT_ENTITY_LABELS[t]}</option>
+                                        {MANUAL_SHEET_TYPES.map(t => (
+                                            <option key={t} value={t}>{MANUAL_SHEET_TYPE_LABELS[t]}</option>
                                         ))}
                                     </select>
 

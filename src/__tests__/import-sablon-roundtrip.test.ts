@@ -37,6 +37,11 @@ const KIND_ENTITY: Record<ExcelImportTemplateKind, string> = {
     // "Tedarikci_Urunleri" → entityType "product"); SKU eşleşen mevcut ürüne
     // tedarikçi bağı kurulur.
     vendor_product_relation: "product",
+    // Kurulum günü kararı (2026-08-29): açık siparişlerin taşınması için şablon.
+    // import-service bu tipleri zaten işliyordu; eksik olan şablon + elle
+    // tür seçimiydi.
+    order: "order",
+    order_line: "order_line",
 };
 
 describe("tek normalizer — normalizeColumnName ile normalizeImportToken ayrışmamalı", () => {

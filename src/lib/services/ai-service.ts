@@ -334,7 +334,10 @@ export const FALLBACK_FIELD_MAP: Record<string, Record<string, string>> = {
         musteri_kodu: "customer_code", musteri_adi: "customer_name", firma_adi: "customer_name",
         para_birimi: "currency",
         toplam_tutar_usd: "grand_total", toplam_tutar: "grand_total", tutar: "grand_total",
-        notlar: "notes", not: "notes",
+        genel_toplam: "grand_total",
+        musteri: "customer_name", unvan: "customer_name", cari: "customer_name",
+        cari_kodu: "customer_code",
+        notlar: "notes", not: "notes", aciklama: "notes",
         incoterm: "incoterm",
         planlanan_sevk_tarihi: "planned_shipment_date",
         teklif_no: "quote_number",
@@ -342,11 +345,13 @@ export const FALLBACK_FIELD_MAP: Record<string, Record<string, string>> = {
     },
     order_line: {
         siparis_no: "order_number",
-        urun_kodu: "product_sku",
-        miktar: "quantity",
-        birim: "unit",
-        birim_fiyat_usd: "unit_price",
-        toplam_tutar_usd: "line_total",
+        urun_kodu: "product_sku", stok_kodu: "product_sku", urun_sku: "product_sku", sku: "product_sku",
+        miktar: "quantity", adet: "quantity",
+        birim: "unit", olcu_birimi: "unit", br: "unit",
+        // "Birim Fiyat (USD)" tanınıyordu ama sade "Birim Fiyat" tanınmıyordu —
+        // şablonun kendi kolonu bile eşleşmiyordu (2026-08-29).
+        birim_fiyat_usd: "unit_price", birim_fiyat: "unit_price", fiyat: "unit_price",
+        toplam_tutar_usd: "line_total", toplam: "line_total", satir_toplami: "line_total",
     },
     quote: {
         teklif_no: "quote_number",
