@@ -7,7 +7,7 @@ const read = (file: string) => readFileSync(join(process.cwd(), file), "utf8");
 const CUSTOMERS = read("src/app/dashboard/customers/CustomersClient.tsx");
 const PURCHASE_ORDERS = read("src/app/dashboard/purchase/orders/PurchaseOrdersClient.tsx");
 const PRODUCTS = read("src/app/dashboard/products/page.tsx");
-const NOTE_TEMPLATES = read("src/app/dashboard/settings/note-templates/page.tsx");
+const NOTE_TEMPLATES = read("src/components/settings/NoteTemplatesTab.tsx");
 const QUOTES = read("src/app/dashboard/quotes/QuotesClient.tsx");
 const ORDERS = read("src/app/dashboard/orders/OrdersClient.tsx");
 

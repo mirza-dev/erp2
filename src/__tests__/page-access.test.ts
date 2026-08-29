@@ -28,7 +28,7 @@ describe("requiredPermissionForPath", () => {
 
     it("spesifiklik sırası: settings/users settings'ten önce", () => {
         expect(requiredPermissionForPath("/dashboard/settings/users")).toBe("view_users");
-        expect(requiredPermissionForPath("/dashboard/settings/product-types")).toBe("view_products");
+        expect(requiredPermissionForPath("/dashboard/settings/product-types")).toBe("view_product_types");
         expect(requiredPermissionForPath("/dashboard/settings/note-templates")).toBe("view_settings");
         expect(requiredPermissionForPath("/dashboard/settings")).toBe("view_dashboard");
         expect(requiredPermissionForPath("/dashboard/settings/company")).toBeNull();
@@ -97,6 +97,8 @@ describe("canAccessPath — rol bazlı", () => {
         expect(canAccessPath("/dashboard/quotes", production)).toBe(false);
         expect(canAccessPath("/dashboard/vendors", production)).toBe(false);
         expect(canAccessPath("/dashboard/parasut", production)).toBe(false);
+        // Ürün GÖRÜR ama katalog ŞEMASINI değiştiremez → sayfa da kapalı.
+        expect(canAccessPath("/dashboard/settings/product-types", production)).toBe(false);
     });
 
     it("accounting: parasut/PO/vendors/quotes(view)/customers/kişisel settings VAR; production/alerts YOK", () => {
@@ -122,7 +124,10 @@ describe("canAccessPath — rol bazlı", () => {
         expect(canAccessPath("/dashboard/production", viewer)).toBe(false);
         expect(canAccessPath("/dashboard/import", viewer)).toBe(false);
         expect(canAccessPath("/dashboard/settings", viewer)).toBe(true);
-        expect(canAccessPath("/dashboard/settings/product-types", viewer)).toBe(true);
+        // 2026-08-29: `view_products` → `view_product_types`. Viewer teknik
+        // şablonları GÖREMEZ artık — hiçbirini düzenleyemiyordu zaten (mutasyon
+        // uçları manage_* istiyor), sayfa yalnız etkin-ama-403 buton gösteriyordu.
+        expect(canAccessPath("/dashboard/settings/product-types", viewer)).toBe(false);
         expect(canAccessPath("/dashboard/settings/users", viewer)).toBe(false);
         expect(canAccessPath("/dashboard/settings/note-templates", viewer)).toBe(false);
         expect(canAccessPath("/dashboard/settings/company", viewer)).toBe(false);

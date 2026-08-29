@@ -1,10 +1,27 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import Button from "@/components/ui/Button";
+import Modal from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { RotateCcw } from "lucide-react";
+
+/**
+ * Tehlikeli Bölge — tüm iş verisini siler, yerine demo seed yükler.
+ *
+ * 2026-08-29 — YAZILI ONAY. Bu bölüm eskiden tek "Emin misiniz?" diyaloğunun
+ * arkasındaydı ve adı ("Demo Verisini Sıfırla") yaptığı işten çok daha masum
+ * duruyordu. Kritik gerçek: **ayrı bir geliştirme veritabanı YOK** — yerel
+ * `.env.local` da fabrikanın canlı Supabase projesine bakıyor. Yani buradaki
+ * tek yanlış tık, gerçek sipariş/teklif/stok verisini götürür ve geri alınamaz.
+ *
+ * Bu yüzden ortam-bazlı gizleme (dev'de göster, prod'da gizle) burada anlamsız:
+ * gizlenecek bir "prod" ayrımı yok. Bariyer eylemin kendisine kondu — admin
+ * firma adını BİREBİR yazmadan buton açılmıyor ve aynı metin sunucuya da
+ * gidiyor (`/api/seed` oturum yolunda `confirm` alanını `company_settings.name`
+ * ile karşılaştırır). Böylece onay kozmetik değil, uygulanan bir kural.
+ */
 
 type SeedResponse = {
     ok: true;
@@ -25,19 +42,49 @@ export default function ResetDemoSection() {
     const { toast } = useToast();
     const [showConfirm, setShowConfirm] = useState(false);
     const [busy, setBusy] = useState(false);
+    const [companyName, setCompanyName] = useState<string | null>(null);
+    const [typed, setTyped] = useState("");
+
+    // Firma adı onay anahtarı — sunucu da aynı değerle karşılaştırır.
+    useEffect(() => {
+        const ctrl = new AbortController();
+        fetch("/api/settings/company", { signal: ctrl.signal })
+            .then(r => (r.ok ? r.json() : null))
+            .then(s => {
+                if (s && typeof s.name === "string") setCompanyName(s.name.trim());
+            })
+            .catch(() => {/* iptal veya ağ hatası — onay kilidi kapalı kalır */});
+        return () => ctrl.abort();
+    }, []);
+
+    // Firma adı okunamadıysa buton AÇILMAZ (fail-closed): doğrulanamayan onay
+    // onay değildir; sunucu da bu durumda 503 döner.
+    const confirmed = companyName !== null && companyName.length > 0 && typed.trim() === companyName;
 
     const handleClick = () => {
         if (isDemo) {
             toast({ type: "info", message: DEMO_BLOCK_TOAST });
             return;
         }
+        setTyped("");
         setShowConfirm(true);
     };
 
+    const closeConfirm = () => {
+        if (busy) return;
+        setShowConfirm(false);
+        setTyped("");
+    };
+
     const handleConfirm = async () => {
+        if (!confirmed) return;
         setBusy(true);
         try {
-            const res = await fetch("/api/seed", { method: "POST" });
+            const res = await fetch("/api/seed", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ confirm: typed.trim() }),
+            });
             if (!res.ok) {
                 const errBody = (await res.json().catch(() => ({}))) as { error?: string };
                 throw new Error(errBody.error ?? `HTTP ${res.status}`);
@@ -88,7 +135,7 @@ export default function ResetDemoSection() {
                     marginBottom: "6px",
                 }}
             >
-                Demo Verisini Sıfırla
+                Tüm Veriyi Sil ve Demo Yükle
             </div>
             <div
                 style={{
@@ -99,9 +146,11 @@ export default function ResetDemoSection() {
                     maxWidth: "560px",
                 }}
             >
-                Tüm sipariş, ürün, müşteri, teklif, AI öneri, import ve uyarı verilerini siler.
+                Bu işlem <strong style={{ color: "var(--danger-text)" }}>canlı veritabanında</strong> çalışır:
+                tüm sipariş, ürün, müşteri, teklif, AI öneri, import ve uyarı verilerini siler.
                 Yerine sade demo seed (8 ürün, 4 müşteri, 7 sipariş, 3 teklif) yükler.
-                <strong style={{ color: "var(--danger-text)" }}> Bu işlem geri alınamaz.</strong>
+                <strong style={{ color: "var(--danger-text)" }}> Geri alınamaz.</strong> Onaylamak
+                için firma adını elle yazmanız gerekir.
             </div>
             <Button
                 variant="dangerSoft"
@@ -114,33 +163,14 @@ export default function ResetDemoSection() {
             </Button>
 
             {showConfirm && (
-                <div
-                    style={{
-                        position: "fixed",
-                        inset: 0,
-                        background: "rgba(0,0,0,0.6)",
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "center",
-                        zIndex: 1000,
-                        padding: "20px",
-                    }}
-                    onClick={() => !busy && setShowConfirm(false)}
+                // `dismissible={!busy}`: sıfırlama sürerken Escape/dış tıklama
+                // kapatmaz — eski `onClick={() => !busy && ...}` guard'ının aynısı.
+                <Modal
+                    onClose={closeConfirm}
+                    labelledBy="reset-demo-confirm-title"
+                    width="min(440px, calc(100vw - 28px))"
+                    dismissible={!busy}
                 >
-                    <div
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="reset-demo-confirm-title"
-                        style={{
-                            background: "var(--bg-secondary)",
-                            border: "0.5px solid var(--border-secondary)",
-                            borderRadius: "10px",
-                            padding: "24px 26px",
-                            maxWidth: "440px",
-                            width: "100%",
-                        }}
-                        onClick={(e) => e.stopPropagation()}
-                    >
                         <div
                             id="reset-demo-confirm-title"
                             style={{
@@ -157,28 +187,52 @@ export default function ResetDemoSection() {
                                 fontSize: "13px",
                                 color: "var(--text-secondary)",
                                 lineHeight: 1.6,
-                                marginBottom: "20px",
+                                marginBottom: "16px",
                             }}
                         >
                             Bu işlem mevcut tüm operasyonel veriyi (sipariş, ürün, müşteri, teklif, AI öneri,
                             import, uyarı) silecek ve yerine demo seed yükleyecek. İş verisi kaybedilirse
                             geri getirilemez.
-                            {busy && (
-                                <div
-                                    style={{
-                                        marginTop: "14px",
-                                        fontSize: "12px",
-                                        color: "var(--accent-text)",
-                                    }}
-                                >
-                                    Sıfırlanıyor… 10-30 saniye sürebilir.
-                                </div>
-                            )}
                         </div>
-                        <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+
+                        <label
+                            htmlFor="reset-demo-confirm-input"
+                            style={{ fontSize: "12px", color: "var(--text-secondary)", display: "block", marginBottom: "6px" }}
+                        >
+                            {companyName
+                                ? <>Onaylamak için firma adını yazın: <strong style={{ color: "var(--text-primary)" }}>{companyName}</strong></>
+                                : "Firma adı okunamadı — sıfırlama onaylanamıyor."}
+                        </label>
+                        <input
+                            id="reset-demo-confirm-input"
+                            type="text"
+                            value={typed}
+                            onChange={(e) => setTyped(e.target.value)}
+                            disabled={busy || !companyName}
+                            autoComplete="off"
+                            placeholder={companyName ?? ""}
+                            style={{
+                                width: "100%",
+                                boxSizing: "border-box",
+                                fontSize: "13px",
+                                padding: "8px 10px",
+                                borderRadius: "6px",
+                                border: `var(--line-width) solid ${confirmed ? "var(--success-border)" : "var(--border-secondary)"}`,
+                                background: "var(--input-bg)",
+                                color: "var(--text-primary)",
+                            }}
+                        />
+
+                        {busy && (
+                            <div style={{ marginTop: "12px", fontSize: "12px", color: "var(--accent-text)" }}>
+                                Sıfırlanıyor… 10-30 saniye sürebilir.
+                            </div>
+                        )}
+
+                        <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", marginTop: "20px" }}>
                             <Button
                                 variant="secondary"
-                                onClick={() => setShowConfirm(false)}
+                                onClick={closeConfirm}
                                 disabled={busy}
                             >
                                 İptal
@@ -187,13 +241,13 @@ export default function ResetDemoSection() {
                                 variant="danger"
                                 leftIcon={<RotateCcw size={14} />}
                                 onClick={handleConfirm}
-                                disabled={busy}
+                                disabled={busy || !confirmed}
+                                title={!confirmed ? "Firma adını birebir yazın." : undefined}
                             >
                                 {busy ? "Sıfırlanıyor…" : "Evet, sıfırla"}
                             </Button>
                         </div>
-                    </div>
-                </div>
+                </Modal>
             )}
         </div>
     );

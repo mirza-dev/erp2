@@ -55,6 +55,8 @@ export async function PATCH(
             err.message.includes("metinler olmalı") ||
             err.message.includes("zaten var") ||
             err.message.includes("çakışıyor") ||
+            // field_key rename reddi (2026-08-29) — bu anahtar olmadan 500'e düşerdi.
+            err.message.includes("değiştirilemez") ||
             err.message.includes("tam sayı")
         )) {
             return NextResponse.json({ error: err.message }, { status: 400 });

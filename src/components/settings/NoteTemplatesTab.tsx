@@ -1,0 +1,353 @@
+"use client";
+
+import { useEffect, useState, useCallback } from "react";
+import Button from "@/components/ui/Button";
+import Modal, { ConfirmModal } from "@/components/ui/Modal";
+import { useToast } from "@/components/ui/Toast";
+import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
+import type { NoteTemplate, NoteTemplateKind } from "@/lib/mock-data";
+import { CircleOff, Eye, Pencil, Plus, RotateCcw } from "lucide-react";
+import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
+import { fieldStyle } from "@/components/ui/Input";
+
+/**
+ * Ayarlar → Not Şablonları.
+ *
+ * 2026-08-29'a kadar `/dashboard/settings/note-templates` altında KENDİ SAYFASIYDI
+ * ve sidebar'da "Ayarlar" ile kardeş duruyordu. 8 satırlık, tek tüketicisi olan
+ * (QuoteForm şablon picker'ı) bir CRUD ekranı üst düzey navigasyon yeri işgal
+ * ediyor, Ayarlar'ı da merkez olmaktan çıkarıyordu. Sekmeye alındı; eski URL
+ * yönlendirme olarak korunuyor.
+ *
+ * Sayfa kabuğu (başlık, açıklama, kirli-form rozeti) artık Ayarlar panelinden
+ * geliyor — burada tekrar edilmez.
+ */
+
+export const KIND_META: Record<NoteTemplateKind, { label: string; badge: string }> = {
+    notes: { label: "Notlar & Şartlar", badge: "Not" },
+    delivery: { label: "Teslimat", badge: "Teslimat" },
+    payment: { label: "Ödeme", badge: "Ödeme" },
+    general: { label: "Genel", badge: "Genel" },
+};
+
+const KIND_ORDER: NoteTemplateKind[] = ["notes", "delivery", "payment", "general"];
+
+const rowStyle: React.CSSProperties = {
+    display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px",
+    background: "var(--bg-secondary)", border: "0.5px solid var(--border-tertiary)",
+    borderRadius: "8px", padding: "12px 14px", marginBottom: "10px",
+};
+const badgeStyle: React.CSSProperties = {
+    display: "inline-block", fontSize: "10px", padding: "2px 6px",
+    background: "var(--accent-bg)", color: "var(--accent-text)", borderRadius: "4px", marginRight: "8px",
+};
+// Ortak form alanı stili — token tek kaynaktan (`--input-bg`/`--input-border`/
+// `--line-width`). Eskiden burada 0.5px + `--border-secondary` + `--bg-tertiary`
+// vardı; koyu temada fark görünmüyordu ama AYDINLIK temada her form ekranı
+// farklı duruyordu (2026-08-24 tespiti).
+const inputStyle: React.CSSProperties = fieldStyle("lg");
+const labelStyle: React.CSSProperties = { fontSize: "12px", color: "var(--text-secondary)", marginBottom: "4px", display: "block" };
+const errStyle: React.CSSProperties = { color: "var(--danger)", fontSize: "12px", marginTop: "8px" };
+
+type FilterKind = NoteTemplateKind | "all";
+
+export default function NoteTemplatesTab() {
+    const { toast } = useToast();
+    const isDemo = useIsDemo();
+
+    const [templates, setTemplates] = useState<NoteTemplate[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+    const [filter, setFilter] = useState<FilterKind>("all");
+    // 2026-08-29 — "Pasifleri Göster". Öncesinde pasifleştirilen şablon UI'dan da
+    // API'den de kalıcı kayboluyordu (route `includeInactive` geçmiyordu, geri
+    // getirecek buton yoktu) → soft-delete fiilen hard delete gibiydi. Teknik
+    // Şablonlar sayfasındaki kalıbın aynısı.
+    const [showInactive, setShowInactive] = useState(false);
+    // window.confirm yerine temalı onay (2026-08-29). Nativ diyalog tarayıcıyı
+    // bloklar, temaya uymaz ve metni biçimlendirilemez.
+    const [pendingConfirm, setPendingConfirm] = useState<
+        { title: string; message: string; confirmLabel: string; onConfirm: () => void } | null
+    >(null);
+
+    // Form modal (create + edit)
+    const [showForm, setShowForm] = useState(false);
+    const [editingId, setEditingId] = useState<string | null>(null);
+    const [formKind, setFormKind] = useState<NoteTemplateKind>("notes");
+    const [formTitle, setFormTitle] = useState("");
+    const [formBody, setFormBody] = useState("");
+    const [formSort, setFormSort] = useState("0");
+    const [formError, setFormError] = useState<string | null>(null);
+    const [saving, setSaving] = useState(false);
+    const kindCounts = KIND_ORDER.reduce<Record<NoteTemplateKind, number>>((acc, kind) => {
+        acc[kind] = templates.filter((template) => template.kind === kind).length;
+        return acc;
+    }, { notes: 0, delivery: 0, payment: 0, general: 0 });
+
+    const load = useCallback(async () => {
+        setLoading(true);
+        setError(null);
+        try {
+            const res = await fetch(`/api/note-templates${showInactive ? "?includeInactive=1" : ""}`);
+            if (!res.ok) throw new Error("Şablonlar yüklenemedi");
+            setTemplates((await res.json()) as NoteTemplate[]);
+        } catch (e) {
+            setError(e instanceof Error ? e.message : "Bilinmeyen hata");
+        } finally {
+            setLoading(false);
+        }
+    }, [showInactive]);
+
+    useEffect(() => { load(); }, [load]);
+
+    const openCreate = () => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        setEditingId(null);
+        setFormKind(filter === "all" ? "notes" : filter);
+        setFormTitle("");
+        setFormBody("");
+        setFormSort("0");
+        setFormError(null);
+        setShowForm(true);
+    };
+
+    const openEdit = (t: NoteTemplate) => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        setEditingId(t.id);
+        setFormKind(t.kind);
+        setFormTitle(t.title);
+        setFormBody(t.body);
+        setFormSort(String(t.sortOrder));
+        setFormError(null);
+        setShowForm(true);
+    };
+
+    const submitForm = async () => {
+        setFormError(null);
+        if (!formTitle.trim()) { setFormError("Başlık zorunludur."); return; }
+        if (!formBody.trim()) { setFormError("Şablon metni zorunludur."); return; }
+        setSaving(true);
+        try {
+            const payload = {
+                kind: formKind,
+                title: formTitle.trim(),
+                body: formBody,
+                sort_order: Number(formSort) || 0,
+            };
+            const url = editingId ? `/api/note-templates/${editingId}` : "/api/note-templates";
+            const method = editingId ? "PATCH" : "POST";
+            const res = await fetch(url, {
+                method,
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload),
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error ?? "Kaydedilemedi");
+            }
+            toast({ type: "success", message: editingId ? "Şablon güncellendi." : "Şablon oluşturuldu." });
+            setShowForm(false);
+            load();
+        } catch (e) {
+            setFormError(e instanceof Error ? e.message : "Bilinmeyen hata");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const deactivate = (t: NoteTemplate) => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        setPendingConfirm({
+            title: "Şablonu pasifleştir",
+            // Metin eski window.confirm cümlesiyle birebir — davranış değil,
+            // yalnız yüzey değişti.
+            message: `"${t.title}" şablonunu pasifleştirmek istiyor musunuz?`,
+            confirmLabel: "Pasifleştir",
+            onConfirm: () => { setPendingConfirm(null); void runDeactivate(t); },
+        });
+    };
+
+    const runDeactivate = async (t: NoteTemplate) => {
+        try {
+            const res = await fetch(`/api/note-templates/${t.id}`, { method: "DELETE" });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error ?? "Pasifleştirilemedi");
+            }
+            toast({ type: "success", message: "Şablon pasifleştirildi." });
+            load();
+        } catch (e) {
+            toast({ type: "error", message: e instanceof Error ? e.message : "Bilinmeyen hata" });
+        }
+    };
+
+    const reactivate = async (t: NoteTemplate) => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        try {
+            const res = await fetch(`/api/note-templates/${t.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ is_active: true }),
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                throw new Error(data.error ?? "Aktifleştirilemedi");
+            }
+            toast({ type: "success", message: "Şablon aktifleştirildi." });
+            load();
+        } catch (e) {
+            toast({ type: "error", message: e instanceof Error ? e.message : "Bilinmeyen hata" });
+        }
+    };
+
+    const visible = filter === "all" ? templates : templates.filter((t) => t.kind === filter);
+    const inactiveCount = templates.filter((t) => !t.isActive).length;
+
+    return (
+        <div>
+            <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginBottom: "12px" }}>
+                <Button
+                    variant={showInactive ? "primary" : "secondary"}
+                    onClick={() => setShowInactive((v) => !v)}
+                    aria-pressed={showInactive}
+                    leftIcon={<Eye size={14} />}
+                >
+                    Pasifleri Göster{showInactive && inactiveCount > 0 ? ` (${inactiveCount})` : ""}
+                </Button>
+                <Button
+                    size="cta"
+                    leftIcon={<Plus size={15} />}
+                    onClick={openCreate}
+                    disabled={isDemo}
+                    title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                >
+                    Yeni Şablon
+                </Button>
+            </div>
+
+            <UnderlinedFilterTabs
+                ariaLabel="Not şablonu kategorisi filtresi"
+                items={[
+                    { key: "all", label: "Tümü", count: templates.length },
+                    ...KIND_ORDER.map((kind) => ({ key: kind, label: KIND_META[kind].label, count: kindCounts[kind] })),
+                ]}
+                activeKey={filter}
+                onChange={setFilter}
+                style={{ marginBottom: "20px" }}
+            />
+
+            {loading && <div style={{ color: "var(--text-secondary)" }}>Yükleniyor...</div>}
+            {error && (
+                <div style={errStyle} role="alert">
+                    {error} <button type="button" onClick={load} style={{ marginLeft: "8px", textDecoration: "underline", background: "none", border: "none", color: "var(--accent-text)", cursor: "pointer" }}>Yeniden dene</button>
+                </div>
+            )}
+
+            {!loading && !error && visible.map((t) => (
+                <div key={t.id} style={t.isActive ? rowStyle : { ...rowStyle, opacity: 0.55 }}>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ marginBottom: "4px" }}>
+                            <span style={badgeStyle}>{KIND_META[t.kind].badge}</span>
+                            <span style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>{t.title}</span>
+                            {!t.isActive && (
+                                <span style={{
+                                    marginLeft: "8px", fontSize: "10px", padding: "2px 6px", borderRadius: "999px",
+                                    border: "0.5px solid var(--border-secondary)", color: "var(--text-tertiary)",
+                                }}>Pasif</span>
+                            )}
+                        </div>
+                        <div style={{
+                            fontSize: "12px", color: "var(--text-secondary)", whiteSpace: "pre-wrap", lineHeight: 1.4,
+                            // Uzun şart metinleri ayar sayfasını şişirmesin — 3 satır önizleme.
+                            display: "-webkit-box", WebkitLineClamp: 3, WebkitBoxOrient: "vertical", overflow: "hidden",
+                        }}>{t.body}</div>
+                    </div>
+                    <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+                        <Button variant="secondary" leftIcon={<Pencil size={14} />} onClick={() => openEdit(t)} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>Düzenle</Button>
+                        {t.isActive ? (
+                            <Button variant="dangerSoft" leftIcon={<CircleOff size={14} />} onClick={() => deactivate(t)} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>Pasifleştir</Button>
+                        ) : (
+                            <Button variant="success" leftIcon={<RotateCcw size={14} />} onClick={() => reactivate(t)} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>Aktifleştir</Button>
+                        )}
+                    </div>
+                </div>
+            ))}
+
+            {!loading && !error && visible.length === 0 && (
+                <div style={{ color: "var(--text-tertiary)", marginTop: "24px" }}>
+                    Bu kategoride {showInactive ? "hiç" : "aktif"} şablon yok. Yeni Şablon ile ekle.
+                </div>
+            )}
+
+            {showForm && (
+                <Modal onClose={() => setShowForm(false)} ariaLabel={editingId ? "Şablon düzenle" : "Yeni şablon ekle"} dismissible={!saving}>
+                        <h2 style={{ fontSize: "16px", fontWeight: 600, marginBottom: "16px" }}>
+                            {editingId ? "Şablonu Düzenle" : "Yeni Not Şablonu"}
+                        </h2>
+
+                        <label style={labelStyle}>Kategori *</label>
+                        <select
+                            value={formKind}
+                            onChange={(e) => setFormKind(e.target.value as NoteTemplateKind)}
+                            style={inputStyle}
+                            aria-label="Şablon kategorisi"
+                        >
+                            {KIND_ORDER.map((k) => (
+                                <option key={k} value={k}>{KIND_META[k].label}</option>
+                            ))}
+                        </select>
+
+                        <label style={{ ...labelStyle, marginTop: "12px" }}>Başlık *</label>
+                        <input
+                            type="text"
+                            value={formTitle}
+                            onChange={(e) => setFormTitle(e.target.value)}
+                            placeholder="örn: %50 Avans / %50 Sevk"
+                            style={inputStyle}
+                            aria-label="Şablon başlığı"
+                            maxLength={120}
+                            autoFocus
+                        />
+
+                        <label style={{ ...labelStyle, marginTop: "12px" }}>Metin *</label>
+                        <textarea
+                            value={formBody}
+                            onChange={(e) => setFormBody(e.target.value)}
+                            placeholder="Teklife eklenecek metin"
+                            style={{ ...inputStyle, minHeight: "90px", resize: "vertical" as const }}
+                            aria-label="Şablon metni"
+                        />
+
+                        <label style={{ ...labelStyle, marginTop: "12px" }}>Sıralama</label>
+                        <input
+                            type="number"
+                            value={formSort}
+                            onChange={(e) => setFormSort(e.target.value)}
+                            style={inputStyle}
+                            aria-label="Sıralama"
+                            min={0}
+                        />
+
+                        {formError && <div style={errStyle} role="alert" aria-live="polite">{formError}</div>}
+
+                        <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end", marginTop: "16px" }}>
+                            <Button variant="ghost" onClick={() => setShowForm(false)} disabled={saving}>İptal</Button>
+                            <Button onClick={submitForm} disabled={saving || isDemo}>
+                                {saving ? "Kaydediliyor..." : "Kaydet"}
+                            </Button>
+                        </div>
+                </Modal>
+            )}
+
+            {pendingConfirm && (
+                <ConfirmModal
+                    title={pendingConfirm.title}
+                    message={pendingConfirm.message}
+                    confirmLabel={pendingConfirm.confirmLabel}
+                    onConfirm={pendingConfirm.onConfirm}
+                    onCancel={() => setPendingConfirm(null)}
+                />
+            )}
+        </div>
+    );
+}

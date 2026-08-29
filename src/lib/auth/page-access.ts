@@ -25,7 +25,13 @@ export interface PageAccessRule {
 export const PAGE_ACCESS: PageAccessRule[] = [
     { prefix: "/dashboard/settings/email-deliveries", permission: "view_settings" },
     { prefix: "/dashboard/settings/users", permission: "view_users" },
-    { prefix: "/dashboard/settings/product-types", permission: "view_products" },
+    // 2026-08-29 — `view_products` idi. O izin satış/üretim/viewer'da da var, oysa
+    // bu sayfanın TÜM mutasyon uçları `manage_product_types|manage_product_master`
+    // istiyor: o roller sayfayı açıp her butonu etkin görüyor, tıklayınca 403
+    // yiyordu. `view_product_types` tanımlıydı ve satın almaya verilmişti ama
+    // hiçbir yerde uygulanmıyordu (ölü izin) — artık burada uygulanıyor:
+    // görebilen = yapabilen (satın alma + admin).
+    { prefix: "/dashboard/settings/product-types", permission: "view_product_types" },
     { prefix: "/dashboard/settings/note-templates", permission: "view_settings" },
     { prefix: "/dashboard/settings", permission: "view_dashboard", exact: true },
     { prefix: "/dashboard/purchase/suggested", permission: "view_purchase_suggestions" },

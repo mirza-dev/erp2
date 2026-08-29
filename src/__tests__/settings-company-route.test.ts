@@ -128,3 +128,46 @@ describe("PATCH /api/settings/company — server-side validation", () => {
         expect(calledWith).not.toHaveProperty("logo_url");
     });
 });
+
+// ─── Teklif numara biçimi (mig.073 — arayüzü 2026-08-29'da açıldı) ──────────
+
+describe("PATCH /api/settings/company — teklif numara biçimi", () => {
+    it("geçerli önek + ayraç → 200 ve ikisi de yazılır", async () => {
+        const res = await PATCH(makeReq({ quote_number_prefix: "OFR", quote_number_separator: "/" }));
+        expect(res.status).toBe(200);
+        expect(mockDbUpdate).toHaveBeenCalledWith({
+            quote_number_prefix: "OFR",
+            quote_number_separator: "/",
+        });
+    });
+
+    it.each([
+        ["boş önek", ""],
+        ["9 karakter", "ABCDEFGHI"],
+        ["ayraç içeriyor", "TK-L"],
+        ["boşluk içeriyor", "TK L"],
+        ["Türkçe karakter", "TÜR"],
+    ])("geçersiz önek (%s) → 400, hiçbir şey yazılmaz", async (_ad, prefix) => {
+        const res = await PATCH(makeReq({ quote_number_prefix: prefix }));
+        expect(res.status).toBe(400);
+        expect(mockDbUpdate).not.toHaveBeenCalled();
+    });
+
+    it.each([
+        ["iki karakter", "--"],
+        ["rakam", "2"],
+        ["boş", ""],
+        ["harf", "x"],
+    ])("geçersiz ayraç (%s) → 400", async (_ad, sep) => {
+        const res = await PATCH(makeReq({ quote_number_separator: sep }));
+        expect(res.status).toBe(400);
+        expect(mockDbUpdate).not.toHaveBeenCalled();
+    });
+
+    it("alanlar gönderilmezse dokunulmaz (mevcut kayıt korunur)", async () => {
+        await PATCH(makeReq({ name: "PMT" }));
+        const calledWith = mockDbUpdate.mock.calls[0][0];
+        expect(calledWith).not.toHaveProperty("quote_number_prefix");
+        expect(calledWith).not.toHaveProperty("quote_number_separator");
+    });
+});

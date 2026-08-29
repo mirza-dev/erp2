@@ -14,7 +14,7 @@ const PRIMARY_CTA_FILES = [
     "src/app/dashboard/quotes/QuotesClient.tsx",
     "src/app/dashboard/purchase/orders/PurchaseOrdersClient.tsx",
     "src/app/dashboard/settings/product-types/page.tsx",
-    "src/app/dashboard/settings/note-templates/page.tsx",
+    "src/components/settings/NoteTemplatesTab.tsx",
     "src/app/dashboard/settings/users/page.tsx",
 ];
 
@@ -40,7 +40,7 @@ const ACTION_BUTTON_FILES = {
     purchaseOrders: "src/app/dashboard/purchase/orders/PurchaseOrdersClient.tsx",
     purchaseOrderDetail: "src/app/dashboard/purchase/orders/[id]/page.tsx",
     purchaseSuggested: "src/app/dashboard/purchase/suggested/page.tsx",
-    noteTemplates: "src/app/dashboard/settings/note-templates/page.tsx",
+    noteTemplates: "src/components/settings/NoteTemplatesTab.tsx",
     productTypeDetail: "src/app/dashboard/settings/product-types/[id]/page.tsx",
     users: "src/app/dashboard/settings/users/page.tsx",
     resetDemo: "src/components/settings/ResetDemoSection.tsx",

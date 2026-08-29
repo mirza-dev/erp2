@@ -18,6 +18,7 @@ describe("settings-tabs", () => {
         expect(getVisibleSettingsTabs(true, false).map(tab => tab.key)).toEqual([
             "firma",
             "dosyalar",
+            "not-sablonlari",
             "kullanici",
             "bildirimler",
         ]);
@@ -35,11 +36,26 @@ describe("settings-tabs", () => {
         expect(getVisibleSettingsTabs(false, false).some(tab => tab.key === "dosyalar")).toBe(false);
     });
 
+    it("not-sablonlari sekmesi sistem kapsamında, dosyalar'dan hemen sonra", () => {
+        // 2026-08-29: kendi sayfasıydı → Ayarlar sekmesi oldu. Kapsam "system"
+        // olmalı: view_settings olmayan kullanıcı (satış/üretim/viewer) teklif
+        // şablonlarını YÖNETEMEZ — mutasyon uçları zaten admin-only.
+        const visible = getVisibleSettingsTabs(true, false);
+        const tab = visible.find(t => t.key === "not-sablonlari");
+        expect(tab).toBeDefined();
+        expect(tab!.scope).toBe("system");
+        expect(tab!.label).toBe("Not Şablonları");
+        expect(visible.findIndex(t => t.key === "not-sablonlari"))
+            .toBe(visible.findIndex(t => t.key === "dosyalar") + 1);
+        expect(getVisibleSettingsTabs(false, false).some(t => t.key === "not-sablonlari")).toBe(false);
+    });
+
     it("internal admin ayrı bakım grubuyla tüm tabları görür", () => {
         const visible = getVisibleSettingsTabs(true, true);
         expect(visible.map(tab => tab.label)).toEqual([
             "Firma Profili",
             "Dosyalar",
+            "Not Şablonları",
             "API Anahtarları",
             "Yapay Zeka",
             "Kullanıcı Profili",

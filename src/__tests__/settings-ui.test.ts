@@ -29,14 +29,34 @@ const RESET_SRC = readFileSync(
 // ── 1. ResetDemoSection onay modalı a11y (codex korudu) ───────
 
 describe("Ayarlar — ResetDemoSection onay modalı a11y", () => {
-    it("onay paneli role=dialog + aria-modal=true + aria-labelledby taşır", () => {
-        expect(RESET_SRC).toMatch(/role="dialog"/);
-        expect(RESET_SRC).toMatch(/aria-modal="true"/);
-        expect(RESET_SRC).toMatch(/aria-labelledby="reset-demo-confirm-title"/);
+    /**
+     * 2026-08-29: dialog attribute'ları ortak `ui/Modal`'a taşındı (repoda 20
+     * elle yazılmış dialog vardı, yalnız 7'sinde Escape çalışıyordu). Kilit
+     * SİLİNMEDİ — sözleşmeyi yeni konumunda doğruluyor: çerçeve attribute'ları
+     * Modal'da, bağ (`labelledBy` + hedef `id`) ResetDemoSection'da.
+     */
+    const MODAL_SRC = readFileSync(
+        join(process.cwd(), "src/components/ui/Modal.tsx"),
+        "utf8",
+    );
+
+    it("ortak Modal role=dialog + aria-modal=true taşır", () => {
+        expect(MODAL_SRC).toMatch(/role="dialog"/);
+        expect(MODAL_SRC).toMatch(/aria-modal="true"/);
     });
 
-    it("başlık 'Emin misiniz?' div'i id taşır (aria-labelledby hedefi)", () => {
+    it("Modal labelledBy verilince aria-labelledby basar (ariaLabel'ı yener)", () => {
+        expect(MODAL_SRC).toMatch(/labelledBy \? \{ "aria-labelledby": labelledBy \} : \{ "aria-label": ariaLabel \}/);
+    });
+
+    it("ResetDemoSection Modal'a labelledBy geçer ve hedef id'yi çizer", () => {
+        expect(RESET_SRC).toMatch(/labelledBy="reset-demo-confirm-title"/);
         expect(RESET_SRC).toMatch(/id="reset-demo-confirm-title"/);
+    });
+
+    it("sıfırlama sürerken Escape/dış tıklama kapatmaz", () => {
+        // Eski `onClick={() => !busy && setShowConfirm(false)}` guard'ının halefi.
+        expect(RESET_SRC).toMatch(/dismissible=\{!busy\}/);
     });
 });
 

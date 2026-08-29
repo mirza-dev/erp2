@@ -4,7 +4,7 @@ import { useState } from "react";
 import { Building2, CalendarClock, CalendarDays, Clock3, LockKeyhole, Pencil, Trash2, UserRound, X } from "lucide-react";
 import Button from "@/components/ui/Button";
 import type { CalendarNote } from "@/lib/calendar-notes";
-import { ModalFrame } from "@/components/alerts/NoteFormModal";
+import Modal from "@/components/ui/Modal";
 
 interface Props {
     note: CalendarNote;
@@ -36,7 +36,7 @@ export function CalendarNoteDetailModal({ note, onClose, onEdit, onDeleted, isDe
     };
 
     return (
-        <ModalFrame onClose={onClose} ariaLabel="Takvim notu detayı">
+        <Modal onClose={onClose} ariaLabel="Takvim notu detayı">
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px" }}>
                 <div style={{ minWidth: 0 }}>
                     <VisibilityBadge visibility={note.visibility} />
@@ -74,7 +74,7 @@ export function CalendarNoteDetailModal({ note, onClose, onEdit, onDeleted, isDe
                 </div>
             ) : null}
             {error && <span role="alert" style={{ fontSize: "11.5px", color: "var(--danger-text)" }}>{error}</span>}
-        </ModalFrame>
+        </Modal>
     );
 }
 

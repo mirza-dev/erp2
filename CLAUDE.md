@@ -5,6 +5,26 @@ _Son güncelleme: 2026-08-29_
 
 > Bu bölüm yalnız **güncel durumu + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda ve `memory/current_focus.md`'de. Aşağıdaki indeks son dönem oturumlarına (commit + konu) hızlı bakış içindir; daha eski dönemler (Faz 2–3d AI Import, Sprint A–C, M-3 Rate Limiting, React Doctor, Teklif V2–V7 plan turları, Paraşüt Faz 1–11) git geçmişinde.
 
+**Son tamamlanan iş:** **Ayarlar üçlüsü — eleştirel inceleme + 5 blok** (2026-08-29; GREEN; **migration YOK**; 6504 test). Kullanıcı Ayarlar / Teknik Şablonlar / Not Şablonları'nı gösterip *"tamamen objektif ve eleştirel ol, işlevsel mi gereksiz mi"* dedi; inceleme 8 bulgu çıkardı, bloklar hâlinde kapatıldı.
+
+**Blok 0 — navigasyon.** Ayarlar'ın kendi sekme çubuğu vardı ama iki şablon sayfası orada değildi ve Ayarlar'dan onlara bağlantı yoktu → "Ayarlar" merkez değil üç kardeşten biriydi. **Not Şablonları → Ayarlar sekmesi** (`components/settings/NoteTemplatesTab.tsx`; eski URL yönlendirme olarak KORUNDU), **Teknik Şablonlar → "Stok & Üretim" grubu**.
+
+**Blok 1 — kritik dörtlü.** (8) Tehlikeli Bölge: **ayrı geliştirme veritabanı YOK** (`.env.local` de canlıya bakıyor) → ortam-bazlı gizleme anlamsız; bariyer eyleme kondu: firma adı **birebir yazılmadan** buton açılmıyor, aynı metin `/api/seed`'e `confirm` ile gidip `company_settings.name` ile karşılaştırılıyor (fail-closed 503). (2) Teknik Şablonlar izni `view_products` → **`view_product_types`** (ölü izin canlandı) + iki sayfaya `usePermissions` (satış/üretim/viewer her butonu etkin görüp 403 yiyordu). (1) Not şablonu soft-delete'i fiilen HARD delete'ti → PATCH `is_active` + "Pasifleri Göster" + Aktifleştir. (3) YENİ `/api/product-types/coverage` + "Şablonsuz Ürün" metriği.
+
+**Blok 2 — dürüstlük.** (5) API Anahtarları paneli yalnız `!!process.env.X` bakıyordu; `/api/ai/health` vardı ama bağlanmamıştı → Claude satırı canlı ölçülüyor, Paraşüt/Vercel "Yapılandırıldı" → **"Tanımlı"**. **Canlı kanıt: `probeAIKey` → `auth_failed` 401.** (4) Modaldeki çelişkili iki uyarıdan yanlışı kalktı + `dbUpdateProductTypeField` **field_key değişimini reddediyor** (atomik olmayan rename gövdesi guard arkasında KORUNDU). (7) `quote_number_prefix/separator` Firma Profili'ne geldi + canlı önizleme; mig.073 okundu → yıllık sayaç yıla göre, çakışma imkânsız.
+
+**Blok 3 — bildirimler.** `browserEnabled` mig.045'ten beri kolon + API doğrulaması + 4 test kilidi taşıyordu ama **hiçbir şey okumuyordu** (`Notification`/`serviceWorker`/`PushManager`/`web-push` = 0 sonuç; canlıda 0 satır). Yüzeyden düştü, **kolon DB'de kaldı**; gövdede gelirse sessizce yok sayılıyor. YENİ `POST /api/settings/user/notifications/test` — **alıcı gövdeden OKUNMAZ** (`POST()` parametresiz), keyfi adrese gönderim yapısal olarak imkânsız; gönderim gövdesi `email-test-service.ts`'e çıkarıldı.
+
+**Blok 4 — ortak Modal.** Repoda **20 elle yazılmış `role="dialog"`**, yalnız 7'sinde Escape. `alerts/NoteFormModal`'daki yarım `ModalFrame` → **`components/ui/Modal.tsx`** + Escape/focus-dönüşü/**focus tuzağı** + `dismissible`; 6 yüzey geçti, `ModalFrame` silindi. `window.confirm` (4) → `ConfirmModal`. `PageHeader` → Teknik Şablonlar listesi. 3× `useIsDemo`. `beforeunload` kirli-form uyarısı (**sınır: App Router içi gezinme yakalanmaz**).
+
+**ÇÜRÜYEN iki kendi bulgum:** *"42 üründen 22'si şablonsuz"* → hepsi **pasif** kayıtmış (aktif 20'nin tamamı şablonlu) · *"product-types Card kullanmıyor"* → yanlış kıyas, üç ayar tablosu kendi aralarında tutarlı. **Üç test kilidi kusuru:** `product-types-field-key-guard`'ın "orphan uyarısı GÖRÜNÜR" testi bir **KOD YORUMUNA** eşleşiyordu → `code()` ayıklayıcısı; `browserEnabled` strict-boolean testleri ve dialog a11y kilitleri yeni konumlarına taşındı (silinmedi). **Kendi yol açtığım sözleşme kayması** (`/api/email/test` `failed`/`error` ayrımı) mevcut testçe yakalandı, `send_error` ile geri alındı.
+
+tsc 0 · lint 0 · **467 dosya / 6504 test** · build 0 · **migration YOK**.
+
+**AÇIK:** tarayıcı turu (modal Escape/focus tuzağı · yazılı onay · PageHeader · test e-postası butonu) · `ANTHROPIC_API_KEY` yenileme · kalan **14 dialog yüzeyi** (kritik akışlar, teslim öncesi bilinçli ertelendi).
+
+<details><summary>Önceki: Veri Aktarım Merkezi — kurulum aracına dönüştürme</summary>
+
 **Son tamamlanan iş:** **Veri Aktarım Merkezi — kurulum aracına dönüştürme, 4 tur** (2026-08-29; GREEN; **migration YOK**). Kullanıcı: *"dosya içe aktarım kısmı var şimdi onun üstüne yoğunlaşalım bu sayfa benim için çok karışık kafamda hiçbir şey yok nasıl konumlandırıcam vs konuşalım"*. Teşhis: sayfa dosya **BİÇİMİNE** göre kurgulanmıştı (Excel mi PDF mi), kullanıcı ise **İŞE** göre düşünüyor ("ürün listemi yükleyeyim"). Konuşmadan önce sihirbazın gerçek yardımcıları gerçekçi PMT dosyalarıyla koşturuldu — bulgular **ölçüldü, iddia değil**.
 
 **Ölçülen kusurlar.** (1) **Sistem KENDİ şablonunu okuyamıyordu** — 56 şablon kolonundan **10'u (%18)** kendi alanına dönmüyordu, biri ZORUNLU (`"Ürün SKU"`), yani **Tedarikçi-Ürün İlişkisi şablonu elle müdahale olmadan hiç çalışmıyordu**. (2) Kök: **iki normalizer ayrışmıştı** — alias anahtarları `normalizeImportToken` ile yazılmış (`tedarik_suresi_gun`), arama `normalizeColumnName` ile yapılıyordu (`tedarik_suresi__gun_`); noktalama içeren HER başlık ıskalıyordu (`Fiyat (USD)`, `Ağırlık (kg)`, `Br.`, `V.D.`). (3) **Kusur AI ile örtülüyordu**: akış hafıza → alias → **AI** → "Atla"; eşleşmeyen başlığı AI doğru bağlıyordu. (4) **`ANTHROPIC_API_KEY` geçersiz** — `api.anthropic.com`'a canlı istek: **HTTP 401 `invalid x-api-key`**. (5) **`isAIAvailable()` yalan söylüyordu** — `!!process.env.ANTHROPIC_API_KEY`, yani anahtar DOLU ama GEÇERSİZken `true`; her çağrı 401 alıp sessizce fallback'e düşüyordu.
@@ -62,6 +82,8 @@ tsc 0 · lint 0 · **455 dosya / 6205 test** (+101 yeni: `sim-tur1..4-fixes`) ·
 **Faz 16 (`1cf8ee3`) — canlı gate + runbook.** YENİ `scripts/parasut-gate.ts` (`npm run parasut:gate [--write]`): salt-okunur modda OAuth + tüm liste filtreleri; `--write` modunda **stok invariant'ını gerçek API'de ÖLÇER** (stok→irsaliye→ölç→fatura→ölç; fatura da düşürüyorsa açıkça "canlıya GEÇİLMEZ" + exit 1) — plan boyunca "spec'te kanıt YOK" diye işaretli **tek varsayım** buydu. Ayrıca alış faturası stok artırmıyor mu · `stock_updates` gerçekten MUTLAK mı (iki kez yazıp kayma testi) · `payment_status` · `exchange_rate`. Mock'a karşı koşmayı REDDEDER (exit 2). **Kapalı-teslim kanıtı** testi: Faz 12–15'in hiçbir yolu `PARASUT_ENABLED=false` iken çalışmıyor (iki kat savunma). YENİ `docs/parasut-golive-runbook.md` — ön koşullar, env, 8 adımlı sıra, CRON zamanlaması, **mali müşavir belge eşleme tablosu**, sorun giderme, acil kapatma. **6100 test.**
 
 tsc/lint 0 · **6100 test** · build 0 · 5 commit.
+
+</details>
 
 </details>
 

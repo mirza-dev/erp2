@@ -11,6 +11,7 @@ import {
     FolderOpen,
     ImageIcon,
     KeyRound,
+    NotebookText,
     RefreshCw,
     TriangleAlert,
     UserRound,
@@ -20,7 +21,8 @@ import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import DemoBanner from "@/components/ui/DemoBanner";
 import DosyalarTab from "@/components/settings/DosyalarTab";
-import { isDemoMode, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
+import NoteTemplatesTab from "@/components/settings/NoteTemplatesTab";
+import { useIsDemo, DEMO_BLOCK_TOAST, DEMO_DISABLED_TOOLTIP } from "@/lib/demo-utils";
 import ResetDemoSection from "@/components/settings/ResetDemoSection";
 import { isValidEmail, isValidTaxNumber, isValidUrl } from "@/lib/validation";
 import { NOTIFICATION_TYPES, type NotificationTypeKey } from "@/lib/notification-types";
@@ -42,6 +44,7 @@ const settingsTabIcons: Record<SettingsTab, LucideIcon> = {
     dosyalar: FolderOpen,
     api: KeyRound,
     "yapay-zeka": BrainCircuit,
+    "not-sablonlari": NotebookText,
     kullanici: UserRound,
     bildirimler: Bell,
 };
@@ -118,10 +121,32 @@ const initialFirmaForm = {
     currency: "USD",
     // mig.106 — yeni teklifte "Geçerlilik" varsayılanı (quote_date + N gün).
     quoteValidityDays: "30",
+    // mig.073 — next_quote_number() bu ikisini okur: prefix+sep+YYYY+sep+NNN.
+    // Kolonlar 073'ten beri vardı ama arayüzü yoktu (2026-08-29'da eklendi).
+    quoteNumberPrefix: "TKL",
+    quoteNumberSeparator: "-",
 };
+
+/** Ayraç seçenekleri — API'deki QUOTE_SEPARATORS kümesiyle birebir. */
+const QUOTE_SEPARATOR_OPTIONS = ["-", ".", "_", "/"] as const;
+
+/**
+ * Formdaki değerlerden numara önizlemesi — `next_quote_number()` biçiminin
+ * birebir aynası (prefix || sep || YYYY || sep || lpad(seq,3,'0')).
+ * Kullanıcı kaydetmeden ne göreceğini bilsin diye saf tutuldu.
+ */
+export function previewQuoteNumber(prefix: string, separator: string, year = new Date().getFullYear()): string {
+    const pfx = prefix.trim() || "TKL";
+    const sep = separator || "-";
+    return `${pfx}${sep}${year}${sep}001`;
+}
 
 function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
     const { toast } = useToast();
+    // 2026-08-29: render içinde `isDemoMode()` çağrılıyordu — cookie'yi render
+    // sırasında okumak SSR/hidrasyon tutarsızlığına açık. Repo konvansiyonu
+    // lazy-state hook'u (demo-utils.ts:22), diğer iki sekme zaten onu kullanıyordu.
+    const isDemo = useIsDemo();
     const [form, setForm] = useState({ ...initialFirmaForm });
     const savedRef = useRef({ ...initialFirmaForm });
     const [isDirty, setIsDirty] = useState(false);
@@ -151,6 +176,8 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
                     currency: s.currency ?? "USD",
                     // Migration uygulanmadıysa alan hiç gelmez → 30'a düşer.
                     quoteValidityDays: String(s.quote_validity_days ?? 30),
+                    quoteNumberPrefix: s.quote_number_prefix ?? "TKL",
+                    quoteNumberSeparator: s.quote_number_separator ?? "-",
                 };
                 setForm(loaded);
                 savedRef.current = loaded;
@@ -185,6 +212,13 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
         if (!Number.isInteger(validityDays) || validityDays < 1 || validityDays > 365) {
             errors.quoteValidityDays = "1 ile 365 arasında tam sayı girin.";
         }
+        // mig.073 — sunucudaki QUOTE_PREFIX_RE / QUOTE_SEPARATORS ile birebir.
+        if (!/^[A-Za-z0-9]{1,8}$/.test(form.quoteNumberPrefix.trim())) {
+            errors.quoteNumberPrefix = "1-8 karakter, yalnız harf ve rakam.";
+        }
+        if (!QUOTE_SEPARATOR_OPTIONS.includes(form.quoteNumberSeparator as typeof QUOTE_SEPARATOR_OPTIONS[number])) {
+            errors.quoteNumberSeparator = "Ayraç - . _ / karakterlerinden biri olmalı.";
+        }
         setFieldErrors(errors);
         return Object.keys(errors).length === 0;
     };
@@ -209,6 +243,8 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
                     website: form.website,
                     currency: form.currency,
                     quote_validity_days: Number(form.quoteValidityDays),
+                    quote_number_prefix: form.quoteNumberPrefix.trim(),
+                    quote_number_separator: form.quoteNumberSeparator,
                 }),
             });
             if (!res.ok) {
@@ -247,7 +283,7 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
         }
     };
 
-    if (isDemoMode()) {
+    if (isDemo) {
         return (
             <div style={{ padding: "40px 0", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
                 Firma bilgileri yalnızca yetkili kullanıcılara gösterilir.
@@ -447,6 +483,54 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
                         </div>
                         {fieldErrors.quoteValidityDays && <FieldError msg={fieldErrors.quoteValidityDays} />}
                     </div>
+                    {/* mig.073 — Teklif numara biçimi. Kolonlar 073'ten beri var ve
+                        next_quote_number() onları okuyor; arayüzü 2026-08-29'da eklendi
+                        (öncesinde müşterinin gördüğü numara SQL'siz değiştirilemiyordu). */}
+                    <div>
+                        <label style={labelStyle} htmlFor="quote-number-prefix">Teklif Numarası Öneki</label>
+                        <input
+                            id="quote-number-prefix"
+                            style={fieldErrors.quoteNumberPrefix ? { ...inputStyle, borderColor: "var(--danger-border)" } : inputStyle}
+                            value={form.quoteNumberPrefix}
+                            onChange={set("quoteNumberPrefix")}
+                            maxLength={8}
+                            placeholder="TKL"
+                        />
+                        {fieldErrors.quoteNumberPrefix && <FieldError msg={fieldErrors.quoteNumberPrefix} />}
+                    </div>
+                    <div>
+                        <label style={labelStyle} htmlFor="quote-number-separator">Numara Ayracı</label>
+                        <select
+                            id="quote-number-separator"
+                            style={fieldErrors.quoteNumberSeparator ? { ...inputStyle, borderColor: "var(--danger-border)" } : inputStyle}
+                            value={form.quoteNumberSeparator}
+                            onChange={set("quoteNumberSeparator")}
+                        >
+                            {QUOTE_SEPARATOR_OPTIONS.map(sep => (
+                                <option key={sep} value={sep}>{sep}</option>
+                            ))}
+                        </select>
+                        {fieldErrors.quoteNumberSeparator && <FieldError msg={fieldErrors.quoteNumberSeparator} />}
+                    </div>
+                    <div style={{ gridColumn: "1 / -1" }}>
+                        <div style={{ fontSize: "12px", color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap" }}>
+                            <span>Yeni teklif numarası şöyle görünecek:</span>
+                            <code style={{
+                                fontSize: "12px",
+                                padding: "2px 8px",
+                                borderRadius: "4px",
+                                background: "var(--bg-tertiary)",
+                                border: "var(--line-width) solid var(--border-tertiary)",
+                                color: "var(--text-primary)",
+                                fontVariantNumeric: "tabular-nums",
+                            }}>
+                                {previewQuoteNumber(form.quoteNumberPrefix, form.quoteNumberSeparator)}
+                            </code>
+                        </div>
+                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
+                            Yalnız bundan sonra oluşturulan teklifleri etkiler; mevcut numaralar değişmez.
+                        </div>
+                    </div>
                 </div>
             </div>
 
@@ -472,7 +556,7 @@ function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void 
     const [pwError, setPwError] = useState("");
     const [isChangingPw, setIsChangingPw] = useState(false);
 
-    const isDemo = isDemoMode();
+    const isDemo = useIsDemo();
 
     // Concurrent mutation lock — name + avatar + password aynı anda gönderilmemeli.
     // patchUserMetadata GET-merge-SET race window'unu UI tarafında kapatır
@@ -739,19 +823,19 @@ function defaultPrefs(): NotificationPref[] {
     return NOTIFICATION_TYPES.map(t => ({
         type: t.key,
         emailEnabled: true,
-        browserEnabled: true,
     }));
 }
 
 function BildirimlerTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
     const { toast } = useToast();
-    const isDemo = isDemoMode();
+    const isDemo = useIsDemo();
     const initialPrefsRef = useRef<NotificationPref[]>(defaultPrefs());
     const [prefs, setPrefs] = useState<NotificationPref[]>(() => initialPrefsRef.current);
     const savedRef = useRef<NotificationPref[]>(initialPrefsRef.current);
     const [isDirty, setIsDirty] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const [isSaving, setIsSaving] = useState(false);
+    const [isTesting, setIsTesting] = useState(false);
 
     useEffect(() => {
         if (isDemo) { setIsLoading(false); return; }
@@ -780,6 +864,31 @@ function BildirimlerTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => voi
         const dirty = JSON.stringify(next) !== JSON.stringify(savedRef.current);
         setIsDirty(dirty);
         onDirtyChange?.(dirty);
+    };
+
+    /**
+     * "Bildirim e-postam geliyor mu?" — alıcı sunucuda oturumdan alınır,
+     * istemci adres GÖNDERMEZ (bkz. api/settings/user/notifications/test).
+     */
+    const handleTestEmail = async () => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        if (isTesting) return;
+        setIsTesting(true);
+        try {
+            const res = await fetch("/api/settings/user/notifications/test", { method: "POST" });
+            const data = await res.json().catch(() => ({}));
+            if (!res.ok) {
+                throw new Error(data.error ?? "Test e-postası gönderilemedi.");
+            }
+            toast({
+                type: "success",
+                message: `Örnek "${data.typeLabel}" bildirimi ${data.to} adresine gönderildi.`,
+            });
+        } catch (err) {
+            toast({ type: "error", message: err instanceof Error ? err.message : "Test e-postası gönderilemedi." });
+        } finally {
+            setIsTesting(false);
+        }
     };
 
     const handleSave = async () => {
@@ -856,7 +965,7 @@ function BildirimlerTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => voi
                 )}
                 {visibleTypes.map((typeDef, i) => {
                     const pref = prefs.find(p => p.type === typeDef.key)
-                        ?? { type: typeDef.key, emailEnabled: true, browserEnabled: true };
+                        ?? { type: typeDef.key, emailEnabled: true };
                     return (
                         <div
                             key={typeDef.key}
@@ -913,6 +1022,35 @@ function BildirimlerTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => voi
                     );
                 })}
             </div>
+
+            {/* Doğrulama satırı — tercihi açmak yetmiyor, gerçekten geliyor mu?
+                Bu ekrandan önce yanıtı yalnız iç operatör görebiliyordu. */}
+            {visibleTypes.length > 0 && (
+                <div style={{
+                    marginTop: "14px",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "12px",
+                    flexWrap: "wrap",
+                }}>
+                    <div style={{ fontSize: "12px", color: "var(--text-tertiary)", maxWidth: "440px" }}>
+                        Bildirim e-postalarının size ulaştığını doğrulayın — örnek bir bildirim
+                        yalnızca kendi adresinize gönderilir.
+                    </div>
+                    <Button
+                        variant="secondary"
+                        size="md"
+                        onClick={handleTestEmail}
+                        loading={isTesting}
+                        disabled={isDemo || isTesting}
+                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                    >
+                        Bana test e-postası gönder
+                    </Button>
+                </div>
+            )}
+
             <SaveButton onClick={handleSave} loading={isSaving} dirty={isDirty} />
         </div>
     );
@@ -923,6 +1061,52 @@ interface KeyStatus {
     parasut: boolean;
     claude: boolean;
     vercel: boolean;
+}
+
+/**
+ * `GET /api/ai/health` yanıtı — anahtarın GERÇEKTEN geçerli olup olmadığı.
+ *
+ * 2026-08-29: bu panel yalnız `!!process.env.X` bakıyordu, yani "tanımlı" ile
+ * "çalışıyor"u ayırmıyordu. Canlı kanıt: `ANTHROPIC_API_KEY` DOLU ama Anthropic
+ * HTTP 401 `invalid x-api-key` veriyor → panel yeşil "Yapılandırıldı" gösterip
+ * operatörü yanıltıyordu. `probeAIKey` anahtar yoksa veya 401 mandalı zaten
+ * kuruluysa HİÇ istek atmaz; atarsa 1 token ve sonucu 10 dk saklar.
+ */
+interface AiHealth {
+    available: boolean;
+    reason: "ok" | "no_key" | "auth_failed";
+    status?: number;
+}
+
+/** Bir anahtar satırının görsel durumu — sunucudan gelen kanıta göre. */
+type KeyTone = "unknown" | "ok" | "warning" | "danger";
+
+interface KeyRowState {
+    tone: KeyTone;
+    label: string;
+    /** Rozetin altına düşen tek satır açıklama (yalnız gerekliyse). */
+    hint?: string;
+}
+
+/**
+ * Claude satırı canlı ölçüme dayanır; Paraşüt/Vercel için elimizde yalnız
+ * VARLIK bilgisi var → "Yapılandırıldı" yerine "Tanımlı" denir ("yapılandırıldı"
+ * çalıştığını ima ediyordu). Paraşüt'ün gerçek bağlantı durumu hemen alttaki
+ * OAuth panelinde.
+ */
+function keyRowState(id: keyof KeyStatus, configured: boolean | null, aiHealth: AiHealth | null): KeyRowState {
+    if (id === "claude" && aiHealth) {
+        if (aiHealth.reason === "ok") return { tone: "ok", label: "Çalışıyor" };
+        if (aiHealth.reason === "no_key") return { tone: "warning", label: "Tanımlı değil" };
+        return {
+            tone: "danger",
+            label: `Anahtar geçersiz${aiHealth.status ? ` (HTTP ${aiHealth.status})` : ""}`,
+            hint: "ANTHROPIC_API_KEY yenilenmeli — AI özellikleri sessizce devre dışı.",
+        };
+    }
+    // Sağlık bilgisi yoksa varlık bilgisine düşülür (fail-soft).
+    if (configured === null) return { tone: "unknown", label: "—" };
+    return configured ? { tone: "ok", label: "Tanımlı" } : { tone: "warning", label: "Eksik" };
 }
 
 interface ParasutTokenInfo {
@@ -947,6 +1131,7 @@ function formatTokenDuration(seconds: number): string {
 
 function ApiTab() {
     const [status, setStatus] = useState<KeyStatus | null>(null);
+    const [aiHealth, setAiHealth] = useState<AiHealth | null>(null);
     const [parasutToken, setParasutToken] = useState<ParasutTokenInfo | null>(null);
     const [refreshing, setRefreshing] = useState(false);
     const [feedback, setFeedback] = useState<{ type: "info" | "error"; message: string } | null>(null);
@@ -965,6 +1150,13 @@ function ApiTab() {
         fetch("/api/settings/api-keys-status")
             .then(r => r.ok ? r.json() : null)
             .then(data => { if (data) setStatus(data); })
+            .catch(() => {});
+        // Claude anahtarının gerçekten çalışıp çalışmadığı — varlık kontrolü
+        // yetmiyor (bkz. AiHealth). `/api/parasut/stats` ile aynı ikinci-fetch
+        // kalıbı; hata sessiz, panel varlık bilgisine düşer.
+        fetch("/api/ai/health")
+            .then(r => r.ok ? r.json() : null)
+            .then(data => { if (data) setAiHealth(data as AiHealth); })
             .catch(() => {});
         fetchToken();
     }, []);
@@ -1009,58 +1201,64 @@ function ApiTab() {
             >
                 {entries.map((entry, i) => {
                     const configured = status ? status[entry.id] : null;
+                    const row = keyRowState(entry.id, configured, aiHealth);
+                    const bg = row.tone === "ok" ? "var(--success-bg)"
+                        : row.tone === "danger" ? "var(--danger-bg)"
+                        : row.tone === "warning" ? "var(--warning-bg)"
+                        : "var(--bg-tertiary)";
+                    const fg = row.tone === "ok" ? "var(--success-text)"
+                        : row.tone === "danger" ? "var(--danger-text)"
+                        : row.tone === "warning" ? "var(--warning-text)"
+                        : "var(--text-tertiary)";
                     return (
                         <div
                             key={entry.id}
                             style={{
                                 display: "flex",
-                                alignItems: "center",
+                                alignItems: "flex-start",
                                 justifyContent: "space-between",
+                                gap: "12px",
                                 padding: "12px 16px",
                                 borderBottom: i < entries.length - 1 ? "var(--line-width) solid var(--border-tertiary)" : "none",
                             }}
                         >
-                            <div style={{ fontSize: "13px", color: "var(--text-primary)" }}>
-                                {entry.label}
+                            <div>
+                                <div style={{ fontSize: "13px", color: "var(--text-primary)" }}>
+                                    {entry.label}
+                                </div>
+                                {row.hint && (
+                                    <div style={{ fontSize: "11px", color: "var(--danger-text)", marginTop: "3px" }}>
+                                        {row.hint}
+                                    </div>
+                                )}
                             </div>
                             <span
                                 style={{
                                     fontSize: "11px",
                                     padding: "2px 8px",
                                     borderRadius: "4px",
-                                    background: configured === null
-                                        ? "var(--bg-tertiary)"
-                                        : configured
-                                            ? "var(--success-bg)"
-                                            : "var(--warning-bg)",
-                                    color: configured === null
-                                        ? "var(--text-tertiary)"
-                                        : configured
-                                            ? "var(--success-text)"
-                                            : "var(--warning-text)",
+                                    background: bg,
+                                    color: fg,
                                     display: "inline-flex",
                                     alignItems: "center",
                                     gap: "5px",
                                     lineHeight: 1.5,
+                                    whiteSpace: "nowrap",
+                                    flexShrink: 0,
                                 }}
                             >
-                                {configured === null ? (
-                                    "—"
-                                ) : configured ? (
-                                    <>
-                                        <CheckCircle2 size={12} aria-hidden="true" />
-                                        Yapılandırıldı
-                                    </>
-                                ) : (
-                                    "Eksik"
-                                )}
+                                {row.tone === "ok" && <CheckCircle2 size={12} aria-hidden="true" />}
+                                {row.tone === "danger" && <TriangleAlert size={12} aria-hidden="true" />}
+                                {row.label}
                             </span>
                         </div>
                     );
                 })}
             </div>
             <div style={{ marginTop: "10px", fontSize: "11px", color: "var(--text-tertiary)" }}>
-                Anahtarlar <code>.env.local</code> üzerinden yönetilir.
+                Anahtarlar <code>.env.local</code> üzerinden yönetilir. Claude satırı canlı
+                ölçülür (anahtar gerçekten kabul ediliyor mu); diğer ikisi yalnız anahtarın
+                tanımlı olup olmadığını gösterir.
             </div>
 
             {/* Faz 11.5 — Paraşüt OAuth bağlantısı */}
@@ -1345,6 +1543,17 @@ function SettingsPageInner() {
         }
     }, [permissionsLoaded, requestedTab, resolvedTab, router, searchKey]);
 
+    // Kaydedilmemiş değişiklik varken sekmeyi kapatma/yenileme uyarısı.
+    // SINIR: `beforeunload` yalnız tam sayfa çıkışını yakalar — App Router içi
+    // gezinme (sidebar'a tıklama) yakalanmaz, router bu amaç için bir olay
+    // açmıyor. Sekme rozeti zaten görünür; bu ek bir kat, tam çözüm değil.
+    useEffect(() => {
+        if (dirtyTabs.size === 0) return;
+        const handler = (event: BeforeUnloadEvent) => { event.preventDefault(); };
+        window.addEventListener("beforeunload", handler);
+        return () => window.removeEventListener("beforeunload", handler);
+    }, [dirtyTabs]);
+
     useEffect(() => {
         const node = activeTabButtonRef.current;
         if (!node?.scrollIntoView) return;
@@ -1455,6 +1664,7 @@ function SettingsPageInner() {
                                 <section key={key} className="settings-panel" hidden={activeTab !== key}>
                                     {key === "firma" && <FirmaTab onDirtyChange={(d) => handleDirtyChange("firma", d)} />}
                                     {key === "dosyalar" && <DosyalarTab />}
+                                    {key === "not-sablonlari" && <NoteTemplatesTab />}
                                     {key === "kullanici" && <KullaniciTab onDirtyChange={(d) => handleDirtyChange("kullanici", d)} />}
                                     {key === "bildirimler" && <BildirimlerTab onDirtyChange={(d) => handleDirtyChange("bildirimler", d)} />}
                                     {key === "api" && <ApiTab />}

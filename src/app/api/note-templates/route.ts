@@ -11,9 +11,12 @@ import type { NoteTemplateKind } from "@/lib/database.types";
 
 export const dynamic = "force-dynamic";
 
-// GET /api/note-templates?kind=notes|delivery|payment|general
+// GET /api/note-templates?kind=notes|delivery|payment|general[&includeInactive=1]
 // Authenticated kullanıcıya açık (satış kullanıcısı QuoteForm picker'ında tüketir;
-// requireRole YOK). Yalnız aktif şablonlar döner.
+// requireRole YOK). Varsayılan yalnız AKTİF şablonlar — picker'a pasif şablon
+// sızmaz. `includeInactive=1` yalnız Ayarlar sekmesinin "Pasifleri Göster"i
+// içindir; `/api/product-types?includeInactive=1` emsaliyle aynı (ek guard yok:
+// pasif teklif metni aktif olanla aynı hassasiyette).
 export async function GET(req: NextRequest) {
     try {
         const { searchParams } = new URL(req.url);
@@ -24,8 +27,9 @@ export async function GET(req: NextRequest) {
             return NextResponse.json({ error: "Geçersiz şablon türü." }, { status: 400 });
         }
         const kind = kindParam !== null ? kindParam as NoteTemplateKind : undefined;
+        const includeInactive = searchParams.get("includeInactive") === "1";
 
-        const rows = await dbListNoteTemplates({ kind });
+        const rows = await dbListNoteTemplates({ kind, includeInactive });
         return NextResponse.json(rows.map(mapNoteTemplate));
     } catch (err) {
         return handleApiError(err, "GET /api/note-templates");

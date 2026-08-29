@@ -61,6 +61,7 @@ export const GUARDLESS_BASELINE: GuardlessRoute[] = [
     // ── self-auth (route içinde getUser, yalnız kendi kaydı) ──────────────────
     { path: "settings/user/avatar", methods: ["POST"], cls: "self-auth", reason: "getUser() → kendi avatarı" },
     { path: "settings/user/password", methods: ["POST"], cls: "self-auth", reason: "getUser() → kendi şifresi (+ mevcut-şifre doğrulama)" },
+    { path: "settings/user/notifications/test", methods: ["POST"], cls: "self-auth", reason: "getUser() → alıcı gövdeden DEĞİL oturumdan; yalnız kendi gelen kutusuna örnek bildirim" },
     { path: "settings/user/preferences", methods: ["GET", "PATCH"], cls: "self-auth", reason: "getUser() → kendi tercihleri" },
     { path: "settings/user/profile", methods: ["GET", "PATCH"], cls: "self-auth", reason: "getUser() → kendi profili" },
 

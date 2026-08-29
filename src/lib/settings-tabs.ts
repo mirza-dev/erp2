@@ -1,6 +1,13 @@
 import type { Permission } from "@/lib/auth/permissions";
 
-export type SettingsTab = "firma" | "dosyalar" | "kullanici" | "bildirimler" | "api" | "yapay-zeka";
+export type SettingsTab =
+    | "firma"
+    | "dosyalar"
+    | "not-sablonlari"
+    | "kullanici"
+    | "bildirimler"
+    | "api"
+    | "yapay-zeka";
 export type SettingsTabScope = "personal" | "system" | "maintenance";
 
 export interface SettingsTabDefinition {
@@ -22,6 +29,17 @@ export const SETTINGS_TABS: SettingsTabDefinition[] = [
         label: "Dosyalar",
         scope: "system",
         description: "Sözleşme, sertifika ve teklif eklerinin saklandığı şirket dosya arşivi.",
+    },
+    {
+        // 2026-08-29 — eskiden kendi sayfasıydı (/dashboard/settings/note-templates)
+        // ve sidebar'da "Ayarlar" ile KARDEŞ duruyordu. İki sonucu vardı: Ayarlar
+        // bir merkez değil üç eşitten biri gibi görünüyordu, ve 8 satırlık bir
+        // CRUD ekranı üst düzey navigasyon yeri işgal ediyordu. Sekmeye alındı;
+        // eski URL yönlendirmeyle korunuyor (yer imleri kırılmasın).
+        key: "not-sablonlari",
+        label: "Not Şablonları",
+        scope: "system",
+        description: "Teklif formunda Notlar, Teslimat ve Ödeme alanlarına tek tıkla eklenen hazır metinler.",
     },
     {
         key: "api",

@@ -71,7 +71,19 @@ describe("GET /api/note-templates", () => {
     it("?kind=payment → helper'a kind geçer", async () => {
         mockDbList.mockResolvedValue([]);
         await listGET(makeReq(undefined, "GET", "http://localhost/api/note-templates?kind=payment"));
-        expect(mockDbList).toHaveBeenCalledWith({ kind: "payment" });
+        expect(mockDbList).toHaveBeenCalledWith({ kind: "payment", includeInactive: false });
+    });
+
+    it("includeInactive varsayılan false — picker'a pasif şablon sızmaz", async () => {
+        mockDbList.mockResolvedValue([]);
+        await listGET(makeReq(undefined, "GET", "http://localhost/api/note-templates"));
+        expect(mockDbList).toHaveBeenCalledWith({ kind: undefined, includeInactive: false });
+    });
+
+    it("?includeInactive=1 → pasifler de döner (Ayarlar 'Pasifleri Göster')", async () => {
+        mockDbList.mockResolvedValue([]);
+        await listGET(makeReq(undefined, "GET", "http://localhost/api/note-templates?includeInactive=1"));
+        expect(mockDbList).toHaveBeenCalledWith({ kind: undefined, includeInactive: true });
     });
 
     it("geçersiz ?kind → 400 (fail-closed; tüm şablonları döndürmez)", async () => {

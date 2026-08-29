@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Building2, CalendarDays, Clock3, LockKeyhole, NotebookPen, Save, X } from "lucide-react";
 import Button from "@/components/ui/Button";
+import Modal from "@/components/ui/Modal";
 import type { CalendarNote } from "@/lib/calendar-notes";
 import type { CalendarNoteVisibility } from "@/lib/database.types";
 
@@ -24,16 +25,13 @@ export function NoteFormModal({ onClose, onSaved, isDemo, initialDate, note = nu
     const [error, setError] = useState<string | null>(null);
     const titleRef = useRef<HTMLInputElement>(null);
 
+    // Escape + focus dönüşü + focus tuzağı artık `ui/Modal`'da (2026-08-29).
+    // Burada yalnız ALANA özgü davranış kalıyor: ilk odak başlık girdisine
+    // gitsin (Modal'ın genel "ilk odaklanabilir öğe" seçimi yeterli değil,
+    // başlık ilk buton olmayabilir).
     useEffect(() => {
-        const prevFocus = document.activeElement as HTMLElement | null;
         titleRef.current?.focus();
-        const handler = (event: KeyboardEvent) => { if (event.key === "Escape") onClose(); };
-        window.addEventListener("keydown", handler);
-        return () => {
-            window.removeEventListener("keydown", handler);
-            prevFocus?.focus?.();
-        };
-    }, [onClose]);
+    }, []);
 
     const handleSave = async () => {
         if (isDemo || saving) return;
@@ -64,7 +62,7 @@ export function NoteFormModal({ onClose, onSaved, isDemo, initialDate, note = nu
     };
 
     return (
-        <ModalFrame onClose={onClose} ariaLabel={note ? "Takvim notunu düzenle" : "Yeni takvim notu"}>
+        <Modal onClose={onClose} ariaLabel={note ? "Takvim notunu düzenle" : "Yeni takvim notu"}>
             <div style={headerStyle}>
                 <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
                     <span style={headerIconStyle}><NotebookPen size={16} /></span>
@@ -143,7 +141,7 @@ export function NoteFormModal({ onClose, onSaved, isDemo, initialDate, note = nu
                     {note ? "Değişiklikleri Kaydet" : "Notu Kaydet"}
                 </Button>
             </div>
-        </ModalFrame>
+        </Modal>
     );
 }
 
@@ -176,14 +174,11 @@ function VisibilityOption({ active, icon, title, detail, onClick }: {
     );
 }
 
-export function ModalFrame({ onClose, ariaLabel, children }: { onClose: () => void; ariaLabel: string; children: React.ReactNode }) {
-    return (
-        <>
-            <div onClick={onClose} style={backdropStyle} />
-            <div role="dialog" aria-modal="true" aria-label={ariaLabel} style={modalStyle}>{children}</div>
-        </>
-    );
-}
+// `ModalFrame` 2026-08-29'da `src/components/ui/Modal.tsx`'e TERFİ ETTİ.
+// Silinme gerekçesi: çerçeve tek başına eksikti (Escape/focus-dönüşü onu
+// kullananın effect'indeydi), yerine geçen `Modal` aynı işi yapıp üstüne
+// focus tuzağı ekliyor. İki çerçevenin yan yana durması kaldırılmak istenen
+// tekrarın ta kendisiydi. Davranış kaybı yok.
 
 export function formatInputDate(date: Date): string {
     const year = date.getFullYear();
@@ -192,17 +187,6 @@ export function formatInputDate(date: Date): string {
     return `${year}-${month}-${day}`;
 }
 
-const backdropStyle: React.CSSProperties = {
-    position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.54)",
-    backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", animation: "fade-in 0.18s ease-out",
-};
-const modalStyle: React.CSSProperties = {
-    position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-    zIndex: 201, width: "min(480px, calc(100vw - 28px))", maxHeight: "calc(100vh - 28px)", overflowY: "auto",
-    background: "var(--surface-raised)", border: "1px solid var(--border-secondary)",
-    borderRadius: "10px", boxShadow: "0 20px 58px rgba(0,0,0,0.38)",
-    padding: "20px", display: "flex", flexDirection: "column", gap: "11px",
-};
 const headerStyle: React.CSSProperties = {
     display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px",
     paddingBottom: "12px", borderBottom: "1px solid var(--border-tertiary)", marginBottom: "1px",

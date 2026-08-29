@@ -14,8 +14,10 @@ import {
     SlidersHorizontal,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
+import Modal, { ConfirmModal } from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { DEMO_BLOCK_TOAST, DEMO_DISABLED_TOOLTIP, useIsDemo } from "@/lib/demo-utils";
+import { usePermissions } from "@/lib/auth/use-permissions";
 import { generateTechnicalFieldKey } from "@/lib/technical-templates";
 import type { ProductFieldType, ProductTypeFieldRow, ProductTypeRow } from "@/lib/database.types";
 import type { ProductTypeStatsRow } from "@/lib/supabase/product-types";
@@ -87,26 +89,6 @@ const labelStyle: React.CSSProperties = {
     display: "block",
 };
 
-const modalBackdropStyle: React.CSSProperties = {
-    position: "fixed",
-    inset: 0,
-    zIndex: 220,
-    background: "rgba(0,0,0,0.5)",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "18px",
-};
-
-const modalStyle: React.CSSProperties = {
-    width: "100%",
-    maxWidth: "560px",
-    background: "var(--bg-primary)",
-    border: "0.5px solid var(--border-tertiary)",
-    borderRadius: "8px",
-    padding: "18px",
-};
-
 function parseFieldOptions(field: ProductTypeFieldRow | FieldDraft): string {
     return Array.isArray(field.options) ? field.options.join("\n") : "";
 }
@@ -158,10 +140,19 @@ function Metric({ label, value, sub }: { label: string; value: string | number; 
     );
 }
 
+/** Mutasyon uçlarının izin listesiyle BİREBİR (api/product-types/**: requirePermission). */
+const NO_MANAGE_TOOLTIP = "Bu işlem için yetkiniz yok.";
+
 export default function ProductTypeDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const { toast } = useToast();
     const isDemo = useIsDemo();
+    // Liste sayfasıyla aynı gerekçe: yetkisiz rol tüm alan-yönetimi butonlarını
+    // etkin görüp 403 yiyordu. Sunucu guard'ıyla birebir izin çifti.
+    const { has } = usePermissions();
+    const canManage = has("manage_product_types") || has("manage_product_master");
+    const blocked = isDemo || !canManage;
+    const blockedTitle = isDemo ? DEMO_DISABLED_TOOLTIP : !canManage ? NO_MANAGE_TOOLTIP : undefined;
 
     const [template, setTemplate] = useState<TemplateWithFields | null>(null);
     const [stats, setStats] = useState<ProductTypeStatsRow | null>(null);
@@ -174,6 +165,10 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
     const [savingHeader, setSavingHeader] = useState(false);
 
     const [fieldModal, setFieldModal] = useState<"new" | "edit" | null>(null);
+    // window.confirm yerine temalı onay (2026-08-29) — üç yıkıcı yol da buradan.
+    const [pendingConfirm, setPendingConfirm] = useState<
+        { title: string; message: string; confirmLabel: string; tone: "danger" | "default"; onConfirm: () => void } | null
+    >(null);
     const [fieldDraft, setFieldDraft] = useState<FieldDraft>(EMPTY_FIELD_DRAFT);
     const [fieldError, setFieldError] = useState<string | null>(null);
     const [fieldSaving, setFieldSaving] = useState(false);
@@ -225,6 +220,10 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
             toast({ type: "info", message: DEMO_BLOCK_TOAST });
             return;
         }
+        if (!canManage) {
+            toast({ type: "error", message: NO_MANAGE_TOOLTIP });
+            return;
+        }
         if (!editName.trim()) {
             toast({ type: "error", message: "Şablon adı zorunludur." });
             return;
@@ -257,10 +256,24 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
             toast({ type: "info", message: DEMO_BLOCK_TOAST });
             return;
         }
-        const ok = isActive
-            ? window.confirm(`"${template.name}" teknik şablonu yeniden aktif olacak. Yeni ürünlerde seçilebilir hale gelsin mi?`)
-            : window.confirm(`"${template.name}" teknik şablonu pasifleştirilecek. Mevcut ürünlerdeki teknik bilgiler korunur, yeni ürünlerde seçilemez. Onaylıyor musun?`);
-        if (!ok) return;
+        if (!canManage) {
+            toast({ type: "error", message: NO_MANAGE_TOOLTIP });
+            return;
+        }
+        // Metinler eski window.confirm cümleleriyle BİREBİR — yüzey değişti,
+        // soru değil.
+        setPendingConfirm({
+            title: isActive ? "Şablonu aktifleştir" : "Şablonu pasifleştir",
+            message: isActive
+                ? `"${template.name}" teknik şablonu yeniden aktif olacak. Yeni ürünlerde seçilebilir hale gelsin mi?`
+                : `"${template.name}" teknik şablonu pasifleştirilecek. Mevcut ürünlerdeki teknik bilgiler korunur, yeni ürünlerde seçilemez. Onaylıyor musun?`,
+            confirmLabel: isActive ? "Aktifleştir" : "Pasifleştir",
+            tone: isActive ? "default" : "danger",
+            onConfirm: () => { setPendingConfirm(null); void runTemplateActive(isActive); },
+        });
+    }
+
+    async function runTemplateActive(isActive: boolean) {
         try {
             const res = isActive
                 ? await fetch(`/api/product-types/${id}`, {
@@ -283,6 +296,10 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
             toast({ type: "info", message: DEMO_BLOCK_TOAST });
             return;
         }
+        if (!canManage) {
+            toast({ type: "error", message: NO_MANAGE_TOOLTIP });
+            return;
+        }
         setFieldDraft(EMPTY_FIELD_DRAFT);
         setFieldError(null);
         setFieldModal("new");
@@ -291,6 +308,10 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
     function openEditField(field: ProductTypeFieldRow) {
         if (isDemo) {
             toast({ type: "info", message: DEMO_BLOCK_TOAST });
+            return;
+        }
+        if (!canManage) {
+            toast({ type: "error", message: NO_MANAGE_TOOLTIP });
             return;
         }
         setFieldDraft({
@@ -309,6 +330,10 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
 
     async function submitField() {
         if (!template || !fieldModal) return;
+        if (!canManage) {
+            setFieldError(NO_MANAGE_TOOLTIP);
+            return;
+        }
         const validation = validateFieldDraft(fieldDraft);
         if (validation) {
             setFieldError(validation);
@@ -342,10 +367,22 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
             toast({ type: "info", message: DEMO_BLOCK_TOAST });
             return;
         }
-        const ok = isActive
-            ? window.confirm(`"${field.label_tr}" alanı yeniden aktif olacak. Onaylıyor musun?`)
-            : window.confirm(`"${field.label_tr}" alanı pasifleştirilecek. Mevcut ürün değerleri korunur ama yeni/aktif düzenlemelerde kullanılmaz. Onaylıyor musun?`);
-        if (!ok) return;
+        if (!canManage) {
+            toast({ type: "error", message: NO_MANAGE_TOOLTIP });
+            return;
+        }
+        setPendingConfirm({
+            title: isActive ? "Alanı aktifleştir" : "Alanı pasifleştir",
+            message: isActive
+                ? `"${field.label_tr}" alanı yeniden aktif olacak. Onaylıyor musun?`
+                : `"${field.label_tr}" alanı pasifleştirilecek. Mevcut ürün değerleri korunur ama yeni/aktif düzenlemelerde kullanılmaz. Onaylıyor musun?`,
+            confirmLabel: isActive ? "Aktifleştir" : "Pasifleştir",
+            tone: isActive ? "default" : "danger",
+            onConfirm: () => { setPendingConfirm(null); void runFieldActive(field, isActive); },
+        });
+    }
+
+    async function runFieldActive(field: ProductTypeFieldRow, isActive: boolean) {
         try {
             const res = isActive
                 ? await fetch(`/api/product-types/${id}/fields/${field.id}`, {
@@ -368,6 +405,10 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
             toast({ type: "info", message: DEMO_BLOCK_TOAST });
             return;
         }
+        if (!canManage) {
+            toast({ type: "error", message: NO_MANAGE_TOOLTIP });
+            return;
+        }
         try {
             const res = await fetch(`/api/product-types/${id}/fields/${field.id}`, {
                 method: "PATCH",
@@ -386,6 +427,10 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
         if (!template) return;
         if (isDemo) {
             toast({ type: "info", message: DEMO_BLOCK_TOAST });
+            return;
+        }
+        if (!canManage) {
+            toast({ type: "error", message: NO_MANAGE_TOOLTIP });
             return;
         }
         const index = activeFields.findIndex(field => field.id === fieldId);
@@ -462,17 +507,17 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
                 const activeIndex = activeFields.findIndex(item => item.id === field.id);
                 return (
                     <div style={{ display: "inline-flex", gap: "5px", flexWrap: "wrap", justifyContent: "flex-end" }}>
-                        <button type="button" onClick={() => void moveField(field.id, "up")} disabled={!field.is_active || activeIndex <= 0 || isDemo} aria-label={`${field.label_tr} yukarı taşı`} style={iconButtonStyle}>
+                        <button type="button" onClick={() => void moveField(field.id, "up")} disabled={!field.is_active || activeIndex <= 0 || blocked} aria-label={`${field.label_tr} yukarı taşı`} style={iconButtonStyle}>
                             <ArrowUp size={13} />
                         </button>
-                        <button type="button" onClick={() => void moveField(field.id, "down")} disabled={!field.is_active || activeIndex < 0 || activeIndex >= activeFields.length - 1 || isDemo} aria-label={`${field.label_tr} aşağı taşı`} style={iconButtonStyle}>
+                        <button type="button" onClick={() => void moveField(field.id, "down")} disabled={!field.is_active || activeIndex < 0 || activeIndex >= activeFields.length - 1 || blocked} aria-label={`${field.label_tr} aşağı taşı`} style={iconButtonStyle}>
                             <ArrowDown size={13} />
                         </button>
-                        <button type="button" onClick={() => openEditField(field)} disabled={isDemo} aria-label={`${field.label_tr} düzenle`} style={iconButtonStyle}>
+                        <button type="button" onClick={() => openEditField(field)} disabled={blocked} aria-label={`${field.label_tr} düzenle`} style={iconButtonStyle}>
                             <Pencil size={13} />
                         </button>
                         {field.is_active && (
-                            <Button variant="toolbar" size="xs" onClick={() => void toggleRequired(field)} disabled={isDemo}>
+                            <Button variant="toolbar" size="xs" onClick={() => void toggleRequired(field)} disabled={blocked}>
                                 {field.required ? "Opsiyonel" : "Zorunlu"}
                             </Button>
                         )}
@@ -481,7 +526,7 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
                             size="xs"
                             leftIcon={field.is_active ? <ArchiveRestore size={13} /> : <RotateCcw size={13} />}
                             onClick={() => void setFieldActive(field, !field.is_active)}
-                            disabled={isDemo}
+                            disabled={blocked}
                         >
                             {field.is_active ? "Pasifleştir" : "Aktifleştir"}
                         </Button>
@@ -514,8 +559,8 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
                     variant={template.is_active ? "dangerSoft" : "success"}
                     leftIcon={template.is_active ? <ArchiveRestore size={14} /> : <RotateCcw size={14} />}
                     onClick={() => void setTemplateActive(!template.is_active)}
-                    disabled={isDemo}
-                    title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                    disabled={blocked}
+                    title={blockedTitle}
                 >
                     {template.is_active ? "Pasifleştir" : "Aktifleştir"}
                 </Button>
@@ -533,21 +578,21 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
                     <div style={cardStyle}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
                             <h2 style={{ fontSize: "15px", fontWeight: 700, margin: 0 }}>Şablon Bilgileri</h2>
-                            <Button onClick={saveHeader} loading={savingHeader} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>Kaydet</Button>
+                            <Button onClick={saveHeader} loading={savingHeader} disabled={blocked} title={blockedTitle}>Kaydet</Button>
                         </div>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 84px", gap: "10px" }}>
                             <label>
                                 <span style={labelStyle}>Şablon Adı</span>
-                                <input aria-label="Şablon adı" value={editName} onChange={event => setEditName(event.target.value)} style={inputStyle} />
+                                <input aria-label="Şablon adı" value={editName} onChange={event => setEditName(event.target.value)} readOnly={!canManage} style={inputStyle} />
                             </label>
                             <label>
                                 <span style={labelStyle}>Simge</span>
-                                <input aria-label="Simge" value={editIcon} onChange={event => setEditIcon(event.target.value)} style={inputStyle} maxLength={4} />
+                                <input aria-label="Simge" value={editIcon} onChange={event => setEditIcon(event.target.value)} readOnly={!canManage} style={inputStyle} maxLength={4} />
                             </label>
                         </div>
                         <label style={{ display: "block", marginTop: "10px" }}>
                             <span style={labelStyle}>Açıklama</span>
-                            <textarea aria-label="Açıklama" value={editDescription} onChange={event => setEditDescription(event.target.value)} style={{ ...inputStyle, minHeight: "72px", resize: "vertical" }} />
+                            <textarea aria-label="Açıklama" value={editDescription} onChange={event => setEditDescription(event.target.value)} readOnly={!canManage} style={{ ...inputStyle, minHeight: "72px", resize: "vertical" }} />
                         </label>
                     </div>
 
@@ -559,7 +604,7 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
                                     Teknik anahtarlar ürün bilgilerindeki attribute kayıtlarıyla birebir eşleşir.
                                 </div>
                             </div>
-                            <Button onClick={openNewField} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
+                            <Button onClick={openNewField} disabled={blocked} title={blockedTitle}>
                                 <Plus size={14} /> Alan Ekle
                             </Button>
                         </div>
@@ -619,7 +664,7 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
                                 {inactiveFields.map(field => (
                                     <div key={field.id} style={{ display: "flex", justifyContent: "space-between", gap: "8px", alignItems: "center", fontSize: "12px" }}>
                                         <span style={{ color: "var(--text-secondary)" }}>{field.label_tr}</span>
-                                        <Button variant="success" size="xs" leftIcon={<RotateCcw size={13} />} onClick={() => void setFieldActive(field, true)} disabled={isDemo}>Aktifleştir</Button>
+                                        <Button variant="success" size="xs" leftIcon={<RotateCcw size={13} />} onClick={() => void setFieldActive(field, true)} disabled={blocked}>Aktifleştir</Button>
                                     </div>
                                 ))}
                             </div>
@@ -629,8 +674,12 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
             </div>
 
             {fieldModal && (
-                <div style={modalBackdropStyle} role="dialog" aria-modal="true" aria-label={fieldModal === "new" ? "Teknik alan ekle" : "Teknik alan düzenle"}>
-                    <div style={modalStyle}>
+                <Modal
+                    onClose={() => setFieldModal(null)}
+                    ariaLabel={fieldModal === "new" ? "Teknik alan ekle" : "Teknik alan düzenle"}
+                    width="min(560px, calc(100vw - 28px))"
+                    dismissible={!fieldSaving}
+                >
                         <h2 style={{ fontSize: "16px", fontWeight: 720, margin: "0 0 14px" }}>
                             {fieldModal === "new" ? "Yeni Teknik Alan" : "Teknik Alanı Düzenle"}
                         </h2>
@@ -678,7 +727,9 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
                             />
                             {fieldModal === "edit" && (
                                 <span style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px", display: "block" }}>
-                                    Anahtar, ürünlerin teknik değerlerinin kimliğidir; değiştirmek mevcut ürün verilerini orphan bırakır.
+                                    Anahtar, ürünlerin teknik değerlerinin kimliğidir ve değiştirilemez.
+                                    Farklı bir anahtar gerekiyorsa bu alanı pasifleştirip yenisini ekleyin —
+                                    mevcut ürün değerleri korunur.
                                 </span>
                             )}
                         </label>
@@ -705,17 +756,22 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
                             Bu alan ürünlerde zorunlu olsun
                         </label>
                         {fieldError && <div role="alert" style={{ marginTop: "10px", color: "var(--danger-text)", fontSize: "12px" }}>{fieldError}</div>}
-                        {fieldModal === "edit" && (
-                            <div style={{ marginTop: "10px", padding: "8px 10px", borderRadius: "6px", background: "var(--warning-bg)", color: "var(--warning-text)", border: "0.5px solid var(--warning-border)", fontSize: "12px" }}>
-                                Teknik anahtar değişirse mevcut ürün attribute kayıtları güvenli şekilde yeni anahtara taşınır. Çakışma varsa işlem durur.
-                            </div>
-                        )}
                         <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "16px" }}>
                             <Button variant="secondary" onClick={() => setFieldModal(null)} disabled={fieldSaving}>İptal</Button>
                             <Button onClick={() => void submitField()} loading={fieldSaving}>{fieldModal === "new" ? "Ekle" : "Kaydet"}</Button>
                         </div>
-                    </div>
-                </div>
+                </Modal>
+            )}
+
+            {pendingConfirm && (
+                <ConfirmModal
+                    title={pendingConfirm.title}
+                    message={pendingConfirm.message}
+                    confirmLabel={pendingConfirm.confirmLabel}
+                    tone={pendingConfirm.tone}
+                    onConfirm={pendingConfirm.onConfirm}
+                    onCancel={() => setPendingConfirm(null)}
+                />
             )}
         </div>
     );

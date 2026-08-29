@@ -12,7 +12,6 @@ import {
     FileText,
     LayoutDashboard,
     MailCheck,
-    NotebookText,
     RefreshCw,
     Settings,
     ShoppingBag,
@@ -103,6 +102,10 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
             label: "Stok & Üretim",
             items: [
                 { label: "Stok & Ürünler", href: "/dashboard/products", icon: Boxes },
+                // Teknik Şablonlar 2026-08-29'da "Sistem" grubundan buraya taşındı:
+                // ürün kataloğunun ŞEMASI (attribute tanımları), bir sistem ayarı
+                // değil. İzni de zaten ürün tarafında (bkz. page-access.ts).
+                { label: "Teknik Şablonlar", href: "/dashboard/settings/product-types", icon: SlidersHorizontal },
                 { label: "Üretim Girişi", href: "/dashboard/production", icon: Factory },
                 { label: "Uyarılar", href: "/dashboard/alerts", icon: TriangleAlert, count: activeAlertCount || undefined, countTone: "danger" },
             ],
@@ -125,9 +128,9 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
             id: "system",
             label: "Sistem",
             items: [
+                // Not Şablonları buradan kalktı → Ayarlar'ın "Not Şablonları"
+                // SEKMESİ oldu (settings-tabs.ts). Eski URL yönlendirme olarak duruyor.
                 { label: "Ayarlar", href: "/dashboard/settings", icon: Settings, exact: true },
-                { label: "Teknik Şablonlar", href: "/dashboard/settings/product-types", icon: SlidersHorizontal },
-                { label: "Not Şablonları", href: "/dashboard/settings/note-templates", icon: NotebookText },
                 { label: "Kullanıcılar", href: "/dashboard/settings/users", icon: Users },
                 ...(internalOperator
                     ? [{ label: "E-posta Teslimatları", href: "/dashboard/settings/email-deliveries", icon: MailCheck }]

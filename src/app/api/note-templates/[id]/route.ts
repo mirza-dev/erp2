@@ -55,6 +55,8 @@ export async function PATCH(
             title: body.title !== undefined ? String(body.title) : undefined,
             body: body.body !== undefined ? String(body.body) : undefined,
             sort_order: body.sort_order != null ? Number(body.sort_order) : undefined,
+            // Aktifleştirme yolu (DELETE'in tersi) — product_types kalıbı.
+            is_active: typeof body.is_active === "boolean" ? body.is_active : undefined,
         });
 
         return NextResponse.json(mapNoteTemplate(updated));

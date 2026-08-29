@@ -8,14 +8,18 @@ import {
     Boxes,
     CheckCircle2,
     Eye,
+    PackageSearch,
     Pencil,
     Plus,
     SlidersHorizontal,
 } from "lucide-react";
 import Button, { ButtonLink } from "@/components/ui/Button";
+import Modal from "@/components/ui/Modal";
+import PageHeader from "@/components/ui/PageHeader";
 import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 import { useToast } from "@/components/ui/Toast";
 import { DEMO_BLOCK_TOAST, DEMO_DISABLED_TOOLTIP, useIsDemo } from "@/lib/demo-utils";
+import { usePermissions } from "@/lib/auth/use-permissions";
 import type { ProductTypeStatsRow } from "@/lib/supabase/product-types";
 import { fieldStyle } from "@/components/ui/Input";
 
@@ -25,17 +29,9 @@ const pageStyle: React.CSSProperties = {
     margin: "0 auto",
 };
 
-const toolbarStyle: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "space-between",
-    gap: "16px",
-    marginBottom: "18px",
-};
-
 const metricGridStyle: React.CSSProperties = {
     display: "grid",
-    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+    gridTemplateColumns: "repeat(5, minmax(0, 1fr))",
     gap: "10px",
     marginBottom: "14px",
 };
@@ -60,26 +56,6 @@ const tableWrapStyle: React.CSSProperties = {
 // vardı; koyu temada fark görünmüyordu ama AYDINLIK temada her form ekranı
 // farklı duruyordu (2026-08-24 tespiti).
 const inputStyle: React.CSSProperties = fieldStyle("lg");
-
-const modalBackdropStyle: React.CSSProperties = {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(0,0,0,0.5)",
-    zIndex: 200,
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: "18px",
-};
-
-const modalStyle: React.CSSProperties = {
-    width: "100%",
-    maxWidth: "460px",
-    background: "var(--bg-primary)",
-    border: "0.5px solid var(--border-tertiary)",
-    borderRadius: "8px",
-    padding: "20px",
-};
 
 function Metric({
     label,
@@ -133,14 +109,29 @@ function statusBadge(type: ProductTypeStatsRow): React.ReactNode {
     );
 }
 
+/** Mutasyon uçlarının izin listesiyle BİREBİR (api/product-types/**: requirePermission). */
+const NO_MANAGE_TOOLTIP = "Bu işlem için yetkiniz yok.";
+
 export default function TechnicalTemplatesPage() {
     const { toast } = useToast();
     const isDemo = useIsDemo();
+    // 2026-08-29 — sayfa yalnız `isDemo`ya bakıyordu: yetkisiz rol her butonu
+    // ETKİN görüp tıklayınca 403 yiyordu. Kontrol sunucudaki
+    // `requirePermission(["manage_product_types","manage_product_master"])`
+    // ile birebir aynı; `has()` yüklenmeden true döner (Sidebar emsali) —
+    // gerçek kapı sunucuda, bu yalnız UI'ı dürüst tutar.
+    const { has } = usePermissions();
+    const canManage = has("manage_product_types") || has("manage_product_master");
+    const blocked = isDemo || !canManage;
+    const blockedTitle = isDemo ? DEMO_DISABLED_TOOLTIP : !canManage ? NO_MANAGE_TOOLTIP : undefined;
 
     const [templates, setTemplates] = useState<ProductTypeStatsRow[]>([]);
     const [showInactive, setShowInactive] = useState(false);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+
+    // Şablonsuz ürün sayısı — sayfanın kör noktası (bkz. dbGetProductTypeCoverage).
+    const [coverage, setCoverage] = useState<{ totalProducts: number; withoutType: number } | null>(null);
 
     const [showCreate, setShowCreate] = useState(false);
     const [createName, setCreateName] = useState("");
@@ -170,6 +161,15 @@ export default function TechnicalTemplatesPage() {
         void loadTemplates();
     }, [loadTemplates]);
 
+    useEffect(() => {
+        const ctrl = new AbortController();
+        fetch("/api/product-types/coverage", { signal: ctrl.signal })
+            .then(r => (r.ok ? r.json() : null))
+            .then(d => { if (d) setCoverage(d); })
+            .catch(() => {/* iptal veya ağ hatası — kart "—" gösterir */});
+        return () => ctrl.abort();
+    }, []);
+
     const metrics = useMemo(() => {
         const active = templates.filter(t => t.is_active);
         return {
@@ -183,6 +183,10 @@ export default function TechnicalTemplatesPage() {
     function openCreate() {
         if (isDemo) {
             toast({ type: "info", message: DEMO_BLOCK_TOAST });
+            return;
+        }
+        if (!canManage) {
+            toast({ type: "error", message: NO_MANAGE_TOOLTIP });
             return;
         }
         setCreateName("");
@@ -277,8 +281,13 @@ export default function TechnicalTemplatesPage() {
             header: "İşlem",
             align: "right",
             cell: t => (
-                <ButtonLink href={`/dashboard/settings/product-types/${t.id}`} variant="secondary" size="sm" leftIcon={<Pencil size={14} />}>
-                    Düzenle
+                <ButtonLink
+                    href={`/dashboard/settings/product-types/${t.id}`}
+                    variant="secondary"
+                    size="sm"
+                    leftIcon={canManage ? <Pencil size={14} /> : <Eye size={14} />}
+                >
+                    {canManage ? "Düzenle" : "İncele"}
                 </ButtonLink>
             ),
         },
@@ -286,34 +295,38 @@ export default function TechnicalTemplatesPage() {
 
     return (
         <div style={pageStyle}>
-            <div style={toolbarStyle}>
-                <div>
-                    <h1 style={{ fontSize: "22px", fontWeight: 700, margin: "0 0 4px", color: "var(--text-primary)" }}>
-                        Teknik Şablonlar
-                    </h1>
-                    <div style={{ fontSize: "13px", color: "var(--text-secondary)" }}>
-                        Ürün katalog alanları, teknik veri kalitesi ve AI import şeması.
-                    </div>
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                    <Button
-                        variant={showInactive ? "primary" : "secondary"}
-                        onClick={() => setShowInactive(v => !v)}
-                        aria-pressed={showInactive}
-                    >
-                        <Eye size={14} />
-                        Pasifleri Göster
-                    </Button>
-                    <Button
-                        size="cta"
-                        leftIcon={<Plus size={15} />}
-                        onClick={openCreate}
-                        disabled={isDemo}
-                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                    >
-                        Yeni Şablon
-                    </Button>
-                </div>
+            {/* 2026-08-29: elle yazılmış üst şerit → ortak PageHeader (8 liste
+                sayfasının standardı). Not/Ayarlar sekmeleri kabuklarını
+                panelden alıyor; bağımsız kalan tek sayfa burası. */}
+            <div style={{ marginBottom: "18px" }}>
+                <PageHeader
+                    title="Teknik Şablonlar"
+                    subtitle="Ürün katalog alanları, teknik veri kalitesi ve AI import şeması."
+                    onRefresh={() => void loadTemplates()}
+                    refreshing={loading}
+                    refreshAriaLabel="Teknik şablonları yenile"
+                    actions={
+                        <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
+                            <Button
+                                variant={showInactive ? "primary" : "secondary"}
+                                onClick={() => setShowInactive(v => !v)}
+                                aria-pressed={showInactive}
+                            >
+                                <Eye size={14} />
+                                Pasifleri Göster
+                            </Button>
+                            <Button
+                                size="cta"
+                                leftIcon={<Plus size={15} />}
+                                onClick={openCreate}
+                                disabled={blocked}
+                                title={blockedTitle}
+                            >
+                                Yeni Şablon
+                            </Button>
+                        </div>
+                    }
+                />
             </div>
 
             <div style={metricGridStyle}>
@@ -321,6 +334,15 @@ export default function TechnicalTemplatesPage() {
                 <Metric label="Ürün Kullanımı" value={metrics.usedProducts} sub="Aktif şablon bağlı ürün" icon={<Boxes size={16} />} />
                 <Metric label="Boş Şablon" value={metrics.unusedTemplates} sub="Henüz üründe kullanılmıyor" icon={<ArchiveRestore size={16} />} />
                 <Metric label="Eksik Bilgi" value={metrics.missingProducts} sub="Zorunlu teknik alan eksiği" icon={<AlertTriangle size={16} />} />
+                {/* "Eksik Bilgi" yalnız BİR şablona bağlı ürünleri tarar; şablonsuz
+                    ürünler hiçbir metriğe girmiyordu. Aktif katalog bugün temiz
+                    (0) — bu kart kusuru değil, kör noktayı gösterir. */}
+                <Metric
+                    label="Şablonsuz Ürün"
+                    value={coverage ? coverage.withoutType : "—"}
+                    sub={coverage ? `${coverage.totalProducts} aktif ürünün ${coverage.withoutType}'i şablonsuz` : "Yükleniyor…"}
+                    icon={<PackageSearch size={16} />}
+                />
             </div>
 
             {error && (
@@ -344,8 +366,7 @@ export default function TechnicalTemplatesPage() {
             </div>
 
             {showCreate && (
-                <div style={modalBackdropStyle} role="dialog" aria-modal="true" aria-label="Yeni teknik şablon">
-                    <div style={modalStyle}>
+                <Modal onClose={() => setShowCreate(false)} ariaLabel="Yeni teknik şablon" dismissible={!creating}>
                         <h2 style={{ fontSize: "16px", fontWeight: 700, margin: "0 0 14px" }}>Yeni Teknik Şablon</h2>
                         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                             <label style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
@@ -366,8 +387,7 @@ export default function TechnicalTemplatesPage() {
                             <Button variant="secondary" onClick={() => setShowCreate(false)} disabled={creating}>İptal</Button>
                             <Button onClick={submitCreate} loading={creating}>Oluştur</Button>
                         </div>
-                    </div>
-                </div>
+                </Modal>
             )}
         </div>
     );

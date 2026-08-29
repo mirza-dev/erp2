@@ -23,7 +23,7 @@ const read = (p: string) => readFileSync(join(root, p), "utf8");
 
 /** `fieldStyle`e bağlanan dosyalar — hepsi aynı token kaynağını kullanmalı. */
 const WIRED = [
-    "src/app/dashboard/settings/note-templates/page.tsx",
+    "src/components/settings/NoteTemplatesTab.tsx",
     "src/app/dashboard/settings/users/page.tsx",
     "src/app/dashboard/settings/product-types/page.tsx",
     "src/app/dashboard/settings/product-types/[id]/page.tsx",

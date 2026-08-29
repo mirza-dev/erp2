@@ -250,6 +250,41 @@ export async function dbListProductTypesWithStats(
     });
 }
 
+/**
+ * Katalog kapsama sayıları — "kaç ürün teknik şablona bağlı?".
+ *
+ * 2026-08-29: Teknik Şablonlar sayfasının "Eksik Bilgi" metriği yalnız BİR
+ * şablona bağlı ürünlerdeki boş zorunlu alanları sayıyor; `dbListProductTypesWithStats`
+ * içindeki `if (!typeId) continue` satırı şablonsuz ürünleri tamamen atlıyor →
+ * "kaç ürün hiçbir şablona bağlı değil" sorusunun sayfada karşılığı yoktu.
+ *
+ * ÖLÇÜM NOTU: bu helper `is_active = true` süzer, stats hesabının yaptığı gibi.
+ * Ölçüldüğünde canlıda 42 ürünün 22'sinin `product_type_id`'si boştu ama
+ * hepsi PASİF (soft-delete edilmiş) kayıtlardı; aktif 20 ürünün tamamı
+ * şablonluydu. Yani metrik bugün 0 gösterir — bulduğu bir kusur değil, açılan
+ * bir gözdür: şablonsuz bir ürün eklendiği an sayfada görünür olur.
+ *
+ * head+count (satır taşımaz) — `dashboard/counters` ve `products/counts` emsali.
+ */
+export async function dbGetProductTypeCoverage(): Promise<{
+    totalProducts: number;
+    withType: number;
+    withoutType: number;
+}> {
+    const supabase = createServiceClient();
+    const [totalRes, untypedRes] = await Promise.all([
+        supabase.from("products").select("id", { count: "exact", head: true }).eq("is_active", true),
+        supabase.from("products").select("id", { count: "exact", head: true })
+            .eq("is_active", true).is("product_type_id", null),
+    ]);
+    if (totalRes.error) throw new Error(totalRes.error.message);
+    if (untypedRes.error) throw new Error(untypedRes.error.message);
+
+    const totalProducts = totalRes.count ?? 0;
+    const withoutType = untypedRes.count ?? 0;
+    return { totalProducts, withoutType, withType: Math.max(0, totalProducts - withoutType) };
+}
+
 // ── Create / Update / Delete (types) ────────────────────────
 
 export async function dbCreateProductType(input: CreateProductTypeInput): Promise<ProductTypeRow> {
@@ -442,6 +477,29 @@ export async function dbUpdateProductTypeField(
         .from("product_types").select("id, is_system").eq("id", existing.product_type_id).single();
 
     const updatePayload: Record<string, unknown> = {};
+
+    // 2026-08-29 — TEKNİK ANAHTAR RENAME'İ KAPATILDI (kullanıcı kararı).
+    //
+    // Aşağıdaki rename bloğu çalışıyordu ve kendi notunda kabul ettiği gibi tek
+    // transaction DEĞİLDİ: N ürün UPDATE'i + field UPDATE'i ayrı ayrı gidiyor,
+    // döngü ortasında hata KISMİ rename bırakıyordu (bazı ürünler yeni
+    // anahtarda, bazıları eskide) — sessiz veri bozulması. Güvenlik gerekçesi
+    // de "UI'da READ-ONLY" idi; veri bütünlüğü UI'ya yaslanamaz, admin doğrudan
+    // PATCH atabiliyordu.
+    //
+    // Fonksiyonel kayıp yok: UI bu yolu zaten hiç kullanmıyordu — edit modunda
+    // alan readOnly+disabled ve `buildFieldPayload` mevcut anahtarı aynen geri
+    // gönderiyor → eşitlik → dala hiç girilmiyordu.
+    if (patch.field_key !== undefined && patch.field_key !== existing.field_key) {
+        throw new Error(
+            "Teknik anahtar değiştirilemez: bu alanı pasifleştirip yeni anahtarla "
+            + "yeni bir alan ekleyin (mevcut ürün değerleri korunur).",
+        );
+    }
+
+    // ── ERİŞİLEMEZ: rename gövdesi (yukarıdaki guard fırlatır) ───────────────
+    // SİLİNMEDİ. Atomik bir RPC'ye (FOR UPDATE + tek transaction) taşımak
+    // istenirse çakışma taraması ve attributes taşıma mantığı burada duruyor.
     if (patch.field_key !== undefined && patch.field_key !== existing.field_key) {
         if (!isValidFieldKey(patch.field_key)) {
             throw new Error("Alan anahtarı geçersiz (küçük harf, rakam, alt çizgi; harf ile başlamalı).");

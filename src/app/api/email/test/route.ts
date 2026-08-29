@@ -8,13 +8,10 @@
  * Auth: INTERNAL_OPERATOR_EMAILS allowlist + view_settings (fail-closed)
  * Demo guard: 403 — middleware zaten /api/** demo POST'u bloklar, ek savunma
  *
- * Davranış:
- *   - 4 iç bildirim + müşteri teklif e-postası için makul sample context render
- *   - dbCreateEmailLog → status='pending' (entity_type='test_email')
- *   - Resend direct send (notifyUsersByEmail içindeki dedup ve recipient lookup
- *     bypass edilir — admin'in test attığı kişiye her seferinde gitmeli)
- *   - dbUpdateEmailLogStatus → 'sent' veya 'failed'
- *   - Config eksikse 503 + "config_missing" (RESEND_API_KEY veya EMAIL_FROM yok)
+ * 2026-08-29: gönderim zinciri `email-test-service.ts`'e taşındı; ikinci
+ * tüketici `POST /api/settings/user/notifications/test` (kullanıcının kendi
+ * adresine). Bu ucun sözleşmesi ve guard'ı DEĞİŞMEDİ — serbest `to` yalnız iç
+ * operatörde kalır.
  *
  * Smoke akışı (deploy sonrası):
  *   1. Coolify env'de RESEND_API_KEY + EMAIL_FROM set edilmiş
@@ -23,54 +20,17 @@
  *   4. Inbox'a "[Roven] Kritik stok · Test Ürün" maili düşmeli
  */
 import { NextRequest, NextResponse } from "next/server";
-import { Resend } from "resend";
 import { resolveAuthContext } from "@/lib/auth/role-guard";
-import {
-    renderEmail,
-    renderQuoteToCustomer,
-    type EmailContent,
-    type RenderContext,
-} from "@/lib/email/templates";
 import { requireInternalOperatorFor } from "@/lib/auth/internal-access";
-import { NOTIFICATION_TYPE_KEYS, type NotificationTypeKey } from "@/lib/notification-types";
-import { dbCreateEmailLog, dbUpdateEmailLogStatus } from "@/lib/supabase/email-logs";
 import { handleApiError } from "@/lib/api-error";
+import { EMAIL_TEST_TYPES, sendSampleNotificationEmail } from "@/lib/services/email-test-service";
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-const QUOTE_TEST_TYPE = "quote_customer_send";
-const EMAIL_TEST_TYPES = new Set<string>([...NOTIFICATION_TYPE_KEYS, QUOTE_TEST_TYPE]);
-
-function buildSampleContext(type: NotificationTypeKey): RenderContext {
-    switch (type) {
-        case "stock_critical":
-            return { type, ctx: { productId: "00000000-0000-0000-0000-000000000001", productName: "Test Ürün", sku: "TST-001", available: 0, min: 10 } };
-        case "order_pending":
-            return { type, ctx: { orderId: "00000000-0000-0000-0000-000000000002", orderNumber: "TST-2026-001", customerName: "Test Müşteri Ltd. Şti.", total: 1500, currency: "TRY", actorLabel: "Test Satış Kullanıcısı" } };
-        case "sync_error":
-            return { type, ctx: { entityName: "Test Müşteri (Paraşüt sync)", errorMessage: "Bu bir test hata mesajıdır — gerçek sync hatası değil." } };
-        case "order_shipped":
-            return { type, ctx: { orderId: "00000000-0000-0000-0000-000000000002", orderNumber: "TST-2026-001", customerName: "Test Müşteri Ltd. Şti.", actorLabel: "Test Üretim Kullanıcısı" } };
-    }
-}
-
-function buildSampleContent(type: string): EmailContent {
-    if (type === QUOTE_TEST_TYPE) {
-        return renderQuoteToCustomer({
-            quoteNumber: "TST-2026-001",
-            customerName: "Örnek Müşteri A.Ş.",
-            validUntil: "2026-06-30",
-            companyName: "Örnek Endüstriyel A.Ş.",
-            companyPhone: "+90 212 555 01 23",
-            companyEmail: "teklif@example.com",
-            companyWebsite: "https://example.com",
-        });
-    }
-    return renderEmail(buildSampleContext(type as NotificationTypeKey));
-}
 
 export async function POST(request: NextRequest) {
     try {
-        // 1. Internal operator guard — müşteri adminleri gerçek test e-postası atamaz.
+        // 1. Internal operator guard — müşteri adminleri buradan serbest adrese
+        //    test atamaz (kendi adreslerine atmak için settings/user ucu var).
         const auth = await resolveAuthContext();
         const internalGuard = requireInternalOperatorFor(auth);
         if (internalGuard) return internalGuard;
@@ -92,78 +52,44 @@ export async function POST(request: NextRequest) {
             );
         }
 
-        // 3. Config check
-        const apiKey = process.env.RESEND_API_KEY;
-        const from = process.env.EMAIL_FROM?.trim();
-        if (!apiKey || !from) {
-            return NextResponse.json(
-                {
-                    status: "config_missing",
-                    error: "E-posta gönderim yapılandırması tamamlanmamış.",
-                },
-                { status: 503 },
-            );
-        }
-
-        // 4. Mevcut user id (audit/log için) — auth context'ten.
         const user = auth.user;
         if (!user) return NextResponse.json({ error: "Oturum bulunamadı." }, { status: 401 });
 
-        // 5. Render
-        const content = buildSampleContent(type);
+        // 3. Gönder (config kontrolü + log + Resend helper'da)
+        const result = await sendSampleNotificationEmail({ userId: user.id, to, type });
 
-        // 6. Log (pending)
-        let logId: string;
-        try {
-            logId = await dbCreateEmailLog({
-                user_id: user.id,
-                notification_type: type,
-                entity_type: "test_email",
-                entity_id: null,
-                recipient_email: to,
-                subject: content.subject,
-            });
-        } catch (err) {
+        if (result.status === "config_missing") {
             return NextResponse.json(
-                { status: "error", error: `Email log create failed: ${err instanceof Error ? err.message : "unknown"}` },
+                { status: "config_missing", error: "E-posta gönderim yapılandırması tamamlanmamış." },
+                { status: 503 },
+            );
+        }
+        if (result.status === "log_failed") {
+            return NextResponse.json(
+                { status: "error", error: `Email log create failed: ${result.error}` },
                 { status: 500 },
             );
         }
-
-        // 7. Resend direct send (recipient lookup + dedup BYPASS — test endpoint)
-        const resend = new Resend(apiKey);
-        try {
-            const sendRes = await resend.emails.send({
-                from,
-                to,
-                subject: content.subject,
-                html: content.html,
-                text: content.text,
-            });
-            if (sendRes.error) {
-                await dbUpdateEmailLogStatus(logId, "failed", { error: sendRes.error.message });
-                return NextResponse.json(
-                    { status: "failed", error: sendRes.error.message, log_id: logId },
-                    { status: 502 },
-                );
-            }
-            await dbUpdateEmailLogStatus(logId, "sent", { resend_message_id: sendRes.data?.id });
-            return NextResponse.json({
-                status: "sent",
-                resend_message_id: sendRes.data?.id,
-                log_id: logId,
-                to,
-                subject: content.subject,
-            });
-        } catch (err) {
-            const msg = err instanceof Error ? err.message : "Resend send error";
-            try { await dbUpdateEmailLogStatus(logId, "failed", { error: msg }); }
-            catch { /* best-effort */ }
+        if (result.status === "failed") {
             return NextResponse.json(
-                { status: "error", error: msg, log_id: logId },
+                { status: "failed", error: result.error, log_id: result.logId },
                 { status: 502 },
             );
         }
+        // Fırlatan gönderim (ağ/SDK) — eski sözleşmede ayrı `status: "error"`.
+        if (result.status === "send_error") {
+            return NextResponse.json(
+                { status: "error", error: result.error, log_id: result.logId },
+                { status: 502 },
+            );
+        }
+        return NextResponse.json({
+            status: "sent",
+            resend_message_id: result.messageId,
+            log_id: result.logId,
+            to: result.to,
+            subject: result.subject,
+        });
     } catch (err) {
         return handleApiError(err, "POST /api/email/test");
     }

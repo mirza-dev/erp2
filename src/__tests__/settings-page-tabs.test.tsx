@@ -84,6 +84,7 @@ describe("SettingsPage tab access", () => {
         expect(within(settingsNav).getAllByRole("button").map(button => button.textContent)).toEqual([
             "Firma Profili",
             "Dosyalar",
+            "Not Şablonları",
             "Kullanıcı Profili",
             "Bildirimler",
         ]);
@@ -101,6 +102,7 @@ describe("SettingsPage tab access", () => {
         expect(within(settingsNav).getAllByRole("button").map(button => button.textContent)).toEqual([
             "Firma Profili",
             "Dosyalar",
+            "Not Şablonları",
             "API Anahtarları",
             "Yapay Zeka",
             "Kullanıcı Profili",

@@ -5,6 +5,84 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-08-29 — Ayarlar üçlüsü: eleştirel inceleme + 5 blok (Blok 0-4)
+
+Kullanıcı üç sidebar satırını gösterip *"tamamen objektif ve eleştirel ol, ne
+yapılabilir, işlevsel mi gereksiz mi"* dedi. İnceleme 8 bulgu çıkardı; kullanıcı
+bloklar hâlinde ilerlemeyi seçti. **Migration YOK · yeni bağımlılık YOK ·
+6480 → 6504 test.**
+
+**Blok 0 — navigasyon (yapısal bulgu).** Ayarlar'ın kendi sekme çubuğu vardı ama
+Teknik/Not Şablonları orada değildi ve Ayarlar'dan onlara bağlantı yoktu; yani
+"Ayarlar" merkez değil, üç kardeşten biriydi. Karar: **Not Şablonları → Ayarlar
+sekmesi** (içerik `components/settings/NoteTemplatesTab.tsx`; eski URL
+yönlendirme olarak KORUNDU) · **Teknik Şablonlar → "Stok & Üretim" grubu**
+(ürün kataloğunun şeması, sistem ayarı değil).
+
+**Blok 1 — kritik dörtlü.** (8) Tehlikeli Bölge: **ayrı geliştirme veritabanı
+YOK**, `.env.local` de canlıya bakıyor → ortam-bazlı gizleme anlamsız; bariyer
+eyleme kondu: firma adı **birebir yazılmadan** buton açılmıyor ve aynı metin
+`/api/seed`'e `confirm` alanıyla gidip `company_settings.name` ile
+karşılaştırılıyor (fail-closed 503). (2) Teknik Şablonlar sayfa izni
+`view_products` → **`view_product_types`** (ölü izin canlandı); iki sayfaya
+`usePermissions` bağlandı — satış/üretim/viewer her butonu etkin görüp 403
+yiyordu. (1) Not şablonu soft-delete'i fiilen HARD delete'ti (route
+`includeInactive` geçmiyordu, geri getirme yolu yoktu) → PATCH `is_active` +
+"Pasifleri Göster" + Aktifleştir. (3) YENİ `/api/product-types/coverage` +
+"Şablonsuz Ürün" metriği.
+
+**Blok 2 — dürüstlük.** (5) API Anahtarları paneli `!!process.env.X` bakıyordu;
+`/api/ai/health` zaten vardı, bağlanmamıştı → Claude satırı canlı ölçülüyor
+(`ok`/`no_key`/`auth_failed`), Paraşüt/Vercel "Yapılandırıldı" → **"Tanımlı"**.
+(4) `product-types/[id]` modalindeki çelişkili iki uyarıdan yanlışı kalktı ve
+`dbUpdateProductTypeField` **field_key değişimini reddediyor** (rename gövdesi
+guard arkasında KORUNDU — atomik değildi, kısmi rename bırakabiliyordu ve
+güvenlik gerekçesi UI'ya yaslanmıştı). (7) `quote_number_prefix/separator`
+Firma Profili'ne geldi (SAFE_COMPANY_FIELDS'a eklenmesi ŞARTTI — GET
+döndürmüyordu) + canlı önizleme; mig.073 okundu: yıllık sayaç **yıla** göre,
+öneke göre değil → çakışma imkânsız.
+
+**Blok 3 — bildirimler.** `browserEnabled` mig.045'ten beri kolon, API'de
+doğrulanıyor, 4 test kilitliyordu ama **hiçbir şey okumuyordu** (kaynakta
+`Notification`/`serviceWorker`/`PushManager`/`web-push` = 0 sonuç; canlıda
+tabloda 0 satır). Yüzeyden düştü, **kolon DB'de kaldı** (APPLY yükü yok);
+gövdede gelirse 400 değil sessizce yok sayılıyor (geriye uyum). YENİ
+`POST /api/settings/user/notifications/test`: **alıcı gövdeden OKUNMAZ**,
+`POST()` parametresiz — keyfi adrese gönderim yapısal olarak imkânsız; tür rol
+matrisinden, 5 dk'da 3 istek. Gönderim gövdesi
+`lib/services/email-test-service.ts`'e çıkarıldı (iki uç paylaşır).
+
+**Blok 4 — ortak Modal.** Repoda **20 elle yazılmış `role="dialog"`**, yalnız
+7'sinde Escape. `alerts/NoteFormModal`'daki yarım `ModalFrame`
+**`components/ui/Modal.tsx`'e terfi etti** + Escape/focus-dönüşü/**focus tuzağı**
+(hiçbir yüzeyde yoktu) + `dismissible`. 6 yüzey geçti (4 ayar modalı + alerts
+çifti), `ModalFrame` silindi. `window.confirm` (4 çağrı) → `ConfirmModal`
+(metinler birebir aynı). `PageHeader` → Teknik Şablonlar listesi. 3× `useIsDemo`.
+`beforeunload` kirli-form uyarısı (**sınır: App Router içi gezinme yakalanmaz**).
+
+**Bu turda ÇÜRÜYEN iki kendi bulgum (rapora yazıldı):**
+1. *"42 üründen 22'si şablonsuz"* → hepsi **pasif** kayıtmış; aktif 20 ürünün
+   tamamı şablonlu. Metrik yine eklendi ama bir kusuru değil, kör noktayı açıyor.
+2. *"product-types Card kullanmıyor"* → yanlış kıyas; üç **ayar** tablosu
+   (users/email-deliveries/product-types) kendi aralarında zaten tutarlı.
+
+**Üç test kilidi kusuru bulundu ve düzeltildi (hepsi aynı sınıf):**
+`product-types-field-key-guard`'ın "orphan uyarısı GÖRÜNÜR" testi bir **KOD
+YORUMUNA** eşleşiyordu → `code()` yorum-ayıklayıcısı eklendi ·
+`settings-user-preferences`'ın `browserEnabled` strict-boolean testleri yeni
+sözleşmeye çevrildi (silinmedi) · `settings-ui` + `blok1`'in dialog a11y
+kilitleri Modal'a taşındı.
+
+**Kendi yol açtığım bir sözleşme kayması geri alındı:** helper çıkarımı
+`/api/email/test`'in `failed` (Resend hata yanıtı) ile `error` (fırlatma)
+ayrımını siliyordu; mevcut test yakaladı, `send_error` varyantıyla korundu.
+
+**AÇIK:** tarayıcı turu yapılmadı (modal Escape/focus tuzağı · yazılı onay ·
+PageHeader · test e-postası butonu) · `ANTHROPIC_API_KEY` **canlıda geçersiz**
+(`probeAIKey` → `auth_failed` 401; panel artık kırmızı gösteriyor) · Paraşüt API
+başvurusu · kalan **14 dialog yüzeyi** ortak Modal'a geçirilmedi (kritik akışlar,
+teslim öncesi bilinçli ertelendi).
+
 ## 2026-08-29 — Genel Bakış KPI şeridi sarmalayan ızgaraya geçti
 
 Kullanıcı: *"bu kartların düzeni hoşuma gitmedi"* (ekran görüntüsüyle: 8. kart

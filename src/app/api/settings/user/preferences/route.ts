@@ -39,6 +39,10 @@ export async function PATCH(req: NextRequest) {
         // Boolean kontratı strict: typeof === "boolean" değilse 400.
         // !!value coercion gevşek davranış (örn. "false" string → true) — API tarafında
         // sıkı tip kontrolü ile garbage input erkenden reddedilir.
+        //
+        // 2026-08-29: `browserEnabled` yüzeyden düştü (bkz. NotificationPref).
+        // Gövdede gelirse 400 DEĞİL, sessizce YOK SAYILIR — deploy sırasında
+        // açık kalmış eski bir sekme e-posta tercihini yine kaydedebilmeli.
         for (let i = 0; i < body.prefs.length; i++) {
             const p = body.prefs[i] as Record<string, unknown> | null;
             if (!p || typeof p !== "object") continue;
@@ -48,16 +52,12 @@ export async function PATCH(req: NextRequest) {
             if (p.emailEnabled !== undefined && typeof p.emailEnabled !== "boolean") {
                 return NextResponse.json({ error: `prefs[${i}].emailEnabled boolean olmalı.` }, { status: 400 });
             }
-            if (p.browserEnabled !== undefined && typeof p.browserEnabled !== "boolean") {
-                return NextResponse.json({ error: `prefs[${i}].browserEnabled boolean olmalı.` }, { status: 400 });
-            }
         }
         const sanitized: NotificationPref[] = body.prefs
             .filter((p): p is Record<string, unknown> => !!p && typeof p === "object")
             .map(p => ({
                 type: typeof p.type === "string" ? p.type : "",
                 emailEnabled: typeof p.emailEnabled === "boolean" ? p.emailEnabled : true,
-                browserEnabled: typeof p.browserEnabled === "boolean" ? p.browserEnabled : true,
             }))
             .filter(p => p.type.length > 0);
 

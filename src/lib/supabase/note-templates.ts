@@ -26,6 +26,14 @@ export interface UpdateNoteTemplateInput {
     title?: string;
     body?: string;
     sort_order?: number;
+    /**
+     * 2026-08-29 — AKTİFLEŞTİRME. `dbDeactivateNoteTemplate` soft-delete yapıyor
+     * ("hard delete YOK") ama geri alacak yol yoktu: liste yalnız aktifleri
+     * döndürüyor, PATCH `is_active` kabul etmiyordu → pasifleşen şablon UI'dan
+     * da API'den de kalıcı olarak kayboluyor, yani soft-delete fiilen HARD
+     * delete gibi davranıyordu. `product_types` kalıbı (PATCH {is_active:true}).
+     */
+    is_active?: boolean;
 }
 
 export interface ListNoteTemplatesOptions {
@@ -140,6 +148,7 @@ export async function dbUpdateNoteTemplate(id: string, patch: UpdateNoteTemplate
     if (patch.title !== undefined) updatePayload.title = patch.title.trim();
     if (patch.body !== undefined) updatePayload.body = patch.body;
     if (patch.sort_order !== undefined) updatePayload.sort_order = patch.sort_order;
+    if (patch.is_active !== undefined) updatePayload.is_active = patch.is_active;
 
     const { data, error } = await supabase
         .from("note_templates")
@@ -155,7 +164,7 @@ export async function dbUpdateNoteTemplate(id: string, patch: UpdateNoteTemplate
         action: "note_template_updated",
         entity_type: "note_template",
         entity_id: id,
-        before_state: { kind: existing.kind, title: existing.title, sort_order: existing.sort_order },
+        before_state: { kind: existing.kind, title: existing.title, sort_order: existing.sort_order, is_active: existing.is_active },
         after_state: updatePayload,
         source: "ui",
     });
