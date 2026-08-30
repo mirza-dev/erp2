@@ -5,6 +5,54 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-08-31 (3) — Telefon/tablet/masaüstü ölçümü + 2 kusur kapatıldı
+
+Kullanıcı "telefon tablet ve masaüstünden sorunsuz tıkır tıkır çalışır mı, evetse
+telefonda çalıştırma yolunu ver" dedi. Chrome eklentisi bağlı değildi → **Playwright
+cihaz emülasyonu** (demo=viewer, **salt-okunur**; hiçbir mutasyon tetiklenmedi).
+Not: `/api/auth/demo` **5/15dk** limitli — 5 profil için tek oturum yaratıp
+`storageState` ile paylaşmak gerekti; sunucuyu yeniden başlatmak in-memory
+limiti sıfırlıyor.
+
+**Duyarlılık SAĞLAM:** 5 profil × 14 ekran = **70 sayfa yüklemesinde yatay taşma 0**
+(360/390 telefon · 768/1024 tablet · 1440 masaüstü). Kenar çubuğu <768px'te hamburger
+çekmeceye dönüyor (768 ve 390'da **tıklanarak** doğrulandı), listeler kendi
+`overflow-x` kabında kayıyor, sipariş formu altta sabit aksiyon çubuğu.
+Ölçüm yöntemi: `documentElement.scrollWidth > innerWidth` + taşan elemanın
+`overflow-x` kabı içinde olup olmadığı (kapsanan taşma sorun değil).
+
+**K1 — `/offline` auth kapısının arkasındaydı — DÜN BENİM EKLEDİĞİM SAYFA.**
+Oturumsuz ziyaretçide `/login`'e 307; SW kurulumda `cache.add` yönlendirmeyi izleyip
+**GİRİŞ SAYFASINI** `/offline` anahtarına yazıyordu (ölçüm: `offlineUrl:/login`,
+başlık `"Giriş · Roven"`). Üstelik **yönlendirilmiş yanıt bir GEZİNME isteğini
+karşılayamaz** (SW spec) → `respondWith` TypeError → **`net::ERR_FAILED`**.
+Yani çevrimdışı sayfası hiç çalışmıyordu; dünkü "tarayıcıda doğrulandı" ölçümü
+temsili değilmiş (kurulum büyük olasılıkla bir demo oturumu varken olmuş).
+**Ders: bir doğrulamanın hangi OTURUM DURUMUNDA yapıldığı, sonucun kendisi kadar
+önemli.** Fix: `/offline` → `ALWAYS_PUBLIC` · `cache.add` → `fetch` +
+`res.ok && !res.redirected` · CACHE v2→v3.
+
+**K2 — iOS otomatik yakınlaştırma.** Safari `font-size < 16px` bir alana dokununca
+sayfayı yakınlaştırır ve geri uzaklaştırmaz. **69 görünür alanın 68'i 12–13.5px**,
+giriş ekranındaki e-posta alanı dahil → telefondaki İLK dokunuşta. Fix tek yerde:
+`globals.css` `@media (max-width:768px)` → `input/select/textarea 16px !important`
+(inline style'ları yenmek için `!important` şart). Masaüstü yoğunluğu değişmedi.
+Yeniden ölçüm: 69/69 güvenli **ve taşma hâlâ 0** (regresyon yok).
+
+**Açık kalan (rapor edildi, yapılmadı):** dokunma hedefleri — hamburger 29×29,
+tema düğmesi 30×30, teklif satırı sil/not 22×22 (Apple 44×44 önerir).
+
+**Telefon yolu:** `npm run start:lan` (YENİ) + `http://<Mac IP>:3000`, aynı Wi-Fi.
+SW **güvenli bağlam** ister → LAN http'de çevrimdışı/"Yenile"/Android install YOK;
+iOS "Ana Ekrana Ekle" tam ekran+ikon+açılış ekranı ÇALIŞIR (`apple-mobile-web-app-capable`
+sağlar, SW değil). Tablo: `docs/musteri-kurulum.md` → "Telefon ve tabletten bakmak".
+
+Kapı `pwa.test.ts` 16 → **19**. "Dosyada tek `cache.put`" **sayım** kuralı, ikinci
+meşru put gelince **biçim** kuralına çevrildi (her put ya `OFFLINE_URL, res` ya
+`req, res.clone()`) — sayıyı gevşetmek invaryantı kaybettirirdi. 4/4 kırmızı kanıtlı.
+
+**484 dosya / 6825 test** · tsc 0 · lint 0 · build temiz · migration YOK.
+
 ## 2026-08-31 (2) — PWA eksiksizleştirme + TARAYICIDA doğrulama
 
 Kullanıcı "PWA olayı eksiksiz hatasız ve tam olmalı" dedi. Ölçtüm: PWA çalışıyordu ama

@@ -1,11 +1,27 @@
 # Roven — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-08-30_
+_Son güncelleme: 2026-08-31_
 
 > Bu bölüm yalnız **güncel durumu + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda ve `memory/current_focus.md`'de. Aşağıdaki indeks son dönem oturumlarına (commit + konu) hızlı bakış içindir; daha eski dönemler (Faz 2–3d AI Import, Sprint A–C, M-3 Rate Limiting, React Doctor, Teklif V2–V7 plan turları, Paraşüt Faz 1–11) git geçmişinde.
 
-**Son tamamlanan iş:** **PWA eksiksizleştirme + TARAYICIDA doğrulama** (2026-08-31; GREEN; **migration YOK**). Kullanıcı "PWA eksiksiz hatasız ve tam olmalı" dedi. PWA çalışıyordu ama **hiçbir tarayıcıda doğrulanmamıştı** — kapı testleri yalnız kaynak metnine bakan regex iddialarıydı — ve 5 gerçek kusuru vardı.
+**Son tamamlanan iş:** **Telefon/tablet/masaüstü ölçümü + 2 kusur** (2026-08-31; GREEN; **migration YOK**). Kullanıcı "telefon tablet ve masaüstünden sorunsuz tıkır tıkır çalışır mı, evetse telefonda çalıştırma yolunu ver" dedi. Tarayıcı eklentisi bağlı değildi → **Playwright cihaz emülasyonu** (demo=viewer, **salt-okunur**, hiçbir mutasyon tetiklenmedi).
+
+**Duyarlılık SAĞLAM, ölçüldü:** 5 profil × 14 ekran = **70 sayfa yüklemesinde yatay taşma 0** (360/390 telefon · 768/1024 tablet · 1440 masaüstü). Kenar çubuğu <768px'te hamburger çekmeceye dönüyor (768 ve 390'da **tıklanarak** açıldığı doğrulandı), listeler kendi `overflow-x` kabında kayıyor, sipariş formunun aksiyon çubuğu altta sabitleniyor. `useIsMobile`/`windowWidth < 768` kolon gizleme + düzen değiştirme yapıyor — mobil desteği kazara değil, kurulmuş.
+
+**K1 — `/offline` auth kapısının arkasındaydı (BİR ÖNCEKİ OTURUMDA BENİM EKLEDİĞİM SAYFA).** Oturumsuz ziyaretçide `/login`'e **307** dönüyordu; service worker kurulumda `cache.add` yönlendirmeyi izleyip **GİRİŞ SAYFASINI** `/offline` anahtarına yazıyordu (ölçüm: `offlineUrl: /login`, başlık `"Giriş · Roven"`). Dahası **yönlendirilmiş bir yanıt bir GEZİNME isteğini karşılayamaz** (SW spec) → `respondWith` TypeError → kullanıcı yedek sayfa yerine **`net::ERR_FAILED`** görüyordu. Yani çevrimdışı sayfası **hiç çalışmıyordu**; dünkü "doğrulandı" ölçümü temsili değilmiş. Fix: `/offline` → `ALWAYS_PUBLIC` (sayfa sunucu verisi OKUMAZ) · `cache.add` → `fetch` + **`res.ok && !res.redirected`** guard · `CACHE` v2→**v3** (zehirli girdi `activate`'te düşsün). Yeniden ölçüldü: `redirected:false`, başlık `"Bağlantı yok — Roven"`, sunucu kapalıyken gezinme çevrimdışı sayfasını gösteriyor.
+
+**K2 — iOS otomatik yakınlaştırma.** Safari, `font-size` 16px'in **altında** olan bir alana dokunulduğunda sayfayı yakınlaştırır ve **geri uzaklaştırmaz**. Ölçüm: **69 görünür alanın 68'i 12–13.5px** — giriş ekranındaki e-posta alanı dahil, yani telefondaki **İLK dokunuşta**. Fix tek yerde (sayfa-bazlı hardcode yerine global): `globals.css` → `@media (max-width: 768px)` altında `input/select/textarea → 16px !important` (`!important` şart: alanlar inline style ile boyutlanıyor). **Masaüstü yoğunluğu değişmedi.** Yeniden ölçüm: 69/69 güvenli, taşma hâlâ 0.
+
+**Açık kalan (rapor edildi, YAPILMADI):** dokunma hedefleri 44×44 altında — hamburger 29×29, tema düğmesi 30×30, teklif satırı sil/not düğmeleri 22×22. Kullanılabilir ama parmakla ıskalanabilir; ayrı iş.
+
+**Telefon yolu:** `npm run start:lan` (YENİ script) + `http://<Mac IP>:3000`, aynı Wi-Fi. SW **güvenli bağlam** ister → düz LAN http'de çevrimdışı/"Yenile"/Android install **YOK**; iOS "Ana Ekrana Ekle" tam ekran+ikon+açılış ekranı **ÇALIŞIR** (onu `apple-mobile-web-app-capable` sağlar, SW değil). Ayrıntı + tablo: `docs/musteri-kurulum.md` → "Telefon ve tabletten bakmak".
+
+Kapı `pwa.test.ts` 16 → **19 test**. "Dosyada tek `cache.put` var" **sayım** kuralı, ikinci meşru put gelince **biçim** kuralına dönüştürüldü (her put ya `OFFLINE_URL, res` ya `req, res.clone()`) — sayıyı gevşetmek invaryantı kaybettirirdi. 4/4 yeni kural kırmızı-yandığı kanıtlandı.
+
+tsc 0 · lint 0 · **484 dosya / 6825 test** (+3) · build temiz · **migration YOK**.
+
+**Önceki iş:** **PWA eksiksizleştirme + TARAYICIDA doğrulama** (2026-08-31; GREEN; **migration YOK**). Kullanıcı "PWA eksiksiz hatasız ve tam olmalı" dedi. PWA çalışıyordu ama **hiçbir tarayıcıda doğrulanmamıştı** — kapı testleri yalnız kaynak metnine bakan regex iddialarıydı — ve 5 gerçek kusuru vardı.
 
 **Kapatılan kusurlar:** SW **development'ta da kaydoluyordu** → `/_next/static/` cache-first yüzünden geliştirmede bayat JS; guard yetmez (SW kaydı KALICI), bu yüzden dev'de mevcut kayıt + `roven-*` cache'leri **aktif olarak siliniyor** · önbellek **sınırsız büyüyordu** → `MAX_ENTRIES=200` FIFO tavan · **çevrimdışı yedek sayfa yoktu** → `/offline` precache + gezinme **yakalaması** (önbellekleme DEĞİL; "API/navigasyon asla önbelleğe alınmaz" invaryantı korundu) · `apple-touch-icon` iOS'un **kök-yol tahminine** güveniyordu → `src/app/apple-icon.png` (Next `<link>`i oradan basıyor) · **`safe-area-inset` kodda hiç yoktu** → mobil çekmeceye `env(safe-area-inset-bottom)`.
 
@@ -23,7 +39,7 @@ Kapı `src/__tests__/gate/pwa.test.ts` **8 → 16 test**; **8/8 yeni kural kırm
 
 tsc 0 · lint 0 · **484 dosya / 6822 test** (+8) · build 0 uyarı · **migration YOK**.
 
-**Önceki iş:** **Çok müşterili teslim altyapısı — şema paketi · prod kapısı · PWA** (2026-08-31; GREEN; **migration YOK**; 3 faz, 3 commit `23f7142` → `c7f715b` → `9172885`). Kullanıcı "ürün bitti mi, sunulabilir mi" diye sordu; ölçüldü: **yazılım olgun, hizmet değil** — prod ayakta değil (`erp.getmedspace.com` → HTTP 000), `EMAIL_FROM` yok (10 bildirim 12 Haziran'dan beri kuyrukta → **24 açık uyarı kimseye ulaşmıyor**), AI 401, ve geliştirme canlı fabrika verisi üstünde. Kullanıcı deploy/env/e-postayı üstlendi.
+**Daha önceki iş:** **Çok müşterili teslim altyapısı — şema paketi · prod kapısı · PWA** (2026-08-31; GREEN; **migration YOK**; 3 faz, 3 commit `23f7142` → `c7f715b` → `9172885`). Kullanıcı "ürün bitti mi, sunulabilir mi" diye sordu; ölçüldü: **yazılım olgun, hizmet değil** — prod ayakta değil (`erp.getmedspace.com` → HTTP 000), `EMAIL_FROM` yok (10 bildirim 12 Haziran'dan beri kuyrukta → **24 açık uyarı kimseye ulaşmıyor**), AI 401, ve geliştirme canlı fabrika verisi üstünde. Kullanıcı deploy/env/e-postayı üstlendi.
 
 **Mimari tespit (planı belirledi):** ürün **TEK KİRACILI** ve şema bunu sert uyguluyor — `company_settings` üzerinde `unique index … ((true))` (033) + 111 migration'da **0 tenant kolonu**. Yani "çok müşteri" daha büyük bir plan değil, **müşteri başına ayrı Supabase projesi**. Pro org başına $25 + marjinal ~$10/proje.
 

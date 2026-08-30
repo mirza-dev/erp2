@@ -60,9 +60,16 @@ describe("GATE — PWA", () => {
         // Önbelleğe alma YALNIZ hash'li statik önekin altında olabilir.
         expect(sw).toMatch(/STATIC_PREFIX = "\/_next\/static\/"/);
         expect(sw).toMatch(/if \(!url\.pathname\.startsWith\(STATIC_PREFIX\)\) return;/);
-        // cache.put'tan ÖNCE statik eleme yapılmış olmalı: dosyada tek put var
-        // ve o da respondWith bloğunun içinde.
-        expect(sw.match(/cache\.put\(/g)?.length ?? 0).toBe(1);
+        // cache.put'tan ÖNCE eleme yapılmış olmalı. Eskiden "dosyada tek put var"
+        // diye sayılıyordu; çevrimdışı precache ikinci meşru put'u getirince sayı
+        // kuralı işe yaramaz oldu. Sayı yerine HER put'un izinli iki biçimden biri
+        // olduğunu doğruluyoruz: ya sabit çevrimdışı sayfa, ya da STATIC_PREFIX
+        // elemesinden geçmiş `req`. Üçüncü bir biçim (ör. bir API yanıtı) kırar.
+        const puts = sw.match(/cache\.put\([^;]*\);/g) ?? [];
+        expect(puts.length).toBeGreaterThan(0);
+        for (const put of puts) {
+            expect(put).toMatch(/^cache\.put\((OFFLINE_URL, res|req, res\.clone\(\))\);$/);
+        }
     });
 
     it("service worker kullanıcıyı eski build'e kilitleyemiyor", () => {
@@ -86,10 +93,29 @@ describe("GATE — PWA", () => {
     it("çevrimdışı yedek sayfa precache'te ve gezinme YAKALAMASINDA", () => {
         expect(existsSync(join(root, "src/app/offline/page.tsx"))).toBe(true);
         expect(sw).toMatch(/OFFLINE_URL = "\/offline"/);
-        expect(sw).toMatch(/cache\.add\(new Request\(OFFLINE_URL/); // install'da precache
+        expect(sw).toMatch(/fetch\(OFFLINE_URL, \{ cache: "reload" \}\)/); // install'da precache
         // Gezinme ağa gider; SADECE hata olursa yedek döner — yanıt önbelleğe YAZILMAZ.
         expect(sw).toMatch(/fetch\(req\)\.catch\(/);
         expect(sw).toMatch(/caches\.match\(OFFLINE_URL\)/);
+    });
+
+    it("precache YÖNLENDİRİLMİŞ yanıtı önbelleğe yazamıyor", () => {
+        // `cache.add` bunu yapamaz: yönlendirmeyi izler ve HEDEFİ /offline anahtarına
+        // yazar. Yönlendirilmiş bir yanıt ise bir GEZİNME isteğini karşılayamaz (SW
+        // spec) → respondWith TypeError atar, kullanıcı yedek sayfa yerine tarayıcının
+        // ağ hatası ekranını görür. 2026-08-31'de ölçülen gerçek arıza buydu.
+        expect(sw).toMatch(/res\.ok && !res\.redirected/);
+        expect(sw).toMatch(/cache\.put\(OFFLINE_URL, res\)/);
+        expect(sw).not.toMatch(/cache\.add\(/); // add() koşulsuz yazar — geri gelmesin
+    });
+
+    it("çevrimdışı sayfa oturumsuz ziyaretçide de erişilebilir", () => {
+        // Kapının arkasındayken /login'e 307 dönüyordu; service worker kurulumu
+        // yönlendirmeyi izleyip GİRİŞ SAYFASINI /offline anahtarına yazıyordu.
+        // Sayfa sunucu verisi okumaz, istemci mantığı içermez — public olması güvenli.
+        const proxy = readFileSync(join(root, "src/proxy.ts"), "utf8");
+        const list = proxy.match(/const ALWAYS_PUBLIC = \[([\s\S]*?)\];/)?.[1] ?? "";
+        expect(list).toContain('"/offline"');
     });
 
     it("çevrimdışı sayfa next/link KULLANMIYOR (linter'ın 'düzeltmesine' karşı)", () => {
@@ -194,6 +220,18 @@ describe("GATE — PWA", () => {
         expect(matcher).toContain("webmanifest");
         expect(matcher).toMatch(/\|js\|/);
         expect(matcher).toContain("png");
+    });
+
+    it("dar ekranda girdiler 16px — iOS otomatik yakınlaştırması", () => {
+        // iOS Safari 16px altındaki bir alana dokunulduğunda sayfayı yakınlaştırır ve
+        // geri uzaklaştırmaz. 2026-08-31 ölçümü: 69 görünür alanın 68'i 12–13.5px'ti,
+        // giriş ekranındaki e-posta alanı dahil. Kural yalnız dar ekranda geçerli —
+        // masaüstü yoğunluğu korunur. `!important` şart: alanlar inline style ile
+        // boyutlanıyor ve inline style normal kuralı yener.
+        const css = readFileSync(join(root, "src/app/globals.css"), "utf8");
+        expect(css).toMatch(
+            /@media \(max-width: 768px\) \{[\s\S]{0,200}?input:not\(\[type="checkbox"\]\)[\s\S]{0,200}?font-size: 16px !important;/,
+        );
     });
 
     it("CSP service worker ve manifest'e açıkça izin veriyor", () => {

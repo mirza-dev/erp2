@@ -137,3 +137,54 @@ yalnız statik varlık önbelleklıyor); bir sonraki tam sayfa yüklemesinde ge�
 **Geliştirme notu:** service worker yalnız üretimde kaydolur. `npm run dev`
 mevcut kaydı ve `roven-*` önbelleklerini aktif olarak siler — aksi halde bir kez
 üretim build'i açmış geliştiricinin tarayıcısında eski JS servis edilirdi.
+
+---
+
+## Telefon ve tabletten bakmak (deploy'dan ÖNCE)
+
+Prod henüz ayakta değil. Bugün telefondan bakmanın tek yolu **Mac'in kendi
+sunucusunu yerel ağa açmak**:
+
+```bash
+npm run build            # kod değiştiyse bir kez
+npm run start:lan        # next start -H 0.0.0.0 → LAN'dan erişilebilir
+ipconfig getifaddr en0   # Mac'in yerel IP'si
+```
+
+Telefon **aynı Wi-Fi'da** olmalı; tarayıcıya `http://<IP>:3000`. Mac'in uyumaması
+için `caffeinate -i npm run start:lan`. macOS ilk seferde "node gelen bağlantıları
+kabul etsin mi" diye sorabilir — İzin Ver.
+
+> Bu bir prod değil: **canlı veritabanına bakan yerel bir sunucu**. Telefonda
+> gördüğünüz kayıtlar gerçek kayıtlardır.
+
+### Düz HTTP'de ne çalışmaz
+
+Service worker **güvenli bağlam** ister (HTTPS ya da `localhost`). `http://192.168.x.x`
+güvenli bağlam değildir:
+
+| | LAN (http) | Deploy (https) |
+|---|---|---|
+| Uygulama, giriş, tüm veri, tüm ekranlar | ✅ | ✅ |
+| iOS "Ana Ekrana Ekle" → tam ekran + ikon + açılış ekranı | ✅ | ✅ |
+| Service worker · çevrimdışı sayfa · "Yenile" bildirimi | ❌ | ✅ |
+| Android Chrome "Uygulamayı yükle" (WebAPK) | ❌ (düz kısayol) | ✅ |
+
+iOS'ta tam ekran açılışın çalışmasının sebebi: onu `apple-mobile-web-app-capable`
+meta'sı sağlar, service worker değil.
+
+Tünel (cloudflared/ngrok) gerçek bir HTTPS adresi verir ve tabloyu tamamen yeşile
+çevirir — ama uygulamayı **herkese açık internete koyar** ve `/api/auth/demo`
+public olduğu için linki bilen herkes gerçek cari/ürün adlarını görebilir.
+Deploy'a kadar beklemek daha güvenli.
+
+### Ölçülen duyarlılık durumu (2026-08-31)
+
+5 cihaz profili × 14 ekran = 70 sayfa yüklemesinde **yatay taşma yok**
+(360/390 telefon · 768/1024 tablet · 1440 masaüstü). Kenar çubuğu <768px'te
+hamburger çekmeceye dönüyor, listeler kendi kabında yatay kayıyor, sipariş
+formunun aksiyon çubuğu altta sabitleniyor.
+
+Açık kalan: **dokunma hedefleri**. Hamburger 29×29, tema düğmesi 30×30, teklif
+satırı sil/not düğmeleri 22×22 — Apple'ın önerdiği 44×44'ün altında. Kullanılabilir
+ama parmakla ıskalanabilir; ayrı bir iş olarak duruyor.

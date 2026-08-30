@@ -833,6 +833,24 @@ body {
   }
 }
 
+/* iOS Safari, font-size'ı 16px'in ALTINDA olan bir alana dokunulduğunda sayfayı
+   otomatik yakınlaştırır — ve geri uzaklaştırmaz; kullanıcı her alandan sonra
+   elle pinch'lemek zorunda kalır. 2026-08-31 ölçümü (iPhone 14 emülasyonu):
+   69 görünür alanın 68'i 12–13.5px'ti, giriş ekranındaki e-posta alanı dahil —
+   yani telefondaki İLK dokunuşta.
+
+   Kural yalnız dar ekranda geçerli: masaüstü yoğunluğu (12–13.5px) değişmez.
+   `!important` zorunlu, çünkü alanların çoğu inline style ile boyutlanıyor ve
+   inline style normal bir kural setini yener. checkbox/radio/range hariç —
+   onlarda font-size görsel boyutu belirler, yakınlaştırmayı değil. */
+@media (max-width: 768px) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
 /* ============================================
    Topbar
    ============================================ */

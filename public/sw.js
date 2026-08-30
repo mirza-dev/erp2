@@ -16,7 +16,7 @@
  * `activate` kolu kendi sürümü dışındaki tüm cache'leri sildiği için yeni bir
  * CACHE sürümü yayınlamak da eski önbelleği temizler.
  */
-const CACHE = "roven-static-v2";
+const CACHE = "roven-static-v3";
 const STATIC_PREFIX = "/_next/static/";
 const OFFLINE_URL = "/offline";
 
@@ -34,7 +34,14 @@ self.addEventListener("install", (event) => {
     event.waitUntil(
         (async () => {
             const cache = await caches.open(CACHE);
-            await cache.add(new Request(OFFLINE_URL, { cache: "reload" }));
+            const res = await fetch(OFFLINE_URL, { cache: "reload" });
+            // `cache.add` YETMEZ — yönlendirilmiş yanıtı da yazar. Yönlendirilmiş bir
+            // yanıt ise bir GEZİNME isteğini karşılayamaz (SW spec); respondWith
+            // TypeError atar ve kullanıcı yedek sayfa yerine tarayıcının ağ hatası
+            // ekranını görür. 2026-08-31'de tam olarak bu oldu: /offline auth kapısının
+            // arkasındaydı, önbelleğe giriş sayfası yazıldı, yedek hiç çalışmadı.
+            // (v3: v2 önbelleğindeki zehirli /offline girdisi activate'te düşsün.)
+            if (res.ok && !res.redirected) await cache.put(OFFLINE_URL, res);
         })().catch(() => {
             /* çevrimdışı yedek yazılamadıysa kurulum yine de sürsün */
         }),
