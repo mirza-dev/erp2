@@ -5,6 +5,45 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-08-31 — Çok müşterili teslim altyapısı (3 faz, 3 commit)
+
+Kullanıcı "ürün bitti mi, insanların kullanımına sunulabilir mi" diye sordu. Ölçüldü:
+**yazılım olgun** (484 dosya/6814 test, 10/10 güvenlik denetimi), **hizmet değil** —
+prod ayakta değil (`erp.getmedspace.com` → HTTP 000), `EMAIL_FROM` yok (10 bildirim
+12 Haziran'dan beri kuyrukta, **24 açık uyarı kimseye ulaşmıyor**), AI 401, ve
+geliştirme canlı fabrika verisinin üstünde yapılıyor. Kullanıcı 1-3'ü üstlendi,
+4'e (ayrı dev DB) + teslim şekline odaklanıldı.
+
+**Faz 1 `23f7142` — şema paketi.** `npm run schema:bundle`: 111 migration → 5 parça
+(502 KB) + README + doğrulama sorgusu. Birleştirme güvenliği ÖLÇÜLEREK doğrulandı
+(begin/commit yok, psql meta yok, concurrently yok, `pg_trgm` IF NOT EXISTS,
+**6 kovanın tamamı migration'larda**). Gate: bir migration'ın sessizce düşmesi;
+iki kanıtla kırmızı yandı.
+
+**Faz 2 `c7f715b` — prod-koruma kapısı.** `predev` + `pretest:e2e*` →
+`preflight:env`. `PROD_PROJECT_REF` sabit commit'li (sır değil). `backup`/`build`
+KASITLI bağlanmadı. **Fail-closed değil, bilinçli** (tanınmayan URL prod sayılmaz —
+gürültü kapıyı kapattırır). ⚠️ **E2E artık kilitli.**
+
+**Faz 3 `9172885` — PWA + `docs/musteri-kurulum.md`.** Sabit "Roven" kimliği;
+ikonlar `icon.svg`'den **sabit renklerle yeniden kurulur** (ham SVG'nin
+`prefers-color-scheme`'i rasterleştirmede uygulanmaz → koyu launcher'da kaybolurdu);
+SW **kasten aptal** (API/navigasyon asla önbelleğe alınmaz). `proxy.ts` matcher
+bağı teste kilitlendi.
+
+**React Doctor hook'u "staged regression" dedi — YANLIŞ ALARM.** İki bulgu da
+layout.tsx'teki FOUC tema bootstrap'ında ve değişiklikten ÖNCE vardı (`HEAD~1`'de
+23-24. satır); 19 satır eklenince 41-42'ye kaydı, hook kaymayı yeni sandı.
+`ServiceWorkerRegister.tsx` sıfır bulgu. `next/script`'e çevirmek FOUC'u geri
+getirirdi → dokunulmadı.
+
+**484 dosya / 6814 test** · tsc 0 · lint 0 · build 0 uyarı · **migration YOK**.
+Detay: [[project_delivery]].
+
+**SIRADAKİ (kullanıcı):** Frankfurt'ta dev projesi kur (`schema:bundle` ile) →
+`.env.local`'ı çevir → dev'de E2E kullanıcısı aç (E2E kilidini kaldırır) →
+deploy + env → PMT'ye pilot.
+
 ## 2026-08-30 (gece, 2) — Supabase yedek doğrulaması: YEDEK YOKTU → `npm run backup`
 
 Kullanıcı "supabase yedeklerini doğrula" dedi (10 maddelik denetimde kapsam dışı

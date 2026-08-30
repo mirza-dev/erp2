@@ -5,7 +5,21 @@ _Son güncelleme: 2026-08-30_
 
 > Bu bölüm yalnız **güncel durumu + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda ve `memory/current_focus.md`'de. Aşağıdaki indeks son dönem oturumlarına (commit + konu) hızlı bakış içindir; daha eski dönemler (Faz 2–3d AI Import, Sprint A–C, M-3 Rate Limiting, React Doctor, Teklif V2–V7 plan turları, Paraşüt Faz 1–11) git geçmişinde.
 
-**Son tamamlanan iş:** **Supabase yedek doğrulaması → yedek YOKTU, `npm run backup` ile kapatıldı** (2026-08-30 gece; GREEN; **migration YOK**). Kullanıcı "supabase yedeklerini doğrula" dedi — 10 maddelik denetimde kapsam dışı bırakılıp not düşülen madde.
+**Son tamamlanan iş:** **Çok müşterili teslim altyapısı — şema paketi · prod kapısı · PWA** (2026-08-31; GREEN; **migration YOK**; 3 faz, 3 commit `23f7142` → `c7f715b` → `9172885`). Kullanıcı "ürün bitti mi, sunulabilir mi" diye sordu; ölçüldü: **yazılım olgun, hizmet değil** — prod ayakta değil (`erp.getmedspace.com` → HTTP 000), `EMAIL_FROM` yok (10 bildirim 12 Haziran'dan beri kuyrukta → **24 açık uyarı kimseye ulaşmıyor**), AI 401, ve geliştirme canlı fabrika verisi üstünde. Kullanıcı deploy/env/e-postayı üstlendi.
+
+**Mimari tespit (planı belirledi):** ürün **TEK KİRACILI** ve şema bunu sert uyguluyor — `company_settings` üzerinde `unique index … ((true))` (033) + 111 migration'da **0 tenant kolonu**. Yani "çok müşteri" daha büyük bir plan değil, **müşteri başına ayrı Supabase projesi**. Pro org başına $25 + marjinal ~$10/proje.
+
+**Faz 1 — şema paketi.** `npm run schema:bundle`: 111 migration → 5 yapıştırmalık parça (502 KB) + README + doğrulama sorgusu (`tablo` == `rls_acik` == 64, kova 6). Birleştirme güvenliği **ölçülerek** doğrulandı: açık begin/commit yok, psql meta-komutu yok, `concurrently` yok, tek eklenti `pg_trgm` (IF NOT EXISTS), **6 kovanın TAMAMI migration'larda yaratılıyor** → paketten kurulan proje eksiksiz. Çıktı `.gitignore`'da (türetilmiş). ⚠️ `057_seed_product_types` **vana/fitting sektörüne özel** — farklı sektör müşterisinde değiştirilmeli.
+
+**Faz 2 — prod-koruma kapısı.** `predev` + `pretest:e2e*` → `npm run preflight:env`. `PROD_PROJECT_REF` **sabit commit'li** (sır değil, `NEXT_PUBLIC_`; env yerine sabit olması kapıyı yapılandırmasız çalıştırır). `backup`/`build`/`start` **KASITLI bağlanmadı** (yedek ve Coolify prod derlemesi meşru biçimde canlıyı hedefler). **Fail-closed DEĞİL, bilinçli:** tanınmayan URL prod sayılmaz — bilinmeyeni bloklamak kapıyı gürültüye çevirir ve kapatılmasına yol açar. Kaçış: `ALLOW_PROD_TARGET=1`. ⚠️ **E2E artık kilitli** — dev projesinde `E2E_USER_EMAIL` açılana kadar (kullanıcı bilerek seçti).
+
+**Faz 3 — PWA + `docs/musteri-kurulum.md`.** Sabit "Roven" kimliği (müşteri logosu uygulama içinde — klasik SaaS). İkonlar `icon.svg`'den **sabit renklerle YENİDEN KURULUR**: ham SVG'yi rasterleştirmek sessizce yanlış olurdu, içindeki `prefers-color-scheme` rasterleştirmede uygulanmaz → koyu marka + şeffaf zemin, koyu launcher'da kaybolur. **`public/sw.js` KASTEN APTAL:** yalnız `/_next/static/` önbelleğe alınır, **API ve navigasyonlar ASLA** (ERP'de bayat sipariş/stok, olmayan hatadan beterdir); KILL SWITCH yordamı dosyanın başında. `proxy.ts` matcher'ının `webmanifest|js|png`'yi dışladığı **teste kilitlendi** — biri daraltırsa PWA sessizce ölürdü. Kurulum yordamı on-premise'in neden reddedildiğini de yazıyor.
+
+**React Doctor hook'u "staged regression" dedi — YANLIŞ ALARM.** İki bulgu da `layout.tsx`'teki FOUC tema bootstrap'ında ve değişiklikten ÖNCE vardı (`HEAD~1`'de 23-24. satır); 19 satır eklenince 41-42'ye kaydı, hook kaymayı yeni sandı. `ServiceWorkerRegister.tsx` **sıfır bulgu**. `next/script`'e çevirmek FOUC'u geri getirirdi → dokunulmadı.
+
+tsc 0 · lint 0 · **484 dosya / 6814 test** (+20) · build 0 uyarı · **migration YOK**.
+
+**Önceki iş:** **Supabase yedek doğrulaması → yedek YOKTU, `npm run backup` ile kapatıldı** (2026-08-30 gece; GREEN; **migration YOK**). Kullanıcı "supabase yedeklerini doğrula" dedi — 10 maddelik denetimde kapsam dışı bırakılıp not düşülen madde.
 
 **Sonuç: yedek yoktu, İKİ ayrı sebeple.** (1) Proje **Free planda** → Supabase'de otomatik yedek hiç yok (günlük yedek Pro 7/Team 14/Enterprise 30 gün; PITR her planda ayrı ücretli). (2) **Storage plandan BAĞIMSIZ kapsam dışı** — Supabase belgesi birebir: *"Database backups do not include objects you store via the Storage API, as the database only includes metadata about these objects."* Yani ücretli plana geçilse **bile** 6 kovadaki dosyalar yedeğe girmez; DB satırı yalnız adresi tutar. Ölçüm: **64 tablo / 1.238 satır · 8 hesap (3 admin) · 76 obje / 47,38 MB**; DB→storage **kırık referans 0** (kayıp yaşanmamış, risk gelecekteydi). Plan seviyesi servis anahtarıyla ölçülemez (Management API + PAT gerekir; PAT yok, CLI token'ı Keychain'de) → kullanıcı Free dedi. Rapor: `docs/audit/2026-08-30-supabase-yedek-dogrulamasi.md`.
 
@@ -15,9 +29,9 @@ _Son güncelleme: 2026-08-30_
 
 **Kalıcı kapı:** `src/__tests__/backup-script.test.ts` 3 invaryant, **üçü de kırmızı-yandığı kanıtlanarak**: `backups/` .gitignore'da · script kaynağa yazmaz (yazma-metotlu her `fetch`'in hedefi `storage/v1/object/list` olmalı) · satır sayısı doğrulaması yerinde.
 
-tsc 0 · lint 0 · **481 dosya / 6794 test** (+6) · build 0 uyarı · **migration YOK**.
+tsc 0 · lint 0 · 481 dosya / 6794 test · build 0 uyarı · migration YOK.
 
-**Önceki iş:** **10 maddelik güvenlik denetimi (10/10 KAPALI) + gate kural 4** (2026-08-30 gece; GREEN; **migration YOK**). Kullanıcı *"vibecoded uygulamalarda bulduğum güvenlik delikleri"* listesini paylaşıp "her şeyi pushla, sonra tek tek bak" dedi. Önce push (`4405b76` + `65983b3`; main + codex-experiment aynı SHA, `git ls-remote` doğruladı), sonra 10 madde canlı `erp2`'ye karşı **ölçüldü**.
+**Daha önceki iş:** **10 maddelik güvenlik denetimi (10/10 KAPALI) + gate kural 4** (2026-08-30 gece; GREEN; **migration YOK**). Kullanıcı *"vibecoded uygulamalarda bulduğum güvenlik delikleri"* listesini paylaşıp "her şeyi pushla, sonra tek tek bak" dedi. Önce push (`4405b76` + `65983b3`; main + codex-experiment aynı SHA, `git ls-remote` doğruladı), sonra 10 madde canlı `erp2`'ye karşı **ölçüldü**.
 
 **Sonuç 10/10 kapalı** — rapor `docs/audit/2026-08-30-vibecode-guvenlik-denetimi.md`. Öne çıkanlar: 65 policy'nin tamamı `service_role`, **tek `using (true)` yok** · anon key ile 24 tablo → `200` + **0 satır** (aynı an service_role: products=128, customers=16, audit_log=142) · 6 bucket'ta anon listeleme boş · **genel kayıt kapalı** (`signUp` hiçbir route'ta yok → "sınırsız hesap" çarpanı yok) · SSRF'in tek yüzeyi logo (host allowlist + MIME + boyut; `logo_url` PATCH allowlist'inde değil) · **G4: AI yalnız tavsiye alanına yazar**. **Madde 3 (tarayıcıda fiyat) bizde GERÇEKTEN vardı** — `mig.093` zaten kapatmıştı (istemci `line_total=1` gönderebiliyordu).
 
@@ -27,7 +41,7 @@ tsc 0 · lint 0 · **481 dosya / 6794 test** (+6) · build 0 uyarı · **migrati
 
 tsc 0 · lint 0 · 480 dosya / 6788 test · build 0 uyarı · migration YOK.
 
-**AÇIK (kullanıcı tarafı):** `EMAIL_FROM` · `ANTHROPIC_API_KEY` yenileme (401) · Paraşüt API başvurusu · **yedeği dış diske çıkarma + geri yükleme provası** (`npm run backup` kuruldu, ilk yedek alındı; prova edilmedi) · şifre sıfırlamanın Supabase-tarafı rate limiti (tarayıcıdan doğrudan gidiyor, bizim middleware'imizi görmüyor).
+**AÇIK (kullanıcı tarafı) — sıralı:** **(1) Frankfurt'ta dev projesi kur** (`npm run schema:bundle` ile; `.env.local`'ı ona çevir — kurulum aynı zamanda geri-yükleme provası) → **(2) dev'de `E2E_USER_EMAIL` kullanıcısı aç** (E2E kilidini kaldırır) → **(3) deploy + env**: `EMAIL_FROM` (10 bildirim kuyrukta, 24 uyarı ulaşmıyor) · `ANTHROPIC_API_KEY` (401) · `REDIS_URL` · `ADMIN_EMAILS` → **(4) PMT'ye pilot hafta**. Ayrıca: Supabase Pro'ya geçiş · yedeği dış diske çıkarma · Paraşüt API başvurusu · şifre sıfırlamanın Supabase-tarafı rate limiti (tarayıcıdan doğrudan gidiyor, middleware'imizi görmüyor).
 
 **Daha önceki iş:** **E2E kök sebebi + deploy hazırlığı + panel avı** (2026-08-30 öğleden sonra). Üç blok:
 
