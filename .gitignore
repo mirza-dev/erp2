@@ -66,3 +66,5 @@ pmt/
 /.obsidian/
 # Supabase yedekleri — müşteri verisi, fiyatlar ve OAuth token'ları içerir
 /backups/
+# Şema paketi — migration'lardan türetilir (npm run schema:bundle)
+/supabase/schema-bundle/
