@@ -12,8 +12,26 @@ bulgunun tamamı kapatıldı. Zemin: tsc 0 · lint 0 · **480 dosya / 6779 test*
 (6713'ten +66) · build 0 uyarı · semgrep (değişen yüzey) 0 · check-migrations
 yalnız 111'i eksik raporluyor.
 
-**İKİ MIGRATION APPLY BEKLİYOR (kullanıcı):** `110` (K1 güvenlik — CANLI açık)
-ve `111` (şema: Y7/O3/D3/D4 + status CHECK).
+**MIGRATION'LAR UYGULANDI (2026-08-30):** `110` (K1 güvenlik) ve `111` (şema)
+Studio'dan uygulandı · `INTERNAL_OPERATOR_EMAILS` set edildi · `check-migrations`
+→ `[mig-gate] OK`. **K1 canlı probe ile kapandı:** `record_request_metrics` anon
+key ile **200 → 401/42501**; beş DEFINER fonksiyonun tamamı `anon_exec=false,
+auth_exec=false, svc_exec=true`. Canlı doğrulama tablosu raporun sonunda
+(§ Canlı doğrulama): Y7 ayrı gruplar · O3 olay-bazlı severity · Y1 query-string
+sızmıyor · redaksiyon `[vkn]`/`[phone]` · D3 histogram guard · Y5 allowlist 4/4 red.
+Yazan her sonda kendi satırlarını sildi.
+
+**PANELİN BULDUĞU GERÇEK SORUNLAR (bu commit'in kusuru değil):**
+1. E-posta yapılandırması eksik → `maintenance_incidents` critical/open + **10
+   `notification_outbox` kaydı `waiting_config`** (en eskisi ~78 gün).
+2. `ANTHROPIC_API_KEY` 401 → AI kapalı.
+
+**E2E SUITE BAYAT (ayrı iş, bu commit'le İLGİSİZ):** `npx playwright test` →
+56 fail / 26 pass. Kanıt: `products.spec` "satır tıklayınca drawer açılıyor"
+testi **Faz 2b'de KALDIRILAN** drawer'ı bekliyor (sayfada 0 drawer referansı,
+satır tıklaması `router.push`). Son yeşil rapor 25 May; UI o tarihten sonra
+Faz B component lib + nav yeniden yapılandırmasıyla değişti. `dashboard.spec`
+İZOLE koşumda 6/6 geçiyor; `networkidle` beklemeleri dev modda kırılgan.
 
 **K1 — DEFINER/anon açığı.** `mig.110` beş fonksiyonu `from public, anon,
 authenticated` ile revoke ediyor (109×3 + 097×2). Gate sertleştirildi:

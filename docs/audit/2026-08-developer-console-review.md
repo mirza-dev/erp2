@@ -14,15 +14,18 @@
 > semgrep (değişen yüzeyin tamamı) **0 bulgu** · `check-migrations` yalnız 111'i eksik raporluyor (beklenen).
 > Ayrıntı: bu dosyanın sonundaki **Kapanış tablosu**.
 >
-> **KULLANICI TARAFI AÇIK:** `migration 110` ve `migration 111` Studio'dan uygulanmalı;
-> `INTERNAL_OPERATOR_EMAILS` set edilmeden panele girilemez (bilinçli fail-closed).
+> **CANLI KAPANIŞ (2026-08-30, aynı gün):** `migration 110` ve `migration 111` Studio'dan
+> **UYGULANDI** · `INTERNAL_OPERATOR_EMAILS` **set edildi** · `check-migrations` → `[mig-gate] OK`.
+> K1 canlı probe ile kapandı: `record_request_metrics` anon key → **401/42501** (öncesi 200) ve
+> beş DEFINER fonksiyonun tamamı `anon_exec=false, auth_exec=false, svc_exec=true`.
+> Canlı doğrulama ayrıntısı: **§ Canlı doğrulama** (bu dosyanın sonu).
 
 ## Verdikt
 
 | Soru | Cevap |
 |---|---|
 | Mevcut ERP bozuldu mu? | **Hayır.** Yüksek riskli dört hipotezin dördü de kanıtla çürütüldü (aşağıda). |
-| Panel güvenli mi? | **Hayır — K1 canlıda istismar edilebilir durumda.** Düzeltme yazıldı: `migration 110`. |
+| Panel güvenli mi? | **Artık evet.** K1 canlıda istismar edilebilirdi; `migration 110` uygulandı ve probe ile kapandığı doğrulandı. |
 | Panel doğru mu ölçüyor? | Kısmen. Kapsama iddiası (K2) ve dört ölçüm kusuru (Y3–Y7) panelin verdiğini olduğundan iyi/kötü gösteriyor. |
 | Arayüz kurallara uyuyor mu? | **Evet.** Tailwind 0 · framer-motion 0 · hardcoded renk 0 · 8/8 `"use client"` · `dangerouslySetInnerHTML` yok. |
 
@@ -272,7 +275,7 @@
 
 | # | Bulgu | Durum | Nerede |
 |---|---|---|---|
-| **K1** | DEFINER RPC'leri anon'a açık (5 fonksiyon) | ✅ `mig.110` (APPLY bekliyor) + gate | `110_fix_definer_rpc_grants.sql` · `gate/sql-migration-lint` yeni rol-hedefli REVOKE iddiası |
+| **K1** | DEFINER RPC'leri anon'a açık (5 fonksiyon) | ✅ `mig.110` **UYGULANDI** + gate | `110_fix_definer_rpc_grants.sql` · `gate/sql-migration-lint` yeni rol-hedefli REVOKE iddiası |
 | **K2** | `onRequestError` 28 route'a ulaşmıyor | ✅ 28 route çevrildi + gate | `handleApiError(err, label, { clientMessage })` · `gate/route-error-coverage.test.ts` (baseline BOŞ) |
 | **Y1** | Ham URL (query string) redaksiyonsuz `endpoint`'e | ✅ | `record.ts` `safeEndpoint()` — `normalizeEndpoint` ∨ `?`-kes + redaksiyon |
 | **Y2** | Sunucu/edge Sentry hiç başlamıyor | ✅ | `instrumentation.ts` `register()` (NEXT_RUNTIME'a göre kök config'leri yükler); test iddiası çevrildi |
@@ -312,9 +315,56 @@ sessizce yanlış şeyi doğruluyordu. (Bu tur `proxy.ts`'e yeni bir JSDoc eklen
 ortaya çıktı: `developer-console-authz` internalOperator kapısını göremez oldu.)
 Sıra 11 dosyada da düzeltildi: **önce satır yorumları, sonra bloklar.**
 
+## Canlı doğrulama (2026-08-30, migration'lar uygulandıktan sonra)
+
+Aşağıdakilerin tamamı **canlı Supabase projesine karşı** koşuldu; yazan her sonda kendi
+satırlarını sildi (`temizlik sonrası 0` ile doğrulandı).
+
+| Kontrol | Sonuç |
+|---|---|
+| `check-migrations` | `[mig-gate] OK — problanan tüm migration'lar canlıda mevcut` (exit 0) |
+| **K1** anon probe (5 DEFINER RPC) | `anon_exec=false · auth_exec=false · svc_exec=true` — beşinde de. `record_request_metrics` **200 → 401/42501** |
+| **Y7** aynı fingerprint, iki ortam | **AYRI GRUPLAR** — `on conflict (fingerprint, environment)` çalışıyor |
+| **O3** olay bazlı ciddiyet | Tek grupta `status=500` ve `status=503` olayları ayrı `severity` taşıyor; `occurrence_count=2` |
+| **O6** geçersiz request-id | `"GECERSIZ REQUEST ID!!"` → kolona `null` düştü |
+| **Y1** sorgu dizesi sızıntısı | `/api/orders/<uuid>?search=Ahmet%20Yilmaz` → `endpoint = /api/orders/[id]` (query yok) |
+| **Redaksiyon** | Başlıkta `vkn [vkn]` ve `tel [phone]`; ham VKN/telefon yazılmadı |
+| **D3** histogram guard | 3 elemanlı → **reddedildi**; dizi olmayan → **reddedildi**; null elemanlar → `coalesce` ile 0 |
+| **Nit** negatif status sayacı | CHECK ihlali `23514` ile **reddedildi** |
+| **Y5** RUM allowlist | Bilinen şablon kabul (1/0); `/api/aaaa`,`/api/aaab`,`/api/aaac`,`/dashboard/zzzz` → **4/4 reddedildi**; allowlist 200 şablon |
+| **D7** statik varlıklar | `/icon.svg` 200 `image/svg+xml` · `favicon.ico` 200 `image/x-icon` |
+| **D7** giriş akışı | Playwright `global-setup` gerçek oturum açtı (`tests/.auth/user.json` yazıldı); `/dashboard` → 307 `/login` oturumsuzken |
+| **Nit 5** `X-RateLimit-Reset` | `/login` yanıtında üç başlık birlikte (`limit/remaining/reset`) — yalnız 429'da değil |
+
+**Panelin canlı çıktısı** (`collectHealth`) — dürüstlük ailesinin çalıştığının kanıtı:
+
+```
+genel durum : degraded          ← kör olduğu yerde "yeşil" demiyor
+api         : unknown   "Ölçülmüyor — bu pencerede istek ölçümü yok"   ← Y4 (0 değil)
+incidents   : degraded  "1 açık arıza kaydı"                            ← O4 (önce hiç okunmuyordu)
+jobs        : critical  "10 bekleyen · en eski 113234 dk"               ← O5 (safe() içinde, gerçek veri)
+unavailableSources: []   truncatedMetrics: []                           ← O7 / D1 alanları yerinde
+```
+
+### Panelin bulduğu GERÇEK sorunlar (bu commit'in kusuru DEĞİL, önceden var)
+
+1. **E-posta yapılandırması eksik** — `maintenance_incidents`'te `critical/open`:
+   *"E-posta gönderim konfigürasyonu eksik"*. Buna bağlı **10 `notification_outbox` kaydı
+   `waiting_config`** durumunda bekliyor (en eskisi ~78 gün). Panel bunu doğru raporluyor.
+2. **`ANTHROPIC_API_KEY` reddediliyor (HTTP 401)** → `ai: degraded "Anahtar geçersiz"`.
+   AI kolon eşleştirme/skorlama bu anahtar yenilenene kadar kapalı.
+
+### Gözlem (yeni, 29 bulgunun dışında)
+
+`email` servis satırı **healthy** görünüyor (*"Bu pencerede gönderim yok"*) — oysa aynı anda
+e-posta yapılandırması için **critical/open** bir arıza kaydı ve 10 bekleyen kuyruk öğesi var.
+Sonda başarılı olduğu (0 gönderim) için Y4b kuralı `unknown`'a düşürmüyor. Yanıltıcı değil
+ama eksik: `incidents` ve `jobs` satırları durumu ayrıca gösterdiği için genel durum yine
+`degraded`. İstenirse `email` satırı açık e-posta arızasıyla ilişkilendirilebilir — bu
+**ayrı bir tur**, bu incelemenin kapsamında değil.
+
 ## Kalan iş (kullanıcı tarafı)
 
-1. **`migration 110`** — Studio'dan uygula, sonundaki `has_function_privilege` sorgusunu koştur (beşi de `false` dönmeli). **K1 canlı.**
-2. **`migration 111`** — Studio'dan uygula; `npx tsx scripts/check-migrations.ts` yeşile döner.
-3. **`INTERNAL_OPERATOR_EMAILS`** set edilmeden panele girilemez (bilinçli fail-closed).
-4. **Tarayıcı turu** — özellikle **D7**: matcher muafiyeti daraldı, statik varlıkların (`/icon.svg`, `favicon.ico`) hâlâ servis edildiğini ve giriş akışının bozulmadığını gözle doğrulayın.
+1. ~~`migration 110` / `migration 111` / `INTERNAL_OPERATOR_EMAILS`~~ ✅ **tamamlandı** (yukarıdaki tablo).
+2. **E-posta yapılandırması** — Resend anahtarı, gönderen adresi ve webhook ayarları; 10 bekleyen bildirim bunu bekliyor.
+3. **`ANTHROPIC_API_KEY` yenile** — şu an 401.
