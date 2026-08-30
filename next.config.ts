@@ -42,6 +42,12 @@ const nextConfig: NextConfig = {
                             "script-src 'self' 'unsafe-inline'",
                             "style-src 'self' 'unsafe-inline'",
                             "font-src 'self' data:",
+                            // PWA: service worker ve manifest. İkisi de bugün
+                            // default-src fallback'iyle çalışıyor; açık yazmak
+                            // ileride default-src daraltılırsa sessizce
+                            // kırılmalarını engeller.
+                            "worker-src 'self'",
+                            "manifest-src 'self'",
                             "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io",
                             "frame-ancestors 'none'",
                         ].join("; "),

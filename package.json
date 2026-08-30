@@ -17,6 +17,7 @@
     "preflight:env": "tsx scripts/check-env-target.ts",
     "backup": "tsx scripts/backup.ts",
     "schema:bundle": "tsx scripts/build-schema-bundle.ts",
+    "pwa:icons": "tsx scripts/build-pwa-icons.ts",
     "pretest:e2e": "npm run preflight:env",
     "test:e2e": "playwright test",
     "pretest:e2e:ui": "npm run preflight:env",

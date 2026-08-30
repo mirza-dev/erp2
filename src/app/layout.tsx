@@ -1,12 +1,30 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
+import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
 
 export const metadata: Metadata = {
   title: "Roven — AI Destekli ERP",
   description:
     "AI destekli sipariş ve stok yönetim sistemi — PMT Endüstriyel",
+  manifest: "/manifest.webmanifest",
+  // iOS ana ekrandan açıldığında tarayıcı çubuğu olmadan çalışsın.
+  appleWebApp: { capable: true, title: "Roven", statusBarStyle: "default" },
+};
+
+/**
+ * Tarayıcı kabuğunu (adres çubuğu, durum çubuğu) sayfanın zeminine boyar.
+ * İki tema için AYRI verilmek zorunda: tek renk verilirse aydınlık temada
+ * koyu bir şerit, koyu temada beyaz bir şerit kalır.
+ * Değerler globals.css ile birebir — `:root`/`[data-theme="dark"]` #1a1d23,
+ * `[data-theme="light"]` #ffffff.
+ */
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#1a1d23" },
+  ],
 };
 
 export default function RootLayout({
@@ -31,6 +49,7 @@ export default function RootLayout({
         suppressHydrationWarning
       >
         {children}
+        <ServiceWorkerRegister />
       </body>
     </html>
   );
