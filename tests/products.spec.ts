@@ -114,14 +114,19 @@ test.describe("Ürün Ekleme Modal", () => {
         await expect(submitBtn).toBeEnabled({ timeout: 3_000 });
         await submitBtn.click();
 
-        // Modal kapanır ve başarı toast
-        await expect(page.getByText(new RegExp(name.slice(0, 15), "i"))
-            .or(page.getByText(/eklendi|oluşturuldu/i)).first()).toBeVisible({ timeout: 8_000 });
-
-        // Temizlik — yoksa ürün canlı katalogda kalıyor.
+        // KALICI sonucu doğrula, geçici toast'ı değil: `handleAdd` önce
+        // `fetchList()`+`refetchCounts()` bekliyor, toast ondan SONRA çıkıyor
+        // ve birkaç saniyede kendiliğinden kayboluyor. Yavaş bir yenilemede
+        // iddia toast'ı hiç göremiyordu — oysa ürün oluşmuştu.
         const created = await waitForInList<{ id?: string; sku: string }>(
             request, "http://localhost:3000/api/products?all=1", (p) => p.sku === sku,
         );
+        expect(created, `${sku} oluşturulmuş olmalıydı`).toBeDefined();
+
+        // Modal kapanmış olmalı (başarı yolunun görünür sonucu).
+        await expect(page.getByPlaceholder(/küresel vana/i)).toBeHidden({ timeout: 10_000 });
+
+        // Temizlik — yoksa ürün canlı katalogda kalıyor.
         if (created?.id) await deleteTestProduct(request, created.id).catch(() => {});
     });
 

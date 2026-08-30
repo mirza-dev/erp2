@@ -18,6 +18,7 @@ import { decrementCount, patchCountRecord, successfulResponseIds } from "@/lib/f
 import { formatExpectedDate, isPoCancellable } from "@/lib/purchase-order-ui";
 import Button, { ButtonLink } from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
+import { ConfirmModal } from "@/components/ui/Modal";
 import Badge, { type BadgeTone } from "@/components/ui/Badge";
 import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 import { CircleOff, Plus } from "lucide-react";
@@ -349,45 +350,17 @@ export default function PurchaseOrdersClient(props: PurchaseOrdersClientProps) {
                     ) : null}
                 />
             </Card>
-            {/* Bulk cancel confirm modal */}
+            {/* Toplu iptal onayı — ortak ConfirmModal (Escape + focus tuzağı). */}
             {bulkCancelConfirm && (
-                <>
-                    <div
-                        onClick={() => !bulkCancelling && setBulkCancelConfirm(false)}
-                        style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.5)" }}
-                    />
-                    <div role="dialog" aria-modal="true" aria-labelledby="bulk-cancel-title" style={{
-                        position: "fixed", top: "50%", left: "50%",
-                        transform: "translate(-50%, -50%)", zIndex: 101,
-                        background: "var(--surface-raised)", border: "var(--line-width) solid var(--surface-border)",
-                        borderRadius: "8px", padding: "24px", width: "380px", maxWidth: "90vw",
-                        boxShadow: "var(--surface-shadow)",
-                    }}>
-                        <div id="bulk-cancel-title" style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "8px" }}>
-                            {selectedIds.size} siparişi iptal et
-                        </div>
-                        <div style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "20px" }}>
-                            Seçili siparişleri iptal etmek istediğinizden emin misiniz?
-                        </div>
-                        <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                            <Button
-                                variant="secondary"
-                                onClick={() => setBulkCancelConfirm(false)}
-                                disabled={bulkCancelling}
-                            >
-                                Vazgeç
-                            </Button>
-                            <Button
-                                variant="danger"
-                                leftIcon={<CircleOff size={14} />}
-                                onClick={handleBulkCancel}
-                                disabled={bulkCancelling}
-                            >
-                                {bulkCancelling ? "İptal ediliyor…" : "İptal Et"}
-                            </Button>
-                        </div>
-                    </div>
-                </>
+                <ConfirmModal
+                    title={`${selectedIds.size} siparişi iptal et`}
+                    message="Seçili siparişleri iptal etmek istediğinizden emin misiniz?"
+                    confirmLabel={bulkCancelling ? "İptal ediliyor…" : "İptal Et"}
+                    cancelLabel="Vazgeç"
+                    busy={bulkCancelling}
+                    onConfirm={handleBulkCancel}
+                    onCancel={() => setBulkCancelConfirm(false)}
+                />
             )}
         </div>
     );

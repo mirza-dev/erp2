@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Check, CircleOff, Pencil, Printer, RotateCcw, Send, Truck } from "lucide-react";
 import Button, { ButtonLink } from "@/components/ui/Button";
+import Modal from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import type { PurchaseOrderRow, PurchaseOrderLineRow, PurchaseOrderStatus, VendorRow, ProductRow } from "@/lib/database.types";
@@ -680,14 +681,12 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
 
             {/* Cancel modal */}
             {cancelOpen && (
-                <div role="dialog" aria-modal="true" aria-labelledby="po-cancel-title" style={{
-                    position: "fixed", inset: 0, background: "rgba(0,0,0,0.5)", zIndex: 200,
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                }}>
-                    <div style={{
-                        background: "var(--bg-primary)", padding: "24px", borderRadius: "10px",
-                        width: "440px", maxWidth: "calc(100vw - 32px)", display: "flex", flexDirection: "column", gap: "12px",
-                    }}>
+                <Modal
+                    onClose={() => { setCancelOpen(false); setCancelReason(""); }}
+                    labelledBy="po-cancel-title"
+                    width="min(440px, calc(100vw - 32px))"
+                    surfaceStyle={{ background: "var(--bg-primary)", padding: "24px", borderRadius: "10px", gap: "12px" }}
+                >
                         <h2 id="po-cancel-title" style={{ fontSize: "16px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
                             Siparişi İptal Et
                         </h2>
@@ -716,8 +715,7 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                                 {actionBusy === "cancel" ? "İptal ediliyor..." : "İptal Et"}
                             </Button>
                         </div>
-                    </div>
-                </div>
+                </Modal>
             )}
         </div>
     );

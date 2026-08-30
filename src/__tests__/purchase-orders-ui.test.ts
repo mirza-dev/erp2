@@ -237,8 +237,15 @@ describe("Liste sayfası — hover state + toplu-iptal seçim + modal a11y", () 
     });
 
     it("toplu-iptal modalı a11y: role=dialog + aria-modal + aria-labelledby", () => {
-        expect(listSrc).toContain('role="dialog" aria-modal="true" aria-labelledby="bulk-cancel-title"');
-        expect(listSrc).toContain('id="bulk-cancel-title"');
+        // a11y ARTIK ORTAK ÇERÇEVEDE: `role="dialog"` + `aria-modal` +
+        // focus tuzağı + Escape `components/ui/Modal.tsx`'te (orada ayrıca
+        // kilitli). Burada kilitlenen: bu yüzey çerçeveyi KULLANIYOR ve
+        // verdiği `labelledBy` id'sinin karşılığı sayfada VAR.
+        expect(listSrc).toContain('from "@/components/ui/Modal"');
+        expect(listSrc).toContain('<ConfirmModal');
+        // Başlık artık ConfirmModal'ın kendi <div id="confirm-modal-title">'ı;
+        // burada kilitlenen METNİN çağırandan geldiği.
+        expect(listSrc).toContain("siparişi iptal et");
     });
 });
 
@@ -250,7 +257,7 @@ describe("Detay sayfası — iptal modalı aria-labelledby", () => {
             path.resolve(process.cwd(), "src/app/dashboard/purchase/orders/[id]/page.tsx"),
             "utf-8",
         );
-        expect(detailSrc).toContain('aria-labelledby="po-cancel-title"');
+        expect(detailSrc).toContain('labelledBy="po-cancel-title"');
         expect(detailSrc).toContain('id="po-cancel-title"');
     });
 });

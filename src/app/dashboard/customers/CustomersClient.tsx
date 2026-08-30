@@ -12,6 +12,7 @@ import { useListUrlState, useDebouncedSearch } from "@/hooks/useListUrlState";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import CustomerDetailPanel from "@/components/customers/CustomerDetailPanel";
 import Button from "@/components/ui/Button";
+import Modal, { ConfirmModal } from "@/components/ui/Modal";
 import Card from "@/components/ui/Card";
 import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 import { useToast } from "@/components/ui/Toast";
@@ -588,84 +589,27 @@ export default function CustomersClient(props: CustomersClientProps) {
                 onCustomerUpdated={applyUpdatedCustomer}
             />
 
-            {/* Bulk delete confirm modal */}
+            {/* Toplu silme onayı — ortak ConfirmModal (Escape + focus tuzağı
+                + odak dönüşü çerçeveden gelir; elle yazılmış sürümde yoktu). */}
             {bulkDeleteConfirm && (
-                <>
-                    <div
-                        onClick={() => !bulkDeleting && setBulkDeleteConfirm(false)}
-                        style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.5)" }}
-                    />
-                    <div
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="bulk-delete-customers-title"
-                        style={{
-                            position: "fixed", top: "50%", left: "50%",
-                            transform: "translate(-50%, -50%)", zIndex: 101,
-                            background: "var(--surface-raised)", border: "var(--line-width) solid var(--surface-border)",
-                            borderRadius: "8px", padding: "24px", width: "380px", maxWidth: "90vw",
-                            boxShadow: "var(--surface-shadow)",
-                        }}>
-                        <div id="bulk-delete-customers-title" style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "8px" }}>
-                            {selectedIds.size} müşteriyi sil
-                        </div>
-                        <div style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "20px" }}>
-                            Seçili müşterileri silmek istediğinizden emin misiniz? Bu işlem geri alınamaz.
-                        </div>
-                        <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                            <Button
-                                variant="secondary"
-                                size="md"
-                                onClick={() => setBulkDeleteConfirm(false)}
-                                disabled={bulkDeleting}
-                            >
-                                İptal
-                            </Button>
-                            <Button
-                                variant="danger"
-                                size="md"
-                                leftIcon={<Trash2 size={14} />}
-                                onClick={handleBulkDelete}
-                                disabled={bulkDeleting}
-                            >
-                                {bulkDeleting ? "Siliniyor…" : "Sil"}
-                            </Button>
-                        </div>
-                    </div>
-                </>
+                <ConfirmModal
+                    title={`${selectedIds.size} müşteriyi sil`}
+                    message="Seçili müşterileri silmek istediğinizden emin misiniz? Bu işlem geri alınamaz."
+                    confirmLabel={bulkDeleting ? "Siliniyor…" : "Sil"}
+                    busy={bulkDeleting}
+                    onConfirm={handleBulkDelete}
+                    onCancel={() => setBulkDeleteConfirm(false)}
+                />
             )}
 
             {/* Yeni Müşteri Modalı */}
             {showAddModal && (
-                <>
-                    <div
-                        onClick={() => setShowAddModal(false)}
-                        style={{
-                            position: "fixed",
-                            inset: 0,
-                            zIndex: 60,
-                            background: "rgba(0,0,0,0.5)",
-                        }}
-                    />
-                    <div
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="add-customer-title"
-                        style={{
-                            position: "fixed",
-                            top: "50%",
-                            left: "50%",
-                            transform: "translate(-50%, -50%)",
-                            zIndex: 61,
-                            width: "100%",
-                            maxWidth: "480px",
-                            background: "var(--surface-raised)",
-                            border: "var(--line-width) solid var(--surface-border)",
-                            borderRadius: "10px",
-                            boxShadow: "var(--surface-shadow)",
-                            overflow: "hidden",
-                        }}
-                    >
+                <Modal
+                    onClose={() => setShowAddModal(false)}
+                    labelledBy="add-customer-title"
+                    width="min(480px, calc(100vw - 28px))"
+                    padded={false}
+                >
                         {/* Modal Header */}
                         <div
                             style={{
@@ -773,8 +717,7 @@ export default function CustomersClient(props: CustomersClientProps) {
                                 Müşteriyi Kaydet
                             </Button>
                         </div>
-                    </div>
-                </>
+                </Modal>
             )}
         </>
     );

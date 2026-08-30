@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { Eraser, FileText, Plus, RotateCcw, Save, Send, StickyNote, Trash2 } from "lucide-react";
 import type { QuoteData } from "../components/quote-types";
 import Button from "@/components/ui/Button";
+import Modal from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { useCustomers, useProducts } from "@/lib/data-context";
 import type { Customer, Product, QuoteDetail } from "@/lib/mock-data";
@@ -1915,22 +1916,20 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
 
             {/* ── Inline Gönder — çift onay modalları (enableInlineSend) ── */}
             {sendStep > 0 && (
-                <>
-                    <div
-                        onClick={() => setSendStep(0)}
-                        style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.6)" }}
-                    />
-                    <div
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="quote-send-dialog-title"
-                        style={{
-                            position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",
-                            zIndex: 101, background: "var(--bg-primary)",
-                            border: "0.5px solid var(--accent-border)", borderRadius: "8px",
-                            padding: "20px 24px", width: "400px", boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
-                        }}
-                    >
+                <Modal
+                    onClose={() => setSendStep(0)}
+                    labelledBy="quote-send-dialog-title"
+                    padded={false}
+                    surfaceStyle={{
+                        background: "var(--bg-primary)",
+                        border: "0.5px solid var(--accent-border)",
+                        borderRadius: "8px",
+                        padding: "20px 24px",
+                        width: "400px",
+                        maxWidth: "calc(100vw - 28px)",
+                        boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+                    }}
+                >
                         <div id="quote-send-dialog-title" style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "12px" }}>
                             {sendStep === 1 ? "Teklifi Gönder (1/2)" : "Son Onay (2/2)"}
                         </div>
@@ -1989,8 +1988,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                                 </div>
                             </>
                         )}
-                    </div>
-                </>
+                </Modal>
             )}
 
             {/* ── Toast ── */}

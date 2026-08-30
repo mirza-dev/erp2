@@ -63,21 +63,22 @@ describe("Cariler — DataTable + CSS hover (hoveredId antipattern kaldırıldı
 // ── 3. Modal/panel a11y ───────────────────────────────────────
 
 describe("Cariler — modal/panel a11y", () => {
-    it("toplu-silme onay modalı role=dialog + aria-modal + aria-labelledby + id", () => {
-        expect(PAGE_SRC).toMatch(/aria-labelledby="bulk-delete-customers-title"/);
-        expect(PAGE_SRC).toMatch(/id="bulk-delete-customers-title"/);
+    it("toplu-silme onayı ortak ConfirmModal'ı kullanır", () => {
+        // a11y ARTIK ORTAK ÇERÇEVEDE: `role="dialog"` + `aria-modal` +
+        // focus tuzağı + Escape `components/ui/Modal.tsx`'te (orada ayrıca
+        // kilitli). Burada kilitlenen: bu yüzey çerçeveyi KULLANIYOR ve
+        // verdiği `labelledBy` id'sinin karşılığı sayfada VAR.
+        expect(PAGE_SRC).toMatch(/from "@\/components\/ui\/Modal"/);
+        expect(PAGE_SRC).toMatch(/<ConfirmModal/);
     });
 
-    it("Yeni Müşteri modalı role=dialog + aria-modal + aria-labelledby + id", () => {
-        expect(PAGE_SRC).toMatch(/aria-labelledby="add-customer-title"/);
+    it("Yeni Müşteri modalı ortak Modal'ı kullanır ve başlık id'si eşleşir", () => {
+        expect(PAGE_SRC).toMatch(/labelledBy="add-customer-title"/);
         expect(PAGE_SRC).toMatch(/id="add-customer-title"/);
     });
 
-    it("iki sayfa modalı da role=dialog + aria-modal=true taşır", () => {
-        const dialogs = PAGE_SRC.match(/role="dialog"/g) ?? [];
-        expect(dialogs.length).toBeGreaterThanOrEqual(2);
-        const ariaModals = PAGE_SRC.match(/aria-modal="true"/g) ?? [];
-        expect(ariaModals.length).toBeGreaterThanOrEqual(2);
+    it("sayfada elle yazılmış dialog KALMADI (çerçeveye taşındı)", () => {
+        expect(PAGE_SRC).not.toMatch(/role="dialog"/);
     });
 
     it("CustomerDetailPanel slide-in role=dialog + aria-modal + aria-labelledby + id", () => {

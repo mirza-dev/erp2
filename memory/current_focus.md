@@ -5,6 +5,46 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-08-30 (akşam) — Blok 4: 9 dialog ortak Modal'a taşındı
+
+Kullanıcı kararı (AskUser): "gerçek modalları ortak Modal'a geçir; 4 yan-çekmeceye
+dokunma". **9 dialog / 8 dosya:** customers ×2 · vendors · quotes/[id] ·
+QuoteForm · production ×2 · purchase/orders ×2 · rfqs/[id].
+Kazanç: Escape + **focus tuzağı** + odak dönüşü (10'unda Escape bile YOKTU).
+**net −73 satır** (227 eklendi, 300 silindi).
+
+**Taşımayı mümkün kılan iki YENİ Modal kapısı** — bunlar olmadan taşımak görsel
+regresyon demekti:
+- `padded={false}` — kendi başlık/gövde/alt-bar düzeni (ayırıcı çizgileriyle)
+  olan yüzeyler çerçevenin 20px padding'ine sokulmuyor.
+- `surfaceStyle` — yüzeyin KİMLİĞİ korunuyor (ör. teklif onayı `variant`e göre
+  kırmızı/mavi kenarlık taşıyor; production/PO kendi radius/gap'i). Konum,
+  z-index ve **erişilebilirlik çerçevede kalır**; yalnız görünüm çağırana açılır.
+  `modal-ui.test.tsx`'e 3 test: iki kapı da `aria-modal`/`aria-label`/Escape'i
+  BOZMUYOR.
+
+**Yan bulgu — rfqs/[id] fiyat giriş diyaloğunun ERİŞİLEBİLİR ADI HİÇ YOKTU**
+(`aria-label` ve `aria-labelledby` ikisi de eksik; ekran okuyucu yalnız "dialog"
+diyordu). Zaten görünen `<h2>`'ye bağlandı.
+
+**11 kaynak-kilidi testi kırıldı ve HEPSİ HAKLIYDI** — `role="dialog"` artık
+sayfada değil çerçevede. Sözleşme yeni yerinde korunarak güncellendi: "bu yüzey
+ortak çerçeveyi kullanıyor + verdiği `labelledBy` id'sinin karşılığı var".
+`ConfirmModal`'a geçen ikisinde başlık id'si yerine METİN kilitlendi (başlık
+artık ConfirmModal'ın kendi elemanı). Ders: a11y kilidini component'e taşırken
+iddiayı da taşı, silme.
+
+**products.spec'te geçici toast iddiası kalıcı sonuca çevrildi.** `handleAdd`
+önce `fetchList()`+`refetchCounts()` bekliyor, toast ondan SONRA çıkıp birkaç
+saniyede kayboluyor → yavaş yenilemede iddia toast'ı hiç göremiyordu (oysa ürün
+oluşmuştu). Artık API'den kalıcı varlık + modalın kapandığı doğrulanıyor.
+
+**Kapsam dışı bırakılanlar (bilinçli):** 4 yan-çekmece (CustomerDetailPanel,
+VendorDetailPanel, AlertCalendarDrawer, AIDetailDrawer) — Modal onlar için
+yanlış yüzey; ayrıca zaten Escape'i olan products/[id], DosyalarTab,
+PurchaseOrderModal.
+
+
 ## 2026-08-30 (öğleden sonra) — Sıradaki tur: E2E + deploy hazırlığı + panel avı
 
 Kullanıcı "hepsini sırayla yapıcaz" dedi; dört blok sırayla işleniyor.

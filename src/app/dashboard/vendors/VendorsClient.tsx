@@ -11,6 +11,7 @@ import { usePermissions } from "@/lib/auth/use-permissions";
 import type { VendorRow } from "@/lib/database.types";
 import { decrementCount, removeByIds, successfulResponseIds, upsertFirst } from "@/lib/fast-mutation";
 import Button from "@/components/ui/Button";
+import { ConfirmModal } from "@/components/ui/Modal";
 import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
@@ -557,52 +558,17 @@ export default function VendorsClient(props: VendorsClientProps) {
                 />
             </Card>
 
-            {/* Bulk deactivate confirm modal */}
+            {/* Toplu pasife alma onayı — ortak ConfirmModal. Elle yazılmış
+                sürümde Escape ve focus tuzağı yoktu. */}
             {bulkDeactivateConfirm && (
-                <>
-                    <div
-                        onClick={() => !bulkDeactivating && setBulkDeactivateConfirm(false)}
-                        style={{ position: "fixed", inset: 0, zIndex: 100, background: "rgba(0,0,0,0.5)" }}
-                    />
-                    <div
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="bulk-deactivate-title"
-                        style={{
-                            position: "fixed", top: "50%", left: "50%",
-                            transform: "translate(-50%, -50%)", zIndex: 101,
-                            background: "var(--surface-raised)", border: "var(--line-width) solid var(--surface-border)",
-                            borderRadius: "8px", padding: "24px", width: "380px", maxWidth: "90vw",
-                            boxShadow: "var(--surface-shadow)",
-                        }}
-                    >
-                        <div id="bulk-deactivate-title" style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "8px" }}>
-                            {selectedIds.size} tedarikçiyi pasife al
-                        </div>
-                        <div style={{ fontSize: "13px", color: "var(--text-secondary)", marginBottom: "20px" }}>
-                            Seçili tedarikçileri pasife almak istediğinizden emin misiniz?
-                        </div>
-                        <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                            <Button
-                                variant="secondary"
-                                size="md"
-                                onClick={() => setBulkDeactivateConfirm(false)}
-                                disabled={bulkDeactivating}
-                            >
-                                İptal
-                            </Button>
-                            <Button
-                                variant="danger"
-                                size="md"
-                                leftIcon={<CircleOff size={14} />}
-                                onClick={handleBulkDeactivate}
-                                disabled={bulkDeactivating}
-                            >
-                                {bulkDeactivating ? "İşleniyor…" : "Pasife Al"}
-                            </Button>
-                        </div>
-                    </div>
-                </>
+                <ConfirmModal
+                    title={`${selectedIds.size} tedarikçiyi pasife al`}
+                    message="Seçili tedarikçileri pasife almak istediğinizden emin misiniz?"
+                    confirmLabel={bulkDeactivating ? "İşleniyor…" : "Pasife Al"}
+                    busy={bulkDeactivating}
+                    onConfirm={handleBulkDeactivate}
+                    onCancel={() => setBulkDeactivateConfirm(false)}
+                />
             )}
 
             {/* Drawer */}

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useProducts, useProduction, buildLoadError } from "@/lib/data-context";
 import { formatNumber, safeRandomUUID } from "@/lib/utils";
 import Button from "@/components/ui/Button";
+import Modal from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { useVoiceRecorder, type VoiceRecorderResult } from "@/hooks/useVoiceRecorder";
@@ -1140,30 +1141,12 @@ function ProductionPageInner() {
                 doğru (üretim bir olaydır, revizyon değil) ama sessizdi; tek
                 düzeltme yolu silmekti ve silme de ayırt edilemiyordu (O1). */}
             {duplicateWarn && (
-                <div
-                    onClick={() => setDuplicateWarn(null)}
-                    style={{
-                        position: "fixed", inset: 0, zIndex: 200,
-                        background: "rgba(0,0,0,0.45)",
-                        display: "flex", alignItems: "center", justifyContent: "center",
-                        padding: "16px",
-                    }}
+                <Modal
+                    onClose={() => setDuplicateWarn(null)}
+                    labelledBy="duplicate-production-title"
+                    width="min(440px, calc(100vw - 32px))"
+                    surfaceStyle={{ borderRadius: "8px", gap: "12px" }}
                 >
-                    <div
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="duplicate-production-title"
-                        onClick={e => e.stopPropagation()}
-                        style={{
-                            background: "var(--surface-raised)",
-                            border: "var(--line-width) solid var(--surface-border)",
-                            borderRadius: "8px",
-                            padding: "20px",
-                            maxWidth: "440px", width: "100%",
-                            display: "flex", flexDirection: "column", gap: "12px",
-                            boxShadow: "var(--surface-shadow)",
-                        }}
-                    >
                         <div id="duplicate-production-title" style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
                             Bu ürün için bugün zaten kayıt var
                         </div>
@@ -1183,8 +1166,7 @@ function ProductionPageInner() {
                                 Yeni kayıt olarak ekle
                             </Button>
                         </div>
-                    </div>
-                </div>
+                </Modal>
             )}
 
             {/* Silme onay modalı — stok ters hareketi geri-dönüşü zor olduğundan
@@ -1194,30 +1176,13 @@ function ProductionPageInner() {
                 if (!target) return null;
                 const busy = deletingId === confirmDeleteId;
                 return (
-                    <div
-                        onClick={() => { if (!busy) setConfirmDeleteId(null); }}
-                        style={{
-                            position: "fixed", inset: 0, zIndex: 200,
-                            background: "rgba(0,0,0,0.45)",
-                            display: "flex", alignItems: "center", justifyContent: "center",
-                            padding: "16px",
-                        }}
+                    <Modal
+                        onClose={() => setConfirmDeleteId(null)}
+                        labelledBy="delete-production-title"
+                        width="min(400px, calc(100vw - 32px))"
+                        dismissible={!busy}
+                        surfaceStyle={{ borderRadius: "8px", gap: "12px" }}
                     >
-                        <div
-                            role="dialog"
-                            aria-modal="true"
-                            aria-labelledby="delete-production-title"
-                            onClick={e => e.stopPropagation()}
-                            style={{
-                                background: "var(--surface-raised)",
-                                border: "var(--line-width) solid var(--surface-border)",
-                                borderRadius: "8px",
-                                padding: "20px",
-                                maxWidth: "400px", width: "100%",
-                                display: "flex", flexDirection: "column", gap: "12px",
-                                boxShadow: "var(--surface-shadow)",
-                            }}
-                        >
                             <div id="delete-production-title" style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
                                 Üretim kaydını sil
                             </div>
@@ -1249,8 +1214,7 @@ function ProductionPageInner() {
                                     {busy ? "Siliniyor..." : "Evet, sil (stok geri alınır)"}
                                 </Button>
                             </div>
-                        </div>
-                    </div>
+                    </Modal>
                 );
             })()}
         </div>

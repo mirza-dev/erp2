@@ -53,9 +53,12 @@ describe("Üretim — kayıt silme onay modalı", () => {
     });
 
     it("modal panel role=dialog + aria-modal=true + aria-labelledby + başlık id taşır", () => {
-        expect(PAGE_SRC).toMatch(/role="dialog"/);
-        expect(PAGE_SRC).toMatch(/aria-modal="true"/);
-        expect(PAGE_SRC).toMatch(/aria-labelledby="delete-production-title"/);
+        // a11y ARTIK ORTAK ÇERÇEVEDE: `role="dialog"` + `aria-modal` +
+        // focus tuzağı + Escape `components/ui/Modal.tsx`'te (orada ayrıca
+        // kilitli). Burada kilitlenen: bu yüzey çerçeveyi KULLANIYOR ve
+        // verdiği `labelledBy` id'sinin karşılığı sayfada VAR.
+        expect(PAGE_SRC).toMatch(/from "@\/components\/ui\/Modal"/);
+        expect(PAGE_SRC).toMatch(/labelledBy="delete-production-title"/);
         expect(PAGE_SRC).toMatch(/id="delete-production-title"/);
     });
 

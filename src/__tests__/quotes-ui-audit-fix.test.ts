@@ -104,15 +104,19 @@ describe("quotes/page.tsx — DOM mutation + UX + a11y fixes", () => {
 
 describe("quotes/[id]/page.tsx — confirm dialog a11y", () => {
     it("Confirm dialog role='dialog' içerir", () => {
-        expect(DETAIL_SRC).toMatch(/role="dialog"/);
+        // a11y ARTIK ORTAK ÇERÇEVEDE: `role="dialog"` + `aria-modal` +
+        // focus tuzağı + Escape `components/ui/Modal.tsx`'te (orada ayrıca
+        // kilitli). Burada kilitlenen: bu yüzey çerçeveyi KULLANIYOR ve
+        // verdiği `labelledBy` id'sinin karşılığı sayfada VAR.
+        expect(DETAIL_SRC).toMatch(/from "@\/components\/ui\/Modal"/);
     });
 
     it("Confirm dialog aria-modal='true' içerir", () => {
-        expect(DETAIL_SRC).toMatch(/aria-modal="true"/);
+        expect(DETAIL_SRC).toMatch(/<Modal\b/);
     });
 
     it("Confirm dialog aria-labelledby + title id eşleşmesi var", () => {
-        expect(DETAIL_SRC).toMatch(/aria-labelledby="quote-confirm-dialog-title"/);
+        expect(DETAIL_SRC).toMatch(/labelledBy="quote-confirm-dialog-title"/);
         expect(DETAIL_SRC).toMatch(/id="quote-confirm-dialog-title"/);
     });
 });

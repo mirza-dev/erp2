@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
 import { FileText } from "lucide-react";
 import Button from "@/components/ui/Button";
+import Modal from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { getQuoteActions, isQuoteEditable, getQuoteConvertAction, getQuoteReviseEligible, type QuoteAction } from "../_utils/quote-display";
@@ -495,34 +496,24 @@ export default function QuoteDetailPage() {
 
             {/* ── Confirm Dialog ── */}
             {confirmDialog && (
-                <>
-                    <div
-                        onClick={() => setConfirmDialog(null)}
-                        style={{
-                            position: "fixed",
-                            inset: 0,
-                            zIndex: 100,
-                            background: "rgba(0,0,0,0.6)",
-                        }}
-                    />
-                    <div
-                        role="dialog"
-                        aria-modal="true"
-                        aria-labelledby="quote-confirm-dialog-title"
-                        style={{
-                            position: "fixed",
-                            top: "50%",
-                            left: "50%",
-                            transform: "translate(-50%, -50%)",
-                            zIndex: 101,
-                            background: "var(--bg-primary)",
-                            border: `0.5px solid ${confirmDialog.variant === "danger" ? "var(--danger-border)" : "var(--accent-border)"}`,
-                            borderRadius: "8px",
-                            padding: "20px 24px",
-                            width: "380px",
-                            boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
-                        }}
-                    >
+                <Modal
+                    onClose={() => setConfirmDialog(null)}
+                    labelledBy="quote-confirm-dialog-title"
+                    padded={false}
+                    // Yüzey stili AYNEN korunuyor (variant'e göre kenarlık rengi
+                    // bu diyaloğun kimliği). Çerçeveden gelen: Escape, focus
+                    // tuzağı, odak dönüşü, backdrop — hiçbiri elle yazılmış
+                    // sürümde yoktu.
+                    surfaceStyle={{
+                        background: "var(--bg-primary)",
+                        border: `0.5px solid ${confirmDialog.variant === "danger" ? "var(--danger-border)" : "var(--accent-border)"}`,
+                        borderRadius: "8px",
+                        padding: "20px 24px",
+                        width: "380px",
+                        maxWidth: "calc(100vw - 28px)",
+                        boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
+                    }}
+                >
                         <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
                             <div
                                 style={{
@@ -638,8 +629,7 @@ export default function QuoteDetailPage() {
                                 {confirmDialog.confirmLabel}
                             </Button>
                         </div>
-                    </div>
-                </>
+                </Modal>
             )}
         </div>
     );

@@ -33,6 +33,23 @@ export interface ModalProps {
      * sürerken kullanıcı yanlışlıkla kaçamasın diye (ResetDemoSection).
      */
     dismissible?: boolean;
+    /**
+     * false → çerçeve kendi iç boşluğunu ve `gap`'ini UYGULAMAZ.
+     *
+     * Kendi başlık/gövde/alt-bar düzeni (ayırıcı çizgileriyle birlikte) olan
+     * yüzeyler için: onları buradaki 20px padding'e sokmak ya çift boşluk ya da
+     * ayırıcıların içeri kaçması demekti. Bu kapıyla elle yazılmış modallar
+     * GÖRÜNTÜLERİ DEĞİŞMEDEN Escape + focus tuzağı + odak dönüşü kazanıyor.
+     */
+    padded?: boolean;
+    /**
+     * Çerçevenin yüzey stilini (arka plan, kenarlık, köşe, gölge, genişlik…)
+     * EZER. Elle yazılmış modalları taşırken görsel regresyon olmasın diye:
+     * bazı yüzeylerin kendi kimliği var (ör. teklif onayı `variant`e göre
+     * kırmızı/mavi kenarlık taşıyor). Konumlandırma, z-index ve erişilebilirlik
+     * çerçevede kalır; yalnız görünüm çağırana açılır.
+     */
+    surfaceStyle?: React.CSSProperties;
     children: ReactNode;
 }
 
@@ -48,6 +65,8 @@ export default function Modal({
     labelledBy,
     width = "min(480px, calc(100vw - 28px))",
     dismissible = true,
+    padded = true,
+    surfaceStyle,
     children,
 }: ModalProps) {
     const dialogRef = useRef<HTMLDivElement>(null);
@@ -118,7 +137,7 @@ export default function Modal({
                 aria-modal="true"
                 {...(labelledBy ? { "aria-labelledby": labelledBy } : { "aria-label": ariaLabel })}
                 tabIndex={-1}
-                style={{ ...modalStyle, width }}
+                style={{ ...modalStyle, width, ...(padded ? null : UNPADDED), ...surfaceStyle }}
             >
                 {children}
             </div>
@@ -183,6 +202,9 @@ const backdropStyle: React.CSSProperties = {
     position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.54)",
     backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", animation: "fade-in 0.18s ease-out",
 };
+
+/** `padded={false}` — iç düzenini kendi taşıyan yüzeyler için. */
+const UNPADDED: React.CSSProperties = { padding: 0, gap: 0, display: "block" };
 
 const modalStyle: React.CSSProperties = {
     position: "fixed", top: "50%", left: "50%", transform: "translate(-50%, -50%)",

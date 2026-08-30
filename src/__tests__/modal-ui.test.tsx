@@ -161,3 +161,45 @@ describe("ConfirmModal", () => {
         expect(screen.getByRole("button", { name: "İptal" }).hasAttribute("disabled")).toBe(true);
     });
 });
+
+// ── 2026-08-30: elle yazılmış modalları taşımak için eklenen iki kapı ──────
+//
+// 9 dialog (customers ×2, vendors, quotes/[id], QuoteForm, production ×2,
+// purchase/orders ×2, rfqs/[id]) ortak çerçeveye alındı. Bu yüzeylerin kendi
+// başlık/gövde/alt-bar düzeni ve kimliği vardı; `padded` ve `surfaceStyle`
+// olmasa taşımak GÖRSEL REGRESYON demekti. İkisi de a11y'yi ETKİLEMEMELİ.
+
+describe("Modal — padded / surfaceStyle kapıları", () => {
+    it("padded={false} çerçevenin kendi boşluğunu kaldırır", () => {
+        const { unmount } = render(<Modal onClose={vi.fn()} ariaLabel="p" padded={false}><span>x</span></Modal>);
+        expect(screen.getByRole("dialog").style.padding).toBe("0px");
+        unmount();
+        render(<Modal onClose={vi.fn()} ariaLabel="p"><span>x</span></Modal>);
+        expect(screen.getByRole("dialog").style.padding).toBe("20px");
+    });
+
+    it("surfaceStyle yalnız GÖRÜNÜMÜ ezer; erişilebilirlik korunur", () => {
+        render(
+            <Modal
+                onClose={vi.fn()}
+                ariaLabel="özel yüzey"
+                surfaceStyle={{ background: "var(--bg-primary)", borderRadius: "8px" }}
+            >
+                <span>x</span>
+            </Modal>,
+        );
+        const dialog = screen.getByRole("dialog");
+        expect(dialog.style.borderRadius).toBe("8px");
+        // Sözleşmenin dokunulmaz kısmı:
+        expect(dialog.getAttribute("aria-modal")).toBe("true");
+        expect(dialog.getAttribute("aria-label")).toBe("özel yüzey");
+        expect(dialog.style.position).toBe("fixed");
+    });
+
+    it("surfaceStyle verilse bile Escape çalışır", () => {
+        const onClose = vi.fn();
+        render(<Modal onClose={onClose} ariaLabel="a" surfaceStyle={{ background: "red" }}><span>x</span></Modal>);
+        fireEvent.keyDown(window, { key: "Escape" });
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
+});

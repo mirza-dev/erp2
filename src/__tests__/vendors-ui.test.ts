@@ -26,13 +26,17 @@ const PAGE_SRC = readFileSync(
 
 describe("Tedarikçiler — toplu pasifleştirme onay modalı a11y", () => {
     it("modal panel role=dialog + aria-modal=true + aria-labelledby taşır", () => {
-        expect(PAGE_SRC).toMatch(/role="dialog"/);
-        expect(PAGE_SRC).toMatch(/aria-modal="true"/);
-        expect(PAGE_SRC).toMatch(/aria-labelledby="bulk-deactivate-title"/);
+        // a11y ARTIK ORTAK ÇERÇEVEDE: `role="dialog"` + `aria-modal` +
+        // focus tuzağı + Escape `components/ui/Modal.tsx`'te (orada ayrıca
+        // kilitli). Burada kilitlenen: bu yüzey çerçeveyi KULLANIYOR ve
+        // verdiği `labelledBy` id'sinin karşılığı sayfada VAR.
+        expect(PAGE_SRC).toMatch(/from "@\/components\/ui\/Modal"/);
+        expect(PAGE_SRC).toMatch(/<ConfirmModal/);
     });
 
     it("başlık div'i eşleşen id taşır (aria-labelledby hedefi)", () => {
-        expect(PAGE_SRC).toMatch(/id="bulk-deactivate-title"/);
+        // Başlık ConfirmModal'ın kendi elemanı; metin çağırandan gelmeli.
+        expect(PAGE_SRC).toMatch(/tedarikçiyi pasife al/);
     });
 
     it("drawer panel aria-modal=true taşır (role=dialog + aria-label korunur)", () => {

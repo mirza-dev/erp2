@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, use } from "react";
+import Modal from "@/components/ui/Modal";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
@@ -394,9 +395,16 @@ function VendorQuoteModal({ rfqId, vendor, lines, onClose, onSaved }: {
     };
 
     return (
-        <div role="dialog" aria-modal="true" onClick={onClose} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.4)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 1000, padding: "20px" }}>
-            <div onClick={e => e.stopPropagation()} style={{ background: "var(--bg-primary)", borderRadius: "10px", padding: "20px", width: "min(720px, 100%)", maxHeight: "85vh", overflowY: "auto", border: "0.5px solid var(--border-tertiary)" }}>
-                <h2 style={{ fontSize: "16px", fontWeight: 600, color: "var(--text-primary)", margin: "0 0 14px" }}>{vendor.vendor_name} — Fiyat Girişi</h2>
+        // Bu diyaloğun ERİŞİLEBİLİR ADI HİÇ YOKTU (`aria-label`/`labelledby`
+        // ikisi de eksikti) — ekran okuyucu yalnız "dialog" diyordu. Zaten
+        // görünen <h2> başlığı var, ona bağlandı.
+        <Modal
+            onClose={onClose}
+            labelledBy="rfq-price-entry-title"
+            width="min(720px, calc(100vw - 40px))"
+            surfaceStyle={{ background: "var(--bg-primary)", borderRadius: "10px", padding: "20px", maxHeight: "85vh", border: "0.5px solid var(--border-tertiary)" }}
+        >
+                <h2 id="rfq-price-entry-title" style={{ fontSize: "16px", fontWeight: 600, color: "var(--text-primary)", margin: "0 0 14px" }}>{vendor.vendor_name} — Fiyat Girişi</h2>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "14px" }}>
                     <div>
                         <label style={{ fontSize: "11px", color: "var(--text-tertiary)", display: "block", marginBottom: "3px" }}>Para Birimi</label>
@@ -434,7 +442,6 @@ function VendorQuoteModal({ rfqId, vendor, lines, onClose, onSaved }: {
                     <button onClick={onClose} style={btn("ghost")}>Vazgeç</button>
                     <button onClick={save} disabled={saving} style={btn("primary")}>{saving ? "Kaydediliyor..." : "Kaydet"}</button>
                 </div>
-            </div>
-        </div>
+        </Modal>
     );
 }
