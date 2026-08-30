@@ -64,3 +64,5 @@ pmt/
 /.sim/
 # editör yapılandırması
 /.obsidian/
+# Supabase yedekleri — müşteri verisi, fiyatlar ve OAuth token'ları içerir
+/backups/

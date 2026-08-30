@@ -213,4 +213,4 @@ Son kalan ertelenen:
   path) — Coolify Redis Resource network sorunu çözülene kadar veya alternatif
   backend (Upstash REST, Cloudflare WAF) seçilene kadar güvenli geçici durum.
 - `purchase_commitments` + `column_mappings` RLS — 029'da ENABLE ROW LEVEL SECURITY mevcut ✅; explicit policy yok (proje genelinde aynı pattern)
-- `purchase_commitments` + `column_mappings` RLS — 029'da ENABLE ROW LEVEL SECURITY mevcut ✅; explicit policy yok (proje genelinde aynı pattern)
+- **Yedekleme ayrı dosyada:** Free planda otomatik yedek yok + Storage hiçbir planda DB yedeğine girmiyor → [[project_backups]] (`npm run backup` ile kapatıldı 2026-08-30)

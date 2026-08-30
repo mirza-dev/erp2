@@ -79,4 +79,12 @@ satırları sonradan eklendi).
 DURDURULUR — o tablo tarayıcıdaki anon anahtarıyla okunabiliyor demektir. Gerekçe ve ölçüm:
 [`audit/2026-08-30-vibecode-guvenlik-denetimi.md`](audit/2026-08-30-vibecode-guvenlik-denetimi.md).
 
+Ve **deploy'dan önce bir yedek al** — proje Free planda, Supabase tarafında geri alma yok:
+
+```bash
+npm run backup    # 64 tablo + 8 hesap + 76 dosya; errors: [] olmalı
+```
+
+Yordam ve geri yükleme: [`backup-restore.md`](backup-restore.md).
+
 Sonra bu dosyadaki §1 ve §2'yi Coolify env'ine karşı satır satır geçir.

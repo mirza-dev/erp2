@@ -5,6 +5,35 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-08-30 (gece, 2) — Supabase yedek doğrulaması: YEDEK YOKTU → `npm run backup`
+
+Kullanıcı "supabase yedeklerini doğrula" dedi (10 maddelik denetimde kapsam dışı
+bırakılıp not düşülen madde). **Sonuç: yedek yoktu, iki ayrı sebeple.**
+
+1. **Free plan** → Supabase'de otomatik yedek hiç yok (günlük yedek Pro/Team/Enterprise'a özel).
+2. **Storage plandan bağımsız kapsam dışı** — Supabase belgesi birebir: *"Database backups do
+   not include objects you store via the Storage API."* Ücretli plana geçilse bile 47 MB dosya girmez.
+
+Ölçüm: 64 tablo / **1.238 satır** · **8 hesap** (3 admin) · **76 obje / 47,38 MB** · DB→storage
+kırık referans **0** (kayıp yaşanmamış, risk gelecekteydi). Plan seviyesi servis anahtarıyla
+ölçülemedi (Management API + PAT gerekiyor, PAT yok/Keychain'de) → kullanıcı Free dedi.
+
+**Kapatıldı:** `npm run backup` (`scripts/backup.ts`, 240 satır) — salt-okunur kaynak, yalnız
+yerel disk. Tablolar NDJSON (**PK'ya göre sıralı** sayfalama; ORDER BY'sız `Range` satır kaçırır),
+`auth/users.ndjson`, `storage/<kova>/<yol>`, `manifest.json` (+`restoreOrder` = migration'ların
+tablo yaratma sırası, geçerli topolojik sıra). `count=exact` vs dosya satır sayısı → **yarım
+yedek exit 0 dönemez**. İlk koşum: 0 hata, 64/64 tablo, 142 dosya / 48 MB.
+
+`docs/backup-restore.md` runbook: şema → **ÖNCE hesaplar** (13 kolon `auth.users(id)` FK'si,
+biri `not null cascade`) → `restoreOrder` → dosyalar. Şemadan doğrulanan trigger yan etkileri
+dahil. Sınır: **parola hash'i yedekte yok** (Admin API döndürmüyor) → sıfırlama gerekir.
+
+`src/__tests__/backup-script.test.ts` 3 kapı, üçü de **kırmızı-yandığı kanıtlanarak** eklendi.
+**481 dosya / 6794 test** · tsc/lint temiz. Detay: [[project_backups]].
+
+**AÇIK (kullanıcı):** yedeği dış diske çıkar (şu an aynı diskte) · haftalık koşum · **geri
+yükleme provası** (prova edilmemiş yedek hipotezdir) · Pro planı değerlendir.
+
 ## 2026-08-30 (gece) — 10 maddelik güvenlik denetimi: 10/10 KAPALI + gate kural 4
 
 Kullanıcı Instagram'dan *"vibecoded uygulamalarda bulduğum güvenlik delikleri"*

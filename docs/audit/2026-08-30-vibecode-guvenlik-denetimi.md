@@ -101,6 +101,8 @@ gösteren tek yol bu sorgular. RLS satırı `❌` dönerse deploy durdurulur.
   rate-limit'imizin dışında. Supabase'in kendi limitleri geçerli; panelden bir kez teyit edilmeli.
 - **`REDIS_URL` yok** → AI/login limitleri in-memory fallback'te, çok-instance'lı kurulumda
   instance başına uygulanır. (Zaten `deferred_backlog` A2.)
-- **Supabase yedekleri doğrulanmadı** — bu denetimin kapsamı dışında, deploy öncesi bakılmalı.
+- **Supabase yedekleri** — aynı gün ayrıca doğrulandı: yedek YOKTU (Free plan = otomatik yedek yok;
+  ayrıca Storage hiçbir planda DB yedeğine girmiyor). `npm run backup` ile kapatıldı →
+  [`2026-08-30-supabase-yedek-dogrulamasi.md`](2026-08-30-supabase-yedek-dogrulamasi.md).
 - **`unit_price` istemciden geliyor** — bu ERP'de doğru: fiyatı satışçı belirler,
   müşterinin seçtiği katalog fiyatı akışı yok. `line_total` ve başlık toplamları sunucuda.
