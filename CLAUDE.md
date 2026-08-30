@@ -5,7 +5,25 @@ _Son güncelleme: 2026-08-30_
 
 > Bu bölüm yalnız **güncel durumu + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda ve `memory/current_focus.md`'de. Aşağıdaki indeks son dönem oturumlarına (commit + konu) hızlı bakış içindir; daha eski dönemler (Faz 2–3d AI Import, Sprint A–C, M-3 Rate Limiting, React Doctor, Teklif V2–V7 plan turları, Paraşüt Faz 1–11) git geçmişinde.
 
-**Son tamamlanan iş:** **Çok müşterili teslim altyapısı — şema paketi · prod kapısı · PWA** (2026-08-31; GREEN; **migration YOK**; 3 faz, 3 commit `23f7142` → `c7f715b` → `9172885`). Kullanıcı "ürün bitti mi, sunulabilir mi" diye sordu; ölçüldü: **yazılım olgun, hizmet değil** — prod ayakta değil (`erp.getmedspace.com` → HTTP 000), `EMAIL_FROM` yok (10 bildirim 12 Haziran'dan beri kuyrukta → **24 açık uyarı kimseye ulaşmıyor**), AI 401, ve geliştirme canlı fabrika verisi üstünde. Kullanıcı deploy/env/e-postayı üstlendi.
+**Son tamamlanan iş:** **PWA eksiksizleştirme + TARAYICIDA doğrulama** (2026-08-31; GREEN; **migration YOK**). Kullanıcı "PWA eksiksiz hatasız ve tam olmalı" dedi. PWA çalışıyordu ama **hiçbir tarayıcıda doğrulanmamıştı** — kapı testleri yalnız kaynak metnine bakan regex iddialarıydı — ve 5 gerçek kusuru vardı.
+
+**Kapatılan kusurlar:** SW **development'ta da kaydoluyordu** → `/_next/static/` cache-first yüzünden geliştirmede bayat JS; guard yetmez (SW kaydı KALICI), bu yüzden dev'de mevcut kayıt + `roven-*` cache'leri **aktif olarak siliniyor** · önbellek **sınırsız büyüyordu** → `MAX_ENTRIES=200` FIFO tavan · **çevrimdışı yedek sayfa yoktu** → `/offline` precache + gezinme **yakalaması** (önbellekleme DEĞİL; "API/navigasyon asla önbelleğe alınmaz" invaryantı korundu) · `apple-touch-icon` iOS'un **kök-yol tahminine** güveniyordu → `src/app/apple-icon.png` (Next `<link>`i oradan basıyor) · **`safe-area-inset` kodda hiç yoktu** → mobil çekmeceye `env(safe-area-inset-bottom)`.
+
+**Eklenenler:** manifest `shortcuts` (Yeni Sipariş / Yeni Teklif / Stok / Uyarılar — rotalar teste karşı doğrulanıyor) + `categories` + `display_override` · **10 iOS açılış ekranı** (yoksa ana ekrandan açılışta beyaz flaş) · **güncelleme bildirimi**: `install`'dan **`skipWaiting()` KALDIRILDI** (anında aktive edilseydi sorulacak an olmazdı), yerine `SKIP_WAITING` mesajı; `ServiceWorkerUpdatePrompt` **dashboard layout'ta** mount — `ToastProvider` kök layout'ta DEĞİL, `useToast()` kökten çağrılsaydı çalışma zamanında patlardı.
+
+**`Toast` geriye dönük uyumlu genişletildi:** `action` artık `{label,href}` VEYA `{label,onClick}`; `duration: 0` = kalıcı toast. 3 saniyede kaybolan bir güncelleme istemi sorulmamış sayılır. Tek mevcut `href` kullanımı (`purchase/suggested`) etkilenmedi.
+
+**NE YAPILMADI, bilerek:** `viewport-fit: cover` **eklenmedi** — bugünkü `statusBarStyle: "default"` içeriği durum çubuğunun altında tutuyor; `cover` üstte bugün olmayan bir sorun *yaratırdı*. `screenshots` **atlandı** (kullanıcı kararı: demo modu canlı veriye viewer rolüyle bakıyor, cari/ürün isimleri gerçek → repoya girmemeli).
+
+**TARAYICIDA DOĞRULANDI** (üretim build + `npm start`; yalnız teknik kontroller, **hiçbir kimlik bilgisi girilmedi**): manifest bağlı · **4/4 ikon HTTP 200** · iki tema `theme-color` · **10 startup image link'i** · SW **`activated`**, scope `/` · Cache Storage **19 girdi, 0'ı API** · **sunucu gerçekten kapatılıp gezinildi → `/offline` sayfası çıktı** · `sw.js` değiştirilip `update()` → yeni worker **`waiting`te bekledi** (skipWaiting yokluğunun canlı kanıtı), Toast çıktı, "Yenile"ye tıklandı → yeni worker aktive + sayfa yenilendi + toast kapandı.
+
+**Tarayıcının bulduğu, testlerin bulamayacağı kusur:** Next `appleWebApp.capable: true` için YALNIZ standart `mobile-web-app-capable` metasını basıyor; iOS 16.4 öncesi Apple'ın kendi metasını istiyor → `metadata.other` ile elle eklendi. Kaynak regex'i bunu asla göremezdi — tarayıcı doğrulamasının somut getirisi.
+
+Kapı `src/__tests__/gate/pwa.test.ts` **8 → 16 test**; **8/8 yeni kural kırmızı-yandığı kanıtlanarak**. (İlk kanıt turunda bir enjeksiyon deseni eşleşmemişti; "yanmadı" sanıp geçmek yerine tek tek tekrarlandı ve gerçekten yandığı görüldü.)
+
+tsc 0 · lint 0 · **484 dosya / 6822 test** (+8) · build 0 uyarı · **migration YOK**.
+
+**Önceki iş:** **Çok müşterili teslim altyapısı — şema paketi · prod kapısı · PWA** (2026-08-31; GREEN; **migration YOK**; 3 faz, 3 commit `23f7142` → `c7f715b` → `9172885`). Kullanıcı "ürün bitti mi, sunulabilir mi" diye sordu; ölçüldü: **yazılım olgun, hizmet değil** — prod ayakta değil (`erp.getmedspace.com` → HTTP 000), `EMAIL_FROM` yok (10 bildirim 12 Haziran'dan beri kuyrukta → **24 açık uyarı kimseye ulaşmıyor**), AI 401, ve geliştirme canlı fabrika verisi üstünde. Kullanıcı deploy/env/e-postayı üstlendi.
 
 **Mimari tespit (planı belirledi):** ürün **TEK KİRACILI** ve şema bunu sert uyguluyor — `company_settings` üzerinde `unique index … ((true))` (033) + 111 migration'da **0 tenant kolonu**. Yani "çok müşteri" daha büyük bir plan değil, **müşteri başına ayrı Supabase projesi**. Pro org başına $25 + marjinal ~$10/proje.
 
@@ -17,9 +35,9 @@ _Son güncelleme: 2026-08-30_
 
 **React Doctor hook'u "staged regression" dedi — YANLIŞ ALARM.** İki bulgu da `layout.tsx`'teki FOUC tema bootstrap'ında ve değişiklikten ÖNCE vardı (`HEAD~1`'de 23-24. satır); 19 satır eklenince 41-42'ye kaydı, hook kaymayı yeni sandı. `ServiceWorkerRegister.tsx` **sıfır bulgu**. `next/script`'e çevirmek FOUC'u geri getirirdi → dokunulmadı.
 
-tsc 0 · lint 0 · **484 dosya / 6814 test** (+20) · build 0 uyarı · **migration YOK**.
+tsc 0 · lint 0 · 484 dosya / 6814 test · build 0 uyarı · migration YOK.
 
-**Önceki iş:** **Supabase yedek doğrulaması → yedek YOKTU, `npm run backup` ile kapatıldı** (2026-08-30 gece; GREEN; **migration YOK**). Kullanıcı "supabase yedeklerini doğrula" dedi — 10 maddelik denetimde kapsam dışı bırakılıp not düşülen madde.
+**Daha önceki iş:** **Supabase yedek doğrulaması → yedek YOKTU, `npm run backup` ile kapatıldı** (2026-08-30 gece; GREEN; **migration YOK**). Kullanıcı "supabase yedeklerini doğrula" dedi — 10 maddelik denetimde kapsam dışı bırakılıp not düşülen madde.
 
 **Sonuç: yedek yoktu, İKİ ayrı sebeple.** (1) Proje **Free planda** → Supabase'de otomatik yedek hiç yok (günlük yedek Pro 7/Team 14/Enterprise 30 gün; PITR her planda ayrı ücretli). (2) **Storage plandan BAĞIMSIZ kapsam dışı** — Supabase belgesi birebir: *"Database backups do not include objects you store via the Storage API, as the database only includes metadata about these objects."* Yani ücretli plana geçilse **bile** 6 kovadaki dosyalar yedeğe girmez; DB satırı yalnız adresi tutar. Ölçüm: **64 tablo / 1.238 satır · 8 hesap (3 admin) · 76 obje / 47,38 MB**; DB→storage **kırık referans 0** (kayıp yaşanmamış, risk gelecekteydi). Plan seviyesi servis anahtarıyla ölçülemez (Management API + PAT gerekir; PAT yok, CLI token'ı Keychain'de) → kullanıcı Free dedi. Rapor: `docs/audit/2026-08-30-supabase-yedek-dogrulamasi.md`.
 

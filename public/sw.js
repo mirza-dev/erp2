@@ -2,13 +2,10 @@
  * Roven service worker — KASTEN APTAL.
  *
  * Bir ERP bayat veri servis edemez: önbellekten dönen eski bir sipariş listesi
- * ya da eski bir stok bakiyesi, olmayan bir hatadan daha kötüdür. Bu yüzden bu
- * service worker YALNIZCA `/_next/static/` altındaki hash'li (dolayısıyla
- * değişmez) dosyaları önbelleğe alır. API yanıtları, navigasyonlar ve diğer her
- * şey doğrudan ağa gider — hiç dokunulmaz.
- *
- * Varlık sebebi işlevsel değil, kurulabilirlik: tarayıcının "ana ekrana ekle"
- * akışı bir fetch dinleyicisi ister.
+ * ya da eski bir stok bakiyesi, olmayan bir hatadan daha kötüdür — yanlış veri
+ * "çalışıyor" gibi görünür. Bu yüzden önbelleğe YALNIZCA `/_next/static/`
+ * altındaki hash'li (dolayısıyla değişmez) dosyalar ve çevrimdışı yedek sayfa
+ * girer. API yanıtları ve sayfa gezinmeleri ASLA önbelleğe yazılmaz.
  *
  * ── KILL SWITCH ────────────────────────────────────────────────────────────
  * Bir service worker, bir web uygulamasını kalıcı olarak bayat HTML'e
@@ -16,15 +13,36 @@
  *   1) `/sw.js` rotasını 404 döndürün (dosyayı silin ve deploy edin)
  *   2) Kullanıcılara: DevTools → Application → Service Workers → Unregister,
  *      ya da tarayıcı ayarlarından site verisini temizlemek
- * Aşağıdaki `activate` kolu kendi sürümü dışındaki tüm cache'leri sildiği için
- * yeni bir CACHE sürümü yayınlamak da eski önbelleği temizler.
+ * `activate` kolu kendi sürümü dışındaki tüm cache'leri sildiği için yeni bir
+ * CACHE sürümü yayınlamak da eski önbelleği temizler.
  */
-const CACHE = "roven-static-v1";
+const CACHE = "roven-static-v2";
 const STATIC_PREFIX = "/_next/static/";
+const OFFLINE_URL = "/offline";
 
-self.addEventListener("install", () => {
-    // Yeni sürüm beklemeye geçmesin — kullanıcı eski build'e kilitlenmemeli.
-    self.skipWaiting();
+/**
+ * Önbellek tavanı. Her deploy yeni hash'li chunk üretir ve eskiler bir daha
+ * istenmez; tavan olmazsa önbellek aylar içinde sınırsız büyür. Hash'li
+ * dosyalar değişmez olduğu için hangisinin atıldığı önemli değil — FIFO yeter.
+ */
+const MAX_ENTRIES = 200;
+
+self.addEventListener("install", (event) => {
+    // skipWaiting() BİLEREK YOK: yeni sürüm "waiting" durumunda beklesin ki
+    // ServiceWorkerUpdatePrompt kullanıcıya sorabilsin. Anında aktive etseydik
+    // sorulacak bir an olmazdı. Kullanıcı onaylayınca SKIP_WAITING mesajı gelir.
+    event.waitUntil(
+        (async () => {
+            const cache = await caches.open(CACHE);
+            await cache.add(new Request(OFFLINE_URL, { cache: "reload" }));
+        })().catch(() => {
+            /* çevrimdışı yedek yazılamadıysa kurulum yine de sürsün */
+        }),
+    );
+});
+
+self.addEventListener("message", (event) => {
+    if (event.data && event.data.type === "SKIP_WAITING") self.skipWaiting();
 });
 
 self.addEventListener("activate", (event) => {
@@ -37,6 +55,13 @@ self.addEventListener("activate", (event) => {
     );
 });
 
+/** Tavanı aşarsa en eski girdileri atar (Cache API insert sırasını korur). */
+async function trim(cache) {
+    const keys = await cache.keys();
+    if (keys.length <= MAX_ENTRIES) return;
+    for (const key of keys.slice(0, keys.length - MAX_ENTRIES)) await cache.delete(key);
+}
+
 self.addEventListener("fetch", (event) => {
     const req = event.request;
     if (req.method !== "GET") return;
@@ -44,9 +69,20 @@ self.addEventListener("fetch", (event) => {
     const url = new URL(req.url);
     if (url.origin !== self.location.origin) return;
 
-    // API ve navigasyonlar ASLA önbelleğe alınmaz — bayat sipariş/stok yasak.
+    // API ASLA önbelleğe alınmaz — bayat sipariş/stok yasak.
     if (url.pathname.startsWith("/api/")) return;
-    if (req.mode === "navigate") return;
+
+    // Gezinmeler de önbelleğe ALINMAZ. Ağa gider; ağ ölürse önceden yazılmış
+    // sabit çevrimdışı sayfa döner. Bu bir yanıt önbelleklemesi DEĞİL, yakalama.
+    if (req.mode === "navigate") {
+        event.respondWith(
+            fetch(req).catch(async () => {
+                const fallback = await caches.match(OFFLINE_URL);
+                return fallback ?? Response.error();
+            }),
+        );
+        return;
+    }
 
     // Yalnız hash'li, değişmez statik varlıklar.
     if (!url.pathname.startsWith(STATIC_PREFIX)) return;
@@ -58,7 +94,8 @@ self.addEventListener("fetch", (event) => {
             const res = await fetch(req);
             if (res.ok) {
                 const cache = await caches.open(CACHE);
-                cache.put(req, res.clone());
+                await cache.put(req, res.clone());
+                void trim(cache);
             }
             return res;
         })(),

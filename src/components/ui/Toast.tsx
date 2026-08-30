@@ -4,16 +4,28 @@ import { createContext, useContext, useState, useCallback, ReactNode } from "rea
 
 type ToastType = "success" | "error" | "warning" | "info";
 
+/**
+ * Toast aksiyonu ya bir BAĞLANTIDIR (`href`) ya da bir KOMUTTUR (`onClick`).
+ * İkisi de opsiyonel; `href` verilen mevcut çağrılar birebir aynı davranır.
+ */
+type ToastAction = { label: string; href: string } | { label: string; onClick: () => void };
+
 interface ToastItem {
     id: number;
     type: ToastType;
     message: string;
-    action?: { label: string; href: string };
+    action?: ToastAction;
     leaving?: boolean;
 }
 
 interface ToastContextValue {
-    toast: (opts: { type: ToastType; message: string; action?: { label: string; href: string } }) => void;
+    /**
+     * @param duration ms. Verilmezse tipin varsayılanı. **0 = kalıcı** — kendi
+     *   kendine kapanmaz, kullanıcı kapatana kadar durur. Kullanıcının görmesi
+     *   ZORUNLU olan istemler için (ör. "yeni sürüm hazır"); 3 saniyede kaybolan
+     *   bir istem sorulmamış sayılır.
+     */
+    toast: (opts: { type: ToastType; message: string; action?: ToastAction; duration?: number }) => void;
 }
 
 const ToastContext = createContext<ToastContextValue | null>(null);
@@ -51,13 +63,14 @@ export function ToastProvider({ children }: { children: ReactNode }) {
         }, 200);
     }, []);
 
-    const toast = useCallback(({ type, message, action }: { type: ToastType; message: string; action?: { label: string; href: string } }) => {
+    const toast = useCallback(({ type, message, action, duration }: { type: ToastType; message: string; action?: ToastAction; duration?: number }) => {
         const id = ++nextId;
         setToasts(prev => {
             const next = [...prev, { id, type, message, action }];
             return next.length > 3 ? next.slice(-3) : next;
         });
-        setTimeout(() => removeToast(id), DURATIONS[type]);
+        const ms = duration ?? DURATIONS[type];
+        if (ms > 0) setTimeout(() => removeToast(id), ms);
     }, [removeToast]);
 
     return (
@@ -126,16 +139,25 @@ function ToastItem({ item, onDismiss }: { item: ToastItem; onDismiss: (id: numbe
                 lineHeight: 1.4,
             }}>
                 {item.message}
-                {item.action && (
+                {item.action && ("href" in item.action ? (
                     <a
                         href={item.action.href}
                         style={{ display: "block", marginTop: "3px", fontSize: "12px", color: colors.text, textDecoration: "underline", opacity: 0.85 }}
                     >
                         {item.action.label} →
                     </a>
-                )}
+                ) : (
+                    <button
+                        type="button"
+                        onClick={item.action.onClick}
+                        style={{ display: "block", marginTop: "3px", padding: 0, background: "none", border: 0, fontSize: "12px", color: colors.text, textDecoration: "underline", opacity: 0.85, cursor: "pointer", font: "inherit" }}
+                    >
+                        {item.action.label} →
+                    </button>
+                ))}
             </span>
             <button
+                type="button"
                 onClick={() => onDismiss(item.id)}
                 style={{
                     background: "none",

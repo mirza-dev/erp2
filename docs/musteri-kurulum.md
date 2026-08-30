@@ -119,7 +119,21 @@ siz deploy ettiğiniz an geçer.
 İkon ve isim **her müşteride "Roven"**; müşterinin kendi logosu uygulama içinde
 (Ayarlar → Firma) görünür. Klasik SaaS davranışı.
 
+Kısayollar da var: ikona uzun basınca (Android) veya sağ tıklayınca (masaüstü)
+**Yeni Sipariş · Yeni Teklif · Stok · Uyarılar** çıkar.
+
 Service worker kasten yalnız `/_next/static/` önbelleğe alır; **API yanıtları ve
 sayfa gezinmeleri asla önbelleğe alınmaz** — bir ERP bayat sipariş veya stok
-gösteremez. Sorun çıkarsa kurtarma yordamı [`../public/sw.js`](../public/sw.js)
-başındaki "KILL SWITCH" bölümünde.
+gösteremez. Bağlantı koptuğunda tarayıcının hata sayfası yerine
+[`/offline`](../src/app/offline/page.tsx) görünür (önbellekten değil, önceden
+yazılmış sabit bir sayfa). Sorun çıkarsa kurtarma yordamı
+[`../public/sw.js`](../public/sw.js) başındaki "KILL SWITCH" bölümünde.
+
+**Yeni sürüm deploy ettiğinizde** açık sekmelerde "Yeni sürüm hazır — Yenile"
+bildirimi çıkar; kullanıcı kendi zamanında yeniler, yarım kalmış form kaybolmaz.
+Yok sayarsa eski service worker'da kalır ama **içerik yine tazedir** (o worker
+yalnız statik varlık önbelleklıyor); bir sonraki tam sayfa yüklemesinde geçer.
+
+**Geliştirme notu:** service worker yalnız üretimde kaydolur. `npm run dev`
+mevcut kaydı ve `roven-*` önbelleklerini aktif olarak siler — aksi halde bir kez
+üretim build'i açmış geliştiricinin tarayıcısında eski JS servis edilirdi.

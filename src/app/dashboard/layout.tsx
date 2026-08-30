@@ -7,6 +7,7 @@ import Topbar from "@/components/layout/Topbar";
 import { DataProvider } from "@/lib/data-context";
 import { PermissionProvider } from "@/lib/auth/use-permissions";
 import { ToastProvider } from "@/components/ui/Toast";
+import { ServiceWorkerUpdatePrompt } from "@/components/ServiceWorkerUpdatePrompt";
 import { ThemeProvider } from "@/lib/theme/use-theme";
 import DemoBanner from "@/components/ui/DemoBanner";
 import RealtimeSyncBridge from "@/components/layout/RealtimeSyncBridge";
@@ -43,6 +44,7 @@ export default function DashboardLayout({
             <TelemetryBridge />
             <PermissionProvider>
             <ToastProvider>
+                <ServiceWorkerUpdatePrompt />
                 <div
                     className="dashboard-grid"
                     style={{
@@ -122,6 +124,9 @@ export default function DashboardLayout({
                                 borderRight: "var(--line-width) solid var(--shell-border)",
                                 boxShadow: "var(--shell-shadow)",
                                 overflowY: "auto",
+                                // iOS standalone: çekmece bottom:0'a kadar iner ve son
+                                // öğeler ana ekran çizgisinin altında kalırdı.
+                                paddingBottom: "env(safe-area-inset-bottom)",
                                 animation: "fade-in 0.15s ease-out",
                             }}
                         >

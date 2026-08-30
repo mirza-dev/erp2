@@ -24,6 +24,9 @@ const manifest = JSON.parse(readFileSync(join(root, "public/manifest.webmanifest
     theme_color?: string;
     background_color?: string;
     icons?: { src: string; sizes: string; type: string; purpose?: string }[];
+    shortcuts?: { name: string; url: string }[];
+    categories?: string[];
+    display_override?: string[];
 };
 const sw = readFileSync(join(root, "public/sw.js"), "utf8");
 const layout = readFileSync(join(root, "src/app/layout.tsx"), "utf8");
@@ -46,7 +49,8 @@ describe("GATE — PWA", () => {
         for (const icon of manifest.icons ?? []) {
             expect(existsSync(join(root, "public", icon.src))).toBe(true);
         }
-        expect(existsSync(join(root, "public/apple-touch-icon.png"))).toBe(true);
+        // apple ikonu artık src/app/apple-icon.png (Next <link>'i oradan üretir) —
+        // ayrı testte doğrulanıyor.
     });
 
     it("service worker API'yi ve navigasyonu ASLA önbelleğe almıyor", () => {
@@ -62,10 +66,105 @@ describe("GATE — PWA", () => {
     });
 
     it("service worker kullanıcıyı eski build'e kilitleyemiyor", () => {
-        expect(sw).toMatch(/skipWaiting\(\)/);
+        // install'da skipWaiting() ÇAĞRILMAZ: yeni worker "waiting"te beklemeli ki
+        // ServiceWorkerUpdatePrompt kullanıcıya sorabilsin. Onay gelince mesajla aktive olur.
+        expect(sw).not.toMatch(/install[\s\S]{0,200}self\.skipWaiting\(\)/);
+        expect(sw).toMatch(/type === "SKIP_WAITING"/);
         expect(sw).toMatch(/clients\.claim\(\)/);
         expect(sw).toMatch(/caches\.delete/); // activate'te yabancı cache'ler silinir
         expect(sw).toMatch(/KILL SWITCH/); // kurtarma yordamı dosyada yazılı
+    });
+
+    it("önbellek sınırsız büyüyemiyor", () => {
+        // Her deploy yeni hash'li chunk üretir; tavan olmazsa önbellek aylar
+        // içinde sınırsız büyür ve hiçbir şey onu küçültmez.
+        expect(sw).toMatch(/MAX_ENTRIES\s*=\s*\d+/);
+        expect(sw).toMatch(/async function trim\(/);
+        expect(sw).toMatch(/void trim\(cache\)/);
+    });
+
+    it("çevrimdışı yedek sayfa precache'te ve gezinme YAKALAMASINDA", () => {
+        expect(existsSync(join(root, "src/app/offline/page.tsx"))).toBe(true);
+        expect(sw).toMatch(/OFFLINE_URL = "\/offline"/);
+        expect(sw).toMatch(/cache\.add\(new Request\(OFFLINE_URL/); // install'da precache
+        // Gezinme ağa gider; SADECE hata olursa yedek döner — yanıt önbelleğe YAZILMAZ.
+        expect(sw).toMatch(/fetch\(req\)\.catch\(/);
+        expect(sw).toMatch(/caches\.match\(OFFLINE_URL\)/);
+    });
+
+    it("çevrimdışı sayfa next/link KULLANMIYOR (linter'ın 'düzeltmesine' karşı)", () => {
+        // Link istemci-taraflı gezinme yapar ve RSC yükü ister — çevrimdışıyken
+        // olmayan şey tam olarak bu. Düz <a> tam belge isteği zorlar = "ağı tekrar
+        // dene". react-doctor burayı nextjs-no-a-element diye işaretliyor; bilinçli.
+        const offline = readFileSync(join(root, "src/app/offline/page.tsx"), "utf8");
+        expect(offline).not.toMatch(/from "next\/link"/);
+        expect(offline).toMatch(/<a\s/);
+        expect(offline).toMatch(/next\/link DEĞİL, bilinçli/); // gerekçe kodda kalsın
+    });
+
+    it("service worker development'ta kaydolmuyor, mevcut kaydı söküyor", () => {
+        // Guard yetmez: SW kaydı kalıcıdır. Bir kez dev'de koşan geliştiricide
+        // kayıtlı kalır ve /_next/static/ chunk'larını cache-first servis eder
+        // → kod değiştiği halde eski JS çalışır.
+        const reg = readFileSync(join(root, "src/components/ServiceWorkerRegister.tsx"), "utf8");
+        expect(reg).toMatch(/process\.env\.NODE_ENV !== "production"/);
+        expect(reg).toMatch(/getRegistrations\(\)/);
+        expect(reg).toMatch(/\.unregister\(\)/);
+        expect(reg).toMatch(/caches\.delete\(/);
+    });
+
+    it("güncelleme istemi Toast sağlayıcısının İÇİNDE mount edilmiş", () => {
+        // ToastProvider kök layout'ta DEĞİL (dashboard layout'ta) — useToast()
+        // kökten çağrılsaydı çalışma zamanında patlardı.
+        const dash = readFileSync(join(root, "src/app/dashboard/layout.tsx"), "utf8");
+        expect(dash).toMatch(/<ServiceWorkerUpdatePrompt \/>/);
+        const providerAt = dash.indexOf("<ToastProvider>");
+        const promptAt = dash.indexOf("<ServiceWorkerUpdatePrompt />");
+        expect(providerAt).toBeGreaterThanOrEqual(0);
+        expect(promptAt).toBeGreaterThan(providerAt);
+        expect(layout).not.toMatch(/ServiceWorkerUpdatePrompt/); // kök layout'ta OLMAMALI
+
+        const prompt = readFileSync(join(root, "src/components/ServiceWorkerUpdatePrompt.tsx"), "utf8");
+        expect(prompt).toMatch(/duration: 0/); // 3 saniyede kaybolan istem sorulmamış sayılır
+        expect(prompt).toMatch(/SKIP_WAITING/);
+    });
+
+    it("iOS: apple-icon Next'in tanıdığı yerde, açılış ekranları eksiksiz", () => {
+        // public/apple-touch-icon.png yalnız iOS'un kök-yol TAHMİNİNE güvenirdi;
+        // src/app/apple-icon.png'yi Next tanıyıp <link rel="apple-touch-icon"> basar.
+        expect(existsSync(join(root, "src/app/apple-icon.png"))).toBe(true);
+        // Next `capable: true` için yalnız `mobile-web-app-capable` basıyor
+        // (tarayıcıda ölçüldü); iOS 16.4 öncesi Apple'ın metasını istiyor.
+        expect(layout).toMatch(/"apple-mobile-web-app-capable": "yes"/);
+        expect(existsSync(join(root, "public/apple-touch-icon.png"))).toBe(false);
+
+        // layout'taki her startupImage girdisinin dosyası diskte olmalı.
+        const urls = [...layout.matchAll(/apple-splash-(\d+)x(\d+)\.png/g)];
+        const declared = [...layout.matchAll(/\[(\d+), (\d+), (\d)\]/g)];
+        expect(declared.length).toBeGreaterThanOrEqual(10);
+        for (const [, w, h] of declared.map((m) => [m[0], m[1], m[2]])) {
+            expect(existsSync(join(root, `public/splash/apple-splash-${w}x${h}.png`))).toBe(true);
+        }
+        expect(urls.length + declared.length).toBeGreaterThan(0);
+    });
+
+    it("manifest kısayolları GERÇEK rotalara işaret ediyor", () => {
+        const shortcuts = (manifest.shortcuts ?? []) as { url: string }[];
+        expect(shortcuts.length).toBeGreaterThanOrEqual(3);
+        for (const sc of shortcuts) {
+            const route = sc.url.replace(/^\/dashboard/, "src/app/dashboard");
+            expect(existsSync(join(root, route, "page.tsx"))).toBe(true);
+        }
+        expect(manifest.categories).toBeDefined();
+        expect(manifest.display_override).toContain("standalone");
+    });
+
+    it("mobil çekmece iOS ana ekran çizgisinin altında kalmıyor", () => {
+        const dash = readFileSync(join(root, "src/app/dashboard/layout.tsx"), "utf8");
+        expect(dash).toMatch(/env\(safe-area-inset-bottom\)/);
+        // viewport-fit: cover EKLENMEMELİ — statusBarStyle "default" ile birlikte
+        // üst tarafta bugün olmayan bir sorun yaratır.
+        expect(layout).not.toMatch(/viewportFit/);
     });
 
     it("layout manifest'e bağlı ve İKİ tema için de themeColor veriyor", () => {

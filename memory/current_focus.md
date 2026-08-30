@@ -5,6 +5,43 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-08-31 (2) — PWA eksiksizleştirme + TARAYICIDA doğrulama
+
+Kullanıcı "PWA olayı eksiksiz hatasız ve tam olmalı" dedi. Ölçtüm: PWA çalışıyordu ama
+**hiçbir tarayıcıda doğrulanmamıştı** (kapı testleri yalnız kaynak regex'i) ve 5 gerçek
+kusuru vardı.
+
+**Kusurlar (hepsi kapatıldı):** SW **development'ta da kaydoluyordu** → `/_next/static/`
+cache-first, geliştirmede bayat JS (guard yetmez, kayıt kalıcı → dev'de AKTİF SÖKME) ·
+önbellek **sınırsız büyüyordu** (`MAX_ENTRIES=200` FIFO) · **çevrimdışı yedek sayfa yoktu**
+(`/offline` + gezinme yakalaması) · `apple-touch-icon` **kök-yol tahminine güveniyordu** →
+`src/app/apple-icon.png` (Next `<link>`i basıyor) · `safe-area-inset` **kodda hiç yoktu** →
+mobil çekmeceye `env(safe-area-inset-bottom)`.
+
+**Eklenenler:** manifest `shortcuts` (Yeni Sipariş/Teklif/Stok/Uyarılar) + `categories` +
+`display_override` · **10 iOS açılış ekranı** · **güncelleme bildirimi**: `install`'dan
+`skipWaiting()` KALDIRILDI (yoksa sorulacak an olmaz), `SKIP_WAITING` mesajı geldi;
+`ServiceWorkerUpdatePrompt` **dashboard layout'ta** — `ToastProvider` kökte değil.
+**Toast geriye dönük uyumlu genişletildi**: `action` artık `{label,onClick}` de olabiliyor,
+`duration: 0` = kalıcı (3sn'de kaybolan güncelleme istemi sorulmamış sayılır).
+
+**TARAYICIDA doğrulandı** (üretim build + `npm start`, yalnız teknik kontroller, hiçbir
+kimlik bilgisi girilmedi): manifest bağlı · 4/4 ikon 200 · iki tema theme-color · 10
+startup image · SW `activated` · cache **19 girdi, 0'ı API** · **sunucu gerçekten
+kapatılıp gezinildi → `/offline` çıktı** · `sw.js` değiştirilip `update()` → yeni worker
+**bekledi** (skipWaiting yokluğunun kanıtı), Toast çıktı, "Yenile"ye tıklandı → yeni worker
+aktive + sayfa yenilendi.
+
+**Tarayıcının bulduğu, testlerin bulamadığı kusur:** Next `appleWebApp.capable: true` için
+YALNIZ standart `mobile-web-app-capable` basıyor; iOS 16.4 öncesi Apple'ınkini istiyor →
+`metadata.other` ile elle eklendi. Kaynak regex'i bunu asla göremezdi.
+
+Kapı `pwa.test.ts` **8 → 16 test**, **8/8 yeni kural kırmızı-yandığı kanıtlanarak**.
+İlk turda bir kanıt denemesi eşleşmemişti — "yanmadı" sanıp geçmek yerine tek tek
+tekrarlandı ve gerçekten yandığı görüldü.
+
+**484 dosya / 6822 test** · tsc 0 · lint 0 · build 0 uyarı · migration YOK.
+
 ## 2026-08-31 — Çok müşterili teslim altyapısı (3 faz, 3 commit)
 
 Kullanıcı "ürün bitti mi, insanların kullanımına sunulabilir mi" diye sordu. Ölçüldü:
