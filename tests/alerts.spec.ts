@@ -2,10 +2,10 @@
  * Alerts E2E Tests
  */
 import { test, expect } from "@playwright/test";
+import { gotoApp } from "./helpers/nav";
 
 test.beforeEach(async ({ page }) => {
-    await page.goto("/dashboard/alerts");
-    await page.waitForLoadState("networkidle");
+    await gotoApp(page, "/dashboard/alerts");
 });
 
 test("alerts sayfası yükleniyor", async ({ page }) => {
@@ -13,22 +13,23 @@ test("alerts sayfası yükleniyor", async ({ page }) => {
     await expect(page.getByText(/uyarı|alert/i).first()).toBeVisible();
 });
 
-test("filtre tab'ları çalışıyor — critical tab", async ({ page }) => {
-    // "Kritik" tab her zaman render edilir (static UI, data-bağımsız)
-    const criticalTab = page.getByRole("button", { name: /kritik/i }).first();
-    await expect(criticalTab).toBeVisible({ timeout: 5_000 });
-    await criticalTab.click();
-    await page.waitForTimeout(400);
-    await expect(page.locator("main")).toBeVisible();
+// Sayfa artık TAKVİM görünümü: ciddiyete göre "Kritik/Uyarı" tab'ları yok,
+// yerine `ALERT_CLASSES` sınıf filtreleri var (Tümü · Stok · Sipariş · …).
+// Eski testler kaldırılmış bir UI'ı bekliyordu.
+// `ClassificationTabs` role="tab" kullanıyor (button DEĞİL) ve erişilebilir ad
+// "<etiket> (<sayı>)" biçiminde — ör. "Stok (3)".
+test("sınıf filtresi çalışıyor — Stok", async ({ page }) => {
+    const stockTab = page.getByRole("tab", { name: /^Stok \(/ });
+    await expect(stockTab).toBeVisible({ timeout: 15_000 });
+    await stockTab.click();
+    await expect(stockTab).toHaveAttribute("aria-selected", "true");
 });
 
-test("filtre tab'ları çalışıyor — warning tab", async ({ page }) => {
-    // "Uyarı" tab her zaman render edilir (static UI, data-bağımsız)
-    const warningTab = page.getByRole("button", { name: /uyarı/i }).first();
-    await expect(warningTab).toBeVisible({ timeout: 5_000 });
-    await warningTab.click();
-    await page.waitForTimeout(400);
-    await expect(page.locator("main")).toBeVisible();
+test("sınıf filtresi çalışıyor — Tümü", async ({ page }) => {
+    const allTab = page.getByRole("tab", { name: /^Tümü \(/ });
+    await expect(allTab).toBeVisible({ timeout: 15_000 });
+    await allTab.click();
+    await expect(allTab).toHaveAttribute("aria-selected", "true");
 });
 
 test("arama çalışıyor", async ({ page }) => {

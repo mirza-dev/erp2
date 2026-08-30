@@ -2,6 +2,7 @@
  * Production E2E Tests
  */
 import { test, expect } from "@playwright/test";
+import { gotoApp } from "./helpers/nav";
 import { createTestProduct, deleteTestProduct } from "./helpers/test-data";
 
 let productId: string;
@@ -16,8 +17,7 @@ test.afterAll(async ({ request }) => {
 });
 
 test.beforeEach(async ({ page }) => {
-    await page.goto("/dashboard/production");
-    await page.waitForLoadState("networkidle");
+    await gotoApp(page, "/dashboard/production");
 });
 
 test("üretim sayfası yükleniyor — form ve tablo görünür", async ({ page }) => {
@@ -69,8 +69,15 @@ test("üretim kaydı silinebiliyor", async ({ page }) => {
 test("seçilen tarih günlük kayıt bağlamını değiştiriyor", async ({ page }) => {
     const dateInput = page.locator("input[type='date']").first();
     if (await dateInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
-        await dateInput.fill("2025-01-01");
-        await expect(page.getByText(/1 Ocak 2025 Üretim Kayıtları/i)).toBeVisible();
+        // Doldurmayı İDDİAYLA BİRLİKTE yeniden dene: sayfa RSC ile geliyor,
+        // hidrasyon tamamlanmadan yapılan `fill` React'in kontrollü `value`'su
+        // tarafından geri alınıyor ve tarih hiç değişmiyordu. `toPass` hidrasyon
+        // yetişene kadar tekrarlar.
+        await expect(async () => {
+            await dateInput.fill("2025-01-01");
+            await expect(page.getByText(/1 Ocak 2025 Üretim Kayıtları/i))
+                .toBeVisible({ timeout: 2_000 });
+        }).toPass({ timeout: 20_000 });
         await expect(page.getByRole("button", { name: /Bugüne Dön/i })).toBeVisible();
         await expect(page.getByText(/Geçmiş tarih seçili/i)).toBeVisible();
         await expect(dateInput).toHaveAttribute("max", /^\d{4}-\d{2}-\d{2}$/);

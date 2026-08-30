@@ -1,4 +1,5 @@
 import { Page, APIRequestContext } from "@playwright/test";
+import { waitForApp } from "./nav";
 
 /**
  * Helpers to create / delete test data via the app's REST API.
@@ -28,6 +29,9 @@ export async function createTestProduct(
     });
     if (!res.ok()) throw new Error(`createTestProduct failed: ${res.status()} ${await res.text()}`);
     const body = await res.json();
+    // Liste API'si sonuçta tutarlı — kayıt görünür olana kadar bekle, aksi hâlde
+    // hemen ardından okuyan test "oluşmadı" sanıyor (bkz. waitForInList).
+    await waitForInList<{ sku?: string }>(request, `${BASE}/api/products?all=1`, p => p.sku === sku);
     return { id: body.id, sku };
 }
 
@@ -57,6 +61,7 @@ export async function createTestCustomer(
     });
     if (!res.ok()) throw new Error(`createTestCustomer failed: ${res.status()} ${await res.text()}`);
     const body = await res.json();
+    await waitForInList<{ name?: string }>(request, `${BASE}/api/customers`, c => c.name === name);
     return { id: body.id, name };
 }
 
@@ -110,12 +115,46 @@ export async function deleteTestOrder(
     await request.delete(`${BASE}/api/orders/${id}`);
 }
 
+/**
+ * Bir kaydın liste API'sinde GÖRÜNÜR olmasını bekler.
+ *
+ * `/api/products` ve `/api/customers` `unstable_cache` ile önbelleklenmiş
+ * (`tags: ["products"]`, `revalidate: 30`). Mutasyon `revalidateTag` çağırıyor
+ * ama geçersizleştirme ANINDA değil: ölçüldü — yeni ürün POST'tan ~1 sn sonra
+ * listede YOK, ~7 sn sonra VAR (2026-08-30). Yani API sonuçta tutarlı.
+ *
+ * Tek seferlik GET yapan testler bu pencereye düşüp "kayıt oluşmadı" sanıyordu.
+ * Bu yardımcı görünene kadar yeniden sorar.
+ */
+export async function waitForInList<T>(
+    request: APIRequestContext,
+    url: string,
+    match: (row: T) => boolean,
+    timeoutMs = 20_000,
+): Promise<T | undefined> {
+    const deadline = Date.now() + timeoutMs;
+    for (;;) {
+        const res = await request.get(url);
+        if (res.ok()) {
+            const body = await res.json();
+            const rows = (Array.isArray(body) ? body : body?.rows ?? []) as T[];
+            const hit = rows.find(match);
+            if (hit) return hit;
+        }
+        if (Date.now() > deadline) return undefined;
+        await new Promise(r => setTimeout(r, 750));
+    }
+}
+
 // ── Wait helpers ─────────────────────────────────────────────────────────────
 
-/** Wait for the page's data-context loading spinner to disappear */
+/**
+ * Uygulama kabuğunun boyanmasını bekler.
+ *
+ * Eskiden `networkidle` bekliyordu; o bekleme dev sunucusunun soğuk derlemesi
+ * ve arka plan yoklamaları yüzünden hiç dolmayabiliyordu (bkz. `helpers/nav.ts`).
+ * `.catch()` ile yutulduğu için de sessizce hiçbir şey beklemiyordu.
+ */
 export async function waitForDataLoad(page: Page): Promise<void> {
-    // The app shows a spinner while loading=true; wait for it to vanish
-    await page.waitForLoadState("networkidle", { timeout: 10_000 }).catch(() => {
-        // networkidle can time out on slow machines — ignore and proceed
-    });
+    await waitForApp(page);
 }

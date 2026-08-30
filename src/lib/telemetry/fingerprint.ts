@@ -168,9 +168,29 @@ export function severityRank(severity: Severity): number {
     return SEVERITIES.indexOf(severity);
 }
 
-/** Grup başlığı: tip + ham mesajın ilk satırı, kırpılmış. */
-export function buildTitle(errorType: string, message: string | null | undefined): string {
+/**
+ * Grup başlığı: tip + ham mesajın ilk satırı, kırpılmış.
+ *
+ * Mesaj boşsa çerçevedeki fonksiyon adına düşülür. Sebep canlıdan: 2026-08-30'da
+ * bir Supabase hatası boş `message` ile geldi ve Hata Merkezi'nde başlığı
+ * düpedüz **"Error"** olan bir grup oluştu — listede hangi kusur olduğu
+ * okunamıyordu (parmak izi doğru gruplamıştı, okunaksız olan yalnız etiketti).
+ * `Error @ dbCountOrdersByCommercialStatus` en azından NEREDE olduğunu söylüyor.
+ */
+export function buildTitle(
+    errorType: string,
+    message: string | null | undefined,
+    topFrame?: string | null,
+): string {
     const firstLine = (message ?? "").split("\n")[0].trim();
-    const title = firstLine ? `${errorType}: ${firstLine}` : errorType;
-    return title.slice(0, 200);
+    if (firstLine) return `${errorType}: ${firstLine}`.slice(0, 200);
+
+    const fn = functionNameFromFrame(topFrame);
+    return (fn ? `${errorType} @ ${fn}` : errorType).slice(0, 200);
+}
+
+/** `at dbFoo (/path/x.js)` → `dbFoo`. Yol/anonim çerçevelerde boş döner. */
+function functionNameFromFrame(frame: string | null | undefined): string {
+    const m = (frame ?? "").match(/^at\s+(?:async\s+)?([A-Za-z_$][\w$.]*)\s*\(/);
+    return m ? m[1] : "";
 }

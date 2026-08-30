@@ -2,10 +2,10 @@
  * Purchase Suggestions E2E Tests
  */
 import { test, expect } from "@playwright/test";
+import { gotoApp } from "./helpers/nav";
 
 test.beforeEach(async ({ page }) => {
-    await page.goto("/dashboard/purchase/suggested");
-    await page.waitForLoadState("networkidle");
+    await gotoApp(page, "/dashboard/purchase/suggested");
 });
 
 test("satın alma önerileri sayfası yükleniyor", async ({ page }) => {

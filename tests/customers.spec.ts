@@ -2,13 +2,13 @@
  * Customers E2E Tests
  */
 import { test, expect } from "@playwright/test";
+import { gotoApp, waitForApp } from "./helpers/nav";
 import { createTestCustomer, deleteTestCustomer } from "./helpers/test-data";
 
 const TS = () => Date.now();
 
 test.beforeEach(async ({ page }) => {
-    await page.goto("/dashboard/customers");
-    await page.waitForLoadState("networkidle");
+    await gotoApp(page, "/dashboard/customers");
 });
 
 test("müşteri listesi yükleniyor", async ({ page }) => {
@@ -89,8 +89,8 @@ test("aktif/pasif tab filtresi çalışıyor", async ({ page }) => {
 test("müşteri silme onay dialogu çalışıyor", async ({ page, request }) => {
     const customer = await createTestCustomer(request);
 
-    await page.reload();
-    await page.waitForLoadState("networkidle");
+    await page.reload({ waitUntil: "domcontentloaded" });
+    await waitForApp(page);
 
     // Search for the customer
     const searchInput = page.getByPlaceholder(/ara|müşteri/i).first();

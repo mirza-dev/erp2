@@ -68,6 +68,8 @@ interface CellProps {
     onClick: () => void;
 }
 
+const OTHER_MONTH_FMT = new Intl.DateTimeFormat("tr-TR", { month: "long" });
+
 function DayCell({ date, current, occurrences, notes, isSelected, isToday, onClick }: CellProps) {
     const [hov, setHov] = useState(false);
     const [pop, setPop] = useState<{ x: number; y: number; above: boolean } | null>(null);
@@ -114,7 +116,14 @@ function DayCell({ date, current, occurrences, notes, isSelected, isToday, onCli
         };
     };
 
-    const cellLabel = `${date.getDate()} — ${sorted.length} uyarı, ${notes.length} not`;
+    // Komşu ayların taşan günleri de yalnız "30 — …" diye okunuyordu: ekran
+    // okuyucuda aynı isimli iki düğme oluşuyor ve hangisinin görüntülenen aya
+    // ait olduğu anlaşılmıyordu (Playwright de strict-mode ihlali veriyordu).
+    // Görsel ayrım yalnız `opacity` ile yapılıyordu — erişilebilir ada hiç
+    // yansımıyordu.
+    const cellLabel = current
+        ? `${date.getDate()} — ${sorted.length} uyarı, ${notes.length} not`
+        : `${date.getDate()} ${OTHER_MONTH_FMT.format(date)} — ${sorted.length} uyarı, ${notes.length} not`;
 
     return (
         <button

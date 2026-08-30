@@ -120,9 +120,21 @@ async function main() {
         if (!ok) missing.push(file);
     }
 
+    const manualFiles: string[] = [];
     for (const [prefix, hint] of Object.entries(MANUAL)) {
         const file = local.find((f) => f.startsWith(prefix));
-        if (file) console.log(`  ⚠️  ${file} — otomatik probe yok, elle doğrula: ${hint}`);
+        if (file) {
+            manualFiles.push(file);
+            console.log(`  ⚠️  ${file} — otomatik probe yok, elle doğrula: ${hint}`);
+        }
+    }
+    if (manualFiles.length > 0) {
+        // Dokuz sorguyu tek tek koşturmak yerine hepsini tek çalıştırmada
+        // döndüren hazır dosya. Son koşum 2026-08-30: 9/9 ✅ (canlı erp2).
+        console.log(
+            `\n[mig-gate] ${manualFiles.length} dosya elle doğrulama istiyor — hepsini tek sorguda kontrol et:\n`
+            + "  Studio → SQL Editor → docs/audit/manual-migration-checks.sql (her satır ✅ olmalı)",
+        );
     }
 
     if (missing.length > 0) {

@@ -9,10 +9,10 @@
  * - "Mamul" label'ı gerçek UI'da "İmalat Eskimesi"; tutarsızlık düzeltildi.
  */
 import { test, expect } from "@playwright/test";
+import { gotoApp } from "./helpers/nav";
 
 test.beforeEach(async ({ page }) => {
-    await page.goto("/dashboard/products/aging");
-    await page.waitForLoadState("networkidle");
+    await gotoApp(page, "/dashboard/products/aging");
 });
 
 test("eskime raporu sayfası yükleniyor", async ({ page }) => {

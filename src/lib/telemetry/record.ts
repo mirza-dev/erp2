@@ -177,7 +177,7 @@ export async function recordError(options: RecordErrorOptions): Promise<void> {
         const { dbRecordErrorOccurrence } = await import("@/lib/supabase/telemetry");
         await dbRecordErrorOccurrence({
             fingerprint: fingerprintError({ errorType, normalizedMessage, topFrame: frame }),
-            title: redactString(buildTitle(errorType, rawMessage), 200),
+            title: redactString(buildTitle(errorType, rawMessage, frame), 200),
             errorType,
             // Normalize mesaj da redaksiyondan geçer: "{str}" yer tutucusu
             // her şeyi yakalamaz, tırnaksız gömülü token kalabilir.

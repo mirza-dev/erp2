@@ -5,7 +5,17 @@ _Son güncelleme: 2026-08-30_
 
 > Bu bölüm yalnız **güncel durumu + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda ve `memory/current_focus.md`'de. Aşağıdaki indeks son dönem oturumlarına (commit + konu) hızlı bakış içindir; daha eski dönemler (Faz 2–3d AI Import, Sprint A–C, M-3 Rate Limiting, React Doctor, Teklif V2–V7 plan turları, Paraşüt Faz 1–11) git geçmişinde.
 
-**Son tamamlanan iş:** **Developer Console — bağımsız inceleme + 29 bulgunun kapanışı** (2026-08-30; GREEN; **mig.110 + 111 UYGULANDI ve canlı doğrulandı**; 480 dosya / 6779 test; yeni bağımlılık 0). `ae7a9c1` üç bağımsız ajana review ettirildi, bulgular kaynaktan VE canlı sistemden yeniden doğrulandı → `docs/audit/2026-08-developer-console-review.md` (**K:2 Y:7 O:7 D:8 Nit:5**), sonra **29/29 düzeltildi**.
+**Son tamamlanan iş:** **E2E kök sebebi + deploy hazırlığı + panel avı** (2026-08-30 öğleden sonra). Üç blok:
+
+**E2E — "56 fail" TEK BİR sebepten geliyormuş.** `/api/auth/logout` `supabase.auth.signOut()` çağırıyordu; supabase-js varsayılanı **`global`**, yani kullanıcının TÜM cihazlardaki oturumlarını iptal ediyor. Playwright'ta `auth` projesi ilk koşuyor ve içindeki çıkış testi `chromium`'un paylaştığı `storageState`'i öldürüyordu → sonraki her test giriş sayfasında. **A/B kanıtı:** `dashboard.spec` tek başına **6/6**, `auth.spec`'ten sonra **2/6**; hata ekran görüntüsü giriş ekranı. Düzeltme (kullanıcı kararı: ikisi de) → `signOut({ scope: "local" })` (**prod davranışı da düzeldi**: diz üstünde çıkış artık telefondaki oturumu öldürmüyor; şifre değiştirme akışı zaten signOut çağırmıyordu, etkilenmedi) **+** `playwright.config.ts`'te `auth` projesi **en sona** alındı. İkinci kusur: **32 `waitForLoadState("networkidle")`** — Next 16 + Turbopack soğuk derlemesinde 30 sn'yi aşıyordu (aynı test retry'da 5,3 sn). Hepsi YENİ `tests/helpers/nav.ts` (`gotoApp`/`waitForApp`) ile değiştirildi; `gotoApp` **oturum düşerse açık hata fırlatıyor** ve dosya hidrasyon yarışını belgeliyor (kabuk boyandı ≠ React hidre oldu — `production.spec`'te `toPass` ile çözüldü). Test timeout 30→60 sn. Kalan kırıklar tek tek gerçek UI'a göre onarıldı: alerts artık **takvim** (`role="tab"`, ad `"Stok (3)"` biçiminde) · `products.spec` drawer bloğu → detay sayfası + "Stok" sekmesi · `/api/products` **sayfalı** → `?all=1` · Next dev hata örtüsü locator'a karışıyordu → `main`'e scope · import XLSX ayrıştırma beklemeleri 30 sn.
+
+**Yan ürün — gerçek a11y kusuru.** Takvimde komşu ayların taşan günleri de yalnız `"30 — …"` diye okunuyordu; ayrım **sadece `opacity`** ileydi, erişilebilir ada yansımıyordu (ekran okuyucuda aynı isimli iki düğme). `CalendarGrid` artık bu aya ait olmayan hücreye ay adını ekliyor.
+
+**Deploy hazırlığı.** Otomatik probe'u olmayan **9 migration Studio'da tek sorguda doğrulandı: 9/9 ✅** → `check-migrations` 23/23 + manuel 9/9 = **migration drift YOK**. `check-migrations.ts` artık dokuz ipucunu tek tek okutmak yerine `docs/audit/manual-migration-checks.sql`'e yönlendiriyor. YENİ **`docs/deploy-env-matrix.md`**: her env değişkeninin *eksikse ne olur* davranışı. Kritik: `ADMIN_EMAILS` yerelde YOK (brick riski) · **`EMAIL_FROM` tek başına eksik** (`RESEND_API_KEY` set!) — 10 `waiting_config` bunun yüzünden, ve `EMAIL_FROM` eklense bile birikeni `POST /api/email/outbox/process` (CRON_SECRET) boşaltmalı · `SENTRY_ENVIRONMENT` prod'da açık verilmeli · `QUOTE_SHARE_SECRET` yoksa `CRON_SECRET`'tan türetiliyor (cron secret dönerse paylaşılan teklif linkleri kırılır) · `PARASUT_USE_MOCK` açıkça `"false"` olmadıkça mock.
+
+**Panelin bulduğu 2 hata teşhis edildi.** İkisi de **tek olay**: 2026-08-30T07:58'de 200 ms arayla `dbCountOrdersByCommercialStatus` + `dbListCustomersPaged` → *"Could not query the database for the schema cache"*. Klasik PostgREST şema-önbelleği yenilenmesi, **mig.111'in DDL'inden hemen sonra** — geçici, kendini onardı, iki uç da sağlıklı. (Stack yolları `/home/runner/work/...` + Windows Chrome UA → bu makineden değil.) **Gerçek kusur telemetride çıktı:** boş mesajlı hata, başlığı düpedüz `"Error"` olan bir grup üretiyordu; `buildTitle` artık çerçevedeki fonksiyon adına düşüyor (`Error @ dbCountOrdersByCommercialStatus`).
+
+**Önceki iş:**  **Developer Console — bağımsız inceleme + 29 bulgunun kapanışı** (2026-08-30; GREEN; **mig.110 + 111 UYGULANDI ve canlı doğrulandı**; 480 dosya / 6779 test; yeni bağımlılık 0). `ae7a9c1` üç bağımsız ajana review ettirildi, bulgular kaynaktan VE canlı sistemden yeniden doğrulandı → `docs/audit/2026-08-developer-console-review.md` (**K:2 Y:7 O:7 D:8 Nit:5**), sonra **29/29 düzeltildi**.
 
 **K1 — CANLIDA DOĞRULANMIŞ GÜVENLİK AÇIĞI.** SECURITY DEFINER RPC'leri `anon` rolüne açıktı. Salt-okunur A/B probe: `record_request_metrics` **anon key ile HTTP 200**, kontrol `dashboard_monthly_cogs` **401/42501**. Sebep: `revoke … from public` Supabase'in varsayılan ayrıcalıklarının anon/authenticated'a verdiği **DOĞRUDAN** EXECUTE'u kaldırmaz; DEFINER olduğu için tablo RLS'i de devreye girmez. 5 fonksiyon (109×3 + **097×2**, ikincisi bu commit'ten değil) → **`mig.110`**. Gate sertleştirildi (`sql-migration-lint` rol-hedefli REVOKE) ve kanıtlandı: 110 çıkarılınca tam o beşini sayıyor.
 
@@ -13,7 +23,7 @@ _Son güncelleme: 2026-08-30_
 
 **Panelin bulduğu GERÇEK sorunlar** (bu commit'in kusuru değil, önceden vardı): (1) e-posta yapılandırması eksik → `maintenance_incidents` critical/open + **10 `notification_outbox` kaydı `waiting_config`** (en eskisi ~78 gün); (2) `ANTHROPIC_API_KEY` **401** → AI kapalı.
 
-**E2E suite BAYAT — ayrı iş, bu commit'le İLGİSİZ.** `npx playwright test` → 56 fail / 26 pass. Kanıt: `products.spec` "satır tıklayınca drawer açılıyor" testi **Faz 2b'de KALDIRILAN** drawer'ı bekliyor (sayfada 0 drawer referansı; satır tıklaması `router.push`). Son yeşil rapor **25 May**; UI o tarihten sonra Faz B component lib + navigasyon yeniden yapılandırmasıyla değişti. `dashboard.spec` izole koşumda **6/6** geçiyor.
+**E2E suite bayattı** (56 fail / 26 pass) — kök sebebi bulunup düzeltildi, yukarıdaki bloğa bak.
 
 **K2 — kapsama iddiası yanlıştı.** `onRequestError` "kalan 33 route"u yakalamıyordu; 28'i kendi `catch`'inde yanıt döndürdüğü için hata Next'in sınırına ULAŞMIYORDU (gerçek kapsama 131/159). `handleApiError`'a opsiyonel `clientMessage` eklendi, **28 route** mesajları BİREBİR korunarak çevrildi; gövde şekli zorunlu farklı olan 3 yer `captureRouteError` ile aynı boruya bağlandı. YENİ `gate/route-error-coverage.test.ts` — **baseline BOŞ**.
 
@@ -27,7 +37,7 @@ _Son güncelleme: 2026-08-30_
 
 tsc 0 · lint 0 · **480 dosya / 6779 test** (+66) · build 0 uyarı · semgrep 0 · gitleaks 0.
 
-**AÇIK (kullanıcı tarafı):** **`mig.110` APPLY (K1 canlı)** · **`mig.111` APPLY** · `INTERNAL_OPERATOR_EMAILS` · tarayıcı turu (özellikle D7 matcher daralması: statik varlıklar + giriş akışı).
+**AÇIK (kullanıcı tarafı):** ~~`mig.110`/`mig.111` APPLY~~ ✅ · ~~`INTERNAL_OPERATOR_EMAILS`~~ ✅ · **`EMAIL_FROM` set edilmeli** (10 bildirim bekliyor) · **`ANTHROPIC_API_KEY` yenilenmeli** (401 doğrulandı: `api.anthropic.com/v1/models`) · Paraşüt API başvurusu · tarayıcı turu (özellikle D7 matcher daralması: statik varlıklar + giriş akışı).
 
 <details><summary>Önceki: Developer Console / System Health Panel (ilk sürüm)</summary>
 

@@ -173,4 +173,22 @@ describe("buildTitle", () => {
     it("mesaj yoksa yalnız tip", () => {
         expect(buildTitle("Error", null)).toBe("Error");
     });
+
+    it("mesaj boşken çerçevedeki fonksiyon adına düşer", () => {
+        // Canlı vaka (2026-08-30): boş mesajlı Supabase hatası başlığı düpedüz
+        // "Error" olan bir grup üretmişti — listede ayırt edilemiyordu.
+        expect(buildTitle("Error", "", "at dbCountOrdersByCommercialStatus (/app/x.js)"))
+            .toBe("Error @ dbCountOrdersByCommercialStatus");
+        expect(buildTitle("Error", null, "at async CustomersPage (/app/y.js)"))
+            .toBe("Error @ CustomersPage");
+    });
+
+    it("çerçeve adsızsa eski davranış korunur (yalnız tip)", () => {
+        expect(buildTitle("Error", null, "at /app/anon.js")).toBe("Error");
+        expect(buildTitle("Error", null, "")).toBe("Error");
+    });
+
+    it("mesaj varsa çerçeve başlığı DEĞİŞTİRMEZ", () => {
+        expect(buildTitle("TypeError", "boom", "at dbFoo (/app/x.js)")).toBe("TypeError: boom");
+    });
 });

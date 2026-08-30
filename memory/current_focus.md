@@ -5,6 +5,57 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-08-30 (öğleden sonra) — Sıradaki tur: E2E + deploy hazırlığı + panel avı
+
+Kullanıcı "hepsini sırayla yapıcaz" dedi; dört blok sırayla işleniyor.
+
+**BLOK 1 — E2E suite (kök sebep bulundu, düzeltildi).** "56 fail" tek bir
+sebepten geliyormuş: `/api/auth/logout` `supabase.auth.signOut()` çağırıyordu ve
+supabase-js **varsayılanı `global`** — kullanıcının TÜM oturumlarını iptal eder.
+`auth` projesi ilk koşuyordu; içindeki çıkış testi `chromium`'un paylaştığı
+`storageState`'i öldürüyor, sonraki her test giriş sayfasına düşüyordu.
+**A/B ile kanıtlandı:** `dashboard.spec` tek başına **6/6**, `auth.spec`'ten
+sonra **2/6**; hata ekran görüntüsü giriş sayfası. Kullanıcı kararı (AskUser):
+**ikisi de** → `signOut({ scope: "local" })` (prod davranışı da düzeldi: artık
+diz üstünde çıkış telefondaki oturumu öldürmüyor) + `playwright.config.ts`'te
+`auth` projesi **en sona** alındı (ikinci savunma).
+İkinci kusur: **`waitForLoadState("networkidle")` 32 çağrı** — Next 16 +
+Turbopack soğuk derlemesinde 30 sn'yi aşıyor (aynı test retry'da 5,3 sn).
+Hepsi YENİ `tests/helpers/nav.ts`'teki `gotoApp`/`waitForApp` ile değiştirildi;
+`gotoApp` ayrıca **oturum düşerse açık hata fırlatıyor** (bu tur tam olarak o
+görünmezlik yüzünden uzadı). Test timeout 30→60 sn.
+`products.spec`'in drawer bloğu gerçek gezinmeye çevrildi (Faz 2b'de drawer
+kaldırılmıştı → `router.push`).
+
+**BLOK 2 — migration + deploy env (KAPANDI).** Otomatik probe'u olmayan **9
+migration Studio'da tek sorguda doğrulandı: 9/9 ✅** (089/093/094×2/095/101/
+102/103/104/105) → `check-migrations` 23/23 + manuel 9/9 = **drift YOK**.
+Not `docs/audit/manual-migration-checks.sql` başlığına düşüldü; `check-migrations.ts`
+artık dokuz ipucunu tek tek okutmak yerine o dosyaya yönlendiriyor.
+YENİ `docs/deploy-env-matrix.md`: her env değişkeninin **eksikse ne olur**
+davranışı. Kritik bulgular: `ADMIN_EMAILS` yerelde YOK (brick riski, preflight
+ölçüyor) · **`EMAIL_FROM` tek başına eksik** (RESEND_API_KEY set!) → 10
+`waiting_config` bunun yüzünden · `SENTRY_ENVIRONMENT` prod'da açık verilmeli
+(mig.111'den beri gruplar `(fingerprint, environment)`) · `QUOTE_SHARE_SECRET`
+yoksa `CRON_SECRET`'tan türetiliyor → cron secret dönerse paylaşılan teklif
+linkleri kırılır · `PARASUT_USE_MOCK` açıkça `"false"` olmadıkça mock.
+
+**BLOK 3 — panelin bulduğu 2 hata (teşhis kondu).** İkisi de **tek bir olay**:
+2026-08-30T07:58'de 200 ms arayla, `dbCountOrdersByCommercialStatus` ve
+`dbListCustomersPaged` → *"Could not query the database for the schema cache"*.
+Klasik PostgREST şema-önbelleği yenilenmesi; **mig.111'in DDL'inden hemen
+sonra**, geçici ve kendini onaran. Her iki uç şu an sağlıklı. Stack yolları
+`/home/runner/work/erp2/erp2` + Windows Chrome UA → bu makineden DEĞİL.
+**Gerçek kusur telemetride çıktı:** boş mesajlı hata, başlığı düpedüz "Error"
+olan bir grup üretiyordu. `buildTitle` artık çerçevedeki fonksiyon adına
+düşüyor (`Error @ dbCountOrdersByCommercialStatus`), +3 test.
+
+**Kanıtlanan ders:** "56 test bozuk" gibi toplu bir arıza tablosu genelde tek
+bir sebeptir; ilk yapılacak şey hata ekran görüntüsüne bakmak. Baseline koşumu
+kontamineydi (her test giriş sayfasında ölüyordu) — o listeye göre tek tek
+"bayat selector" düzeltmek yanlış işe saatler harcatırdı.
+
+
 ## 2026-08-30 (gece) — İnceleme bulgularının kapanışı: 29/29 düzeltildi
 
 `docs/audit/2026-08-developer-console-review.md`'deki **K:2 Y:7 O:7 D:8 Nit:5**

@@ -3,6 +3,7 @@
  * These tests run WITHOUT pre-stored auth state (see playwright.config.ts "auth" project).
  */
 import { test, expect } from "@playwright/test";
+import { gotoApp } from "./helpers/nav";
 
 // Auth tests explicitly clear storageState
 test.use({ storageState: { cookies: [], origins: [] } });
@@ -49,8 +50,7 @@ test("giriş yapmış kullanıcı /dashboard'a erişebilir (oturum korunuyor)", 
     await page.waitForURL("**/dashboard**", { timeout: 15_000 });
 
     // Session is maintained — navigate away and back
-    await page.goto("/dashboard/orders");
-    await page.waitForLoadState("networkidle");
+    await gotoApp(page, "/dashboard/orders");
     expect(page.url()).toContain("/dashboard/orders");
 
     void context;
@@ -76,8 +76,7 @@ test("demo modda yazma işlemi (müşteri ekleme) engellenir", async ({ page }) 
     await page.evaluate(() => {
         document.cookie = "demo_mode=1; path=/; max-age=86400; SameSite=Lax";
     });
-    await page.goto("/dashboard/customers");
-    await page.waitForLoadState("networkidle");
+    await gotoApp(page, "/dashboard/customers");
 
     const addBtn = page.getByRole("button", { name: /müşteri ekle|yeni müşteri/i });
     if (await addBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
@@ -99,8 +98,7 @@ test("demo modda buton title attribute 'Demo modunda...' içerir", async ({ page
     await page.evaluate(() => {
         document.cookie = "demo_mode=1; path=/; max-age=86400; SameSite=Lax";
     });
-    await page.goto("/dashboard/products");
-    await page.waitForLoadState("networkidle");
+    await gotoApp(page, "/dashboard/products");
 
     // "+ Yeni Ürün" butonu disabled veya title içeriyor
     const newProductBtn = page.getByRole("button", { name: /yeni ürün/i });

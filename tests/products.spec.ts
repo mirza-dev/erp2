@@ -2,7 +2,8 @@
  * Products & Stock E2E Tests — including detailed add product modal tests
  */
 import { test, expect } from "@playwright/test";
-import { createTestProduct, deleteTestProduct } from "./helpers/test-data";
+import { gotoApp } from "./helpers/nav";
+import { createTestProduct, deleteTestProduct, waitForInList } from "./helpers/test-data";
 
 const TS = () => Date.now();
 
@@ -10,8 +11,7 @@ const TS = () => Date.now();
 
 test.describe("Ürün Listesi & Filtreler", () => {
     test.beforeEach(async ({ page }) => {
-        await page.goto("/dashboard/products");
-        await page.waitForLoadState("networkidle");
+        await gotoApp(page, "/dashboard/products");
     });
 
     test("ürün listesi başarıyla yükleniyor", async ({ page }) => {
@@ -68,8 +68,7 @@ test.describe("Ürün Listesi & Filtreler", () => {
 
 test.describe("Ürün Ekleme Modal", () => {
     test.beforeEach(async ({ page }) => {
-        await page.goto("/dashboard/products");
-        await page.waitForLoadState("networkidle");
+        await gotoApp(page, "/dashboard/products");
     });
 
     test("'+ Yeni Ürün' butonu modal açıyor", async ({ page }) => {
@@ -99,7 +98,9 @@ test.describe("Ürün Ekleme Modal", () => {
         await expect(submitBtn).toBeDisabled({ timeout: 3_000 });
     });
 
-    test("minimum alanlarla (isim + SKU) ürün oluşturuluyor", async ({ page }) => {
+    // request fixture'ı temizlik için: bu test CANLI veritabanına yazıyor ve
+    // eskiden hiç silmiyordu → her koşumda katalogda bir ürün bırakıyordu.
+    test("minimum alanlarla (isim + SKU) ürün oluşturuluyor", async ({ page, request }) => {
         const sku  = `E2E-MIN-${TS()}`;
         const name = `E2E Min Ürünü ${sku}`;
 
@@ -116,6 +117,12 @@ test.describe("Ürün Ekleme Modal", () => {
         // Modal kapanır ve başarı toast
         await expect(page.getByText(new RegExp(name.slice(0, 15), "i"))
             .or(page.getByText(/eklendi|oluşturuldu/i)).first()).toBeVisible({ timeout: 8_000 });
+
+        // Temizlik — yoksa ürün canlı katalogda kalıyor.
+        const created = await waitForInList<{ id?: string; sku: string }>(
+            request, "http://localhost:3000/api/products?all=1", (p) => p.sku === sku,
+        );
+        if (created?.id) await deleteTestProduct(request, created.id).catch(() => {});
     });
 
     test("tüm alanlar doldurularak ürün oluşturuluyor", async ({ page, request }) => {
@@ -176,9 +183,12 @@ test.describe("Ürün Ekleme Modal", () => {
         ).toBeVisible({ timeout: 8_000 });
 
         // Verify via API that fields were saved
-        const res  = await request.get(`http://localhost:3000/api/products`);
-        const body = await res.json() as Array<{ sku: string; on_hand?: number }>;
-        const created = body.find((p) => p.sku === sku);
+        // Liste API'si önbellekli ve sonuçta tutarlı: POST 201 dönse bile kayıt
+        // ~1 sn sonra listede YOK, ~7 sn sonra VAR (ölçüldü). Tek seferlik GET
+        // bu pencereye düşüp "oluşmadı" sanıyordu.
+        const created = await waitForInList<{ id?: string; sku: string; on_hand?: number }>(
+            request, "http://localhost:3000/api/products?all=1", (p) => p.sku === sku,
+        );
         expect(created).toBeDefined();
 
         // Cleanup
@@ -192,8 +202,7 @@ test.describe("Ürün Ekleme Modal", () => {
         // Create a product first
         const { id, sku } = await createTestProduct(request);
 
-        await page.goto("/dashboard/products");
-        await page.waitForLoadState("networkidle");
+        await gotoApp(page, "/dashboard/products");
 
         await page.getByRole("button", { name: /yeni ürün/i }).click();
         await page.waitForTimeout(300);
@@ -203,11 +212,12 @@ test.describe("Ürün Ekleme Modal", () => {
         const submitBtn = page.getByRole("button", { name: /oluştur|kaydet|ekle/i }).last();
         await submitBtn.click();
 
-        // Error message
+        // Hata toast'ı portal ile <body>'ye basılıyor — `main` scope'u onu
+        // dışarıda bırakıyordu. Metin yeterince ayırt edici, Next dev örtüsüyle
+        // çakışmıyor (örtü "Console Error" diyor).
         await expect(
-            page.getByText(/zaten kayıtlı|duplicate|sku.*mevcut/i)
-                .or(page.getByText(/hata|error/i))
-        ).toBeVisible({ timeout: 8_000 });
+            page.getByText(/zaten kayıtlı/i).first()
+        ).toBeVisible({ timeout: 10_000 });
 
         await deleteTestProduct(request, id);
     });
@@ -249,9 +259,9 @@ test.describe("Ürün Ekleme Modal", () => {
         await page.waitForTimeout(2_000);
 
         // Verify via API
-        const res  = await request.get("http://localhost:3000/api/products");
-        const body = await res.json() as Array<{ sku: string; on_hand?: number; id?: string }>;
-        const created = body.find((p) => p.sku === sku);
+        const created = await waitForInList<{ sku: string; on_hand?: number; id?: string }>(
+            request, "http://localhost:3000/api/products?all=1", (p) => p.sku === sku,
+        );
         if (created?.on_hand !== undefined) {
             expect(created.on_hand).toBe(99);
         }
@@ -286,9 +296,14 @@ test.describe("Ürün Ekleme Modal", () => {
     });
 });
 
-// ── Detay Drawer ──────────────────────────────────────────────────────────────
+// ── Detay Sayfası ─────────────────────────────────────────────────────────────
+//
+// Faz 2b'de detay DRAWER'ı kaldırıldı: liste satırına tıklamak artık
+// `router.push(\`/dashboard/products/${id}\`)` yapıyor (products/page.tsx
+// `onRowClick`). Sayfada tek bir drawer referansı kalmadı — bu blok eski
+// drawer beklentisini değil, gerçek gezinmeyi doğruluyor.
 
-test.describe("Ürün Detay Drawer", () => {
+test.describe("Ürün Detay Sayfası", () => {
     let productId: string;
 
     test.beforeAll(async ({ request }) => {
@@ -300,32 +315,28 @@ test.describe("Ürün Detay Drawer", () => {
         await deleteTestProduct(request, productId).catch(() => {});
     });
 
-    test("satır tıklayınca drawer açılıyor", async ({ page }) => {
-        await page.goto("/dashboard/products");
-        await page.waitForLoadState("networkidle");
+    test("satır tıklayınca detay sayfasına gidiliyor", async ({ page }) => {
+        await gotoApp(page, "/dashboard/products");
 
         const firstRow = page.locator("table tbody tr").first();
-        if (await firstRow.isVisible({ timeout: 5_000 }).catch(() => false)) {
-            await firstRow.click();
-            // Drawer content
-            await expect(
-                page.getByText(/on.?hand|stok|reserved|available/i).first()
-            ).toBeVisible({ timeout: 5_000 });
-        }
+        await expect(firstRow).toBeVisible({ timeout: 10_000 });
+        await firstRow.click();
+
+        // Drawer değil, gerçek rota: /dashboard/products/<uuid>
+        await page.waitForURL(/\/dashboard\/products\/[0-9a-f-]{36}/i, { timeout: 15_000 });
     });
 
-    test("drawer stok metriklerini gösteriyor", async ({ page }) => {
-        await page.goto("/dashboard/products");
-        await page.waitForLoadState("networkidle");
+    test("detay sayfası stok metriklerini gösteriyor", async ({ page }) => {
+        await gotoApp(page, `/dashboard/products/${productId}`);
 
-        const firstRow = page.locator("table tbody tr").first();
-        if (await firstRow.isVisible({ timeout: 5_000 }).catch(() => false)) {
-            await firstRow.click();
-            await page.waitForTimeout(500);
-            // Stok metrikleri: on_hand, reserved, available, promisable
-            const metricText = page.getByText(/mevcut|stok|rezerve|satılabilir|promisable/i);
-            await expect(metricText.first()).toBeVisible({ timeout: 5_000 });
-        }
+        // Kartlar `activeTab === "stok"` altında; sayfa "Genel" ile açılıyor.
+        // Sekmeler `role="tab"` (products/[id]/page.tsx:1066) — button değil.
+        await page.getByRole("tab", { name: "Stok", exact: true }).click();
+
+        // products/[id]/page.tsx'teki stok kartlarının etiketleri
+        await expect(page.getByText("Stokta", { exact: true })).toBeVisible({ timeout: 10_000 });
+        await expect(page.getByText("Satılabilir", { exact: true })).toBeVisible({ timeout: 5_000 });
+        await expect(page.getByText("Rezerve", { exact: true })).toBeVisible({ timeout: 5_000 });
     });
 });
 
@@ -335,8 +346,7 @@ test.describe("Ürün Silme", () => {
     test("silme butonu onay dialog açıyor", async ({ page, request }) => {
         const { id } = await createTestProduct(request);
 
-        await page.goto("/dashboard/products");
-        await page.waitForLoadState("networkidle");
+        await gotoApp(page, "/dashboard/products");
 
         // Find delete button for a row
         const deleteBtn = page.getByRole("button", { name: /sil/i }).first();
@@ -359,8 +369,7 @@ test.describe("Ürün Silme", () => {
     test("onaylanınca ürün listeden kaldırılıyor", async ({ page, request }) => {
         const { id, sku } = await createTestProduct(request);
 
-        await page.goto("/dashboard/products");
-        await page.waitForLoadState("networkidle");
+        await gotoApp(page, "/dashboard/products");
 
         // Search for the product
         const searchInput = page.getByPlaceholder(/ara|ürün|sku/i).first();

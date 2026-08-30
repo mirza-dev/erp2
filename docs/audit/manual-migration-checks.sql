@@ -13,6 +13,10 @@
 -- cazip ama SQL editörü uzun metni kırpıyor → hüküm okunamıyordu (2026-08-24).
 -- Ham tanıma bakmak gerekirse dosyanın sonundaki yorumlu blok var.
 --
+-- SON KOŞUM: 2026-08-30 — canlı `erp2` projesinde 9/9 ✅ (089, 093, 094 ×2,
+-- 095, 101, 102, 103, 104, 105). `check-migrations.ts` da 23/23 otomatik
+-- probe'u yeşil raporluyor → 2026-08-30 itibarıyla migration drift'i YOK.
+--
 -- Deploy günü (bkz. memory C3) bu sorgu + `npx tsx scripts/check-migrations.ts`
 -- + `npm run preflight:auth` üçlüsü açılış hamlesidir.
 -- ────────────────────────────────────────────────────────────────────────────

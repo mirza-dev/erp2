@@ -2,10 +2,10 @@
  * Settings E2E Tests
  */
 import { test, expect } from "@playwright/test";
+import { gotoApp } from "./helpers/nav";
 
 test.beforeEach(async ({ page }) => {
-    await page.goto("/dashboard/settings");
-    await page.waitForLoadState("networkidle");
+    await gotoApp(page, "/dashboard/settings");
 });
 
 test("ayarlar sayfası yükleniyor — tab'lar görünür", async ({ page }) => {
@@ -29,8 +29,7 @@ test("tab geçişi çalışıyor — API tab'ı", async ({ page }) => {
 });
 
 test("kullanıcı yönetimi sayfası açılıyor", async ({ page }) => {
-    await page.goto("/dashboard/settings/users");
-    await page.waitForLoadState("networkidle");
+    await gotoApp(page, "/dashboard/settings/users");
     await expect(page.locator("main")).toBeVisible();
     await expect(
         page.getByText(/kullanıcı|user|e-posta/i).first()
@@ -38,8 +37,7 @@ test("kullanıcı yönetimi sayfası açılıyor", async ({ page }) => {
 });
 
 test("kullanıcı ekleme formu görünür", async ({ page }) => {
-    await page.goto("/dashboard/settings/users");
-    await page.waitForLoadState("networkidle");
+    await gotoApp(page, "/dashboard/settings/users");
 
     const addBtn = page.getByRole("button", { name: /kullanıcı ekle|yeni kullanıcı/i });
     if (await addBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
@@ -51,8 +49,7 @@ test("kullanıcı ekleme formu görünür", async ({ page }) => {
 });
 
 test("kendi e-posta satırında silme butonu disabled veya yok", async ({ page }) => {
-    await page.goto("/dashboard/settings/users");
-    await page.waitForLoadState("networkidle");
+    await gotoApp(page, "/dashboard/settings/users");
 
     const email     = process.env.E2E_USER_EMAIL ?? "";
     const userRow   = page.locator("tr").filter({ hasText: email });

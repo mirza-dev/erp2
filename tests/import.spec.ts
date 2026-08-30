@@ -7,6 +7,7 @@
  * File input `data-testid="classic-import-file"` locator'ı aynen korunur.
  */
 import { test, expect } from "@playwright/test";
+import { gotoApp } from "./helpers/nav";
 import path from "path";
 
 const XLSX_PATH = path.join(__dirname, "fixtures/test-import.xlsx");
@@ -21,14 +22,12 @@ if (!fs.existsSync(path.join(__dirname, "fixtures/invalid.txt"))) {
 }
 
 test.beforeEach(async ({ page }) => {
-    await page.goto("/dashboard/import/excel");
-    await page.waitForLoadState("networkidle");
+    await gotoApp(page, "/dashboard/import/excel");
     const demoLink = page.getByRole("link", { name: /demo ile gezin/i });
     if (await demoLink.isVisible().catch(() => false)) {
         await demoLink.click();
         await page.waitForURL(/\/dashboard(?:\/.*)?$/, { timeout: 15_000 });
-        await page.goto("/dashboard/import/excel");
-        await page.waitForLoadState("networkidle");
+        await gotoApp(page, "/dashboard/import/excel");
     }
 });
 
@@ -84,7 +83,10 @@ test("sheet seçim ekranında checkbox'lar görünür", async ({ page }) => {
 
     // Sheet listesi
     const checkboxes = page.locator("input[type='checkbox']");
-    await expect(checkboxes.first()).toBeVisible({ timeout: 15_000 });
+    // 15 sn yetmiyordu: XLSX ayrıştırması dev sunucusunda ilk denemede
+    // 15 sn'yi aşıp retry'da geçiyordu (2026-08-30 koşumu). Aynı bekleme
+    // import.spec'in her adımında var — hepsi 30 sn'ye çekildi.
+    await expect(checkboxes.first()).toBeVisible({ timeout: 30_000 });
     const count = await checkboxes.count();
     expect(count).toBeGreaterThanOrEqual(1);
 });
@@ -95,7 +97,7 @@ test("sheet seçimi toggle edilebiliyor", async ({ page }) => {
     await fileInput.setInputFiles(XLSX_PATH);
 
     const checkbox = page.locator("input[type='checkbox']").first();
-    await checkbox.waitFor({ state: "visible", timeout: 15_000 });
+    await checkbox.waitFor({ state: "visible", timeout: 30_000 });
     const initialState = await checkbox.isChecked();
     await checkbox.click();
     const newState = await checkbox.isChecked();
@@ -110,7 +112,7 @@ test("'Kolon Eşleştirmeye Geç' butonu tıklanıyor → mapping tablosu görü
     await fileInput.setInputFiles(XLSX_PATH);
 
     // Wait for sheet_select
-    await expect(page.locator("input[type='checkbox']").first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("input[type='checkbox']").first()).toBeVisible({ timeout: 30_000 });
 
     // En az bir sheet seçili olduğundan emin ol
     const firstCheckbox = page.locator("input[type='checkbox']").first();
@@ -133,7 +135,9 @@ test("kolon mapping tablosunda source chip'ler görünür (memory/fallback/ai)",
     const fileInput = page.locator(CLASSIC_FILE_INPUT);
     await expect(fileInput).toBeAttached({ timeout: 5_000 });
     await fileInput.setInputFiles(XLSX_PATH);
-    await expect(page.locator("input[type='checkbox']").first()).toBeVisible({ timeout: 15_000 });
+    // 15 sn yetmiyordu: aynı adım "sheet seçimi toggle edilebiliyor" testinde de
+    // ilk denemede düşüp retry'da geçiyor → XLSX ayrıştırması dev'de yavaş.
+    await expect(page.locator("input[type='checkbox']").first()).toBeVisible({ timeout: 30_000 });
 
     const firstCheckbox = page.locator("input[type='checkbox']").first();
     if (!await firstCheckbox.isChecked()) await firstCheckbox.click();
@@ -150,7 +154,7 @@ test("dropdown ile alan değiştirilince chip 'Kullanıcı' (sarı) oluyor", asy
     const fileInput = page.locator(CLASSIC_FILE_INPUT);
     await expect(fileInput).toBeAttached({ timeout: 5_000 });
     await fileInput.setInputFiles(XLSX_PATH);
-    await expect(page.locator("input[type='checkbox']").first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("input[type='checkbox']").first()).toBeVisible({ timeout: 30_000 });
 
     const firstCheckbox = page.locator("input[type='checkbox']").first();
     if (!await firstCheckbox.isChecked()) await firstCheckbox.click();
@@ -175,7 +179,7 @@ test("preview ekranı draft tablosunu gösteriyor", async ({ page }) => {
     const fileInput = page.locator(CLASSIC_FILE_INPUT);
     await expect(fileInput).toBeAttached({ timeout: 5_000 });
     await fileInput.setInputFiles(XLSX_PATH);
-    await expect(page.locator("input[type='checkbox']").first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("input[type='checkbox']").first()).toBeVisible({ timeout: 30_000 });
 
     const firstCheckbox = page.locator("input[type='checkbox']").first();
     if (!await firstCheckbox.isChecked()) await firstCheckbox.click();
@@ -204,7 +208,7 @@ test("tam import akışı: dosya → done ekranı", async ({ page }) => {
     await fileInput.setInputFiles(XLSX_PATH);
 
     // sheet_select
-    await expect(page.locator("input[type='checkbox']").first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("input[type='checkbox']").first()).toBeVisible({ timeout: 30_000 });
 
     // Select sheets — try to pick only "Urunler", fall back to first checkbox
     const checkboxes = page.locator("input[type='checkbox']");
@@ -265,7 +269,7 @@ test("geri navigasyon (column_mapping → sheet_select) batch'i siliyor", async 
     const fileInput = page.locator(CLASSIC_FILE_INPUT);
     await expect(fileInput).toBeAttached({ timeout: 5_000 });
     await fileInput.setInputFiles(XLSX_PATH);
-    await expect(page.locator("input[type='checkbox']").first()).toBeVisible({ timeout: 15_000 });
+    await expect(page.locator("input[type='checkbox']").first()).toBeVisible({ timeout: 30_000 });
 
     const firstCheckbox = page.locator("input[type='checkbox']").first();
     if (!await firstCheckbox.isChecked()) await firstCheckbox.click();

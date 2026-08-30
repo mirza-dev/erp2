@@ -2,10 +2,10 @@
  * Dashboard E2E Tests
  */
 import { test, expect } from "@playwright/test";
+import { gotoApp } from "./helpers/nav";
 
 test.beforeEach(async ({ page }) => {
-    await page.goto("/dashboard");
-    await page.waitForLoadState("networkidle");
+    await gotoApp(page, "/dashboard");
 });
 
 test("dashboard sayfası başarıyla yükleniyor", async ({ page }) => {

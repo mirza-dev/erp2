@@ -445,7 +445,13 @@ export default function ProductsPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify(body),
             });
-            if (!res.ok) throw new Error(await res.text());
+            if (!res.ok) {
+                // Ham gövdeyi fırlatmak toast'a `{"error":"Bu SKU zaten kayıtlı."}`
+                // diye JSON basıyordu. Repo geneli zaten `errBody?.error ?? "…"`
+                // kullanıyor (ör. CustomersClient) — burası tek aykırıydı.
+                const errBody = await res.json().catch(() => null);
+                throw new Error(errBody?.error ?? "Ürün eklenemedi. Lütfen tekrar deneyin.");
+            }
             await Promise.all([fetchList(), refetchCounts()]);
             setCreateOpen(false);
             setCreateForm({
