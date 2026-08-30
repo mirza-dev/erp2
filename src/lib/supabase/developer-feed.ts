@@ -1,5 +1,7 @@
 import { createServiceClient } from "./service";
 import { redactString } from "@/lib/telemetry/redact";
+import { orIlikeFilter } from "@/lib/list-query";
+import { dbListSystemEvents } from "./telemetry";
 import { FEED_SOURCES as FEED_SOURCE_LIST } from "@/lib/telemetry/console-types";
 import type { FeedEntry, FeedSource } from "@/lib/telemetry/console-types";
 import type {
@@ -47,6 +49,19 @@ export interface FeedFilters {
     limit?: number;
 }
 
+/**
+ * Akış imleci "yaklaşık"tır: altı heterojen kaynağın id uzayı ortak değil, bu
+ * yüzden bileşik (ts,id) imleci kaynaklar arasında anlam taşımaz. Gelen imleç
+ * bileşik biçimdeyse (hata listesinden gelmiş olabilir) yalnız zaman damgası
+ * kullanılır; kaynak-içi determinizmi her sorgudaki ikincil `order by id`
+ * sağlar (2026-08 O2).
+ */
+function cursorTs(before: string | null | undefined): string | null {
+    if (!before) return null;
+    const parts = before.split("|");
+    return parts.length === 3 ? parts[1] : parts[0];
+}
+
 const DEFAULT_LIMIT = 60;
 const MAX_LIMIT = 200;
 
@@ -55,53 +70,80 @@ function perSourceLimit(limit: number): number {
     return Math.min(MAX_LIMIT, limit + 10);
 }
 
+/** Kaynak okuyucusunun sonucu — "olay yok" ile "okunamadı" AYRI (O7). */
+interface SourceResult {
+    entries: FeedEntry[];
+    failed: boolean;
+}
+
+const OK = (entries: FeedEntry[]): SourceResult => ({ entries, failed: false });
+/** Kaynağın bu filtre ekseninde karşılığı yok → boş, ama ARIZA DEĞİL. */
+const NONE: SourceResult = { entries: [], failed: false };
+const FAILED: SourceResult = { entries: [], failed: true };
+
 export async function dbActivityFeed(filters: FeedFilters = {}): Promise<{
     entries: FeedEntry[];
     nextCursor: string | null;
+    unavailableSources: FeedSource[];
 }> {
     const limit = Math.min(MAX_LIMIT, Math.max(1, filters.limit ?? DEFAULT_LIMIT));
     const want = new Set<FeedSource>(filters.sources?.length ? filters.sources : [...FEED_SOURCE_LIST]);
     const share = perSourceLimit(limit);
+    const filters2 = { ...filters, before: cursorTs(filters.before) };
 
     const [telemetry, errors, audit, integration, email, incidents] = await Promise.all([
-        want.has("telemetry") ? fetchTelemetry(filters, share) : Promise.resolve([]),
-        want.has("error") ? fetchErrors(filters, share) : Promise.resolve([]),
-        want.has("audit") ? fetchAudit(filters, share) : Promise.resolve([]),
-        want.has("integration") ? fetchIntegration(filters, share) : Promise.resolve([]),
-        want.has("email") ? fetchEmail(filters, share) : Promise.resolve([]),
-        want.has("incident") ? fetchIncidents(filters, share) : Promise.resolve([]),
+        want.has("telemetry") ? fetchTelemetry(filters2, share) : Promise.resolve(NONE),
+        want.has("error") ? fetchErrors(filters2, share) : Promise.resolve(NONE),
+        want.has("audit") ? fetchAudit(filters2, share) : Promise.resolve(NONE),
+        want.has("integration") ? fetchIntegration(filters2, share) : Promise.resolve(NONE),
+        want.has("email") ? fetchEmail(filters2, share) : Promise.resolve(NONE),
+        want.has("incident") ? fetchIncidents(filters2, share) : Promise.resolve(NONE),
     ]);
 
-    let merged = [...telemetry, ...errors, ...audit, ...integration, ...email, ...incidents];
+    const bySource: Array<[FeedSource, SourceResult]> = [
+        ["telemetry", telemetry], ["error", errors], ["audit", audit],
+        ["integration", integration], ["email", email], ["incident", incidents],
+    ];
+    const unavailableSources = bySource.filter(([, r]) => r.failed).map(([k]) => k);
 
-    if (filters.level) merged = merged.filter(e => e.level === filters.level);
-    if (filters.module) merged = merged.filter(e => e.module === filters.module);
-    if (filters.search?.trim()) {
-        const needle = filters.search.trim().toLocaleLowerCase("tr");
-        merged = merged.filter(e => e.message.toLocaleLowerCase("tr").includes(needle));
-    }
-
+    // 2026-08 Y6: `level`/`module`/`search` artık HER kaynağın SORGUSUNA iniyor.
+    // Eskiden filtresiz çekilip bellekte eleniyordu ve imleç eleme SONRASI
+    // diziden hesaplanıyordu → "level=critical" seçilince ekran boş görünüp
+    // "Daha fazla yükle" de kayboluyordu; bir saat önceki kritik olaylar hiçbir
+    // şekilde bulunamıyordu. Artık her kaynak kendi payını FİLTRELİ getirir.
+    const merged = bySource.flatMap(([, r]) => r.entries);
     merged.sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
 
     const entries = merged.slice(0, limit);
     const nextCursor = merged.length > limit ? entries[entries.length - 1]?.occurredAt ?? null : null;
-    return { entries, nextCursor };
+    return { entries, nextCursor, unavailableSources };
 }
 
 // ── Kaynak okuyucuları ───────────────────────────────────────────────────
 
-async function fetchTelemetry(f: FeedFilters, limit: number): Promise<FeedEntry[]> {
-    const supabase = createServiceClient();
-    let q = supabase.from("system_events").select("*")
-        .order("occurred_at", { ascending: false }).limit(limit);
-    if (f.since) q = q.gte("occurred_at", f.since);
-    if (f.before) q = q.lt("occurred_at", f.before);
-    if (f.requestId) q = q.eq("request_id", f.requestId);
-    if (f.userId) q = q.eq("user_id", f.userId);
-
-    const { data, error } = await q;
-    if (error) return [];
-    return ((data ?? []) as SystemEventRow[]).map(r => ({
+/**
+ * 2026-08 Nit: bu kaynak kendi sorgusunu elle kuruyordu ve `dbListSystemEvents`
+ * (aynı işi sunucu-tarafı filtrelerle YAPAN fonksiyon) sıfır çağıranla ölü
+ * duruyordu. Artık ona delege ediliyor — tek sorgu tanımı, tek bakım noktası.
+ */
+async function fetchTelemetry(f: FeedFilters, limit: number): Promise<SourceResult> {
+    let data: SystemEventRow[];
+    try {
+        const page = await dbListSystemEvents({
+            level: f.level,
+            module: f.module,
+            requestId: f.requestId,
+            userId: f.userId,
+            since: f.since,
+            before: f.before,
+            search: f.search,
+            limit,
+        });
+        data = page.rows;
+    } catch {
+        return FAILED;
+    }
+    return OK(data.map(r => ({
         id: `sys:${r.id}`,
         occurredAt: r.occurred_at,
         level: r.level,
@@ -112,23 +154,32 @@ async function fetchTelemetry(f: FeedFilters, limit: number): Promise<FeedEntry[
         requestId: r.request_id,
         userId: r.user_id,
         errorGroupId: null,
-    }));
+    })));
 }
 
-async function fetchErrors(f: FeedFilters, limit: number): Promise<FeedEntry[]> {
+async function fetchErrors(f: FeedFilters, limit: number): Promise<SourceResult> {
     const supabase = createServiceClient();
     let q = supabase
         .from("system_error_events")
         .select("*, system_error_groups!inner(id, title, severity, module)")
         .order("occurred_at", { ascending: false })
+        .order("id", { ascending: false })
         .limit(limit);
     if (f.since) q = q.gte("occurred_at", f.since);
     if (f.before) q = q.lt("occurred_at", f.before);
     if (f.requestId) q = q.eq("request_id", f.requestId);
     if (f.userId) q = q.eq("user_id", f.userId);
+    // Ciddiyet ve modül GRUPTA duruyor; `!inner` join gömülü filtreye izin verir.
+    if (f.level) q = q.eq("system_error_groups.severity", f.level);
+    if (f.module) q = q.eq("system_error_groups.module", f.module);
+    if (f.search?.trim()) {
+        q = q.or(orIlikeFilter(["title", "normalized_message"], f.search), {
+            referencedTable: "system_error_groups",
+        });
+    }
 
     const { data, error } = await q;
-    if (error) return [];
+    if (error) return FAILED;
 
     type Joined = SystemErrorEventRow & {
         system_error_groups:
@@ -136,7 +187,7 @@ async function fetchErrors(f: FeedFilters, limit: number): Promise<FeedEntry[]> 
             | Array<{ id: string; title: string; severity: TelemetrySeverity; module: string | null }>;
     };
 
-    return ((data ?? []) as Joined[]).map(r => {
+    return OK(((data ?? []) as Joined[]).map(r => {
         const g = Array.isArray(r.system_error_groups) ? r.system_error_groups[0] : r.system_error_groups;
         return {
             id: `err:${r.id}`,
@@ -150,23 +201,31 @@ async function fetchErrors(f: FeedFilters, limit: number): Promise<FeedEntry[]> 
             userId: r.user_id,
             errorGroupId: g?.id ?? null,
         };
-    });
+    }));
 }
 
-async function fetchAudit(f: FeedFilters, limit: number): Promise<FeedEntry[]> {
-    // request_id/userId filtresi audit_log'da karşılığı olmayan eksenlerdir —
-    // filtre verilmişse bu kaynak sonuç döndürmemeli (yanlış eşleşme üretmesin).
-    if (f.requestId) return [];
+async function fetchAudit(f: FeedFilters, limit: number): Promise<SourceResult> {
+    // `request_id` ve `user_id` audit_log'da karşılığı OLMAYAN eksenler; filtre
+    // verilmişse bu kaynak sonuç döndürmemeli (yanlış eşleşme üretmesin).
+    // 2026-08 Nit: `userId` için bu erken çıkış eksikti → kullanıcıya göre
+    // filtrelendiğinde ilgisiz denetim satırları listeye karışıyordu.
+    if (f.requestId || f.userId) return NONE;
+    // Denetim satırları her zaman "info" seviyesindedir.
+    if (f.level && f.level !== "info") return NONE;
     const supabase = createServiceClient();
     let q = supabase.from("audit_log")
         .select("id, actor, action, entity_type, entity_id, occurred_at, source")
-        .order("occurred_at", { ascending: false }).limit(limit);
+        .order("occurred_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(limit);
     if (f.since) q = q.gte("occurred_at", f.since);
     if (f.before) q = q.lt("occurred_at", f.before);
+    if (f.module) q = q.eq("entity_type", f.module);
+    if (f.search?.trim()) q = q.or(orIlikeFilter(["action", "entity_type"], f.search));
 
     const { data, error } = await q;
-    if (error) return [];
-    return ((data ?? []) as AuditLogRow[]).map(r => ({
+    if (error) return FAILED;
+    return OK(((data ?? []) as AuditLogRow[]).map(r => ({
         id: `audit:${r.id}`,
         occurredAt: r.occurred_at,
         level: "info" as const,
@@ -178,21 +237,29 @@ async function fetchAudit(f: FeedFilters, limit: number): Promise<FeedEntry[]> {
         requestId: null,
         userId: null,
         errorGroupId: null,
-    }));
+    })));
 }
 
-async function fetchIntegration(f: FeedFilters, limit: number): Promise<FeedEntry[]> {
-    if (f.requestId) return [];
+async function fetchIntegration(f: FeedFilters, limit: number): Promise<SourceResult> {
+    if (f.requestId || f.userId) return NONE;
+    // Seviye `status`'ten türetilir: error → "error", diğerleri → "info".
+    if (f.level && f.level !== "info" && f.level !== "error") return NONE;
+    if (f.module && f.module !== "parasut") return NONE;
     const supabase = createServiceClient();
     let q = supabase.from("integration_sync_logs")
         .select("id, entity_type, direction, status, error_message, requested_at, step")
-        .order("requested_at", { ascending: false }).limit(limit);
+        .order("requested_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(limit);
     if (f.since) q = q.gte("requested_at", f.since);
     if (f.before) q = q.lt("requested_at", f.before);
+    if (f.level === "error") q = q.eq("status", "error");
+    if (f.level === "info") q = q.neq("status", "error");
+    if (f.search?.trim()) q = q.or(orIlikeFilter(["entity_type", "error_message", "step"], f.search));
 
     const { data, error } = await q;
-    if (error) return [];
-    return ((data ?? []) as IntegrationSyncLogRow[]).map(r => ({
+    if (error) return FAILED;
+    return OK(((data ?? []) as IntegrationSyncLogRow[]).map(r => ({
         id: `sync:${r.id}`,
         occurredAt: r.requested_at,
         level: (r.status === "error" ? "error" : "info") as TelemetrySeverity,
@@ -204,28 +271,41 @@ async function fetchIntegration(f: FeedFilters, limit: number): Promise<FeedEntr
         requestId: null,
         userId: null,
         errorGroupId: null,
-    }));
+    })));
 }
 
-async function fetchEmail(f: FeedFilters, limit: number): Promise<FeedEntry[]> {
-    if (f.requestId) return [];
+/** Teslimat durumu → akış seviyesi. Filtre ile map AYNI kaynaktan türer. */
+const EMAIL_LEVEL: Record<string, TelemetrySeverity> = {
+    failed: "error", bounced: "error", complained: "warning", suppressed: "warning",
+};
+
+async function fetchEmail(f: FeedFilters, limit: number): Promise<SourceResult> {
+    if (f.requestId) return NONE;
+    if (f.module && f.module !== "email") return NONE;
+    const statuses = Object.keys(EMAIL_LEVEL).filter(
+        s => !f.level || EMAIL_LEVEL[s] === f.level,
+    );
+    if (statuses.length === 0) return NONE;
+
     const supabase = createServiceClient();
     // Yalnız SORUNLU teslimatlar akışa girer — başarılı e-posta gürültüdür.
     let q = supabase.from("email_logs")
         .select("id, notification_type, delivery_status, error_message, created_at, user_id")
-        .in("delivery_status", ["failed", "bounced", "complained", "suppressed"])
-        .order("created_at", { ascending: false }).limit(limit);
+        .in("delivery_status", statuses)
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(limit);
     if (f.since) q = q.gte("created_at", f.since);
     if (f.before) q = q.lt("created_at", f.before);
     if (f.userId) q = q.eq("user_id", f.userId);
+    if (f.search?.trim()) q = q.or(orIlikeFilter(["notification_type", "error_message"], f.search));
 
     const { data, error } = await q;
-    if (error) return [];
-    return ((data ?? []) as EmailLogRow[]).map(r => ({
+    if (error) return FAILED;
+    return OK(((data ?? []) as EmailLogRow[]).map(r => ({
         id: `mail:${r.id}`,
         occurredAt: r.created_at,
-        level: (r.delivery_status === "failed" || r.delivery_status === "bounced"
-            ? "error" : "warning") as TelemetrySeverity,
+        level: EMAIL_LEVEL[r.delivery_status] ?? "warning",
         source: "email" as const,
         message: `E-posta ${r.delivery_status} · ${r.notification_type}`
             + (r.error_message ? ` — ${redactString(r.error_message, 200)}` : ""),
@@ -234,21 +314,26 @@ async function fetchEmail(f: FeedFilters, limit: number): Promise<FeedEntry[]> {
         requestId: null,
         userId: r.user_id,
         errorGroupId: null,
-    }));
+    })));
 }
 
-async function fetchIncidents(f: FeedFilters, limit: number): Promise<FeedEntry[]> {
-    if (f.requestId) return [];
+async function fetchIncidents(f: FeedFilters, limit: number): Promise<SourceResult> {
+    if (f.requestId || f.userId) return NONE;
     const supabase = createServiceClient();
     let q = supabase.from("maintenance_incidents")
         .select("id, kind, severity, status, title, opened_at")
-        .order("opened_at", { ascending: false }).limit(limit);
+        .order("opened_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(limit);
     if (f.since) q = q.gte("opened_at", f.since);
     if (f.before) q = q.lt("opened_at", f.before);
+    if (f.level) q = q.eq("severity", f.level);
+    if (f.module) q = q.eq("kind", f.module);
+    if (f.search?.trim()) q = q.or(orIlikeFilter(["title", "kind"], f.search));
 
     const { data, error } = await q;
-    if (error) return [];
-    return ((data ?? []) as MaintenanceIncidentRow[]).map(r => ({
+    if (error) return FAILED;
+    return OK(((data ?? []) as MaintenanceIncidentRow[]).map(r => ({
         id: `inc:${r.id}`,
         occurredAt: r.opened_at,
         level: r.severity as TelemetrySeverity,
@@ -259,7 +344,7 @@ async function fetchIncidents(f: FeedFilters, limit: number): Promise<FeedEntry[
         requestId: null,
         userId: null,
         errorGroupId: null,
-    }));
+    })));
 }
 
 // ── Servis sağlığı sondaları ─────────────────────────────────────────────
@@ -294,7 +379,13 @@ export interface BackgroundJobHealth {
     lastCronEffectAt: string | null;
 }
 
-export async function dbBackgroundJobHealth(): Promise<BackgroundJobHealth> {
+/**
+ * 2026-08 Y4: bu fonksiyon `.error` alanını HİÇ kontrol etmiyordu → sorgu
+ * patlarsa `count ?? 0` ile "0 bekleyen · 0 başarısız" dönüyor, panel de
+ * bunu SAĞLIKLI yeşil gösteriyordu. Artık okunamayan sonda `null` döner ve
+ * `buildServiceHealth` satırı "Ölçülmüyor" yapar.
+ */
+export async function dbBackgroundJobHealth(): Promise<BackgroundJobHealth | null> {
     const supabase = createServiceClient();
     const [queuedRes, failedRes, oldestRes, lastDoneRes, lastSyncRes] = await Promise.all([
         supabase.from("notification_outbox").select("id", { count: "exact", head: true })
@@ -311,6 +402,9 @@ export async function dbBackgroundJobHealth(): Promise<BackgroundJobHealth> {
             .eq("source", "scheduled")
             .order("requested_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
+
+    // Sayaç sorgularından biri bile patladıysa sonuç güvenilmez.
+    if (queuedRes.error || failedRes.error || oldestRes.error) return null;
 
     const oldestCreated = (oldestRes.data as { created_at?: string } | null)?.created_at ?? null;
     return {
@@ -330,7 +424,7 @@ export async function dbExternalServiceHealth(sinceISO: string): Promise<{
     emailTotal: number;
     openIncidents: number;
     lastIntegrationError: string | null;
-}> {
+} | null> {
     const supabase = createServiceClient();
     const [failedRes, totalRes, incidentRes, syncErrRes] = await Promise.all([
         supabase.from("email_logs").select("id", { count: "exact", head: true })
@@ -344,6 +438,10 @@ export async function dbExternalServiceHealth(sinceISO: string): Promise<{
             .eq("status", "error").gte("requested_at", sinceISO)
             .order("requested_at", { ascending: false }).limit(1).maybeSingle(),
     ]);
+
+    // Y4 — aynı gerekçe: e-posta sorgusu patlarsa `emailTotal = 0` olur ve
+    // satır "Bu pencerede gönderim yok · sağlıklı" der; oysa ÖLÇÜLEMEDİ.
+    if (failedRes.error || totalRes.error || incidentRes.error) return null;
 
     const lastErr = (syncErrRes.data as { error_message?: string | null } | null)?.error_message ?? null;
     return {
@@ -359,14 +457,25 @@ export async function dbExternalServiceHealth(sinceISO: string): Promise<{
  * "Şu an sitede olan" DEĞİL — oturum takibi yok; bu, denetim izi üretmiş
  * kullanıcı sayısıdır ve panelde etiketinde böyle yazar.
  */
-export async function dbActiveUserCount(sinceISO: string): Promise<number | null> {
+export const ACTIVE_USER_SCAN_LIMIT = 10_000;
+
+export async function dbActiveUserCount(
+    sinceISO: string,
+): Promise<{ users: number; truncated: boolean } | null> {
     const supabase = createServiceClient();
+    // limit + 1: tavana DAYANDIK mı yoksa tam mı okuduk — ayrımı sonuçta taşı.
+    // Kırpılmış bir tarama kesin sayı değil ALT SINIRDIR (2026-08 D1).
     const { data, error } = await supabase
-        .from("audit_log").select("actor").gte("occurred_at", sinceISO).limit(10_000);
+        .from("audit_log").select("actor")
+        .gte("occurred_at", sinceISO)
+        .order("occurred_at", { ascending: false })
+        .limit(ACTIVE_USER_SCAN_LIMIT + 1);
     if (error) return null;
+    const rows = (data ?? []) as Array<{ actor: string | null }>;
+    const truncated = rows.length > ACTIVE_USER_SCAN_LIMIT;
     const actors = new Set(
-        ((data ?? []) as Array<{ actor: string | null }>)
+        rows.slice(0, ACTIVE_USER_SCAN_LIMIT)
             .map(r => r.actor).filter((a): a is string => !!a),
     );
-    return actors.size;
+    return { users: actors.size, truncated };
 }

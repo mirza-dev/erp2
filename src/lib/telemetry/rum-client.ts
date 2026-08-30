@@ -30,6 +30,7 @@ const FLUSH_INTERVAL_MS = 30_000;
 const RUM_ENDPOINT = "/api/developer/rum";
 
 let installed = false;
+let installedCleanup: (() => void) | null = null;
 let buffer: Sample[] = [];
 let timer: ReturnType<typeof setInterval> | null = null;
 
@@ -133,20 +134,33 @@ export function installRumCollector(): () => void {
 
     timer = setInterval(() => flush(), FLUSH_INTERVAL_MS);
     const onHide = () => { if (document.visibilityState === "hidden") flush(true); };
+    // 2026-08 D5: `pagehide` inline arrow ile bağlanıyordu → referans
+    // saklanmadığı için cleanup onu KALDIRAMIYORDU. Her install/uninstall
+    // turunda (StrictMode çift-mount, Fast Refresh, layout remount) bir
+    // dinleyici daha birikiyor ve her biri kapalı bir `flush` tutuyordu.
+    const onPageHide = () => flush(true);
     document.addEventListener("visibilitychange", onHide);
-    window.addEventListener("pagehide", () => flush(true));
+    window.addEventListener("pagehide", onPageHide);
 
-    return () => {
+    installedCleanup = () => {
         if (timer) clearInterval(timer);
         timer = null;
         document.removeEventListener("visibilitychange", onHide);
+        window.removeEventListener("pagehide", onPageHide);
         window.fetch = originalFetch;
         installed = false;
+        installedCleanup = null;
     };
+    return installedCleanup;
 }
 
-/** Yalnız testler için — modül durumunu sıfırlar. */
+/**
+ * Yalnız testler için — modül durumunu sıfırlar.
+ * D5: sarmalanmış `fetch`'i de GERİ YÜKLER; aksi hâlde yeniden install
+ * edildiğinde sarmalayıcı-üstüne-sarmalayıcı zinciri oluşuyordu.
+ */
 export function resetRumCollector(): void {
+    if (installedCleanup) installedCleanup();
     buffer = [];
     installed = false;
     if (timer) clearInterval(timer);

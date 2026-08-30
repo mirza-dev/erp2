@@ -8,6 +8,7 @@ import {
     buildProductTypeTemplateColumns,
 } from "@/lib/import-center";
 import { dbGetProductTypeWithFields } from "@/lib/supabase/product-types";
+import { handleApiError } from "@/lib/api-error";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -96,7 +97,6 @@ export async function GET(req: NextRequest) {
             },
         });
     } catch (err) {
-        console.error("[GET /api/import/templates]", err);
-        return NextResponse.json({ error: "Şablon üretilemedi." }, { status: 500 });
+        return handleApiError(err, "GET /api/import/templates", { clientMessage: "Şablon üretilemedi." });
     }
 }

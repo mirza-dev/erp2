@@ -3,7 +3,7 @@ import { requirePermission } from "@/lib/auth/role-guard";
 import { dbGetBatch } from "@/lib/supabase/import";
 import { dbLookupColumnMappings, normalizeColumnName } from "@/lib/supabase/column-mappings";
 import { aiDetectColumns, FALLBACK_FIELD_MAP } from "@/lib/services/ai-service";
-import { safeParseJson } from "@/lib/api-error";
+import { safeParseJson, handleApiError } from "@/lib/api-error";
 
 /**
  * POST /api/import/[batchId]/detect-columns
@@ -142,7 +142,6 @@ export async function POST(
 
         return NextResponse.json({ sheets: resultSheets });
     } catch (err) {
-        console.error("[POST /api/import/[batchId]/detect-columns]", err);
-        return NextResponse.json({ error: "Kolon algılama başarısız." }, { status: 500 });
+        return handleApiError(err, "POST /api/import/[batchId]/detect-columns", { clientMessage: "Kolon algılama başarısız." });
     }
 }

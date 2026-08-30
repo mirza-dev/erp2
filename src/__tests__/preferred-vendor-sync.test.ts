@@ -21,7 +21,10 @@ import { SEED_VENDOR_LINKS, SEED_VENDORS } from "@/lib/seed/seed-data";
 
 /** Yorumları düşürür — iddia açıklama metnine değil KODA bakmalı. */
 function code(src: string): string {
-    return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    // Satır yorumları ÖNCE ayıklanır: bir `//` yorumunun içindeki `/**`
+    // (ör. "// /dashboard/** erişimi") aksi hâlde blok yorum başlangıcı
+    // sanılıp sonraki `*/`e kadar GERÇEK KODU yutuyordu (2026-08).
+    return src.replace(/^\s*\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
 describe("seed — tercihli bağ products.preferred_vendor_id'yi de yazmalı", () => {

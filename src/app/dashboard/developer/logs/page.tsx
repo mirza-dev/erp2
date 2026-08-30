@@ -71,6 +71,11 @@ export default function DeveloperLogsPage() {
     }, [data, extraPages]);
 
     const lastCursor = (extraPages ?? []).at(-1)?.nextCursor ?? data?.nextCursor ?? null;
+    // Tüm sayfalardaki okunamayan kaynakların birleşimi.
+    const unavailable = [...new Set([
+        ...(data?.unavailableSources ?? []),
+        ...(extraPages ?? []).flatMap(p => p.unavailableSources ?? []),
+    ])];
 
     const reset = <T,>(setter: (v: T) => void) => (value: T) => {
         setCursors([]);
@@ -171,6 +176,17 @@ export default function DeveloperLogsPage() {
                 </div>
             </Card>
 
+            {/* 2026-08 O7: altı kaynağın hepsi hatayı sessizce yutup boş dönüyordu
+                → "olay yok" ile "kaynak okunamıyor" ayırt edilemiyordu ve ekran
+                arızayı normal sayıyordu. Artık okunamayan kaynak adıyla yazılır. */}
+            {unavailable.length > 0 && (
+                <div role="status" style={warnStripStyle}>
+                    <strong>Okunamayan kaynak:</strong>{" "}
+                    {unavailable.map(s => FEED_SOURCE_LABELS[s]).join(", ")} — bu kaynakların
+                    olayları aşağıdaki listede YOK. Liste eksiktir; &quot;olay yok&quot; demek değildir.
+                </div>
+            )}
+
             {isLoading && !data ? (
                 <LoadingState message="Kayıtlar yükleniyor…" />
             ) : error && !data ? (
@@ -178,8 +194,10 @@ export default function DeveloperLogsPage() {
             ) : entries.length === 0 ? (
                 <Card>
                     <EmptyState
-                        title="Kayıt yok"
-                        description="Bu aralıkta ve bu filtrelerde olay bulunmuyor."
+                        title={unavailable.length > 0 ? "Liste okunamadı" : "Kayıt yok"}
+                        description={unavailable.length > 0
+                            ? "Seçili kaynaklar okunamadığı için sonuç gösterilemiyor."
+                            : "Bu aralıkta ve bu filtrelerde olay bulunmuyor."}
                     />
                 </Card>
             ) : (
@@ -251,3 +269,13 @@ export default function DeveloperLogsPage() {
         </div>
     );
 }
+
+const warnStripStyle: React.CSSProperties = {
+    fontSize: "12px",
+    lineHeight: 1.6,
+    color: "var(--warning-text)",
+    background: "var(--warning-bg)",
+    border: "0.5px solid var(--warning-border)",
+    borderRadius: "8px",
+    padding: "9px 12px",
+};

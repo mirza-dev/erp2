@@ -2,20 +2,43 @@ import * as Sentry from "@sentry/nextjs";
 import type { InstrumentationOnRequestError } from "next/dist/server/instrumentation/types";
 
 /**
- * Sunucu hatalarının GLOBAL kancası (Developer Console §21).
+ * Sunucu/edge çalışma zamanı kancaları: Sentry init (`register`) + global hata
+ * yakalayıcı (`onRequestError`).
  *
- * Neden gerekli: `handleApiError` 148 route'un 115'ini kapsıyor, ama kalan 33'ü
- * (alerts, import, parasut, inventory, calendar-notes…) kendi try/catch'ini
- * yazıp hatayı yutuyor — oralara merkezi bir kanca olmadan ULAŞILAMAZ. Ayrıca
- * RSC/sayfa render hataları hiçbir route helper'ından geçmez. Next.js'in
- * `onRequestError` kancası ikisini de yakalar.
+ * ── `register()` — 2026-08 Y2 DÜZELTMESİ ────────────────────────────────────
+ * Bu dosyanın ilk hâli `register()` export ETMİYORDU; gerekçe olarak "Sentry
+ * kök `sentry.{server,edge}.config.ts` üzerinden kuruluyor ve ÇALIŞIYOR"
+ * yazıyordu. **Bu önerme yanlıştı.** `@sentry/nextjs` v10'da kök server/edge
+ * config dosyaları otomatik YÜKLENMEZ — SDK'nın kendi kodu bunu söylüyor
+ * (`config/webpack.js` `warnAboutDeprecatedConfigFiles`: "`Sentry.init` must be
+ * called inside of an instrumentation file"). Yalnız `sentry.client.config.ts`
+ * webpack tarafından istemci entry'sine enjekte edilir; sunucu/edge'in
+ * karşılığı yoktur.
  *
- * `register()` BİLİNÇLİ OLARAK EXPORT EDİLMEZ: Sentry bu projede kök
- * `sentry.{server,client,edge}.config.ts` üzerinden kuruluyor ve çalışıyor.
- * Buraya bir `register()` koymak o kurulumu üstlenmek/ikiye bölmek olurdu.
- * Bu dosya yalnız hata kancasını ekler; Sentry'nin kendi raporlaması
- * `captureRequestError` ile AYNEN korunur ve önce çalışır.
+ * Sonuç: sunucu Sentry'si hiç başlamıyordu ve `captureRequestError` no-op'tu.
+ * Daha kötüsü, bu dosya `@sentry/` içerdiği için SDK'nın durumu bildiren build
+ * uyarısı da BASTIRILIYORDU — tek otomatik sinyal kayboluyordu.
+ *
+ * Doğrusu: init'i runtime'a göre buradan yükle. Kök config dosyaları tek
+ * kaynak olarak KALIR (DSN, environment, tracesSampleRate, `beforeSend` PII
+ * scrub) — burada yalnız import ediliyorlar, mantık kopyalanmıyor.
+ *
+ * ── `onRequestError` ────────────────────────────────────────────────────────
+ * `handleApiError` çağırmayan route'lar + RSC/sayfa render hataları hiçbir
+ * route helper'ından geçmez; bu kanca onları yakalar.
+ *
+ * DİKKAT (2026-08 K2): kanca YALNIZ hata Next'in sınırına ULAŞIRSA çalışır.
+ * Kendi `catch`'inde yanıt döndüren bir route hatayı yutar ve buraya HİÇ
+ * düşmez. Bu yüzden 5xx döndüren her catch `handleApiError`/`captureRouteError`
+ * çağırmak zorunda — `src/__tests__/gate/route-error-coverage.test.ts` kilitler.
  */
+export async function register(): Promise<void> {
+    if (process.env.NEXT_RUNTIME === "nodejs") {
+        await import("../sentry.server.config");
+    } else if (process.env.NEXT_RUNTIME === "edge") {
+        await import("../sentry.edge.config");
+    }
+}
 export const onRequestError: InstrumentationOnRequestError = async (
     error,
     errorRequest,

@@ -6,7 +6,7 @@ import { dbListErrorGroups } from "@/lib/supabase/telemetry";
 import { parseTimeRange, rangeStartISO } from "@/lib/telemetry/health";
 import {
     parseErrorGroupStatus,
-    parseISODate,
+    parseCursor,
     parseLimit,
     parseSeverity,
     parseText,
@@ -37,7 +37,7 @@ export async function GET(req: NextRequest) {
             errorType: parseText(sp.get("errorType"), 60),
             environment: parseText(sp.get("environment"), 40),
             since: rangeStartISO(range),
-            before: parseISODate(sp.get("before")),
+            before: parseCursor(sp.get("before")),
             search: parseText(sp.get("search"), 120),
             limit: parseLimit(sp.get("limit"), 50, 200),
         });

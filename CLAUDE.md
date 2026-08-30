@@ -5,6 +5,26 @@ _Son güncelleme: 2026-08-30_
 
 > Bu bölüm yalnız **güncel durumu + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda ve `memory/current_focus.md`'de. Aşağıdaki indeks son dönem oturumlarına (commit + konu) hızlı bakış içindir; daha eski dönemler (Faz 2–3d AI Import, Sprint A–C, M-3 Rate Limiting, React Doctor, Teklif V2–V7 plan turları, Paraşüt Faz 1–11) git geçmişinde.
 
+**Son tamamlanan iş:** **Developer Console — bağımsız inceleme + 29 bulgunun kapanışı** (2026-08-30; GREEN; **mig.110 + 111 APPLY BEKLİYOR**; 480 dosya / 6779 test; yeni bağımlılık 0). `ae7a9c1` üç bağımsız ajana review ettirildi, bulgular kaynaktan VE canlı sistemden yeniden doğrulandı → `docs/audit/2026-08-developer-console-review.md` (**K:2 Y:7 O:7 D:8 Nit:5**), sonra **29/29 düzeltildi**.
+
+**K1 — CANLIDA DOĞRULANMIŞ GÜVENLİK AÇIĞI.** SECURITY DEFINER RPC'leri `anon` rolüne açıktı. Salt-okunur A/B probe: `record_request_metrics` **anon key ile HTTP 200**, kontrol `dashboard_monthly_cogs` **401/42501**. Sebep: `revoke … from public` Supabase'in varsayılan ayrıcalıklarının anon/authenticated'a verdiği **DOĞRUDAN** EXECUTE'u kaldırmaz; DEFINER olduğu için tablo RLS'i de devreye girmez. 5 fonksiyon (109×3 + **097×2**, ikincisi bu commit'ten değil) → **`mig.110`**. Gate sertleştirildi (`sql-migration-lint` rol-hedefli REVOKE) ve kanıtlandı: 110 çıkarılınca tam o beşini sayıyor.
+
+**K2 — kapsama iddiası yanlıştı.** `onRequestError` "kalan 33 route"u yakalamıyordu; 28'i kendi `catch`'inde yanıt döndürdüğü için hata Next'in sınırına ULAŞMIYORDU (gerçek kapsama 131/159). `handleApiError`'a opsiyonel `clientMessage` eklendi, **28 route** mesajları BİREBİR korunarak çevrildi; gövde şekli zorunlu farklı olan 3 yer `captureRouteError` ile aynı boruya bağlandı. YENİ `gate/route-error-coverage.test.ts` — **baseline BOŞ**.
+
+**Y2 — sunucu/edge Sentry'si hiç başlamıyordu** (v10 kök `sentry.*.config.ts`'i otomatik yüklemez; SDK'nın kendi uyarısı bunu söylüyor ama dosya `@sentry/` içerdiği için uyarı SUSTURULMUŞTU). `register()` eklendi.
+
+**Ölçüm dürüstlüğü.** `null = ölçülemedi` sözleşmesi uçtan uca (Y4); sağlık kararı yalnız **5xx** (Y3); sondalar `.error` kontrol ediyor; `openIncidents` karara bağlandı (O4); feed `unavailableSources` sinyalliyor (O7); kırpılan taramalar "≥" ile işaretli (D1); `avgMs`/`errorRate` sıfır yerine null (D2); yüzdelik taşma kovası `overflow` ile "> 12,8 sn" (O1).
+
+**Y5 RUM:** `known-endpoints.ts` allowlist (200 şablon, dizinden üretilir + senkron gate) → kardinalite patlaması kapandı; `POLICIES.RUM`; sağlık RUM oranını sunucu kaydıyla çapraz doğruluyor. **Y6/O2 Kayıtlar:** filtreler kaynak sorgularına indi, bileşik imleç `<snapshot>|<ts>|<id>`. **Y7/O3/D3/D4 → `mig.111`:** grup anahtarı `(fingerprint, environment)`, olay bazlı `severity`, histogram `coalesce`+uzunluk kontrolü, 180 günlük açık-grup purge kolu.
+
+**YAN BULGU — test altyapısı.** `code()` yorum-ayıklayıcısı **11 dosyada** kopyalanmış ve blokları satır yorumlarından ÖNCE ayıklıyordu: `proxy.ts`'teki `// /dashboard/** erişimi` satırındaki `/*` blok başlangıcı sanılınca aradaki **gerçek kod siliniyor**, kaynak-kilidi testleri sessizce yanlış şeyi doğruluyordu. Sıra 11 dosyada düzeltildi. Ayrıca parmak izi **gerçekten** 64 bit oldu (`mix32` finalizer; bit0 eşitlik oranı 1.0 → 0.498, 200k girdide 0 çakışma).
+
+tsc 0 · lint 0 · **480 dosya / 6779 test** (+66) · build 0 uyarı · semgrep 0 · gitleaks 0.
+
+**AÇIK (kullanıcı tarafı):** **`mig.110` APPLY (K1 canlı)** · **`mig.111` APPLY** · `INTERNAL_OPERATOR_EMAILS` · tarayıcı turu (özellikle D7 matcher daralması: statik varlıklar + giriş akışı).
+
+<details><summary>Önceki: Developer Console / System Health Panel (ilk sürüm)</summary>
+
 **Son tamamlanan iş:** **Developer Console / System Health Panel** (2026-08-30; GREEN; **migration 109 — APPLY BEKLİYOR**; 6713 test; **yeni bağımlılık 0**). 30 maddelik şartname; #0 kodlamadan önce tam repo denetimi istiyordu ve **denetimin asıl çıktısı ne KURULMAYACAĞI oldu.**
 
 **Kurulmayanlar.** Sentry v10.48 ZATEN kuruluydu (3 kök config + `sentry-scrub.ts`) → §27 gereği entegre edildi, ikinci monitoring kurulmadı. `internalOperator` (`INTERNAL_OPERATOR_EMAILS` allowlist ∧ `view_settings`, env boşsa fail-closed) tam olarak istenen "developer rolü"ydü → **yeni rol/permission icat edilmedi**; `/dashboard/settings/email-deliveries` de aranan 4 katmanlı kalıbın çalışan örneğiydi, birebir genişletildi. Gerçekten yoktu: **request/correlation ID** ve yapısal log.
@@ -22,6 +42,8 @@ _Son güncelleme: 2026-08-30_
 tsc 0 · lint 0 · **476 dosya / 6713 test** (+209) · build **0 uyarı** · migration 109.
 
 **AÇIK (kullanıcı tarafı):** **migration 109 APPLY** · **`INTERNAL_OPERATOR_EMAILS` set edilmeden panel fail-closed** (kimse giremez) · tarayıcı turu.
+
+</details>
 
 <details><summary>Önceki: Ayarlar üçlüsü — eleştirel inceleme + 5 blok</summary>
 

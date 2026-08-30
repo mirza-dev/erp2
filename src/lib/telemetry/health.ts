@@ -25,10 +25,12 @@ export interface ServiceHealth {
 /** Sağlık verdikti bu kadar geriye bakar. */
 export const HEALTH_WINDOW_MINUTES = 15;
 
+/** Eşikler DAHİLDİR: karşılaştırmalar `>=` (yorum "üstünde" diyordu, kod `>=`
+ *  kullanıyordu ve test `>=`'i kilitliyor — düzeltilen yorumdu, kod değil). */
 export const HEALTH_THRESHOLDS = {
-    /** Hata oranı bunun üstündeyse Degraded. */
+    /** SUNUCU hata oranı (5xx) buna EŞİT veya üstündeyse Degraded. */
     degradedErrorRate: 0.05,
-    /** Hata oranı bunun üstündeyse Critical. */
+    /** SUNUCU hata oranı (5xx) buna EŞİT veya üstündeyse Critical. */
     criticalErrorRate: 0.2,
     /** Pencerede bu kadar hata Degraded yapar (oran ölçülemediğinde de çalışır). */
     degradedErrorCount: 10,
@@ -52,12 +54,33 @@ export function worstStatus(a: HealthStatus, b: HealthStatus): HealthStatus {
 
 export interface OverallHealthInput {
     services: ServiceHealth[];
-    /** Son HEALTH_WINDOW_MINUTES içindeki kritik hata sayısı. */
-    recentCriticalErrors: number;
-    /** Son HEALTH_WINDOW_MINUTES içindeki toplam hata sayısı. */
-    recentErrors: number;
-    /** Hatalı istek / toplam istek. Ölçülemiyorsa null. */
+    /** Son HEALTH_WINDOW_MINUTES içindeki kritik hata sayısı. Ölçülemediyse null. */
+    recentCriticalErrors: number | null;
+    /** Son HEALTH_WINDOW_MINUTES içindeki toplam hata sayısı. Ölçülemediyse null. */
+    recentErrors: number | null;
+    /**
+     * **SUNUCU** hatası oranı (yalnız 5xx) / toplam istek. Ölçülemiyorsa null.
+     *
+     * 2026-08 Y3: burası eskiden 4xx'i de sayıyordu; 100 istekte 25 adet 401
+     * (oturum tazeleme) genel durumu "Kritik" yapıyor, aynı ekrandaki API
+     * servis satırı ise yalnız 5xx saydığı için "Sağlıklı" yazıyordu.
+     */
     errorRate: number | null;
+    /**
+     * Telemetri tabloları okunabildi mi (2026-08 Y4). `false` ise sayaçlar
+     * güvenilmez → panel ASLA "healthy" demez; kör olduğunu söyler.
+     */
+    telemetryReadable: boolean;
+    /**
+     * Hata oranı SUNUCU tarafı kanıtla doğrulandı mı (2026-08 Y5).
+     *
+     * `errorRate` istemci bildirimi olan RUM'dan gelir ve `/api/developer/rum`
+     * ucu `view_dashboard` taşıyan HER role açıktır — yani herhangi bir
+     * oturumlu kullanıcı sahte 5xx yükleyip paneli "Kritik"e çevirebilirdi.
+     * Sunucunun kendi kaydı (`system_error_events`) bunu doğrulamıyorsa oran
+     * en fazla `degraded` üretir; karar tek bir güvenilmez kaynağa bırakılmaz.
+     */
+    errorRateCorroborated: boolean;
 }
 
 export interface OverallHealth {
@@ -71,22 +94,37 @@ export interface OverallHealth {
  * oranının ne olduğu önemsizdir (istek zaten gitmiyordur).
  */
 export function computeOverallHealth(input: OverallHealthInput): OverallHealth {
-    const { services, recentCriticalErrors, recentErrors, errorRate } = input;
+    const {
+        services, recentCriticalErrors, recentErrors, errorRate,
+        telemetryReadable, errorRateCorroborated,
+    } = input;
 
     const downEssential = services.find(s => s.essential && s.status === "critical");
     if (downEssential) {
         return { status: "critical", reason: `${downEssential.label} yanıt vermiyor` };
     }
 
-    if (recentCriticalErrors > 0) {
+    if (recentCriticalErrors !== null && recentCriticalErrors > 0) {
         return {
             status: "critical",
             reason: `Son ${HEALTH_WINDOW_MINUTES} dakikada ${recentCriticalErrors} kritik hata`,
         };
     }
 
+    // Sayaçlar okunamıyorsa "kritik hata yok" DENEMEZ — izleme aracının kendisi
+    // kör olduğunda "her şey yolunda" demesi, modülün varlık sebebine aykırı.
+    if (!telemetryReadable) {
+        return { status: "degraded", reason: "Telemetri kayıtları okunamadı — sayaçlar güvenilmez" };
+    }
+
     if (errorRate !== null && errorRate >= HEALTH_THRESHOLDS.criticalErrorRate) {
-        return { status: "critical", reason: `Hata oranı %${(errorRate * 100).toFixed(1)}` };
+        return errorRateCorroborated
+            ? { status: "critical", reason: `Sunucu hata oranı %${(errorRate * 100).toFixed(1)}` }
+            : {
+                status: "degraded",
+                reason: `Sunucu hata oranı %${(errorRate * 100).toFixed(1)}`
+                    + " (yalnız istemci bildirimi — sunucu kaydıyla doğrulanmadı)",
+            };
     }
 
     const unknownEssential = services.find(s => s.essential && s.status === "unknown");
@@ -103,10 +141,10 @@ export function computeOverallHealth(input: OverallHealthInput): OverallHealth {
     }
 
     if (errorRate !== null && errorRate >= HEALTH_THRESHOLDS.degradedErrorRate) {
-        return { status: "degraded", reason: `Hata oranı %${(errorRate * 100).toFixed(1)}` };
+        return { status: "degraded", reason: `Sunucu hata oranı %${(errorRate * 100).toFixed(1)}` };
     }
 
-    if (recentErrors >= HEALTH_THRESHOLDS.degradedErrorCount) {
+    if (recentErrors !== null && recentErrors >= HEALTH_THRESHOLDS.degradedErrorCount) {
         return {
             status: "degraded",
             reason: `Son ${HEALTH_WINDOW_MINUTES} dakikada ${recentErrors} hata`,

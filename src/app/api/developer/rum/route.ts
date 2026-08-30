@@ -16,7 +16,18 @@ import { isTelemetryEnabled } from "@/lib/telemetry/record";
  * (Performans ekranı) yine yalnız internalOperator'a açık.
  *
  * Yazılan veri kişisel değil: method + normalize path + status + süre.
- * Doğrulama `aggregateRumSamples` içinde ve serttir — tanınmayan path yazılmaz.
+ *
+ * Doğrulama `aggregateRumSamples` içindedir ve İKİ katmanlıdır (2026-08 Y5):
+ *   1. biçim — `SAFE_PATH_RE`, method allowlist, status/süre aralığı;
+ *   2. ÜYELİK — normalize yol `known-endpoints.ts`'teki gerçek route şablonu
+ *      kümesinde OLMALI. Eskiden yalnız (1) vardı ve yorum yanlışlıkla
+ *      "tanınmayan path yazılmaz" diyordu: `/api/aaaa`, `/api/aaab`… hepsi
+ *      geçiyor, `unique(bucket_at, endpoint, method)` yüzünden tekil satır
+ *      sayısı sınırsız büyüyebiliyordu.
+ *
+ * Örnekler gerçek trafikle BAĞLI DEĞİLDİR (istemci ne derse o yazılır); bu
+ * yüzden sağlık kararı bu oranı sunucu kaydıyla çapraz doğrular
+ * (`errorRateCorroborated`) ve uç kendi hız tavanını taşır (`POLICIES.RUM`).
  */
 export async function POST(req: NextRequest) {
     try {

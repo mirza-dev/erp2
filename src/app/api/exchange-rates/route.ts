@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { parseLiveRatesExchangeRates, parseTcmbExchangeRates } from "@/lib/exchange-rates";
+import { captureRouteError } from "@/lib/api-error";
 
 const TCMB_TODAY_XML_URL = "https://www.tcmb.gov.tr/kurlar/today.xml";
 const LIVE_RATES_URL = "https://www.live-rates.com/api/rates";
@@ -53,7 +54,8 @@ export async function GET() {
     try {
         const payload = await fetchTcmbRates();
         return NextResponse.json(payload, { headers: cacheHeaders(ONE_HOUR_SECONDS) });
-    } catch {
+    } catch (err) {
+        captureRouteError(err, "GET /api/exchange-rates", 503);
         return NextResponse.json(ERROR_BODY, { status: 503 });
     }
 }

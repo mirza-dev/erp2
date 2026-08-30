@@ -68,14 +68,23 @@ export default function DeveloperPerformancePage() {
             header: "P95",
             align: "right",
             width: "84px",
-            cell: row => <Numeric tone={latencyTone(row.p95Ms)}>{formatMs(row.p95Ms)}</Numeric>,
+            // Taşma kovasında değer ALT sınırdır → "> 12,8 sn" (O1).
+            cell: row => (
+                <Numeric tone={latencyTone(row.p95Ms)}>
+                    {row.p95Overflow ? `> ${formatMs(row.p95Ms)}` : formatMs(row.p95Ms)}
+                </Numeric>
+            ),
         },
         {
             key: "p99",
             header: "P99",
             align: "right",
             width: "84px",
-            cell: row => <Numeric tone={latencyTone(row.p99Ms)}>{formatMs(row.p99Ms)}</Numeric>,
+            cell: row => (
+                <Numeric tone={latencyTone(row.p99Ms)}>
+                    {row.p99Overflow ? `> ${formatMs(row.p99Ms)}` : formatMs(row.p99Ms)}
+                </Numeric>
+            ),
         },
         {
             key: "errors",
@@ -99,9 +108,12 @@ export default function DeveloperPerformancePage() {
             header: "Hata oranı",
             align: "right",
             width: "94px",
+            // errorRate null = bu uçta örnek yok → "—" (ölçülmüş %0 değil, D2).
             cell: row => (
-                <Badge tone={row.errorRate >= 0.05 ? "danger" : row.errorRate > 0 ? "warning" : "neutral"}>
-                    {formatPercent(row.errorRate)}
+                <Badge tone={row.errorRate === null
+                    ? "neutral"
+                    : row.errorRate >= 0.05 ? "danger" : row.errorRate > 0 ? "warning" : "neutral"}>
+                    {row.errorRate === null ? "—" : formatPercent(row.errorRate)}
                 </Badge>
             ),
         },
@@ -134,7 +146,8 @@ export default function DeveloperPerformancePage() {
                 Süreler ağ gecikmesini de içerir ve yalnız arayüzün çağırdığı uçları kapsar;
                 cron ve sunucudan-sunucuya istekler bu tabloda yoktur. Next.js middleware
                 yanıtı göremediği için saf sunucu süresi 148 route&apos;a dokunmadan ölçülemiyor.
-                Yüzdelikler kova üst sınırıdır.
+                Yüzdelikler kova üst sınırıdır; &quot;&gt;&quot; işaretli değerler son kovaya
+                taştı ve ALT sınırdır.
             </div>
 
             {isLoading && !data ? (
@@ -154,7 +167,12 @@ export default function DeveloperPerformancePage() {
                         />
                         <MetricCard
                             label="P95 yanıt"
-                            value={data.overall.p95Ms === null ? null : formatMs(data.overall.p95Ms)}
+                            hint={data.overall.p95Overflow ? "Kova taştı — alt sınır" : "Kova üst sınırı"}
+                            value={data.overall.p95Ms === null
+                                ? null
+                                : data.overall.p95Overflow
+                                    ? `> ${formatMs(data.overall.p95Ms)}`
+                                    : formatMs(data.overall.p95Ms)}
                             tone={latencyTone(data.overall.p95Ms) === "default" ? "default" : "warning"}
                         />
                         <MetricCard
@@ -167,6 +185,13 @@ export default function DeveloperPerformancePage() {
                             value={data.endpoints.length}
                         />
                     </MetricGrid>
+
+                    {data.truncated && (
+                        <div role="status" style={warnStripStyle}>
+                            Tarama tavanına dayanıldı — toplamlar ve yüzdelikler bu aralık için
+                            ALT SINIRDIR (≥). Daha dar bir zaman aralığı seçin.
+                        </div>
+                    )}
 
                     {data.endpoints.length === 0 ? (
                         <Card>
@@ -205,3 +230,16 @@ function Numeric({
         </span>
     );
 }
+
+/** Uyarı şeridi — Kayıtlar ve Genel Bakış ekranlarıyla aynı görünüm.
+ *  `role="status"` KORUNUR: ARIA canlı bölgesidir, semantik HTML karşılığı
+ *  yoktur; ekran okuyucu uyarıyı bu sayede duyurur. */
+const warnStripStyle: React.CSSProperties = {
+    fontSize: "12px",
+    lineHeight: 1.6,
+    color: "var(--warning-text)",
+    background: "var(--warning-bg)",
+    border: "0.5px solid var(--warning-border)",
+    borderRadius: "8px",
+    padding: "9px 12px",
+};

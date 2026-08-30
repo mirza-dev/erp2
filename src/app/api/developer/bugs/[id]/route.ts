@@ -68,6 +68,15 @@ export async function PATCH(req: NextRequest, ctx: { params: Promise<{ id: strin
             }
         }
 
+        // 2026-08 D6: bağ işlemleri VARLIK kontrolünden önce yapılıyordu →
+        // var olmayan bir bug id'siyle `developer_bug_errors` upsert'i FK
+        // ihlaline çarpıyor, kullanıcı 404 yerine "Beklenmeyen bir hata"
+        // görüyor VE bu 500 hata merkezine gerçek bir kusur gibi yazılıyordu
+        // (panelin kendi gürültüsünü üretmesi). Varlık kararı artık önce.
+        if (!(await dbGetBug(id))) {
+            return NextResponse.json({ error: "Bug bulunamadı." }, { status: 404 });
+        }
+
         // Bağ işlemleri güncellemeden ÖNCE — böylece dönen gövde güncel bağları taşır.
         const toLink = Array.isArray(body.linkErrorGroupIds)
             ? body.linkErrorGroupIds.filter((v): v is string => typeof v === "string" && isUuid(v))

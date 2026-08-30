@@ -68,6 +68,8 @@ export interface ErrorWindowStats {
     bySeverity: Record<TelemetrySeverity, number>;
     /** Pencerede en az bir kez görülen grup sayısı. */
     activeGroups: number;
+    /** Tarama tavanına dayanıldı → sayılar ALT SINIR ("≥ N"), kesin değil (D1). */
+    truncated: boolean;
 }
 
 // ── Performans ───────────────────────────────────────────────────────────
@@ -76,25 +78,39 @@ export interface EndpointPerformance {
     endpoint: string;
     method: string;
     count: number;
-    avgMs: number;
+    /** Örnek yoksa null — "0 ms" ölçülmüş sıfır gibi okunmasın (D2). */
+    avgMs: number | null;
     maxMs: number;
     p50Ms: number | null;
     p95Ms: number | null;
     p99Ms: number | null;
+    /** Yüzdelik taşma kovasına düştü → değer ALT sınır ("> 12,8 sn") (O1). */
+    p95Overflow: boolean;
+    p99Overflow: boolean;
     status2xx: number;
     status3xx: number;
     status4xx: number;
     status5xx: number;
-    errorRate: number;
+    /** Örnek yoksa null (D2). */
+    errorRate: number | null;
 }
 
 export interface PerformanceSummary {
     endpoints: EndpointPerformance[];
     totalRequests: number;
+    /** 4xx + 5xx — Performans ekranının "hatalı yanıt" sayacı. */
     totalErrors: number;
-    overall: { avgMs: number | null; p95Ms: number | null };
+    /**
+     * YALNIZ 5xx. Sağlık verdikti bunu kullanır: 4xx (401 oturum tazeleme,
+     * 404 opsiyonel kaynak, 400 form doğrulama) sistem kusuru DEĞİLDİR —
+     * `api-error.ts`'in kendi gerekçesi de bunu söylüyor (Y3).
+     */
+    totalServerErrors: number;
+    overall: { avgMs: number | null; p95Ms: number | null; p95Overflow: boolean };
     /** Kova sınırları (ms); sonsuz kova -1 ile işaretlenir. */
     buckets: readonly number[];
+    /** Tarama tavanına dayanıldı → toplamlar ALT SINIR (D1). */
+    truncated: boolean;
 }
 
 export interface PerformanceResponse extends PerformanceSummary {
@@ -112,19 +128,30 @@ export interface HealthPayload {
     checkedAt: string;
 }
 
+/**
+ * Panel metrikleri. **`null` = ÖLÇÜLEMEDİ, `0` = ölçüldü ve sıfır.**
+ *
+ * 2026-08 Y4: hata sayaçları eskiden `number`'dı ve sonda patladığında
+ * `emptyErrorStats()` ile SIFIRA düşüyordu → panel kör olduğu anda yeşil
+ * "0 kritik hata" gösteriyordu. Artık `null` geçiyor ve `MetricCard`'ın
+ * mevcut "Ölçülmüyor" yolu devreye giriyor.
+ */
 export interface OverviewMetrics {
-    sampledErrorEvents: number;
-    criticalErrors: number;
-    warnings: number;
-    activeErrorGroups: number;
+    sampledErrorEvents: number | null;
+    criticalErrors: number | null;
+    warnings: number | null;
+    activeErrorGroups: number | null;
     /** RUM ölçümü yoksa null → panelde "Ölçülmüyor". */
     requests: number | null;
+    /** 4xx + 5xx / toplam — Performans ekranının tanımı. */
     errorRate: number | null;
+    /** YALNIZ 5xx / toplam — sağlık kararının kullandığı oran (Y3). */
+    serverErrorRate: number | null;
     avgResponseMs: number | null;
     p95ResponseMs: number | null;
     activeUsers: number | null;
     uptimeSeconds: number;
-    openBugs: number;
+    openBugs: number | null;
 }
 
 export interface OverviewPayload {
@@ -134,7 +161,14 @@ export interface OverviewPayload {
     metrics: OverviewMetrics;
     health: HealthPayload;
     recentActivity: FeedEntry[];
-    bugCounts: Record<DeveloperBugStatus, number>;
+    bugCounts: Record<DeveloperBugStatus, number> | null;
+    /**
+     * Tarama tavanına dayandığı için ALT SINIR olan metriklerin etiketleri
+     * (D1). Boş değilse panel "≥" uyarısı gösterir.
+     */
+    truncatedMetrics: string[];
+    /** Kayıtlar akışında okunamayan kaynaklar (O7) — "olay yok" ile karışmasın. */
+    unavailableSources: FeedSource[];
     generatedAt: string;
 }
 
@@ -149,6 +183,12 @@ export interface FeedPage {
     entries: FeedEntry[];
     nextCursor: string | null;
     range: TimeRange;
+    /**
+     * Okunamayan kaynaklar (2026-08 O7). Altı okuyucunun hepsi hatayı sessizce
+     * yutup `[]` dönüyordu → "olay yok" ile "kaynak okunamıyor" ayırt
+     * edilemiyordu ve ekran arızayı normal sayıyordu.
+     */
+    unavailableSources: FeedSource[];
 }
 
 // ── Tanılama ─────────────────────────────────────────────────────────────

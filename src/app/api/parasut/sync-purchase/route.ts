@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serviceSyncPurchaseOrderToParasut } from "@/lib/services/parasut-purchase-service";
-import { safeParseJson } from "@/lib/api-error";
+import { safeParseJson, handleApiError } from "@/lib/api-error";
 import { requirePermission } from "@/lib/auth/role-guard";
 
 // POST /api/parasut/sync-purchase — tek PO'yu Paraşüt'e alış faturası olarak gönder.
@@ -24,7 +24,6 @@ export async function POST(req: NextRequest) {
         }
         return NextResponse.json(result);
     } catch (err) {
-        console.error("[POST /api/parasut/sync-purchase]", err);
-        return NextResponse.json({ error: "Alış faturası senkronu başarısız." }, { status: 500 });
+        return handleApiError(err, "POST /api/parasut/sync-purchase", { clientMessage: "Alış faturası senkronu başarısız." });
     }
 }

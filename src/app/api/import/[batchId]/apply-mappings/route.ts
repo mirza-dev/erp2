@@ -3,7 +3,7 @@ import { requirePermission } from "@/lib/auth/role-guard";
 import { dbGetBatch, dbUpdateBatchStatus, dbCreateDrafts, dbDeletePendingDrafts } from "@/lib/supabase/import";
 import { dbSaveColumnMappings, normalizeColumnName } from "@/lib/supabase/column-mappings";
 import { NUMERIC_FIELDS, IMPORT_FIELD_SET } from "@/lib/import-fields";
-import { safeParseJson } from "@/lib/api-error";
+import { safeParseJson, handleApiError } from "@/lib/api-error";
 import {
     DEFAULT_AI_IMPORT_OPERATION,
     getAiImportOperation,
@@ -272,11 +272,9 @@ export async function POST(
 
         return NextResponse.json({ drafts: allDrafts }, { status: 201 });
     } catch (err) {
-        console.error("[POST /api/import/[batchId]/apply-mappings]", err);
         const detail = err instanceof Error ? err.message : "Bilinmeyen hata";
-        return NextResponse.json(
-            { error: `Eşleştirme uygulanamadı: ${detail}` },
-            { status: 500 }
-        );
+        return handleApiError(err, "POST /api/import/[batchId]/apply-mappings", {
+            clientMessage: `Eşleştirme uygulanamadı: ${detail}`,
+        });
     }
 }

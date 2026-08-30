@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { serviceRunAlertScan } from "@/lib/services/alert-scan-runner";
 import { createClient } from "@/lib/supabase/server";
+import { handleApiError } from "@/lib/api-error";
 
 // POST /api/alerts/scan — scans all products and creates/resolves stock alerts
 // Auth: CRON_SECRET Bearer token (Vercel Cron) OR authenticated session (UI "Tara" butonu)
@@ -40,7 +41,6 @@ export async function POST(request: Request) {
         }
         return NextResponse.json(result);
     } catch (err) {
-        console.error("[POST /api/alerts/scan]", err);
-        return NextResponse.json({ error: "Tarama başarısız." }, { status: 500 });
+        return handleApiError(err, "POST /api/alerts/scan", { clientMessage: "Tarama başarısız." });
     }
 }

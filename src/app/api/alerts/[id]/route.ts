@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serviceGetAlert, serviceUpdateAlertStatus } from "@/lib/services/alert-service";
-import { safeParseJson } from "@/lib/api-error";
+import { safeParseJson, handleApiError } from "@/lib/api-error";
 import { requirePermission } from "@/lib/auth/role-guard";
 import type { AlertStatus } from "@/lib/database.types";
 
@@ -22,8 +22,7 @@ export async function GET(
         if (!alert) return NextResponse.json({ error: "Alert bulunamadı." }, { status: 404 });
         return NextResponse.json(alert);
     } catch (err) {
-        console.error("[GET /api/alerts/[id]]", err);
-        return NextResponse.json({ error: "Alert alınamadı." }, { status: 500 });
+        return handleApiError(err, "GET /api/alerts/[id]", { clientMessage: "Alert alınamadı." });
     }
 }
 
@@ -54,7 +53,6 @@ export async function PATCH(
         const updated = await serviceGetAlert(id);
         return NextResponse.json(updated);
     } catch (err) {
-        console.error("[PATCH /api/alerts/[id]]", err);
-        return NextResponse.json({ error: "Alert güncellenemedi." }, { status: 500 });
+        return handleApiError(err, "PATCH /api/alerts/[id]", { clientMessage: "Alert güncellenemedi." });
     }
 }

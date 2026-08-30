@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbListSyncLogs } from "@/lib/supabase/sync-log";
 import { requirePermission } from "@/lib/auth/role-guard";
+import { handleApiError } from "@/lib/api-error";
 
 // GET /api/parasut/logs?entity_type=sales_order&step=invoice&error_kind=validation&status=error&limit=50
 export async function GET(req: NextRequest) {
@@ -19,7 +20,6 @@ export async function GET(req: NextRequest) {
         });
         return NextResponse.json(logs);
     } catch (err) {
-        console.error("[GET /api/parasut/logs]", err);
-        return NextResponse.json({ error: "Loglar alınamadı." }, { status: 500 });
+        return handleApiError(err, "GET /api/parasut/logs", { clientMessage: "Loglar alınamadı." });
     }
 }

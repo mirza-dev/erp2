@@ -148,6 +148,53 @@ export interface ErrorGroupFilters {
 const DEFAULT_PAGE_SIZE = 50;
 const MAX_PAGE_SIZE = 200;
 
+/**
+ * Bileşik imleç (2026-08 O2).
+ *
+ * İKİ kusur vardı:
+ *   (a) Tie-breaker yoktu. İmleç yalnız zaman damgasıydı ve sorgu `strict <`
+ *       kullanıyordu → aynı ms'ye düşen iki satır SONRAKİ sayfada ikisi birden
+ *       atlanıyordu. Eşitlik gerçekçi: `occurred_at` istemciden gelen
+ *       milisaniye hassasiyetli değerdir, hata fırtınasında çakışır.
+ *   (b) Hata gruplarında imleç kolonu (`last_seen_at`) HER yeni oluşumda
+ *       GÜNCELLENİYOR → 1. sayfa okunurken yeniden patlayan grup imlecin
+ *       ötesine taşınıyor ve 2. sayfada da çıkmıyordu; yani EN AKTİF hata
+ *       grubu listeden düşüyordu.
+ *
+ * Çözüm: imleç `<snapshot>|<ts>|<id>`. `snapshot` ilk sayfanın tepe zamanıdır
+ * ve sonraki sayfalar `<= snapshot` ile sınırlanır — sayfalama boyunca sabit
+ * bir küme üzerinde ilerlenir. Kolonu snapshot'ın ÜSTÜNE taşınan grup listeden
+ * düşmez, tazelemede en tepede görünür.
+ */
+interface DecodedCursor {
+    snapshot: string;
+    ts: string;
+    id: string | null;
+}
+
+export function encodeCursor(snapshot: string, ts: string, id: string): string {
+    return `${snapshot}|${ts}|${id}`;
+}
+
+export function decodeCursor(raw: string | null | undefined): DecodedCursor | null {
+    if (!raw) return null;
+    const parts = raw.split("|");
+    // Eski biçim (yalnız zaman damgası) geriye dönük kabul edilir.
+    if (parts.length === 1) return { snapshot: parts[0], ts: parts[0], id: null };
+    if (parts.length === 3) return { snapshot: parts[0], ts: parts[1], id: parts[2] };
+    return null;
+}
+
+/** PostgREST `or()` değeri: `.` ve `:` ayraç olduğu için tırnaklanır. */
+function quoted(value: string): string {
+    return `"${value.replace(/["\\]/g, "\\$&")}"`;
+}
+
+/** `.or()` gövdesi: `(col < ts) OR (col = ts AND id < id)`. */
+function cursorOrExpr(col: string, ts: string, id: string): string {
+    return `${col}.lt.${quoted(ts)},and(${col}.eq.${quoted(ts)},id.lt.${quoted(id)})`;
+}
+
 function clampLimit(limit?: number): number {
     if (!limit || !Number.isFinite(limit)) return DEFAULT_PAGE_SIZE;
     return Math.min(MAX_PAGE_SIZE, Math.max(1, Math.floor(limit)));
@@ -159,10 +206,13 @@ export async function dbListErrorGroups(
     const supabase = createServiceClient();
     const limit = clampLimit(filters.limit);
 
+    const cursor = decodeCursor(filters.before);
+
     let query = supabase
         .from("system_error_groups")
         .select("*")
         .order("last_seen_at", { ascending: false })
+        .order("id", { ascending: false })
         .limit(limit + 1);
 
     if (filters.severity) query = query.eq("severity", filters.severity);
@@ -172,7 +222,14 @@ export async function dbListErrorGroups(
     if (filters.errorType) query = query.eq("error_type", filters.errorType);
     if (filters.endpoint) query = query.ilike("endpoint", `%${filters.endpoint}%`);
     if (filters.since) query = query.gte("last_seen_at", filters.since);
-    if (filters.before) query = query.lt("last_seen_at", filters.before);
+    if (cursor) {
+        // Sayfalama boyunca sabit küme: kolonu snapshot'ın üstüne taşınan grup
+        // sonraki sayfalarda görünmez (tazelemede en tepede çıkar).
+        query = query.lte("last_seen_at", cursor.snapshot);
+        query = cursor.id
+            ? query.or(cursorOrExpr("last_seen_at", cursor.ts, cursor.id))
+            : query.lt("last_seen_at", cursor.ts);
+    }
     if (filters.search?.trim()) {
         query = query.or(orIlikeFilter(["title", "normalized_message", "endpoint"], filters.search));
     }
@@ -182,7 +239,11 @@ export async function dbListErrorGroups(
 
     const all = (data ?? []) as SystemErrorGroupRow[];
     const rows = all.slice(0, limit);
-    const nextCursor = all.length > limit ? rows[rows.length - 1]?.last_seen_at ?? null : null;
+    const last = rows[rows.length - 1];
+    const snapshot = cursor?.snapshot ?? rows[0]?.last_seen_at ?? null;
+    const nextCursor = all.length > limit && last && snapshot
+        ? encodeCursor(snapshot, last.last_seen_at, last.id)
+        : null;
     return { rows, nextCursor };
 }
 
@@ -268,34 +329,49 @@ const EMPTY_SEVERITY: Record<TelemetrySeverity, number> = {
  * ALT SINIRDIR — panelde bu açıkça yazılır (§28). Bir hatanın gerçek toplam
  * sayısı grubun `occurrence_count` alanındadır ve tamdır.
  */
-export async function dbErrorWindowStats(sinceISO: string): Promise<ErrorWindowStats> {
+export const ERROR_WINDOW_SCAN_LIMIT = 20_000;
+
+export async function dbErrorWindowStats(
+    sinceISO: string,
+    environment?: string | null,
+): Promise<ErrorWindowStats> {
     const supabase = createServiceClient();
 
-    const { data, error } = await supabase
+    // 2026-08 O3: ciddiyet artık OLAYIN kendi kolonundan okunur (mig.111).
+    // Eskiden gruba join edilip GRUBUN mevcut seviyesi sayılıyordu; grup
+    // seviyesi monoton olduğu için "son 15 dakikada N kritik hata" ifadesi o
+    // pencerede kritik sınıflanmamış oluşumlarla üretilebiliyordu.
+    // 2026-08 Y7: ortam filtresi — panel kendini `environment` ile etiketliyor,
+    // sayılar da o ortamdan gelmeli.
+    let query = supabase
         .from("system_error_events")
-        .select("group_id, system_error_groups!inner(severity)")
-        .gte("occurred_at", sinceISO)
-        .limit(20_000);
+        .select("group_id, severity")
+        .gte("occurred_at", sinceISO);
+    if (environment) query = query.eq("environment", environment);
+
+    const { data, error } = await query
+        .order("occurred_at", { ascending: false })
+        .limit(ERROR_WINDOW_SCAN_LIMIT + 1);
     if (error) throw new Error(error.message);
+
+    // limit + 1 → tavana dayandık mı, ayrımı sonuçta taşı (2026-08 D1):
+    // kırpılmış tarama kesin sayı değil ALT SINIRDIR ve panelde "≥" ile yazılır.
+    const all = (data ?? []) as Array<{ group_id: string; severity: TelemetrySeverity }>;
+    const truncated = all.length > ERROR_WINDOW_SCAN_LIMIT;
+    const scanned = truncated ? all.slice(0, ERROR_WINDOW_SCAN_LIMIT) : all;
 
     const bySeverity = { ...EMPTY_SEVERITY };
     const groups = new Set<string>();
-    for (const row of (data ?? []) as Array<{
-        group_id: string;
-        system_error_groups: { severity: TelemetrySeverity } | { severity: TelemetrySeverity }[];
-    }>) {
+    for (const row of scanned) {
         groups.add(row.group_id);
-        const rel = Array.isArray(row.system_error_groups)
-            ? row.system_error_groups[0]
-            : row.system_error_groups;
-        const sev = rel?.severity;
-        if (sev && sev in bySeverity) bySeverity[sev]++;
+        if (row.severity && row.severity in bySeverity) bySeverity[row.severity]++;
     }
 
     return {
-        sampledEvents: (data ?? []).length,
+        sampledEvents: Math.min(scanned.length, ERROR_WINDOW_SCAN_LIMIT),
         bySeverity,
         activeGroups: groups.size,
+        truncated,
     };
 }
 
@@ -318,10 +394,14 @@ export async function dbListSystemEvents(
     const supabase = createServiceClient();
     const limit = clampLimit(filters.limit);
 
+    // `occurred_at` DEĞİŞMEZ → snapshot sınırı gerekmez, yalnız tie-breaker.
+    const cursor = decodeCursor(filters.before);
+
     let query = supabase
         .from("system_events")
         .select("*")
         .order("occurred_at", { ascending: false })
+        .order("id", { ascending: false })
         .limit(limit + 1);
 
     if (filters.level) query = query.eq("level", filters.level);
@@ -329,7 +409,11 @@ export async function dbListSystemEvents(
     if (filters.requestId) query = query.eq("request_id", filters.requestId);
     if (filters.userId) query = query.eq("user_id", filters.userId);
     if (filters.since) query = query.gte("occurred_at", filters.since);
-    if (filters.before) query = query.lt("occurred_at", filters.before);
+    if (cursor) {
+        query = cursor.id
+            ? query.or(cursorOrExpr("occurred_at", cursor.ts, cursor.id))
+            : query.lt("occurred_at", cursor.ts);
+    }
     if (filters.search?.trim()) {
         query = query.or(orIlikeFilter(["message", "module", "endpoint"], filters.search));
     }
@@ -339,11 +423,16 @@ export async function dbListSystemEvents(
 
     const all = (data ?? []) as SystemEventRow[];
     const rows = all.slice(0, limit);
-    const nextCursor = all.length > limit ? rows[rows.length - 1]?.occurred_at ?? null : null;
+    const last = rows[rows.length - 1];
+    const nextCursor = all.length > limit && last
+        ? encodeCursor(last.occurred_at, last.occurred_at, last.id)
+        : null;
     return { rows, nextCursor };
 }
 
 // ── İstek metrikleri — okuma ─────────────────────────────────────────────
+
+export const PERFORMANCE_SCAN_LIMIT = 10_000;
 
 export async function dbPerformanceSummary(sinceISO: string): Promise<PerformanceSummary> {
     const supabase = createServiceClient();
@@ -352,10 +441,12 @@ export async function dbPerformanceSummary(sinceISO: string): Promise<Performanc
         .select("*")
         .gte("bucket_at", sinceISO)
         .order("bucket_at", { ascending: false })
-        .limit(10_000);
+        .limit(PERFORMANCE_SCAN_LIMIT + 1);
     if (error) throw new Error(error.message);
 
-    const rows = (data ?? []) as RequestMetricRow[];
+    const allRows = (data ?? []) as RequestMetricRow[];
+    const truncated = allRows.length > PERFORMANCE_SCAN_LIMIT;
+    const rows = truncated ? allRows.slice(0, PERFORMANCE_SCAN_LIMIT) : allRows;
     const byKey = new Map<string, {
         endpoint: string; method: string; count: number; sumMs: number; maxMs: number;
         histogram: number[]; s2: number; s3: number; s4: number; s5: number;
@@ -391,39 +482,57 @@ export async function dbPerformanceSummary(sinceISO: string): Promise<Performanc
 
     const endpoints: EndpointPerformance[] = [...byKey.values()]
         .map(a => {
-            const errors = a.s4 + a.s5;
-            const total = a.count || 1;
+            const p50 = percentileFromHistogram(a.histogram, 0.5);
+            const p95 = percentileFromHistogram(a.histogram, 0.95);
+            const p99 = percentileFromHistogram(a.histogram, 0.99);
             return {
                 endpoint: a.endpoint,
                 method: a.method,
                 count: a.count,
-                avgMs: a.count > 0 ? Math.round(a.sumMs / a.count) : 0,
+                // 2026-08 D2: örnek yoksa `0` DEĞİL `null` — "0 ms · %0 hata"
+                // ölçülmüş ve sağlıklı gibi okunuyordu. Aynı dosyanın genel
+                // toplamı zaten `null` dönüyordu; iki sözleşme birleşti.
+                avgMs: a.count > 0 ? Math.round(a.sumMs / a.count) : null,
                 maxMs: a.maxMs,
-                p50Ms: percentileFromHistogram(a.histogram, 0.5),
-                p95Ms: percentileFromHistogram(a.histogram, 0.95),
-                p99Ms: percentileFromHistogram(a.histogram, 0.99),
+                p50Ms: p50?.ms ?? null,
+                p95Ms: p95?.ms ?? null,
+                p99Ms: p99?.ms ?? null,
+                p95Overflow: p95?.overflow ?? false,
+                p99Overflow: p99?.overflow ?? false,
                 status2xx: a.s2,
                 status3xx: a.s3,
                 status4xx: a.s4,
                 status5xx: a.s5,
-                errorRate: errors / total,
+                errorRate: a.count > 0 ? (a.s4 + a.s5) / a.count : null,
             };
         })
-        // En yavaş uç en üstte — "hangi endpoint yavaşlıyor" tek bakışta.
-        .sort((a, b) => (b.p95Ms ?? b.avgMs) - (a.p95Ms ?? a.avgMs));
+        // En yavaş uç en üstte. Taşma kovasındaki uçlar p95 olarak EŞİT
+        // göründüğü için (hepsi 12800) sıralama orada `maxMs`'e düşer (O1).
+        .sort((a, b) => sortWeight(b) - sortWeight(a));
 
     const totalErrors = endpoints.reduce((s, e) => s + e.status4xx + e.status5xx, 0);
+    const totalServerErrors = endpoints.reduce((s, e) => s + e.status5xx, 0);
+    const overallP95 = percentileFromHistogram(overallHistogram, 0.95);
 
     return {
         endpoints,
         totalRequests: overallCount,
         totalErrors,
+        totalServerErrors,
         overall: {
             avgMs: overallCount > 0 ? Math.round(overallSum / overallCount) : null,
-            p95Ms: percentileFromHistogram(overallHistogram, 0.95),
+            p95Ms: overallP95?.ms ?? null,
+            p95Overflow: overallP95?.overflow ?? false,
         },
         buckets: DURATION_BUCKETS.map(b => (Number.isFinite(b) ? b : -1)),
+        truncated,
     };
+}
+
+/** Sıralama ağırlığı: taşma kovasında p95 ayırt edici değil → maxMs kullanılır. */
+function sortWeight(e: EndpointPerformance): number {
+    if (e.p95Overflow) return Math.max(e.maxMs, e.p95Ms ?? 0);
+    return e.p95Ms ?? e.avgMs ?? 0;
 }
 
 // ── Retention ────────────────────────────────────────────────────────────

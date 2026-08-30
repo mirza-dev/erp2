@@ -1,11 +1,20 @@
 /**
- * GATE: SQL/migration lint — supabase/migrations/*.sql üzerinde iki kural:
+ * GATE: SQL/migration lint — supabase/migrations/*.sql üzerinde üç kural:
  *
  *  1. SECURITY DEFINER hijyeni: DEFINER içeren YENİ migration `SET search_path`
  *     VE (REVOKE veya GRANT EXECUTE) içermek zorunda (039/054/087 kalıbı).
  *     Mevcut ihlaller DEFINER_GRANDFATHER'da — liste yalnız küçülür.
  *
- *  2. Fonksiyon redefinition takibi: mevcut bir fonksiyonu yeniden tanımlayan
+ *  2. REVOKE'un HEDEF ROLLERİ: her DEFINER fonksiyonu `FROM public, anon,
+ *     authenticated` ile revoke edilmiş olmalı. Yalnız `FROM public` YETMEZ —
+ *     Supabase'in `ALTER DEFAULT PRIVILEGES ... GRANT ALL ON FUNCTIONS TO
+ *     postgres, anon, authenticated, service_role` varsayılanı her yeni
+ *     fonksiyona anon/authenticated için DOĞRUDAN grant verir ve `FROM public`
+ *     yalnız PUBLIC pseudo-rolünü kaldırır. Kural 1 metnin VARLIĞINA baktığı
+ *     için bu sapmayı göremiyordu (2026-08 K1: 5 DEFINER RPC'si canlıda anon
+ *     anahtarıyla çağrılabiliyordu — A/B probe ile kanıtlandı, mig.110 kapattı).
+ *
+ *  3. Fonksiyon redefinition takibi: mevcut bir fonksiyonu yeniden tanımlayan
  *     yeni migration REDEFINITION_CHAINS'te bilinçli kayıtla güncellenmek
  *     zorunda → 088-tipi sessiz davranış kaybı (Y4) review'da görünür olur.
  */
@@ -24,6 +33,35 @@ interface MigInfo {
     hasSearchPath: boolean;
     hasGrant: boolean;
     fns: string[];
+    /** Bu dosyada SECURITY DEFINER olarak tanımlanan fonksiyon adları. */
+    definerFns: string[];
+    /** Bu dosyada `from public, anon, authenticated` ile revoke edilen adlar. */
+    roleRevokedFns: string[];
+}
+
+/** `create or replace function <ad>(...)` bloklarını gövdeleriyle ayırır —
+ *  DEFINER kararı fonksiyon BAŞINA verilmeli (bir migration hem DEFINER hem
+ *  INVOKER fonksiyon tanımlayabilir). */
+function definerFunctionsIn(src: string): string[] {
+    const names: string[] = [];
+    const heads = [...src.matchAll(/CREATE\s+OR\s+REPLACE\s+FUNCTION\s+(?:public\.)?([a-z0-9_]+)/gi)];
+    for (let i = 0; i < heads.length; i++) {
+        const start = heads[i].index ?? 0;
+        const end = i + 1 < heads.length ? (heads[i + 1].index ?? src.length) : src.length;
+        if (/SECURITY\s+DEFINER/i.test(src.slice(start, end))) names.push(heads[i][1].toLowerCase());
+    }
+    return names;
+}
+
+/** `revoke all on function <ad>(...) from <roller>;` — imza çok satırlı olabilir. */
+function roleRevokedFunctionsIn(src: string): string[] {
+    const names: string[] = [];
+    const re = /REVOKE\s+ALL\s+ON\s+FUNCTION\s+(?:public\.)?([a-z0-9_]+)\s*\([\s\S]*?\)\s*FROM\s+([a-z0-9_,\s]+);/gi;
+    for (const m of src.matchAll(re)) {
+        const roles = m[2].toLowerCase();
+        if (roles.includes("anon") && roles.includes("authenticated")) names.push(m[1].toLowerCase());
+    }
+    return names;
 }
 
 /** SQL satır yorumlarını ayıkla — "-- SECURITY DEFINER YOK" gibi açıklamalar
@@ -42,6 +80,8 @@ const inventory: MigInfo[] = files.map((file) => {
         hasGrant: /REVOKE|GRANT EXECUTE/i.test(src),
         fns: [...src.matchAll(/CREATE OR REPLACE FUNCTION\s+(?:public\.)?([a-z0-9_]+)/gi)]
             .map((m) => m[1].toLowerCase()),
+        definerFns: definerFunctionsIn(src),
+        roleRevokedFns: roleRevokedFunctionsIn(src),
     };
 });
 
@@ -70,6 +110,32 @@ describe("GATE — SECURITY DEFINER hijyeni", () => {
             }
         }
         expect(stale, stale.join("\n")).toEqual([]);
+    });
+
+    it("her DEFINER fonksiyonu public+anon+authenticated'tan revoke edilmiş", () => {
+        // Revoke migration'lar arası aranır: sonraki bir migration (ör. 110)
+        // önceki bir dosyanın eksiğini kapatabilir → gate kendi kendini temizler.
+        const roleRevoked = new Set(inventory.flatMap((m) => m.roleRevokedFns));
+        const exempt = new Set(
+            inventory.filter((m) => DEFINER_GRANDFATHER.includes(m.file)).flatMap((m) => m.definerFns),
+        );
+
+        const missing: string[] = [];
+        for (const m of inventory) {
+            for (const fn of m.definerFns) {
+                if (roleRevoked.has(fn) || exempt.has(fn)) continue;
+                missing.push(`${fn} (${m.file})`);
+            }
+        }
+        expect(
+            [...new Set(missing)],
+            `SECURITY DEFINER fonksiyon(lar)ı anon/authenticated'tan revoke EDİLMEMİŞ:\n  ${missing.join("\n  ")}\n` +
+            "→ `REVOKE ALL ON FUNCTION <ad>(<imza>) FROM public, anon, authenticated;` yazın.\n" +
+            "   YALNIZ `FROM public` YETMEZ: Supabase varsayılan ayrıcalıkları anon/authenticated'a\n" +
+            "   DOĞRUDAN EXECUTE verir; `FROM public` yalnız PUBLIC pseudo-rolünü kaldırır.\n" +
+            "   DEFINER fonksiyon çağıranın RLS'ine tabi DEĞİLDİR → tablo policy'leri devreye girmez.\n" +
+            "   Emsal: 055_revoke_ai_feedback_rpc_authenticated.sql · 110_fix_definer_rpc_grants.sql",
+        ).toEqual([]);
     });
 });
 

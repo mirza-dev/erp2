@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetQuoteArchive, dbDownloadArchiveHtml } from "@/lib/supabase/quote-pdf-archives";
 import { resolveQuoteShareSecret, verifyQuoteShareToken } from "@/lib/quote-share-token";
+import { captureRouteError } from "@/lib/api-error";
 
 export const dynamic = "force-dynamic";
 
@@ -65,7 +66,7 @@ export async function GET(
             },
         });
     } catch (err) {
-        console.error("[GET /api/quotes/shared]", err);
+        captureRouteError(err, "GET /api/quotes/shared/[token]", 500);
         return htmlError("Beklenmeyen bir hata oluştu.", 500);
     }
 }

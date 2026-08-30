@@ -25,7 +25,10 @@ import { join } from "node:path";
 
 /** Yorumları düşürür — iddia açıklamaya değil koda/render edilen metne bakmalı. */
 function code(src: string): string {
-    return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    // Satır yorumları ÖNCE ayıklanır: bir `//` yorumunun içindeki `/**`
+    // (ör. "// /dashboard/** erişimi") aksi hâlde blok yorum başlangıcı
+    // sanılıp sonraki `*/`e kadar GERÇEK KODU yutuyordu (2026-08).
+    return src.replace(/^\s*\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
 const DETAIL_SRC = code(readFileSync(

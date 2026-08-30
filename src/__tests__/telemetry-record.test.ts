@@ -177,3 +177,70 @@ describe("hız tavanı (§23, §24) — hata fırtınası telemetriyi pahalıla�
         expect(diag.failures).toBe(0);
     });
 });
+
+/**
+ * 2026-08 Y1/O6 — sızıntı sınırı ve korelasyon bütünlüğü.
+ *
+ * `endpoint`, kardeş alanların (title/message/stack/userAgent/context) aksine
+ * redaksiyonsuz yazılıyordu. `onRequestError` Next'ten HAM `req.url` alır —
+ * sorgu dizesi DAHİL — ve RSC render hataları `handleApiError`'dan geçmediği
+ * için doğrudan bu yola düşer.
+ */
+describe("sızıntı sınırı — endpoint (Y1)", () => {
+    it("sorgu dizesi endpoint'e YAZILMAZ", async () => {
+        await recordError({
+            error: new Error("render patladı"),
+            endpoint: "/dashboard/orders?search=Ahmet%20Yilmaz&customerId=42",
+        });
+        const row = mockRecordOccurrence.mock.calls[0][0] as { endpoint: string };
+        expect(row.endpoint).toBe("/dashboard/orders");
+        expect(row.endpoint).not.toContain("?");
+        expect(row.endpoint).not.toContain("Ahmet");
+    });
+
+    it("dinamik segment yer tutucuya iner — grup ürün başına bölünmez", async () => {
+        await recordError({
+            error: new Error("x"),
+            endpoint: "/api/products/3f2a4b1c-1111-2222-3333-444455556666/attachments",
+        });
+        const row = mockRecordOccurrence.mock.calls[0][0] as { endpoint: string };
+        expect(row.endpoint).toBe("/api/products/[id]/attachments");
+    });
+
+    it("paylaşım token'ı path'te olsa da saklanmaz", async () => {
+        await recordError({
+            error: new Error("x"),
+            endpoint: "/api/quotes/shared/AbCdEf0123456789AbCdEf0123456789",
+        });
+        const row = mockRecordOccurrence.mock.calls[0][0] as { endpoint: string };
+        expect(row.endpoint).toBe("/api/quotes/shared/[token]");
+    });
+
+    it("şablona oturmayan yolda bile sorgu dizesi düşer", async () => {
+        await recordError({
+            error: new Error("x"),
+            endpoint: "/webhook/xyz?email=ali@firma.com",
+        });
+        const row = mockRecordOccurrence.mock.calls[0][0] as { endpoint: string };
+        expect(row.endpoint).not.toContain("?");
+        expect(row.endpoint).not.toContain("ali@firma.com");
+    });
+});
+
+describe("korelasyon bütünlüğü — request id (O6)", () => {
+    it("biçimi bozuk request id null'a düşer (enjeksiyon kapısı iki yolda da)", async () => {
+        await recordError({
+            error: new Error("x"),
+            requestId: "not a valid id!! <script>",
+            userAgent: "curl/8",
+        });
+        const row = mockRecordOccurrence.mock.calls[0][0] as { requestId: string | null };
+        expect(row.requestId).toBeNull();
+    });
+
+    it("geçerli request id korunur", async () => {
+        await recordError({ error: new Error("x"), requestId: "a1b2c3d4e5f60718", userAgent: "x" });
+        const row = mockRecordOccurrence.mock.calls[0][0] as { requestId: string | null };
+        expect(row.requestId).toBe("a1b2c3d4e5f60718");
+    });
+});

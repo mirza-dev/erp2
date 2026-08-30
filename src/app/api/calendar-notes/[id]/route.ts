@@ -10,7 +10,7 @@ import {
     mapCalendarNote,
 } from "@/lib/calendar-notes";
 import { dbDeleteCalendarNote, dbGetCalendarNote, dbUpdateCalendarNote } from "@/lib/supabase/calendar-notes";
-import { safeParseJson } from "@/lib/api-error";
+import { safeParseJson, handleApiError } from "@/lib/api-error";
 import type { UpdateCalendarNoteInput } from "@/lib/supabase/calendar-notes";
 
 function notFound() {
@@ -34,8 +34,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
         if ("response" in result) return result.response;
         return NextResponse.json(mapCalendarNote(result.row, result.actor));
     } catch (err) {
-        console.error("[GET /api/calendar-notes/[id]]", err);
-        return NextResponse.json({ error: "Takvim notu alınamadı." }, { status: 500 });
+        return handleApiError(err, "GET /api/calendar-notes/[id]", { clientMessage: "Takvim notu alınamadı." });
     }
 }
 
@@ -83,8 +82,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         const updated = await dbUpdateCalendarNote(id, patch);
         return NextResponse.json(mapCalendarNote(updated, result.actor));
     } catch (err) {
-        console.error("[PATCH /api/calendar-notes/[id]]", err);
-        return NextResponse.json({ error: "Takvim notu güncellenemedi." }, { status: 500 });
+        return handleApiError(err, "PATCH /api/calendar-notes/[id]", { clientMessage: "Takvim notu güncellenemedi." });
     }
 }
 
@@ -97,7 +95,6 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         await dbDeleteCalendarNote(id);
         return NextResponse.json({ success: true });
     } catch (err) {
-        console.error("[DELETE /api/calendar-notes/[id]]", err);
-        return NextResponse.json({ error: "Takvim notu silinemedi." }, { status: 500 });
+        return handleApiError(err, "DELETE /api/calendar-notes/[id]", { clientMessage: "Takvim notu silinemedi." });
     }
 }

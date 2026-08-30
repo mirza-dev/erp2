@@ -4,6 +4,7 @@ import { dbListAlertsForCalendar } from "@/lib/supabase/alerts";
 import { enrichAlertsWithDueMeta } from "@/lib/services/alert-due-dates";
 import type { AlertStatus, AlertSeverity, AlertType } from "@/lib/database.types";
 import { resolveAuthContext, requirePermissionFor } from "@/lib/auth/role-guard";
+import { handleApiError } from "@/lib/api-error";
 
 // GET /api/alerts/calendar — takvim için zengin liste: her alert'e
 // due_date/due_label/order_code (order-entity alertleri için) eklenir.
@@ -37,7 +38,6 @@ export async function GET(req: NextRequest) {
         const enriched = await enrichAlertsWithDueMeta(alerts);
         return NextResponse.json(enriched);
     } catch (err) {
-        console.error("[GET /api/alerts/calendar]", err);
-        return NextResponse.json({ error: "Alertler alınamadı." }, { status: 500 });
+        return handleApiError(err, "GET /api/alerts/calendar", { clientMessage: "Alertler alınamadı." });
     }
 }

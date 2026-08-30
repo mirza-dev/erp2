@@ -9,8 +9,9 @@ import {
     topStackFrame,
     type Severity,
 } from "./fingerprint";
+import { normalizeEndpoint } from "./endpoint";
 import { redactContext, redactString } from "./redact";
-import { readRequestHeader, readRequestId } from "./request-id";
+import { isValidRequestId, readRequestHeader, readRequestId } from "./request-id";
 
 /**
  * Telemetri yazma yolu — TEK fail-safe kapı (Developer Console §20, §23, §24).
@@ -115,6 +116,27 @@ export interface RecordErrorOptions {
 }
 
 /**
+ * Endpoint'i yazmadan önce güvenli hâle getirir (2026-08 Y1).
+ *
+ * `onRequestError` kancası Next'ten HAM `req.url` alır — **sorgu dizesi
+ * DAHİL** (`base-server.js`: `path: req.url || ''`). RSC render hataları
+ * `handleApiError`'dan geçmediği için `/dashboard/orders?search=<müşteri adı>`
+ * gibi URL'ler doğrudan buraya düşüyordu ve `endpoint`, kardeş alanların
+ * (title/message/stack/userAgent/context) aksine redaksiyonsuz yazılıyordu.
+ *
+ * `normalizeEndpoint` zaten sorgu dizesini ve dinamik segmentleri düşürüyor
+ * ama yalnız RUM yolunda çağrılıyordu. Şablona oturmayan yollar için de en
+ * azından `?`/`#` kesilir ve redaksiyondan geçirilir.
+ */
+function safeEndpoint(raw: string | null | undefined): string | null {
+    if (!raw) return null;
+    const normalized = normalizeEndpoint(raw);
+    if (normalized) return normalized;
+    const path = raw.split("?")[0].split("#")[0];
+    return redactString(path, 200) || null;
+}
+
+/**
  * Bir hatayı kaydeder. Hiçbir koşulda throw etmez ve çağıranı bekletmez
  * (çağıran `after()` içinde tetikler).
  */
@@ -130,6 +152,7 @@ export async function recordError(options: RecordErrorOptions): Promise<void> {
 
         const errorType = extractErrorType(error);
         const endpoint = options.endpoint ?? endpointFromLabel(options.label);
+        const safeEndpointValue = safeEndpoint(endpoint);
         const method = options.method ?? methodFromLabel(options.label);
 
         const normalizedMessage = normalizeMessage(rawMessage);
@@ -140,10 +163,16 @@ export async function recordError(options: RecordErrorOptions): Promise<void> {
             message: rawMessage,
         });
 
-        const [requestId, userAgent] = options.requestId !== undefined
+        // Request id İKİ yoldan gelebilir: `handleApiError` (`readRequestId`,
+        // doğrulamayı kendi yapar) ve `onRequestError` (ham istek başlığı).
+        // İkinci yolda `isValidRequestId` atlanıyordu (2026-08 O6) → istemcinin
+        // gönderdiği keyfi değer korelasyon kolonuna düşebiliyordu. Doğrulama
+        // artık iki yolun da geçtiği TEK noktada.
+        const [rawRequestId, userAgent] = options.requestId !== undefined
             || options.userAgent !== undefined
             ? [options.requestId ?? null, options.userAgent ?? null]
             : await Promise.all([readRequestId(), readRequestHeader("user-agent")]);
+        const requestId = isValidRequestId(rawRequestId) ? rawRequestId : null;
 
         const { dbRecordErrorOccurrence } = await import("@/lib/supabase/telemetry");
         await dbRecordErrorOccurrence({
@@ -154,8 +183,8 @@ export async function recordError(options: RecordErrorOptions): Promise<void> {
             // her şeyi yakalamaz, tırnaksız gömülü token kalabilir.
             normalizedMessage: redactString(normalizedMessage, 500),
             severity,
-            module: moduleFromEndpoint(endpoint),
-            endpoint,
+            module: moduleFromEndpoint(safeEndpointValue),
+            endpoint: safeEndpointValue,
             environment: telemetryEnvironment(),
             occurredAt: new Date().toISOString(),
             requestId,
@@ -182,18 +211,29 @@ export interface RecordEventOptions {
     context?: unknown;
 }
 
-/** Telemetrinin kendi olayı (yavaş istek, retention turu…). Throw etmez. */
+/**
+ * Telemetrinin KENDİ olayı. Throw etmez.
+ *
+ * Bugünkü tek çağıran retention turudur (`/api/developer/retention`). Modülün
+ * ilk yorumu "yavaş istek" olayını da vaat ediyordu ama böyle bir üretici hiç
+ * yazılmadı (2026-08 Nit — belge/davranış sapması). Yavaşlık ölçümü Performans
+ * ekranında RUM histogramından okunuyor; ayrı bir olay satırı üretmek aynı
+ * bilgiyi ikinci kez, üstelik hot path'te yazmak olurdu.
+ */
 export async function recordEvent(options: RecordEventOptions): Promise<void> {
     try {
         if (!isTelemetryEnabled() || !takeToken()) return;
 
         const requestId = await readRequestId();
+        // `recordError` ile aynı sızıntı sınırı (Y1) — bu yolda bugün ham URL
+        // gelmiyor ama sözleşme tek olmalı, sonraki çağıran şansa kalmasın.
+        const safeEndpointValue = safeEndpoint(options.endpoint);
         const { dbRecordSystemEvent } = await import("@/lib/supabase/telemetry");
         await dbRecordSystemEvent({
             level: options.level,
             message: redactString(options.message, 1_000),
-            module: options.module ?? moduleFromEndpoint(options.endpoint),
-            endpoint: options.endpoint ?? null,
+            module: options.module ?? moduleFromEndpoint(safeEndpointValue),
+            endpoint: safeEndpointValue,
             requestId,
             userId: options.userId ?? null,
             environment: telemetryEnvironment(),

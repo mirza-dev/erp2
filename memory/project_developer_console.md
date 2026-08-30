@@ -51,3 +51,31 @@ grup başına saatte 20 örneklenir (grup `occurrence_count` TAM) ·
 **Açık:** migration 109 APPLY · `INTERNAL_OPERATOR_EMAILS` set · tarayıcı turu.
 
 İlgili: [[project_security]] · [[project_integrations]] · [[current_focus]]
+
+## 2026-08-30 — bağımsız inceleme + 29 bulgunun kapanışı
+
+Rapor: `docs/audit/2026-08-developer-console-review.md` (K:2 Y:7 O:7 D:8 Nit:5 → **29/29 düzeltildi**).
+
+**Panelin ilk sürümündeki iki yapısal yanlış:**
+1. **Kapsama iddiası yanlıştı.** `onRequestError` "kalan 33 route"u yakalamıyordu —
+   28'i kendi `catch`'inde yanıt döndürdüğü için hata Next'in sınırına ULAŞMIYOR.
+   Ders: *bir kancanın kapsamı, kancanın varlığıyla değil, hatanın oraya ULAŞMASIYLA ölçülür.*
+   Artık `gate/route-error-coverage.test.ts` kilitliyor (baseline BOŞ).
+2. **Kör olduğunda yeşil gösteriyordu.** `safe(…, emptyErrorStats())` başarısız sondayı
+   ölçülmüş sıfıra çeviriyordu. Ders: *izleme aracında `0` ile `null` ASLA aynı şey değildir.*
+   Sözleşme artık uçtan uca `null = ölçülemedi`; `computeOverallHealth` `telemetryReadable`
+   girdisiyle kör durumda **degraded** diyor.
+
+**Güvenlik dersi (K1, canlıda kanıtlandı):** Supabase'te `revoke … from public`
+varsayılan ayrıcalıkların anon/authenticated'a verdiği DOĞRUDAN EXECUTE'u KALDIRMAZ.
+DEFINER fonksiyonu çağıranın RLS'ine tabi olmadığı için tablo policy'leri devreye girmez.
+A/B probe: 109'un RPC'si anon key ile HTTP 200, kontrol (087) 401/42501.
+→ `mig.110` + gate'te rol-hedefli REVOKE kontrolü. Bkz. [[project_security]].
+
+**Test altyapısı dersi:** `code()` yorum-ayıklayıcısı 11 dosyada kopyalanmıştı ve
+blokları satır yorumlarından ÖNCE ayıklıyordu; `// /dashboard/**` içindeki `/*`
+blok başlangıcı sanılınca aradaki GERÇEK KOD siliniyor, kaynak-kilidi testleri
+sessizce yanlış şeyi doğruluyordu. Sıra düzeltildi (önce satır, sonra blok).
+
+**Yeni kalıcı kapılar:** `gate/route-error-coverage` · `gate/rum-endpoint-allowlist`
+(`known-endpoints.ts` dizinden üretilir) · `sql-migration-lint`'te rol-hedefli REVOKE.

@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createHmac, timingSafeEqual } from "crypto";
 import { getParasutAdapter } from "@/lib/parasut";
 import { createServiceClient } from "@/lib/supabase/service";
+import { captureRouteError } from "@/lib/api-error";
 
 interface TokenRow {
     token_version:      number;
@@ -87,6 +88,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
     try {
         tokens = await adapter.exchangeAuthCode(code, redirectUri);
     } catch (err) {
+        captureRouteError(err, "GET /api/parasut/oauth/callback", 502);
         const msg = err instanceof Error ? err.message : String(err);
         return NextResponse.json({ error: `OAuth kodu değiştirilemedi: ${msg}` }, { status: 502 });
     }
@@ -115,6 +117,7 @@ export async function GET(request: NextRequest): Promise<NextResponse> {
         );
 
     if (upsertError) {
+        captureRouteError(upsertError, "GET /api/parasut/oauth/callback", 500);
         return NextResponse.json({ error: `Token kaydedilemedi: ${upsertError.message}` }, { status: 500 });
     }
 

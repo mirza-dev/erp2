@@ -8,7 +8,7 @@ import {
     mapCalendarNote,
 } from "@/lib/calendar-notes";
 import { dbCreateCalendarNote, dbListVisibleCalendarNotes } from "@/lib/supabase/calendar-notes";
-import { safeParseJson } from "@/lib/api-error";
+import { safeParseJson, handleApiError } from "@/lib/api-error";
 
 export const dynamic = "force-dynamic";
 
@@ -41,8 +41,7 @@ export async function GET(req: NextRequest) {
         const rows = await dbListVisibleCalendarNotes(actor.id, from, to);
         return NextResponse.json(rows.map((row) => mapCalendarNote(row, actor)));
     } catch (err) {
-        console.error("[GET /api/calendar-notes]", err);
-        return NextResponse.json({ error: "Takvim notları alınamadı." }, { status: 500 });
+        return handleApiError(err, "GET /api/calendar-notes", { clientMessage: "Takvim notları alınamadı." });
     }
 }
 
@@ -80,7 +79,6 @@ export async function POST(req: NextRequest) {
         });
         return NextResponse.json(mapCalendarNote(row, actor), { status: 201 });
     } catch (err) {
-        console.error("[POST /api/calendar-notes]", err);
-        return NextResponse.json({ error: "Takvim notu oluşturulamadı." }, { status: 500 });
+        return handleApiError(err, "POST /api/calendar-notes", { clientMessage: "Takvim notu oluşturulamadı." });
     }
 }

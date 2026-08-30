@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serviceSyncOrderToParasut } from "@/lib/services/parasut-service";
-import { safeParseJson } from "@/lib/api-error";
+import { safeParseJson, handleApiError } from "@/lib/api-error";
 import { requirePermission } from "@/lib/auth/role-guard";
 
 // POST /api/parasut/sync
@@ -25,7 +25,6 @@ export async function POST(req: NextRequest) {
 
         return NextResponse.json(result);
     } catch (err) {
-        console.error("[POST /api/parasut/sync]", err);
-        return NextResponse.json({ error: "Sync başarısız." }, { status: 500 });
+        return handleApiError(err, "POST /api/parasut/sync", { clientMessage: "Sync başarısız." });
     }
 }

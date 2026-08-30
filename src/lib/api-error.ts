@@ -14,8 +14,24 @@ import { recordError, scheduleTelemetry } from "@/lib/telemetry/record";
  *   — unexpected runtime or DB error.
  *   — In production: generic message (internal details logged only).
  *   — In development: full error message returned.
+ *
+ * `options.clientMessage` — route'a özel Türkçe mesajı KORUYARAK merkezî
+ * yakalayıcıya geçmek için (2026-08 K2). Verilirse 500 gövdesinde hem dev hem
+ * prod'da o mesaj döner; iç mesaj yalnız log + telemetriye gider. Kendi
+ * `catch`'inde `NextResponse.json({error:"..."},{status:500})` döndüren
+ * route'lar bu parametreyle çevrildi: yanıt sözleşmesi aynı kaldı, hata
+ * artık Hata Merkezi'ne düşüyor ve ConfigError → 503 ayrımı kazanıldı.
  */
-export function handleApiError(err: unknown, label: string): NextResponse {
+export interface HandleApiErrorOptions {
+    /** 500 yanıtında kullanıcıya gösterilecek mesaj (route'a özel). */
+    clientMessage?: string;
+}
+
+export function handleApiError(
+    err: unknown,
+    label: string,
+    options?: HandleApiErrorOptions,
+): NextResponse {
     if (err instanceof ConfigError) {
         console.error(`[CONFIG_ERROR] ${label}`, err.message);
         capture(err, label, 503);
@@ -42,9 +58,12 @@ export function handleApiError(err: unknown, label: string): NextResponse {
     console.error(`[${label}]`, pgCode ? `[${pgCode}]` : "", internalMsg);
     capture(err, label, 500);
 
-    // Production: iç hata mesajı sızmasın (yalnız güvenli SQLSTATE kodu)
+    // Production: iç hata mesajı sızmasın (yalnız güvenli SQLSTATE kodu).
+    // Route kendi mesajını verdiyse o her iki ortamda da kazanır — çevrilen 28
+    // route'un kullanıcıya gösterdiği metin birebir korunsun diye.
     const isProduction = process.env.NODE_ENV === "production";
-    const clientMsg = isProduction ? "Beklenmeyen bir hata oluştu." : internalMsg;
+    const clientMsg = options?.clientMessage
+        ?? (isProduction ? "Beklenmeyen bir hata oluştu." : internalMsg);
 
     return NextResponse.json(
         pgCode ? { error: clientMsg, code: pgCode } : { error: clientMsg },
@@ -55,10 +74,10 @@ export function handleApiError(err: unknown, label: string): NextResponse {
 /**
  * Developer Console telemetri kancası (§21 — merkezi nokta, route'lara dokunmadan).
  *
- * Bu fonksiyon 148 route'un 115'inin catch bloğunda çalışıyor; kaydı BURADAN
- * almak, aynı üç satırı 115 dosyaya kopyalamanın alternatifidir. Kalan 33
- * route (kendi try/catch'ini yazanlar) + RSC hataları `instrumentation.ts`'in
- * `onRequestError` kancasından geçer.
+ * `handleApiError` çağıran her route bu kancadan geçer. Kendi `catch`'inde
+ * kendi yanıtını döndüren route'lar 2026-08 K2 turunda `clientMessage` ile
+ * buraya çevrildi; yanıt şekli JSON-500 OLMAYAN birkaç istisna (503 fallback,
+ * HTML hata sayfası, 502 upstream) `captureRouteError` ile aynı boruya bağlı.
  *
  * `scheduleTelemetry` yanıt gönderildikten sonra çalışır → istek gecikmez.
  * `recordError` hiçbir koşulda throw etmez → telemetri arızası ERP'yi bozmaz.
@@ -70,6 +89,20 @@ export function handleApiError(err: unknown, label: string): NextResponse {
  */
 function capture(err: unknown, label: string, statusCode: number): void {
     scheduleTelemetry(() => recordError({ error: err, label, statusCode }));
+}
+
+/**
+ * Yanıtını kendi üreten route'lar için telemetri kancası (2026-08 K2).
+ *
+ * Kullanım yeri DAR: yanıt şekli `handleApiError`'ınkinden farklı olmak
+ * ZORUNDA olan durumlar — 503 upstream fallback (`exchange-rates` ERROR_BODY
+ * sözleşmesi), HTML hata sayfası (`quotes/shared`), 502 upstream (Paraşüt
+ * OAuth). Yeni route yazarken önce `handleApiError` denenmeli; bu yalnız
+ * gövde sözleşmesi korunmak zorundaysa kullanılır.
+ */
+export function captureRouteError(err: unknown, label: string, statusCode: number): void {
+    console.error(`[${label}]`, err);
+    capture(err, label, statusCode);
 }
 
 /**

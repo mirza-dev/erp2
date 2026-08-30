@@ -1,4 +1,5 @@
 import { probeAIKey } from "@/lib/services/ai-service";
+import { FEED_SOURCES } from "@/lib/telemetry/console-types";
 import {
     dbActiveUserCount,
     dbActivityFeed,
@@ -16,10 +17,8 @@ import {
 } from "@/lib/telemetry/health";
 import { buildServiceHealth, readServiceEnv } from "@/lib/telemetry/service-health";
 import { telemetryEnvironment } from "@/lib/telemetry/record";
-import type { DeveloperBugStatus } from "@/lib/database.types";
 // Yanıt tipleri istemciyle paylaşılır → tek kaynak console-types.
 import type {
-    ErrorWindowStats,
     HealthPayload,
     OverviewPayload,
 } from "@/lib/telemetry/console-types";
@@ -45,11 +44,17 @@ function healthWindowStart(): string {
 export async function collectHealth(): Promise<HealthPayload> {
     const since = healthWindowStart();
 
+    // 2026-08 O5: `dbBackgroundJobHealth` ve `dbExternalServiceHealth` ÇIPLAK
+    // çağrılıyordu; patladıklarında aşağıdaki gerekçe geçersiz kalıp sağlık
+    // route'unun TAMAMI 500 dönüyordu — panel "bir şey bozuk mu" sorusunu
+    // tam da bozukken cevaplayamıyordu.
     const [db, jobs, external, errorStats, perf, ai] = await Promise.all([
         dbPingDatabase(),
-        dbBackgroundJobHealth(),
-        dbExternalServiceHealth(since),
-        safe(() => dbErrorWindowStats(since), emptyErrorStats()),
+        safe(() => dbBackgroundJobHealth(), null),
+        safe(() => dbExternalServiceHealth(since), null),
+        // Y4: fallback SIFIR DEĞİL `null` — sonda patladığında panel "0 kritik
+        // hata" diyip yeşile boyanıyordu (§28 ihlali).
+        safe(() => dbErrorWindowStats(since, telemetryEnvironment()), null),
         safe(() => dbPerformanceSummary(since), null),
         // AI sondası kendi 10 dk önbelleğine sahip; anahtar yoksa istek atmaz.
         safe(() => probeAIKey(), null),
@@ -70,15 +75,23 @@ export async function collectHealth(): Promise<HealthPayload> {
         env: readServiceEnv(),
     });
 
+    // Y3: sağlık kararı YALNIZ 5xx oranını kullanır. 4xx (401 oturum tazeleme,
+    // 404, 400 form doğrulama) sistem kusuru değildir; Performans ekranında
+    // ayrı gösterilir. Eskiden 4xx de sayıldığı için 100 istekte 25 adet 401
+    // genel durumu "Kritik" yapıyor, aynı yanıttaki API satırı ise yalnız 5xx
+    // saydığı için "Sağlıklı" diyordu — panel kendi kendisiyle çelişiyordu.
     const errorRate = perf && perf.totalRequests > 0
-        ? perf.totalErrors / perf.totalRequests
+        ? perf.totalServerErrors / perf.totalRequests
         : null;
 
     const overall = computeOverallHealth({
         services,
-        recentCriticalErrors: errorStats.bySeverity.critical,
-        recentErrors: errorStats.sampledEvents,
+        recentCriticalErrors: errorStats?.bySeverity.critical ?? null,
+        recentErrors: errorStats?.sampledEvents ?? null,
         errorRate,
+        telemetryReadable: errorStats !== null,
+        // Sunucunun kendi hata kaydı varsa RUM oranı doğrulanmış sayılır.
+        errorRateCorroborated: (errorStats?.sampledEvents ?? 0) > 0,
     });
 
     return {
@@ -94,37 +107,50 @@ export async function collectOverview(range: TimeRange): Promise<OverviewPayload
 
     const [health, errorStats, perf, activity, activeUsers, bugCounts] = await Promise.all([
         collectHealth(),
-        safe(() => dbErrorWindowStats(since), emptyErrorStats()),
+        safe(() => dbErrorWindowStats(since, telemetryEnvironment()), null),
         safe(() => dbPerformanceSummary(since), null),
-        safe(() => dbActivityFeed({ since, limit: 12 }), { entries: [], nextCursor: null }),
+        safe(() => dbActivityFeed({ since, limit: 12 }),
+            { entries: [], nextCursor: null, unavailableSources: [...FEED_SOURCES] }),
         safe(() => dbActiveUserCount(since), null),
         safe(() => dbBugCounts(), null),
     ]);
 
-    const counts = bugCounts ?? emptyBugCounts();
+    // D1: tavana dayanan taramaların sonucu KESİN SAYI değil ALT SINIRDIR.
+    const truncatedMetrics: string[] = [];
+    if (errorStats?.truncated) truncatedMetrics.push("Hata olayı", "Kritik hata", "Uyarı", "Aktif hata grubu");
+    if (perf?.truncated) truncatedMetrics.push("İstek", "Hata oranı");
+    if (activeUsers?.truncated) truncatedMetrics.push("Aktif kullanıcı");
 
     return {
         range,
         since,
         environment: telemetryEnvironment(),
         metrics: {
-            sampledErrorEvents: errorStats.sampledEvents,
-            criticalErrors: errorStats.bySeverity.critical,
-            warnings: errorStats.bySeverity.warning,
-            activeErrorGroups: errorStats.activeGroups,
+            // `null` = ölçülemedi (MetricCard "Ölçülmüyor" yazar), `0` = ölçüldü.
+            sampledErrorEvents: errorStats?.sampledEvents ?? null,
+            criticalErrors: errorStats?.bySeverity.critical ?? null,
+            warnings: errorStats?.bySeverity.warning ?? null,
+            activeErrorGroups: errorStats?.activeGroups ?? null,
             requests: perf && perf.totalRequests > 0 ? perf.totalRequests : null,
             errorRate: perf && perf.totalRequests > 0
                 ? perf.totalErrors / perf.totalRequests
                 : null,
+            serverErrorRate: perf && perf.totalRequests > 0
+                ? perf.totalServerErrors / perf.totalRequests
+                : null,
             avgResponseMs: perf?.overall.avgMs ?? null,
             p95ResponseMs: perf?.overall.p95Ms ?? null,
-            activeUsers,
+            activeUsers: activeUsers?.users ?? null,
             uptimeSeconds: process.uptime(),
-            openBugs: counts.open + counts.investigating + counts.in_progress,
+            openBugs: bugCounts
+                ? bugCounts.open + bugCounts.investigating + bugCounts.in_progress
+                : null,
         },
         health,
         recentActivity: activity.entries,
-        bugCounts: counts,
+        bugCounts,
+        truncatedMetrics,
+        unavailableSources: activity.unavailableSources,
         generatedAt: new Date().toISOString(),
     };
 }
@@ -144,16 +170,8 @@ async function safe<T>(fn: () => Promise<T>, fallback: T): Promise<T> {
     }
 }
 
-function emptyErrorStats(): ErrorWindowStats {
-    return {
-        sampledEvents: 0,
-        bySeverity: { info: 0, warning: 0, error: 0, critical: 0 },
-        activeGroups: 0,
-    };
-}
-
-function emptyBugCounts(): Record<DeveloperBugStatus, number> {
-    return {
-        open: 0, investigating: 0, in_progress: 0, fixed: 0, closed: 0, ignored: 0,
-    };
-}
+/**
+ * `emptyErrorStats()` / `emptyBugCounts()` KALDIRILDI (2026-08 Y4).
+ * Başarısız bir sondayı sıfırlarla doldurmak, "ölçtük ve sıfır çıktı" demekle
+ * aynı şeydi; panel kör olduğu anda yeşile boyanıyordu. Fallback artık `null`.
+ */

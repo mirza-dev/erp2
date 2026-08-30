@@ -27,7 +27,7 @@ import { createClient } from "@/lib/supabase/server";
 import { parseRoles } from "@/lib/auth/permissions";
 import { clearAllData, runSeed } from "@/lib/seed/seed-runner";
 import { dbGetCompanySettings } from "@/lib/supabase/company-settings";
-import { safeParseJson } from "@/lib/api-error";
+import { safeParseJson, handleApiError } from "@/lib/api-error";
 
 type AuthKind = "cron" | "session" | null;
 
@@ -97,11 +97,9 @@ export async function DELETE(request: NextRequest) {
             cleaned,
         });
     } catch (err) {
-        console.error("[DELETE /api/seed]", err);
-        return NextResponse.json(
-            { error: err instanceof Error ? err.message : "Silme başarısız." },
-            { status: 500 }
-        );
+        return handleApiError(err, "DELETE /api/seed", {
+            clientMessage: err instanceof Error ? err.message : "Silme başarısız.",
+        });
     }
 }
 
@@ -120,10 +118,8 @@ export async function POST(request: NextRequest) {
         const seeded = await runSeed(supabase);
         return NextResponse.json({ ok: true, cleared, seeded });
     } catch (err) {
-        console.error("[POST /api/seed]", err);
-        return NextResponse.json(
-            { error: err instanceof Error ? err.message : "Seed başarısız." },
-            { status: 500 }
-        );
+        return handleApiError(err, "POST /api/seed", {
+            clientMessage: err instanceof Error ? err.message : "Seed başarısız.",
+        });
     }
 }

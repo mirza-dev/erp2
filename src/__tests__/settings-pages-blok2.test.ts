@@ -19,7 +19,10 @@ const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 
 /** Yorumları düşürür — iddia açıklamaya değil koda bakmalı. */
 function code(src: string): string {
-    return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    // Satır yorumları ÖNCE ayıklanır: bir `//` yorumunun içindeki `/**`
+    // (ör. "// /dashboard/** erişimi") aksi hâlde blok yorum başlangıcı
+    // sanılıp sonraki `*/`e kadar GERÇEK KODU yutuyordu (2026-08).
+    return src.replace(/^\s*\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
 const SETTINGS = code(read("src/app/dashboard/settings/page.tsx"));

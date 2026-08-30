@@ -33,13 +33,15 @@ export interface ServiceHealthInput {
     /** `process.uptime()` — saniye. */
     uptimeSeconds: number;
     db: { ok: boolean; ms: number; error: string | null };
-    jobs: BackgroundJobHealth;
+    /** Sonda patladıysa null → satır `unknown` olur, ASLA "0 bekleyen" (Y4). */
+    jobs: BackgroundJobHealth | null;
+    /** Sonda patladıysa null → e-posta/Paraşüt/arıza satırları `unknown` (Y4). */
     external: {
         emailFailures: number;
         emailTotal: number;
         openIncidents: number;
         lastIntegrationError: string | null;
-    };
+    } | null;
     /** RUM'dan gelen istek sayıları; ölçüm yoksa null. */
     api: { total: number; serverErrors: number } | null;
     ai: AiHealth | null;
@@ -109,10 +111,32 @@ export function buildServiceHealth(input: ServiceHealthInput): ServiceHealth[] {
         label: "Paraşüt",
         status: !input.env.parasutEnabled
             ? "unknown"
-            : input.external.lastIntegrationError ? "degraded" : "healthy",
+            : !input.external
+                ? "unknown"
+                : input.external.lastIntegrationError ? "degraded" : "healthy",
         detail: !input.env.parasutEnabled
             ? "Kapalı (PARASUT_ENABLED=false)"
-            : input.external.lastIntegrationError ?? "Son pencerede hata yok",
+            : !input.external
+                ? `${NOT_MEASURED} — sonda çalışmadı`
+                : input.external.lastIntegrationError ?? "Son pencerede hata yok",
+        essential: false,
+    });
+
+    // ── Bakım / arıza ────────────────────────────────────────────────────
+    // 2026-08 O4: `openIncidents` hesaplanıyordu ama hiçbir yerde OKUNMUYORDU
+    // → açık bir bakım arızası varken panel bunu ne satırda ne genel durumda
+    // gösteriyordu. Sorgunun maliyeti zaten ödeniyordu; karara bağlandı.
+    services.push({
+        key: "incidents",
+        label: "Bakım / Arıza",
+        status: !input.external
+            ? "unknown"
+            : input.external.openIncidents > 0 ? "degraded" : "healthy",
+        detail: !input.external
+            ? `${NOT_MEASURED} — sonda çalışmadı`
+            : input.external.openIncidents > 0
+                ? `${input.external.openIncidents} açık arıza kaydı`
+                : "Açık arıza yok",
         essential: false,
     });
 
@@ -154,7 +178,18 @@ export function buildServiceHealth(input: ServiceHealthInput): ServiceHealth[] {
     return services;
 }
 
-function buildJobsHealth(jobs: BackgroundJobHealth): ServiceHealth {
+function buildJobsHealth(jobs: BackgroundJobHealth | null): ServiceHealth {
+    // Sonda okunamadıysa "0 bekleyen · sağlıklı" DEMEZ (Y4) — kuyruk taşıyor
+    // olabilir ve panel bunu bilmiyordur.
+    if (!jobs) {
+        return {
+            key: "jobs",
+            label: "Arka Plan İşleri",
+            status: "unknown",
+            detail: `${NOT_MEASURED} — kuyruk sondası okunamadı`,
+            essential: false,
+        };
+    }
     const parts: string[] = [`${jobs.queued} bekleyen`];
     if (jobs.failed > 0) parts.push(`${jobs.failed} başarısız`);
     if (jobs.oldestQueuedMinutes !== null) parts.push(`en eski ${jobs.oldestQueuedMinutes} dk`);
@@ -181,6 +216,15 @@ function buildEmailHealth(
     external: ServiceHealthInput["external"],
     resendConfigured: boolean,
 ): ServiceHealth {
+    if (external === null) {
+        return {
+            key: "email",
+            label: "E-posta (Resend)",
+            status: "unknown",
+            detail: `${NOT_MEASURED} — teslimat sondası okunamadı`,
+            essential: false,
+        };
+    }
     if (!resendConfigured) {
         return {
             key: "email",

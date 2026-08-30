@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { processResendWebhook, verifyResendWebhook } from "@/lib/services/email-webhook-service";
+import { handleApiError } from "@/lib/api-error";
 
 export async function POST(req: NextRequest) {
     const id = req.headers.get("svix-id") ?? "";
@@ -24,7 +25,9 @@ async function processVerifiedEvent(
     try {
         const result = await processResendWebhook(event, id);
         return NextResponse.json({ ok: true, duplicate: result.duplicate, matched: result.matched });
-    } catch {
-        return NextResponse.json({ error: "Webhook işlenemedi." }, { status: 500 });
+    } catch (err) {
+        return handleApiError(err, "POST /api/email/webhooks/resend", {
+            clientMessage: "Webhook işlenemedi.",
+        });
     }
 }

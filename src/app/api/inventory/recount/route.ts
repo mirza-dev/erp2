@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbRecountStock, dbTryResolveShortages } from "@/lib/supabase/products";
-import { safeParseJson } from "@/lib/api-error";
+import { safeParseJson, handleApiError } from "@/lib/api-error";
 import { requirePermission, getCurrentUserId } from "@/lib/auth/role-guard";
 import { revalidateTag } from "next/cache";
 import { broadcastDataChange } from "@/lib/realtime/broadcast";
@@ -85,7 +85,6 @@ export async function POST(req: NextRequest) {
             delta:       result.delta,
         }, { status: 201 });
     } catch (err) {
-        console.error("[POST /api/inventory/recount]", err);
-        return NextResponse.json({ error: "Sayım kaydedilemedi." }, { status: 500 });
+        return handleApiError(err, "POST /api/inventory/recount", { clientMessage: "Sayım kaydedilemedi." });
     }
 }

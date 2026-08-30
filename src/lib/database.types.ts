@@ -1100,6 +1100,8 @@ export interface SystemErrorEventRow {
     id:          string
     group_id:    string
     occurred_at: string
+    /** Olayın KENDİ ciddiyeti (mig.111 O3) — grubun monoton seviyesi değil. */
+    severity:    TelemetrySeverity
     request_id:  string | null
     endpoint:    string | null
     method:      string | null

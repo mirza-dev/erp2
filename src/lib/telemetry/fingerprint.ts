@@ -49,7 +49,9 @@ export function topStackFrame(stack: string | null | undefined): string {
     const own = lines.find(l => !l.includes("node_modules") && !l.includes("node:internal"));
     const picked = own ?? lines[0] ?? "";
     // Satır/sütun numaraları build'den build'e kayar → parmak izinden düşür.
-    return picked.replace(/:\d+:\d+\)?$/, ")").slice(0, 200);
+    // Kapanış parantezi yalnız AÇILMIŞSA geri konur: "at /app/x.ts:10:5"
+    // girdisi eskiden "at /app/x.ts)" oluyordu (2026-08 Nit).
+    return picked.replace(/:\d+:\d+(\))?$/, (_m, close) => (close ? ")" : "")).slice(0, 200);
 }
 
 /** Hata sınıfı adı. Supabase/Postgres düz nesnelerinde SQLSTATE kodu kullanılır. */
@@ -79,9 +81,12 @@ export function fingerprintError(input: {
     topFrame?: string;
 }): string {
     const basis = [input.errorType, input.normalizedMessage, input.topFrame ?? ""].join(" ");
-    // İki bağımsız tohumla iki 32-bit yarım → 64 bit. BigInt yerine `Math.imul`:
+    // İki farklı tohumla iki 32-bit yarım → 64 bit. BigInt yerine `Math.imul`:
     // proje hedefi ES2017 ve BigInt literali ES2020 istiyor; bu biçim her
     // çalışma zamanında (Node · Edge · tarayıcı) aynı sonucu verir.
+    // Yarımların BAĞIMSIZLIĞINI `mix32` finalizeri sağlar — ham FNV-1a'da
+    // düşük bit yalnız girdi paritesine bağlıydı ve iki yarım o bitte her
+    // zaman eşleşiyordu (bkz. mix32 yorumu, 2026-08 Nit).
     const hi = fnv1a32(basis, 0x811c9dc5);
     const lo = fnv1a32(basis, 0x9e3779b9);
     return hi.toString(16).padStart(8, "0") + lo.toString(16).padStart(8, "0");
@@ -96,7 +101,23 @@ function fnv1a32(input: string, seed: number): number {
         hash = Math.imul(hash ^ (code & 0xff), PRIME) >>> 0;
         hash = Math.imul(hash ^ ((code >>> 8) & 0xff), PRIME) >>> 0;
     }
-    return hash >>> 0;
+    return mix32(hash);
+}
+
+/**
+ * Avalanche karıştırıcı (murmur3 finalizer).
+ *
+ * 2026-08 Nit: HAM FNV-1a'da düşük bit yalnız girdi paritesine bağlıdır —
+ * çarpan tek sayı olduğu için `bit0(hash) = bit0(seed) XOR parity(bytes)`.
+ * İki yarım aynı baytları gördüğünden `hi & 1 === lo & 1` HER ZAMAN doğruydu
+ * (200k girdide ölçüldü: oran 1.0) ve "iki bağımsız tohum → 64 bit" iddiası
+ * gerçekte 63 bit ediyordu. Finalizer düşük biti tüm girdi bitlerine bağlar.
+ */
+function mix32(h: number): number {
+    let x = h >>> 0;
+    x = Math.imul(x ^ (x >>> 16), 0x85ebca6b) >>> 0;
+    x = Math.imul(x ^ (x >>> 13), 0xc2b2ae35) >>> 0;
+    return (x ^ (x >>> 16)) >>> 0;
 }
 
 /**

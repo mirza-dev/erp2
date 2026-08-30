@@ -34,7 +34,13 @@ const healthy = {
     services: [svc({ key: "database", label: "Veritabanı", essential: true })],
     recentCriticalErrors: 0,
     recentErrors: 0,
+    // 2026-08 Y3: bu oran artık YALNIZ 5xx'i temsil eder (4xx sağlık kararına
+    // girmiyor); eşik anlamı değişmedi.
     errorRate: 0,
+    // 2026-08 Y4: telemetri okunabildi mi. `false` → panel ASLA healthy demez.
+    telemetryReadable: true,
+    // 2026-08 Y5: RUM oranı sunucu kaydıyla doğrulandı mı.
+    errorRateCorroborated: true,
 };
 
 describe("computeOverallHealth — karar sırası", () => {
@@ -304,5 +310,60 @@ describe("formatUptime", () => {
     it("geçersiz değer 'Ölçülmüyor'", () => {
         expect(formatUptime(Number.NaN)).toBe("Ölçülmüyor");
         expect(formatUptime(-1)).toBe("Ölçülmüyor");
+    });
+});
+
+/**
+ * 2026-08 Y4 — panelin en tehlikeli davranışı: kör olduğunda yeşil göstermek.
+ * Sonda patlayınca sayaçlar sıfıra düşüyordu ve `computeOverallHealth` bunu
+ * "kritik olay yok" diye okuyup "healthy" diyordu.
+ */
+describe("telemetri okunamadığında (Y4)", () => {
+    it("sayaçlar null iken ASLA healthy demez", () => {
+        const out = computeOverallHealth({
+            ...healthy,
+            recentCriticalErrors: null,
+            recentErrors: null,
+            errorRate: null,
+            telemetryReadable: false,
+        });
+        expect(out.status).toBe("degraded");
+        expect(out.reason).toContain("okunamadı");
+    });
+
+    it("okunamayan telemetri, ÇÖKMÜŞ zorunlu servisin önüne geçmez", () => {
+        const out = computeOverallHealth({
+            ...healthy,
+            services: [svc({ label: "Veritabanı", status: "critical", essential: true })],
+            telemetryReadable: false,
+        });
+        expect(out.status).toBe("critical");
+        expect(out.reason).toContain("Veritabanı");
+    });
+
+    it("okunabilir telemetride sıfır sayaç healthy kalır (regresyon değil)", () => {
+        expect(computeOverallHealth(healthy).status).toBe("healthy");
+    });
+});
+
+/**
+ * 2026-08 Y5 — `errorRate` istemci bildirimi olan RUM'dan gelir ve ingest ucu
+ * `view_dashboard` taşıyan HER role açıktır. Sunucu kaydı doğrulamıyorsa tek
+ * bir kullanıcının sahte 5xx yüklemesi paneli "Kritik"e çevirmemeli.
+ */
+describe("RUM oranının doğrulanması (Y5)", () => {
+    it("doğrulanmamış yüksek oran critical DEĞİL degraded üretir", () => {
+        const out = computeOverallHealth({
+            ...healthy, errorRate: 0.9, errorRateCorroborated: false,
+        });
+        expect(out.status).toBe("degraded");
+        expect(out.reason).toContain("doğrulanmadı");
+    });
+
+    it("sunucu kaydıyla doğrulanmış yüksek oran critical üretir", () => {
+        const out = computeOverallHealth({
+            ...healthy, errorRate: 0.9, errorRateCorroborated: true,
+        });
+        expect(out.status).toBe("critical");
     });
 });

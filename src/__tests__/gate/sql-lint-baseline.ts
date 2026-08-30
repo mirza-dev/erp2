@@ -68,4 +68,11 @@ export const REDEFINITION_CHAINS: Record<string, string[]> = {
     try_acquire_ai_suggest_lock: ["019", "095"],
     release_ai_suggest_lock: ["019", "095"],
     check_migration_011_applied: ["016", "095"],
+    // 111 (inceleme Y7/O3/D3/D4): grup anahtarı (fingerprint, environment) oldu ·
+    // olay satırına severity yazılır · histogram coalesce + uzunluk ön kontrolü ·
+    // purge'e "180 gündür görülmemiş AÇIK grup" kolu. 109'un yalnız-yukarı
+    // ciddiyet, yeniden-açılma ve saatlik örnekleme davranışları KORUNDU.
+    record_error_occurrence: ["109", "111"],
+    record_request_metrics: ["109", "111"],
+    purge_telemetry: ["109", "111"],
 };

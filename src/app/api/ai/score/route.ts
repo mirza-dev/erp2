@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { aiScoreOrder } from "@/lib/services/ai-service";
-import { safeParseJson } from "@/lib/api-error";
+import { safeParseJson, handleApiError } from "@/lib/api-error";
 import { guardAiRoute } from "@/lib/ai-route-limit";
 
 // POST /api/ai/score
@@ -26,8 +26,8 @@ export async function POST(req: NextRequest) {
         const result = await aiScoreOrder(order_id);
         return NextResponse.json(result);
     } catch (err) {
-        console.error("[POST /api/ai/score]", err);
-        const message = err instanceof Error ? err.message : "Score işlemi başarısız.";
-        return NextResponse.json({ error: message }, { status: 500 });
+        return handleApiError(err, "POST /api/ai/score", {
+            clientMessage: err instanceof Error ? err.message : "Score işlemi başarısız.",
+        });
     }
 }

@@ -141,6 +141,9 @@ export const POLICIES = {
     // çıkarılırsa aktif olur. selectPolicy `POST /api/parasut/*` için bunu seçer.
     PARASUT_SYNC: { name: "psync", points: 30,  duration: 60 },                        // 30 / dk
     // Authenticated user normal API (Supabase auth cookie VEYA demo_mode cookie)
+    /** RUM ingest — istek başına 50 örnek taşır; genel API tavanı fazla cömert
+     *  kalıyordu (2026-08 Y5). Panelin ihtiyacı 30 sn'de bir flush. */
+    RUM:          { name: "rum",   points: 30,  duration: 60 },
     API_AUTH:     { name: "auth",  points: 300, duration: 60 },                        // 300 / dk
     // Anon (login öncesi public read)
     API_ANON:     { name: "anon",  points: 30,  duration: 60 },                        // 30 / dk
@@ -267,6 +270,7 @@ export function selectPolicy(pathname: string, method: string, isAuthenticated: 
     if (pathname === "/api/auth/demo" || pathname.startsWith("/api/auth/demo/"))   return POLICIES.DEMO;
     if (pathname.startsWith("/api/ai/"))                                           return POLICIES.AI;
     if (pathname.startsWith("/api/parasut/") && method !== "GET")                  return POLICIES.PARASUT_SYNC;
+    if (pathname === "/api/developer/rum")                                         return POLICIES.RUM;
     if (pathname.startsWith("/api/"))                                              return isAuthenticated ? POLICIES.API_AUTH : POLICIES.API_ANON;
     return POLICIES.API_AUTH;  // /dashboard/** vb — practical olarak hit etmez (middleware /api ve auth path filter)
 }

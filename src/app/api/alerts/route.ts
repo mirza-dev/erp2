@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { serviceListAlerts } from "@/lib/services/alert-service";
 import type { AlertStatus, AlertSeverity, AlertType } from "@/lib/database.types";
+import { handleApiError } from "@/lib/api-error";
 
 // GET /api/alerts?status=open&severity=critical&type=stock_critical
 export async function GET(req: NextRequest) {
@@ -22,7 +23,6 @@ export async function GET(req: NextRequest) {
         });
         return NextResponse.json(alerts);
     } catch (err) {
-        console.error("[GET /api/alerts]", err);
-        return NextResponse.json({ error: "Alertler alınamadı." }, { status: 500 });
+        return handleApiError(err, "GET /api/alerts", { clientMessage: "Alertler alınamadı." });
     }
 }

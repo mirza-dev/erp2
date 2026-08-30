@@ -16,7 +16,7 @@ vi.mock("@/lib/auth/role-guard", () => ({
     getCurrentUserRoles: vi.fn().mockResolvedValue(["admin"]),
     getCurrentUserRole: vi.fn().mockResolvedValue("admin"),
 }));
-import { NextRequest } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 const mockDbGetDraft = vi.fn();
 const mockDbUpdateDraft = vi.fn();
@@ -31,6 +31,10 @@ vi.mock("@/lib/api-error", () => ({
         const data = await req.json();
         return { ok: true, data };
     },
+    // Route 2026-08 K2 turunda merkezî yakalayıcıya çevrildi (hata artık
+    // Developer Console'a düşüyor). Testin iddiası aynı: throw → 500 + mesaj.
+    handleApiError: (_err: unknown, _label: string, opts?: { clientMessage?: string }) =>
+        NextResponse.json({ error: opts?.clientMessage ?? "Beklenmeyen bir hata oluştu." }, { status: 500 }),
 }));
 
 import { PATCH, GET } from "@/app/api/import/drafts/[id]/route";

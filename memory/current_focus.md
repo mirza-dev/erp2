@@ -5,6 +5,115 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-08-30 (gece) — İnceleme bulgularının kapanışı: 29/29 düzeltildi
+
+`docs/audit/2026-08-developer-console-review.md`'deki **K:2 Y:7 O:7 D:8 Nit:5**
+bulgunun tamamı kapatıldı. Zemin: tsc 0 · lint 0 · **480 dosya / 6779 test**
+(6713'ten +66) · build 0 uyarı · semgrep (değişen yüzey) 0 · check-migrations
+yalnız 111'i eksik raporluyor.
+
+**İKİ MIGRATION APPLY BEKLİYOR (kullanıcı):** `110` (K1 güvenlik — CANLI açık)
+ve `111` (şema: Y7/O3/D3/D4 + status CHECK).
+
+**K1 — DEFINER/anon açığı.** `mig.110` beş fonksiyonu `from public, anon,
+authenticated` ile revoke ediyor (109×3 + 097×2). Gate sertleştirildi:
+`sql-migration-lint`'e **rol-hedefli REVOKE** iddiası eklendi ve kanıtlandı —
+110 dosyadan çıkarılınca gate tam o beş fonksiyonu sayıyor, 110 varken geçiyor.
+`developer-migration-109.test.ts:64`'ün yanlış-yön iddiası pozitife çevrildi.
+
+**K2 — kapsama 131/159 → 159/159.** `handleApiError(err, label, { clientMessage })`
+eklendi; **28 route** çevrildi (mesajlar BİREBİR korundu, ConfigError→503
+kazanıldı). Gövde şekli farklı olmak zorunda olan 3 yer (`exchange-rates` 503,
+`quotes/shared` HTML, `parasut/oauth/callback` 502) `captureRouteError` ile aynı
+boruya bağlandı. YENİ `gate/route-error-coverage.test.ts`: 5xx döndüren her catch
+telemetriye bağlı olmalı — **baseline BOŞ**.
+
+**Y2 — sunucu Sentry'si.** `instrumentation.ts`'e `register()` eklendi
+(NEXT_RUNTIME → kök config). `Sentry.init` kopyalanmadı (tek kaynak korunuyor).
+
+**Ölçüm dürüstlüğü (Y3/Y4/O4/O5/O7/D1/D2).** `null = ölçülemedi` sözleşmesi uçtan
+uca: `safe(…, null)`, metrikler `number | null`, `computeOverallHealth`'e
+`telemetryReadable` → panel kör olduğunda ASLA healthy demiyor. Sağlık kararı
+yalnız **5xx** oranını kullanıyor (4xx ayrı kart). Sondalar `.error` kontrol
+ediyor. `openIncidents` "Bakım/Arıza" satırına bağlandı. Feed kaynakları
+`unavailableSources` sinyalliyor. Kırpılan taramalar `truncated` → panelde "≥".
+
+**Y5 — RUM.** `known-endpoints.ts` (200 şablon, dizinden üretilir + senkron gate);
+tanınmayan yol ATILIYOR → kardinalite patlaması kapandı. `POLICIES.RUM` (30/dk).
+Sağlık, RUM oranını sunucu kaydıyla çapraz doğruluyor (`errorRateCorroborated`).
+
+**Y6/O2 — Kayıtlar.** Filtreler her kaynağın SORGUSUNA indi (ölü
+`dbListSystemEvents` devreye girdi); bileşik imleç `<snapshot>|<ts>|<id>` +
+`lte(snapshot)` → hareketli `last_seen_at` yüzünden en aktif grubun listeden
+düşmesi bitti.
+
+**D7 — proxy matcher.** `.*\..*` muafiyeti uzantı-son-eki allowlist'ine indi.
+DİKKAT: Next `config.matcher`'ı STATİK literal ister — string birleştirme
+build'i "route-segment-config" hatasıyla kırıyor (denendi, tek satıra alındı).
+
+**YAN BULGU — test altyapısında latent kusur.** `code()` yorum-ayıklayıcısı
+**11 dosyada** kopyalanmış ve blokları satır yorumlarından ÖNCE ayıklıyordu;
+`proxy.ts`'teki `// /dashboard/** erişimi` satırındaki `/*` blok başlangıcı
+sanılıp sonraki `*/`e kadar GERÇEK KOD siliniyordu → kaynak-kilidi testleri
+sessizce yanlış şeyi doğruluyordu. Sıra 11 dosyada da düzeltildi.
+
+**Parmak izi gerçekten 64 bit oldu.** Ham FNV-1a'da düşük bit yalnız girdi
+paritesine bağlıydı → `hi & 1 === lo & 1` HER ZAMAN. `mix32` (murmur3 finalizer)
+eklendi; ölçüldü: eşitlik oranı **1.0 → 0.498**, 200k girdide 0 çakışma.
+
+
+## 2026-08-30 (akşam) — Developer Console bağımsız inceleme + K1 CANLI GÜVENLİK AÇIĞI
+
+`ae7a9c1` üç bağımsız ajana review ettirildi (güvenlik/yetki · doğruluk/veri ·
+regresyon/arayüz), sonra bulgular ana ajan tarafından kaynaktan ve **canlı
+sistemden** yeniden doğrulandı. Rapor: `docs/audit/2026-08-developer-console-review.md`
+(**K:2 Y:7 O:7 D:8 Nit:5**).
+
+**Zemin yeşil:** tsc 0 · eslint 0 · 476 dosya/6713 test · build 0 uyarı ·
+semgrep 0 · gitleaks 0. **Mevcut ERP bozulmadı** — Supabase çerez düşmesi,
+`handleApiError` self-patlaması, `register()` yokluğu, fetch sarmalayıcı,
+`database.types.ts` hipotezlerinin hepsi kanıtla çürütüldü (rapordaki tabloda).
+
+**K1 — CANLIDA DOĞRULANDI, AÇIK.** SECURITY DEFINER RPC'leri `anon` rolüne açık.
+Salt-okunur A/B probe: `record_request_metrics` anon key ile **HTTP 200**,
+kontrol `dashboard_monthly_cogs` **401 / 42501**. Sebep: `revoke … from public`
+Supabase'in varsayılan ayrıcalıklarının verdiği DOĞRUDAN anon/authenticated
+grant'ini KALDIRMAZ; repo standardı `from public, anon, authenticated`
+(emsal: `055`). 5 fonksiyon etkileniyor — 109'un üçü + **097'nin ikisi**
+(`claim_notification_outbox`, `update_email_delivery_from_provider`; bunlar bu
+commit'ten değil, aynı mekanizma olduğu için bulundu).
+→ **`supabase/migrations/110_fix_definer_rpc_grants.sql` YAZILDI, APPLY BEKLİYOR.**
+İki koruma da kördü: `developer-migration-109.test.ts:64` yanlış yönü test ediyor,
+`sql-migration-lint.test.ts:42` yalnız REVOKE metninin varlığına bakıyor → gate
+rol-hedefli kontrolle sertleştirilmeli.
+
+**K2 — kapsama iddiası yanlış.** `onRequestError` "kalan 33 route"un 28'ine
+ULAŞMIYOR: o route'lar kendi `catch`'inde yanıt döndüğü için hata Next'in
+sınırına hiç ulaşmıyor. Gerçek kapsama 131/159. import/parasut/alerts/inventory
+arızaları panelde görünmez.
+
+**Y2 — sunucu/edge Sentry hiç başlamıyor** (v10 kök `sentry.*.config.ts`'i
+otomatik yüklemiyor; SDK `webpack.js:534-540` bunu söylüyor). Bu commit Sentry'yi
+BOZMADI — zaten çalışmıyordu — ama dosyası `@sentry/` içerdiği için SDK'nın
+uyarısını **sustur du** (`webpack.js:524-528`) ve yanlış varsayımı yorumda +
+`developer-integration.test.ts:62-68`'de kilitledi.
+
+Diğer yüksekler: Y1 ham URL (query string dahil) redaksiyonsuz `endpoint`'e
+yazılıyor (RSC hataları bu yoldan geçiyor) · Y3 sağlık hata oranı 4xx sayıyor,
+aynı ekrandaki API satırı yalnız 5xx · Y4 başarısız sonda "ölçülmüş sıfır"+yeşil
+(§28 ihlali) · Y5 RUM ingest bütünlük/kota yok (yorumu "tanınmayan path yazılmaz"
+diyor, kod biçim doğruluyor) · Y6 Kayıtlar filtreleri fetch sonrası, sayfalama
+erken duruyor · Y7 hata grupları ortamları karıştırıyor.
+
+**Migration 109 UYGULANDI** (kullanıcı bildirdi). Açık: **110 APPLY** ·
+`INTERNAL_OPERATOR_EMAILS` · tarayıcı turu.
+
+**Ders:** doğrulayıcının ilk teşhisi de iddiadır — bu turda üç ajan bulgusunun
+ikisi ana ajan tarafından düzeltildi (Y5'in DoS gerekçesi yorumda değil kodda,
+Y2 "regresyon" değil "önceden bozuk + uyarı susturuldu"), K1 ise teoriden
+**canlı kanıta** yükseltildi.
+
+
 ## 2026-08-30 — Developer Console / System Health Panel (migration 109)
 
 Kullanıcı 30 maddelik bir şartname verdi: yalnız geliştiricinin eriştiği bir

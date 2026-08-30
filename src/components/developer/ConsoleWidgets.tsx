@@ -1,7 +1,7 @@
 "use client";
 
 import type { CSSProperties, ReactNode } from "react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Check, Copy } from "lucide-react";
 import Badge, { type BadgeTone } from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -190,6 +190,12 @@ export function RangePicker({
 /** Monospace + kopyalanabilir (§7). Uzun satırlar yatayda kendi içinde kayar. */
 export function StackTrace({ stack }: { stack: string | null }) {
     const [copied, setCopied] = useState(false);
+    // Zamanlayıcı unmount'ta temizlenir — kullanıcı 1,8 sn dolmadan başka
+    // sayfaya geçerse sökülmüş bileşende state set edilmesin (2026-08 Nit).
+    const resetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(() => () => {
+        if (resetTimer.current) clearTimeout(resetTimer.current);
+    }, []);
 
     if (!stack) {
         return (
@@ -203,7 +209,8 @@ export function StackTrace({ stack }: { stack: string | null }) {
         try {
             await navigator.clipboard.writeText(stack);
             setCopied(true);
-            setTimeout(() => setCopied(false), 1_800);
+            if (resetTimer.current) clearTimeout(resetTimer.current);
+            resetTimer.current = setTimeout(() => setCopied(false), 1_800);
         } catch {
             setCopied(false);
         }

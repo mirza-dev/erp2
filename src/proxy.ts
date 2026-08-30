@@ -71,6 +71,12 @@ function withRateHeaders(
 ): NextResponse {
     response.headers.set("X-RateLimit-Limit", String(rate.limit));
     response.headers.set("X-RateLimit-Remaining", String(rate.remaining));
+    // 2026-08 Nit: `Reset` yalnız 429'da basılıyordu → istemci geri-çekilme
+    // hesabı yapamıyordu. Üç başlık artık her yolda birlikte gider.
+    response.headers.set(
+        "X-RateLimit-Reset",
+        String(Math.ceil(Date.now() / 1000) + Math.max(0, rate.retryAfter)),
+    );
     // Developer Console §13 — kullanıcı/tarayıcı aynı ID'yi görsün; bir hata
     // bildirildiğinde "şu isteğe bak" demek için tek referans.
     response.headers.set(REQUEST_ID_HEADER, requestId);
@@ -341,8 +347,24 @@ export async function proxy(request: NextRequest) {
 // proxy convention'ı (Next runtime) hem test import'larını destekler.
 export const middleware = proxy;
 
+/**
+ * 2026-08 D7 — matcher muafiyeti DARALTILDI.
+ *
+ * Eski desen `.*\..*` ile **path'inde nokta geçen HER yolu** middleware'den
+ * muaf tutuyordu; `/api/products/foo.bar` gibi bir istek gerçek bir route
+ * handler'ına ulaşıyor ama request-id üretilmiyor, rate-limit uygulanmıyor ve
+ * oturum/RBAC kapısı hiç çalışmıyordu. (Developer Console uçları kendi
+ * guard'larını taşıdığı için panel bu yoldan açılmıyordu; etki korelasyon
+ * kaybı ve kapı atlanmasıydı.)
+ *
+ * Yeni desen yalnız BİLİNEN statik uzantılarla BİTEN yolları muaf tutar.
+ * `public/` yalnız `.svg` içeriyor; `/icon.svg` ve `/favicon.ico` da listede.
+ * Uzantısız her yol (tüm API route'ları ve sayfalar) artık middleware'den geçer.
+ */
+// NOT: Next `config.matcher` STATİK literal olmak zorunda — string
+// birleştirme build'de "route-segment-config" hatası verir (denendi).
 export const config = {
-    matcher: ["/((?!_next/static|_next/image|favicon.ico|.*\\..*).*)"],
+    matcher: ["/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpe?g|gif|webp|avif|ico|css|js|mjs|map|woff2?|ttf|otf|txt|xml|webmanifest)$).*)"],
 };
 
 // M-3 Review 2 (2026-05-25): Bu dosya **proxy.ts** convention'ı (eski

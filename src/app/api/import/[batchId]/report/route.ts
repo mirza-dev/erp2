@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import * as XLSX from "xlsx";
 import { requirePermission } from "@/lib/auth/role-guard";
 import { dbGetBatch, dbListDrafts } from "@/lib/supabase/import";
+import { handleApiError } from "@/lib/api-error";
 
 type ReportFormat = "csv" | "xlsx";
 
@@ -123,7 +124,6 @@ export async function GET(
             },
         });
     } catch (err) {
-        console.error("[GET /api/import/[batchId]/report]", err);
-        return NextResponse.json({ error: "Import raporu üretilemedi." }, { status: 500 });
+        return handleApiError(err, "GET /api/import/[batchId]/report", { clientMessage: "Import raporu üretilemedi." });
     }
 }

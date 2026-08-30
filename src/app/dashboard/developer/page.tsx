@@ -83,21 +83,26 @@ export default function DeveloperOverviewPage() {
 
             {/* ── Metrikler ───────────────────────────────────────────────── */}
             <MetricGrid>
+                {/* `null` = ölçülemedi → MetricCard "Ölçülmüyor" yazar ve tonu
+                    nötr kalır. Sıfırı yeşil göstermek, sonda patladığında paneli
+                    yalancı yapıyordu (2026-08 Y4). */}
                 <MetricCard
                     label="Hata olayı"
                     value={metrics.sampledErrorEvents}
                     hint="Kaydedilen oluşum — grup başına saatte en çok 20 örneklenir"
-                    tone={metrics.sampledErrorEvents > 0 ? "warning" : "default"}
+                    tone={(metrics.sampledErrorEvents ?? 0) > 0 ? "warning" : "default"}
                 />
                 <MetricCard
                     label="Kritik hata"
                     value={metrics.criticalErrors}
-                    tone={metrics.criticalErrors > 0 ? "danger" : "success"}
+                    tone={metrics.criticalErrors === null
+                        ? "default"
+                        : metrics.criticalErrors > 0 ? "danger" : "success"}
                 />
                 <MetricCard
                     label="Uyarı"
                     value={metrics.warnings}
-                    tone={metrics.warnings > 0 ? "warning" : "default"}
+                    tone={(metrics.warnings ?? 0) > 0 ? "warning" : "default"}
                 />
                 <MetricCard
                     label="Aktif hata grubu"
@@ -112,7 +117,8 @@ export default function DeveloperOverviewPage() {
                 <MetricCard
                     label="Hata oranı"
                     value={metrics.errorRate === null ? null : formatPercent(metrics.errorRate)}
-                    tone={metrics.errorRate !== null && metrics.errorRate >= 0.05 ? "danger" : "default"}
+                    hint="4xx + 5xx — istemci hataları dahil"
+                    tone={metrics.errorRate !== null && metrics.errorRate >= 0.05 ? "warning" : "default"}
                 />
                 <MetricCard
                     label="Ortalama yanıt"
@@ -123,6 +129,12 @@ export default function DeveloperOverviewPage() {
                     label="P95 yanıt"
                     value={metrics.p95ResponseMs === null ? null : formatMs(metrics.p95ResponseMs)}
                     hint="Kova üst sınırı"
+                />
+                <MetricCard
+                    label="Sunucu hatası oranı"
+                    value={metrics.serverErrorRate === null ? null : formatPercent(metrics.serverErrorRate)}
+                    hint="Sağlık kararı bunu kullanır (yalnız 5xx)"
+                    tone={metrics.serverErrorRate !== null && metrics.serverErrorRate >= 0.05 ? "danger" : "default"}
                 />
                 <MetricCard
                     label="Aktif kullanıcı"
@@ -137,9 +149,27 @@ export default function DeveloperOverviewPage() {
                 <MetricCard
                     label="Açık bug"
                     value={metrics.openBugs}
-                    tone={metrics.openBugs > 0 ? "warning" : "default"}
+                    tone={(metrics.openBugs ?? 0) > 0 ? "warning" : "default"}
                 />
             </MetricGrid>
+
+            {(data.truncatedMetrics.length > 0 || data.unavailableSources.length > 0) && (
+                <div role="status" style={noticeStyle}>
+                    {data.unavailableSources.length > 0 && (
+                        <div>
+                            <strong>Okunamayan kaynak:</strong>{" "}
+                            {data.unavailableSources.map(s => FEED_SOURCE_LABELS[s]).join(", ")}
+                            {" "}— bu kaynakların olayları listede YOK; &quot;olay yok&quot; anlamına gelmez.
+                        </div>
+                    )}
+                    {data.truncatedMetrics.length > 0 && (
+                        <div>
+                            <strong>Tarama tavanına dayanıldı:</strong>{" "}
+                            {data.truncatedMetrics.join(", ")} — gösterilen değerler ALT SINIRDIR (≥).
+                        </div>
+                    )}
+                </div>
+            )}
 
             {/* ── Servis sağlığı ──────────────────────────────────────────── */}
             <Card>
@@ -223,6 +253,19 @@ const sectionTitle: React.CSSProperties = {
     fontWeight: 650,
     color: "var(--text-primary)",
     margin: "0 0 6px",
+};
+
+const noticeStyle: React.CSSProperties = {
+    display: "flex",
+    flexDirection: "column",
+    gap: "4px",
+    fontSize: "12px",
+    lineHeight: 1.6,
+    color: "var(--warning-text)",
+    background: "var(--warning-bg)",
+    border: "0.5px solid var(--warning-border)",
+    borderRadius: "8px",
+    padding: "9px 12px",
 };
 
 const linkStyle: React.CSSProperties = {

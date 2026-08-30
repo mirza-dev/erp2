@@ -1,3 +1,4 @@
+import { KNOWN_ENDPOINTS } from "./known-endpoints";
 import {
     BUCKET_COUNT,
     bucketIndexFor,
@@ -91,6 +92,10 @@ function validateSample(item: unknown): ValidSample | null {
 
     const endpoint = normalizeEndpoint(typeof s.endpoint === "string" ? s.endpoint : null);
     if (!endpoint) return null;
+    // 2026-08 Y5: biçim doğruluğu YETMEZ — yol GERÇEK bir route şablonuna
+    // karşılık gelmeli. Aksi hâlde saldırgan sınırsız tekil endpoint üretip
+    // `request_metrics`'i şişirebilir (unique(bucket_at, endpoint, method)).
+    if (!KNOWN_ENDPOINTS.has(endpoint)) return null;
 
     const method = typeof s.method === "string" ? s.method.toUpperCase() : "";
     if (!isHttpMethod(method)) return null;

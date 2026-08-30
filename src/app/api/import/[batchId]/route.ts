@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetBatch, dbUpdateBatchStatus, dbDeleteBatch } from "@/lib/supabase/import";
 import type { ImportBatchStatus } from "@/lib/database.types";
-import { safeParseJson } from "@/lib/api-error";
+import { safeParseJson, handleApiError } from "@/lib/api-error";
 import { requirePermission } from "@/lib/auth/role-guard";
 
 // GET /api/import/[batchId]
@@ -21,8 +21,7 @@ export async function GET(
         if (!batch) return NextResponse.json({ error: "Batch bulunamadı." }, { status: 404 });
         return NextResponse.json(batch);
     } catch (err) {
-        console.error("[GET /api/import/[batchId]]", err);
-        return NextResponse.json({ error: "Batch alınamadı." }, { status: 500 });
+        return handleApiError(err, "GET /api/import/[batchId]", { clientMessage: "Batch alınamadı." });
     }
 }
 
@@ -40,8 +39,7 @@ export async function DELETE(
         await dbDeleteBatch(batchId);
         return new NextResponse(null, { status: 204 });
     } catch (err) {
-        console.error("[DELETE /api/import/[batchId]]", err);
-        return NextResponse.json({ error: "Batch silinemedi." }, { status: 500 });
+        return handleApiError(err, "DELETE /api/import/[batchId]", { clientMessage: "Batch silinemedi." });
     }
 }
 
@@ -64,7 +62,6 @@ export async function PATCH(
         const updated = await dbUpdateBatchStatus(batchId, status);
         return NextResponse.json(updated);
     } catch (err) {
-        console.error("[PATCH /api/import/[batchId]]", err);
-        return NextResponse.json({ error: "Batch güncellenemedi." }, { status: 500 });
+        return handleApiError(err, "PATCH /api/import/[batchId]", { clientMessage: "Batch güncellenemedi." });
     }
 }

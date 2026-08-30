@@ -43,6 +43,24 @@ export function parseISODate(value: string | null): string | null {
     return Number.isNaN(t) ? null : new Date(t).toISOString();
 }
 
+/**
+ * Sayfalama imleci. Biçim `<snapshot>|<ts>|<id>` (2026-08 O2) — eski salt-ISO
+ * biçim de kabul edilir. `parseISODate` bileşik imleci REDDEDERDİ; bu yüzden
+ * ayrı ayrıştırıcı: her parça biçim doğrulamasından geçer, ham metin DB'ye
+ * gitmez.
+ */
+export function parseCursor(value: string | null): string | null {
+    const raw = value?.trim();
+    if (!raw || raw.length > 160) return null;
+    const parts = raw.split("|");
+    if (parts.length !== 1 && parts.length !== 3) return null;
+    const isoOk = (v: string) => !Number.isNaN(Date.parse(v));
+    if (parts.length === 1) return isoOk(parts[0]) ? parts[0] : null;
+    const [snapshot, ts, id] = parts;
+    if (!isoOk(snapshot) || !isoOk(ts) || !isUuid(id)) return null;
+    return raw;
+}
+
 /** Serbest metin — kırpılır ve uzunluk sınırlanır. */
 export function parseText(value: string | null, maxLength = 120): string | null {
     const trimmed = value?.trim() ?? "";

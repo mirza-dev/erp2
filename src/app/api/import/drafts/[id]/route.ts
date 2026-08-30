@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbGetDraft, dbUpdateDraft } from "@/lib/supabase/import";
 import type { ImportDraftStatus } from "@/lib/database.types";
-import { safeParseJson } from "@/lib/api-error";
+import { safeParseJson, handleApiError } from "@/lib/api-error";
 import { requirePermission } from "@/lib/auth/role-guard";
 import type { ImportFieldApproval } from "@/lib/import-center";
 
@@ -22,8 +22,7 @@ export async function GET(
         if (!draft) return NextResponse.json({ error: "Draft bulunamadı." }, { status: 404 });
         return NextResponse.json(draft);
     } catch (err) {
-        console.error("[GET /api/import/drafts/[id]]", err);
-        return NextResponse.json({ error: "Draft alınamadı." }, { status: 500 });
+        return handleApiError(err, "GET /api/import/drafts/[id]", { clientMessage: "Draft alınamadı." });
     }
 }
 
@@ -63,7 +62,6 @@ export async function PATCH(
         const updated = await dbUpdateDraft(id, { status, user_corrections, field_approvals });
         return NextResponse.json(updated);
     } catch (err) {
-        console.error("[PATCH /api/import/drafts/[id]]", err);
-        return NextResponse.json({ error: "Draft güncellenemedi." }, { status: 500 });
+        return handleApiError(err, "PATCH /api/import/drafts/[id]", { clientMessage: "Draft güncellenemedi." });
     }
 }

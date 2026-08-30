@@ -101,8 +101,26 @@ describe("kova ve yüzdelik matematiği", () => {
     it("p50/p95 kova üst sınırını döner", () => {
         // 100 örnek: 90'ı <=50ms, 10'u <=800ms
         const hist = [90, 0, 0, 0, 10, 0, 0, 0, 0, 0];
-        expect(percentileFromHistogram(hist, 0.5)).toBe(50);
-        expect(percentileFromHistogram(hist, 0.95)).toBe(800);
+        expect(percentileFromHistogram(hist, 0.5)).toEqual({ ms: 50, overflow: false });
+        expect(percentileFromHistogram(hist, 0.95)).toEqual({ ms: 800, overflow: false });
+    });
+
+    /**
+     * 2026-08 O1 — taşma kovası `(12800, ∞)` aralığıdır ve ÜST sınırı yoktur.
+     * Eski kod orada sessizce ALT sınırı (12800) döndürüyordu: 60 saniyelik bir
+     * uç panelde "p99 = 12,8 sn" görünüyor, aynı satırdaki max_ms 60000 yazıyor
+     * ve ekran kendi kendisiyle çelişiyordu. Değer artık `overflow` ile
+     * işaretli — UI "> 12,8 sn" yazar.
+     */
+    it("taşma kovasında değer ALT sınır olarak işaretlenir", () => {
+        const allSlow = [0, 0, 0, 0, 0, 0, 0, 0, 0, 100];
+        expect(percentileFromHistogram(allSlow, 0.99)).toEqual({ ms: 12_800, overflow: true });
+        expect(percentileFromHistogram(allSlow, 0.5)).toEqual({ ms: 12_800, overflow: true });
+    });
+
+    it("sonlu kovada overflow işareti KONMAZ", () => {
+        const fast = [100, 0, 0, 0, 0, 0, 0, 0, 0, 0];
+        expect(percentileFromHistogram(fast, 0.99)?.overflow).toBe(false);
     });
 });
 

@@ -77,12 +77,30 @@ export function bucketIndexFor(durationMs: number): number {
     return DURATION_BUCKETS.length - 1;
 }
 
+/** Yüzdelik sonucu. `overflow` → değer ALT sınır ("> ms"), üst sınır DEĞİL. */
+export interface Percentile {
+    ms: number;
+    overflow: boolean;
+}
+
 /**
  * Histogramdan yüzdelik. Kova içi doğrusal enterpolasyon YAPILMAZ — kovanın
  * üst sınırı döner; yani değer "en fazla şu kadar" anlamındadır. Uydurma
  * hassasiyet vermemek için bilinçli (§28).
+ *
+ * 2026-08 O1 — TAŞMA KOVASI İSTİSNASI: son kova `(12800, ∞)` aralığıdır ve
+ * üst sınırı yoktur. Eski kod orada sessizce `DURATION_BUCKETS[i-1]` yani
+ * kovanın **ALT** sınırını döndürüyordu; 60 saniyelik bir uç panelde
+ * "p99 = 12,8 sn" görünüyor (5× eksik), aynı satırdaki `max_ms` 60000 yazıyor
+ * ve ekran kendi kendisiyle çelişiyordu. Üstelik 12,8 sn'yi aşan TÜM uçlar
+ * eşit sayıldığı için "en yavaş uç en üstte" sıralaması da çalışmıyordu.
+ * Artık değer `overflow: true` ile işaretlenir — UI "> 12,8 sn" yazar,
+ * sıralama `maxMs`'e düşer.
  */
-export function percentileFromHistogram(histogram: readonly number[], percentile: number): number | null {
+export function percentileFromHistogram(
+    histogram: readonly number[],
+    percentile: number,
+): Percentile | null {
     const total = histogram.reduce((a, b) => a + b, 0);
     if (total === 0) return null;
     const target = total * percentile;
@@ -91,7 +109,9 @@ export function percentileFromHistogram(histogram: readonly number[], percentile
         cumulative += histogram[i];
         if (cumulative >= target) {
             const upper = DURATION_BUCKETS[i];
-            return Number.isFinite(upper) ? (upper as number) : (DURATION_BUCKETS[i - 1] as number);
+            return Number.isFinite(upper)
+                ? { ms: upper as number, overflow: false }
+                : { ms: DURATION_BUCKETS[i - 1] as number, overflow: true };
         }
     }
     return null;

@@ -59,8 +59,30 @@ describe("RLS — service_role dışında erişim yok", () => {
         }
     });
 
-    it("anon/authenticated rolüne doğrudan grant YOK", () => {
+    it("anon/authenticated rolüne doğrudan TABLO grant'i YOK", () => {
         expect(CODE).not.toMatch(/grant\s+(select|insert|update|delete|all)[\s\S]{0,60}to\s+(anon|authenticated)/i);
+    });
+
+    /**
+     * 2026-08 K1 — bu testin ESKİ hâli yanlış yönü doğruluyordu ("açık grant yok").
+     * Gerçek risk açık grant DEĞİL, Supabase'in `ALTER DEFAULT PRIVILEGES ... TO
+     * postgres, anon, authenticated, service_role` varsayılanının zaten VERMİŞ
+     * olmasıydı; `revoke ... from public` o doğrudan grant'i kaldırmaz.
+     * Canlı A/B probe: `record_request_metrics` anon key ile HTTP 200 dönüyordu,
+     * kontrol `dashboard_monthly_cogs` (public,anon,authenticated revoke) 401/42501.
+     * 109 üç RPC'yi de yalnız `from public` revoke ettiği için düzeltme mig.110'da.
+     */
+    it("109'un üç DEFINER RPC'si mig.110'da anon+authenticated'tan revoke edilmiş", () => {
+        const fix = readFileSync(
+            join(process.cwd(), "supabase/migrations/110_fix_definer_rpc_grants.sql"),
+            "utf8",
+        ).replace(/--[^\n]*/g, "");
+
+        for (const fn of ["record_error_occurrence", "record_request_metrics", "purge_telemetry"]) {
+            expect(fix, `${fn} mig.110'da rol-hedefli revoke edilmemiş`).toMatch(
+                new RegExp(`revoke\\s+all\\s+on\\s+function\\s+${fn}[\\s\\S]{0,400}?from\\s+public,\\s*anon,\\s*authenticated`, "i"),
+            );
+        }
     });
 });
 

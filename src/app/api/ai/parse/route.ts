@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { aiParseEntity } from "@/lib/services/ai-service";
 import type { ParseEntityInput } from "@/lib/services/ai-service";
-import { safeParseJson } from "@/lib/api-error";
+import { safeParseJson, handleApiError } from "@/lib/api-error";
 import { guardAiRoute } from "@/lib/ai-route-limit";
 
 // POST /api/ai/parse
@@ -45,7 +45,6 @@ export async function POST(req: NextRequest) {
         const result = await aiParseEntity(body);
         return NextResponse.json(result);
     } catch (err) {
-        console.error("[POST /api/ai/parse]", err);
-        return NextResponse.json({ error: "Parse işlemi başarısız." }, { status: 500 });
+        return handleApiError(err, "POST /api/ai/parse", { clientMessage: "Parse işlemi başarısız." });
     }
 }

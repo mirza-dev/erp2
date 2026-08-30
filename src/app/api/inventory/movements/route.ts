@@ -5,7 +5,7 @@ import {
     dbListMovements,
     type RecordMovementInput,
 } from "@/lib/supabase/products";
-import { safeParseJson } from "@/lib/api-error";
+import { safeParseJson, handleApiError } from "@/lib/api-error";
 import { requirePermission } from "@/lib/auth/role-guard";
 import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
@@ -29,8 +29,7 @@ export async function GET(req: NextRequest) {
         const movements = await dbListMovements(productId, limit);
         return NextResponse.json(movements);
     } catch (err) {
-        console.error("[GET /api/inventory/movements]", err);
-        return NextResponse.json({ error: "Hareketler alınamadı." }, { status: 500 });
+        return handleApiError(err, "GET /api/inventory/movements", { clientMessage: "Hareketler alınamadı." });
     }
 }
 
@@ -73,7 +72,6 @@ export async function POST(req: NextRequest) {
         void broadcastDataChange(["products"]);
         return NextResponse.json({ ok: true, new_on_hand: result.new_on_hand }, { status: 201 });
     } catch (err) {
-        console.error("[POST /api/inventory/movements]", err);
-        return NextResponse.json({ error: "Hareket kaydedilemedi." }, { status: 500 });
+        return handleApiError(err, "POST /api/inventory/movements", { clientMessage: "Hareket kaydedilemedi." });
     }
 }

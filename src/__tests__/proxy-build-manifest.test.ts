@@ -51,7 +51,12 @@ describe("P0 regression — proxy.ts production pipeline kayıt", () => {
     });
 
     it("proxy.ts config.matcher tanımlı (sayfa scope'u belirli)", () => {
-        expect(PROXY_SOURCE).toMatch(/matcher:\s*\["\/\(\(\?!_next/);
+        // 2026-08 D7: matcher artık çok satırlı bir birleştirme (uzantı
+        // allowlist'i). İddia aynı: negatif-lookahead scope'u _next ile başlar.
+        expect(PROXY_SOURCE).toMatch(/matcher:\s*\[[\s\S]{0,40}"\/\(\(\?!_next/);
+        // Muafiyet ARTIK "noktalı her yol" DEĞİL: uzantı ile BİTEN yollar.
+        expect(PROXY_SOURCE).not.toMatch(/\.\*\\\\\.\.\*\)/);
+        expect(PROXY_SOURCE).toMatch(/webmanifest\)\$/);
     });
 
     it("[build sonrası] functions-config-manifest /_middleware entry'sini içerir (Node runtime kayıtlı)", () => {

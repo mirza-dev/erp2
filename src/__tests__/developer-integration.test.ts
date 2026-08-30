@@ -5,9 +5,14 @@
  * mükemmel çalışsa bile kancalar sökülürse panel sessizce boş kalır ve bunu
  * hiçbir birim testi yakalamaz. Üç kanca var ve üçü de merkezî:
  *
- *   1. `api-error.ts`      → 148 route'un 115'i (kendi catch'ini yazmayanlar)
- *   2. `instrumentation.ts`→ kalan 33 route + RSC + sayfa hataları
+ *   1. `api-error.ts`      → `handleApiError`/`captureRouteError` çağıran her route
+ *   2. `instrumentation.ts`→ hatayı YUTMAYAN route'lar + RSC + sayfa hataları
  *   3. `proxy.ts`          → request ID üretimi ve yayılımı
+ *
+ * 2026-08 K2: (2)'nin eski tarifi "kalan 33 route" idi ve YANLIŞTI — o
+ * route'ların 28'i kendi `catch`'inde yanıt döndürdüğü için hata Next'in
+ * sınırına hiç ulaşmıyor, kanca tetiklenmiyordu. Hepsi (1)'e bağlandı;
+ * `gate/route-error-coverage.test.ts` bunu kilitliyor.
  *
  * Ayrıca §21'in asıl şartı: iş mantığı dosyalarına telemetri SIZMAMIŞ olmalı.
  */
@@ -19,14 +24,17 @@ const read = (p: string) => readFileSync(join(process.cwd(), p), "utf8");
 
 /** Yorumları düşürür — iddia açıklamaya değil koda bakmalı. */
 function code(src: string): string {
-    return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    // Satır yorumları ÖNCE ayıklanır: bir `//` yorumunun içindeki `/**`
+    // (ör. "// /dashboard/** erişimi") aksi hâlde blok yorum başlangıcı
+    // sanılıp sonraki `*/`e kadar GERÇEK KODU yutuyordu (2026-08).
+    return src.replace(/^\s*\/\/.*$/gm, "").replace(/\/\*[\s\S]*?\*\//g, "");
 }
 
 const API_ERROR = code(read("src/lib/api-error.ts"));
 const INSTRUMENTATION = code(read("src/instrumentation.ts"));
 const PROXY = code(read("src/proxy.ts"));
 
-describe("Kanca 1 — merkezi hata yakalayıcı (115 route)", () => {
+describe("Kanca 1 — merkezi hata yakalayıcı (5xx döndüren TÜM catch'ler)", () => {
     it("handleApiError telemetriyi çağırır", () => {
         expect(API_ERROR).toContain('from "@/lib/telemetry/record"');
         expect(API_ERROR).toMatch(/scheduleTelemetry\(\(\) => recordError\(/);
@@ -52,16 +60,29 @@ describe("Kanca 1 — merkezi hata yakalayıcı (115 route)", () => {
     });
 });
 
-describe("Kanca 2 — onRequestError (kalan 33 route + RSC)", () => {
+describe("Kanca 2 — onRequestError (handleApiError'a uğramayan yollar + RSC)", () => {
     it("instrumentation.ts onRequestError export eder", () => {
         expect(INSTRUMENTATION).toMatch(/export const onRequestError/);
     });
 
-    it("register() export ETMEZ — mevcut Sentry kurulumu devralınmaz", () => {
-        // Sentry bu projede kök sentry.*.config.ts ile kuruluyor ve çalışıyor.
-        // Buraya register koymak o kurulumu ikiye bölme riski taşırdı.
-        expect(INSTRUMENTATION).not.toMatch(/export (async )?function register/);
-        expect(INSTRUMENTATION).not.toMatch(/export const register/);
+    /**
+     * 2026-08 Y2 — bu testin ESKİ hâli "register() export ETMEZ" diyordu ve
+     * yanlış bir varsayımı kilitliyordu: `@sentry/nextjs` v10 kök
+     * `sentry.server.config.ts` / `sentry.edge.config.ts` dosyalarını otomatik
+     * YÜKLEMEZ (SDK'nın kendi uyarısı: "`Sentry.init` must be called inside of
+     * an instrumentation file"). Yani sunucu/edge Sentry'si hiç başlamıyordu ve
+     * `captureRequestError` no-op'tu. Test doğru davranışı kilitliyor.
+     */
+    it("register() export EDER ve iki runtime'ın config'ini de yükler", () => {
+        expect(INSTRUMENTATION).toMatch(/export async function register/);
+        expect(INSTRUMENTATION).toMatch(/NEXT_RUNTIME === "nodejs"[\s\S]{0,120}sentry\.server\.config/);
+        expect(INSTRUMENTATION).toMatch(/NEXT_RUNTIME === "edge"[\s\S]{0,120}sentry\.edge\.config/);
+    });
+
+    it("init mantığı kopyalanmaz — kök config dosyaları tek kaynak kalır", () => {
+        // `Sentry.init(` burada ÇAĞRILMAMALI: DSN/environment/beforeSend PII
+        // scrub'ı ikiye bölmek, birinin sessizce eskimesi demektir.
+        expect(INSTRUMENTATION).not.toMatch(/Sentry\.init\(/);
     });
 
     it("ÖNCE Sentry'ye bildirir, sonra yerel kayıt (mevcut davranış korunur)", () => {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbListDrafts } from "@/lib/supabase/import";
 import { resolveAuthContext, requirePermissionFor } from "@/lib/auth/role-guard";
+import { handleApiError } from "@/lib/api-error";
 
 // GET /api/import/[batchId]/drafts
 // (POST handler kaldırıldı — 2026-06-10 sadeleştirme: hiçbir UI tüketicisi yoktu,
@@ -20,7 +21,6 @@ export async function GET(
         const drafts = await dbListDrafts(batchId);
         return NextResponse.json(drafts);
     } catch (err) {
-        console.error("[GET /api/import/[batchId]/drafts]", err);
-        return NextResponse.json({ error: "Draftlar alınamadı." }, { status: 500 });
+        return handleApiError(err, "GET /api/import/[batchId]/drafts", { clientMessage: "Draftlar alınamadı." });
     }
 }

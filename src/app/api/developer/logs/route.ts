@@ -6,10 +6,12 @@ import { dbActivityFeed } from "@/lib/supabase/developer-feed";
 import { parseTimeRange, rangeStartISO } from "@/lib/telemetry/health";
 import {
     parseFeedSources,
+    parseCursor,
     parseISODate,
     parseLimit,
     parseSeverity,
     parseText,
+    isUuid,
 } from "@/lib/telemetry/api-params";
 
 /**
@@ -32,9 +34,15 @@ export async function GET(req: NextRequest) {
             level: parseSeverity(sp.get("level")),
             module: parseText(sp.get("module"), 60),
             requestId: parseText(sp.get("requestId"), 64),
-            userId: parseText(sp.get("userId"), 64),
+            // uuid doğrulaması: `user_id` kolonu uuid; serbest metin PG 22P02
+            // fırlatır ve 400 yerine 500 üretirdi (2026-08 Nit). Kardeş
+            // route'lar (`errors/[id]`, `bugs/[id]`) zaten `isUuid` kullanıyor.
+            userId: (() => {
+                const raw = parseText(sp.get("userId"), 64);
+                return raw && isUuid(raw) ? raw : null;
+            })(),
             since: parseISODate(sp.get("since")) ?? rangeStartISO(range),
-            before: parseISODate(sp.get("before")),
+            before: parseCursor(sp.get("before")),
             search: parseText(sp.get("search"), 120),
             limit: parseLimit(sp.get("limit"), 60, 200),
         });

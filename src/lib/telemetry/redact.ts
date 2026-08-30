@@ -44,6 +44,13 @@ const SENSITIVE_KEY_WORDS = [
     "credential", "credentials",
     "card", "cardnumber", "pan", "cvv", "cvc", "iban",
     "otp", "pin", "signature",
+    // Kişisel veri alan adları (2026-08 Nit-1). Sır değiller ama panelde
+    // görünmeleri gerekmiyor: hata teşhisi için `user_id` (uuid) yeterli.
+    // Bugün hiçbir çağıran `context`'e müşteri verisi koymuyor — bu liste
+    // bir sonraki `recordError({ context })` çağrısı için hazır duruyor.
+    "phone", "telefon", "gsm", "mobile",
+    "address", "adres",
+    "tax_number", "taxnumber", "vergi_no", "vkn", "tckn", "tc_kimlik",
 ];
 
 const SENSITIVE_KEY_RE = new RegExp(
@@ -101,6 +108,17 @@ export function redactText(input: string | null | undefined): string {
             // zaten maskeledi; şemayı da yemek teşhisi gereksiz körleştirir.
             AUTH_SCHEMES.has(value.toLowerCase()) ? match : `${boundary}${key}${sep}${REDACTED}`,
         )
+        // IBAN — karttan ÖNCE: "TR33 0006 …" karttaki hane sayacına yakalanırdı.
+        // İki harf + iki hane + en az 3 dörtlü grup → en az 16 karakter; kısa
+        // hata kodları ("PG23505") bu eşiği geçemez.
+        .replace(/\b[A-Z]{2}\d{2}(?:[ ]?[A-Z0-9]{4}){3,8}(?:[ ]?[A-Z0-9]{1,3})?\b/g, "[iban]")
+        // Biçimlendirilmiş telefon: "+90 532 123 45 67" · "0532 123-45-67".
+        // Alan kodundan sonra AYRAÇ ZORUNLU (`[ -]`) — aksi hâlde düz 10 haneli
+        // VKN de eşleşirdi. Rakam sınırları (?<!\d)/(?!\d) ile kapalı, böylece
+        // 13-19 haneli kart numarasının içinden parça koparılamaz.
+        .replace(/(?<!\d)(?:\+\d{1,3}[ -])?\(?0?\d{3}\)?[ -]\d{3}[ -]?\d{2}[ -]?\d{2}(?!\d)/g, (m) =>
+            // En az 10 hane taşımayan eşleşme telefon değildir (tarih, sipariş no…).
+            (m.replace(/\D/g, "").length >= 10 ? "[phone]" : m))
         // Kart numarası (13-19 hane, boşluk/tire ayraçlı olabilir)
         .replace(/\b(?:\d[ -]?){13,19}\b/g, "[card]")
         // VKN (10) / TCKN (11)
