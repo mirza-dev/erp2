@@ -1,10 +1,12 @@
 -- ────────────────────────────────────────────────────────────────────────────
 -- MANUAL migration doğrulaması — TEK SORGU (SALT-OKUNUR)
 --
--- `scripts/check-migrations.ts` 17 migration'ı otomatik problar; geri kalan 9'u
--- "elle doğrula" diye işaretler çünkü bunlar REDEFINE migration'ları (fonksiyon
--- zaten vardı, gövdesi değişti) veya CHECK/index tanımı. PostgREST bunları
--- okuyamaz — fonksiyonun VAR olması güncel sürüm olduğunu KANITLAMAZ.
+-- `scripts/check-migrations.ts` migration'ların bir kısmını otomatik problar;
+-- geri kalanını "elle doğrula" diye işaretler çünkü bunlar REDEFINE migration'ları
+-- (fonksiyon zaten vardı, gövdesi değişti), CHECK/index tanımı, ya da **yetki/RLS**
+-- değişikliği (017, 029, 110). PostgREST bunları okuyamaz — fonksiyonun VAR olması
+-- güncel sürüm olduğunu KANITLAMAZ, tablonun VAR olması da RLS'inin açık
+-- olduğunu göstermez.
 --
 -- Kullanım: Supabase Dashboard → SQL Editor → yapıştır → Run.
 -- Hiçbir şey değiştirmez; yalnız katalog okur.
@@ -15,7 +17,12 @@
 --
 -- SON KOŞUM: 2026-08-30 — canlı `erp2` projesinde 9/9 ✅ (089, 093, 094 ×2,
 -- 095, 101, 102, 103, 104, 105). `check-migrations.ts` da 23/23 otomatik
--- probe'u yeşil raporluyor → 2026-08-30 itibarıyla migration drift'i YOK.
+-- probe'u yeşil raporluyor.
+--
+-- 2026-08-30 EK: 110 (DEFINER grant) + 017/029 (tablo RLS) satırları eklendi.
+-- Üçü de canlıda GEÇMİŞ durumda olmalı; yeni migration DEĞİL, mevcut korumanın
+-- canlıda hâlâ yerinde olduğunu ölçüyorlar. RLS satırı ❌ dönerse o tablo
+-- tarayıcıdaki anon anahtarıyla okunabiliyor demektir → deploy DURDURULUR.
 --
 -- Deploy günü (bkz. memory C3) bu sorgu + `npx tsx scripts/check-migrations.ts`
 -- + `npm run preflight:auth` üçlüsü açılış hamlesidir.
@@ -85,6 +92,42 @@ select '106', 'company_settings.quote_validity_days (teklif geçerlilik varsayı
                 select 1 from information_schema.columns
                  where table_name = 'company_settings' and column_name = 'quote_validity_days')
             then '✅ VAR' else '❌ YOK — 106 uygulanmamış' end
+
+-- 110/112: yetki ve RLS değişiklikleri. Hiçbiri OpenAPI'de görünmez →
+-- `check-migrations.ts` bunları probe EDEMEZ, tek doğrulama yolu burası.
+union all
+select '110', 'DEFINER RPC''leri anon/authenticated''a KAPALI (5 fonksiyon)',
+       case when count(*) filter (
+                where has_function_privilege('anon', p.oid, 'EXECUTE')
+                   or has_function_privilege('authenticated', p.oid, 'EXECUTE')) = 0
+            then '✅ HEPSİ KAPALI' else '❌ AÇIK KALAN VAR — 110 uygulanmamış' end
+  from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+ where n.nspname = 'public'
+   and p.proname in ('purge_telemetry', 'record_error_occurrence', 'record_request_metrics',
+                     'claim_notification_outbox', 'update_email_delivery_from_provider')
+
+union all
+select '017', 'Çekirdek 23 tabloda RLS açık (017_enable_rls)',
+       case when count(*) filter (where not c.relrowsecurity) = 0 and count(*) = 23
+            then '✅ 23/23 AÇIK'
+            else '❌ ' || count(*) filter (where not c.relrowsecurity)::text
+                 || ' tabloda KAPALI (bulunan: ' || count(*)::text || '/23)' end
+  from pg_class c join pg_namespace n on n.oid = c.relnamespace
+ where n.nspname = 'public'
+   and c.relname in ('customers', 'products', 'sales_orders', 'order_lines', 'quotes',
+                     'audit_log', 'alerts', 'inventory_movements', 'production_entries',
+                     'invoices', 'payments', 'shipments', 'bills_of_materials',
+                     'stock_reservations', 'shortages', 'import_batches', 'import_drafts',
+                     'ai_entity_aliases', 'ai_feedback', 'ai_recommendations', 'ai_runs',
+                     'order_counters', 'integration_sync_logs')
+
+union all
+select '029', 'purchase_commitments + column_mappings RLS açık',
+       case when count(*) filter (where not c.relrowsecurity) = 0 and count(*) = 2
+            then '✅ 2/2 AÇIK' else '❌ KAPALI VAR (bulunan: ' || count(*)::text || '/2)' end
+  from pg_class c join pg_namespace n on n.oid = c.relnamespace
+ where n.nspname = 'public'
+   and c.relname in ('purchase_commitments', 'column_mappings')
 
 order by 1, 2;
 

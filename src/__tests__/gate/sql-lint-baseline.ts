@@ -76,3 +76,14 @@ export const REDEFINITION_CHAINS: Record<string, string[]> = {
     record_request_metrics: ["109", "111"],
     purge_telemetry: ["109", "111"],
 };
+
+/**
+ * RLS'siz kalmasına BİLEREK izin verilen tablolar: tablo adı → gerekçe.
+ *
+ * Liste BOŞ ve öyle kalmalı. Buraya kayıt eklemek, o tablonun anon anahtarıyla
+ * okunabilir olmasını göze almak demektir (Supabase varsayılanı
+ * `grant all on all tables in schema public to anon, authenticated`), çünkü
+ * NEXT_PUBLIC_SUPABASE_ANON_KEY tarayıcı bundle'ındadır. Gerekçe yazmadan
+ * eklemeyin; varsayılan cevap "tabloya RLS aç"tır.
+ */
+export const RLS_EXEMPT_TABLES: Record<string, string> = {};

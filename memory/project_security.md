@@ -4,6 +4,16 @@ description: RLS, auth middleware, demo mode mimarisi, credential güvenliği, a
 type: project
 originSessionId: 9b856903-3698-4fae-92be-9c687d469cdf
 ---
+## 2026-08-30 — 10 maddelik "vibecode açıkları" denetimi: 10/10 KAPALI
+
+Kullanıcının paylaştığı liste (IDOR · açık RLS · istemci-fiyat · rate limit · JWT ·
+policy deliği · bucket listeleme · pre-auth maliyet · SSRF · prompt injection) tek tek
+canlıya karşı ölçüldü. Rapor: `docs/audit/2026-08-30-vibecode-guvenlik-denetimi.md`.
+Madde 3 (tarayıcıda fiyat) GERÇEKTEN vardı ve `mig.093` ile zaten kapatılmıştı.
+Kalıcı çıktı: gate kural 4 (aşağıda) + `check-migrations` artık kayıtsız migration'ları
+raporluyor (77 dosya sessizce atlanıyordu, `110` güvenlik yaması dahil) + `017`/`029`/`110`
+doğrulama sorguları `manual-migration-checks.sql`'e girdi.
+
 ## 2026-06 Denetim + Gate Sistemi (GÜNCEL referans)
 
 **Tam bulgular:** `docs/audit/2026-06-guvenlik-dogruluk-bulgulari.md` (5 Kritik · 8 Yüksek · 11 Orta · 6 Düşük + elenen yanlış-pozitifler). **Tur A–E düzeltmeleri TAMAMLANDI (2026-06; rapor §8 durum tablosu):** K1 audit-log guard · K2 mig.093 sunucu-recompute · K3 import KDV · K4+Y3 reconciler · Y4 mig.094 · Y7 mig.095 (093/094/095 apply edildi ✅) · Y6 localISODate · xlsx CDN 0.20.3 · **Next 16.1.7 → 16.2.9 + fast-uri 3.1.2 (2026-06-12, `64c2fd0`) → deps-gate ALLOWLIST BOŞ** — yeni high/critical advisory anında CI kırar. **Y1 da kapandı (2026-06-12):** kalan 7 GET demo-dostu `requirePermissionFor` aldı (anonim→viewer fallback bilinçli — demo yaşar; import uçları fiilen kapalı; baseline ACIK-BULGU boş). Açık: yalnız O5 Upstash rate-limit (ertelendi).
@@ -12,9 +22,33 @@ originSessionId: 9b856903-3698-4fae-92be-9c687d469cdf
 
 ---
 
-## Supabase RLS
+## Supabase RLS (2026-08-30 doğrulandı)
 
-Tüm 23 tablo için Row Level Security aktif.
+**Kapsama TAM:** 65 `create table` · 65 `enable row level security` · 1 bilinçli drop
+(`product_batches`, mig.060). Kaynak `017_enable_rls.sql` (23 çekirdek tablo) +
+`029_rls_missing_tables.sql` (`purchase_commitments`, `column_mappings`) + her yeni
+tablo migration'ı kendi satırını taşıyor.
+
+**Policy deseni:** 65 policy'nin tamamı `service_role`; **tek bir `using (true)` yok**.
+`service_role` zaten `BYPASSRLS` taşır → policy'ler ikinci kemer. Veri katmanının
+44/44 modülü service client kullanıyor (`src/lib/supabase/service.ts`); `server.ts`
+(anon key + cookie) yalnız kimlik doğrulama için — tarayıcı Supabase'e tablo sorgusu atmıyor.
+
+**Canlı kanıt (2026-08-30):** 24 çekirdek tablo anon key ile `200` + **0 satır**;
+aynı an service_role products=128 / customers=16 / audit_log=142.
+Ayrım: grant kaldırılsa `401/42501` gelirdi — `200 + 0 satır` imzası RLS'in açık olduğunu söyler.
+
+**Gate kural 4 (YENİ, 2026-08-30):** `sql-migration-lint` artık `create table X` gören
+her migration için (X düşürülmediyse) `enable row level security` arıyor; muafiyet
+`RLS_EXEMPT_TABLES` (BOŞ). Bugün 0 ihlal — kural gelecek için. Fonksiyon tarafı zaten
+kural 2'yle kapılıydı (110/K1), tablo tarafında hiçbir kapı yoktu.
+
+**⚠️ Ölçüm dersi:** SQL şemasını kabuk regex'iyle SAYMA. `017` kolon hizalı yazılmış
+(`ALTER TABLE customers      ENABLE …`); tek boşluk arayan bir desen 23 satırın hiçbirini
+görmedi ve "24 tabloda RLS drift'i var" diye yanlış bir bulgu üretildi (aynı hata o
+denetimde üç kez tekrarlandı). Çıkarım bağımsız bir kaynakla karşılaştırılmalı —
+burada canlı OpenAPI tablo listesi. Gate'in "tablo çıkarımı çökmedi" testi bu sınıfı kilitler.
+Ayrıntı: `docs/audit/2026-08-30-vibecode-guvenlik-denetimi.md`.
 
 ---
 

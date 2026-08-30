@@ -5,6 +5,53 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-08-30 (gece) — 10 maddelik güvenlik denetimi: 10/10 KAPALI + gate kural 4
+
+Kullanıcı Instagram'dan *"vibecoded uygulamalarda bulduğum güvenlik delikleri"*
+listesini (10 madde) paylaşıp "her şeyi pushla, sonra tek tek bak eksik var mı" dedi.
+Push yapıldı (`4405b76` + `65983b3`, main + codex-experiment aynı SHA), sonra 10 madde
+canlı `erp2` projesine karşı **ölçüldü** (iddia olarak değil).
+
+**Sonuç 10/10 kapalı.** Rapor: `docs/audit/2026-08-30-vibecode-guvenlik-denetimi.md`.
+Öne çıkanlar: 65 policy'nin tamamı `service_role`, tek `using (true)` yok · anon key ile
+24 tablo → `200` + **0 satır** · 6 bucket'ta anon listeleme boş · genel kayıt kapalı
+(`signUp` hiçbir route'ta yok → "sınırsız hesap" çarpanı yok) · SSRF'in tek yüzeyi logo,
+host allowlist'li · AI yalnız tavsiye alanına yazıyor (G4). **Madde 3 (tarayıcıda fiyat)
+bizde GERÇEKTEN vardı** — `mig.093` zaten kapatmıştı.
+
+### ⚠️ Kendi ürettiğim yanlış bulgu (ders)
+
+"24 tabloda RLS canlıda açık ama migration'da yok — DB yeniden kurulursa korumasız doğar"
+diye bir drift bulgusu üretildi, plan yazıldı, migration 112 yazıldı. **İddia yanlıştı:**
+`017_enable_rls.sql` o 23 tablonun RLS'ini zaten açıyor (`029` da `column_mappings`'i).
+Sebep tamamen ölçüm aracıydı — kabuk regex'i **tek boşluk** arıyordu, `017` ise kolon
+hizalı yazılmış (`ALTER TABLE customers      ENABLE …`). Aynı sınıf hata o denetimde
+**üç kez** tekrarlandı (41→1, 24→17, sonra bu). Canlı probe doğruyu söylüyordu ve iki
+ölçüm çelişiyordu; çelişkiyi kovalamak yerine yanlış olana inanıldı.
+**mig.112 SİLİNDİ** (gereksizdi, hiç uygulanmadı).
+
+### Yanlış alarmdan kalan gerçek değer (commit edilen)
+
+1. **Gate kural 4** — `sql-migration-lint.test.ts`: `create table X` varsa (X sonradan
+   drop edilmediyse) `enable row level security` de olmalı; muafiyet `RLS_EXEMPT_TABLES`
+   (BOŞ). Bugün 0 ihlal; değeri gelecekte. Kırmızı yandığı **kanıtlandı** (RLS'siz geçici
+   tablo → test kırıldı → kaldırılınca yeşil). Ayrıca **"tablo çıkarımı çökmedi"** testi
+   var: regex boşa düşerse (tam da yukarıdaki hata) eşik altına inip kırılır.
+2. **`check-migrations.ts`** artık `PROBES`/`MANUAL`'da kaydı olmayan migration'ları
+   `ℹ️` ile listeliyor + özette `kayıtsız: N`. **77 dosya sessizce atlanıyordu, `110`
+   (K1 güvenlik yaması) dahil** — uygulanmamış olsa gate bunu söylemeyecekti.
+3. **`017` / `029` / `110`** `MANUAL`'a girdi; sorguları `manual-migration-checks.sql`'de.
+   Üçü de OpenAPI'de görünmez (RLS + grant) → otomatik probe edilemez.
+
+**Kapılar:** tsc 0 · lint 0 · **480 dosya / 6788 test** · build 0 uyarı.
+
+**Kullanıcı tarafında açık:** `EMAIL_FROM` · `ANTHROPIC_API_KEY` yenileme (401) ·
+Paraşüt API başvurusu · Supabase yedeklerinin doğrulanması (bu denetimin kapsamı dışıydı) ·
+şifre sıfırlamanın Supabase-tarafı rate limiti (tarayıcıdan doğrudan gidiyor, bizim
+middleware'imizi görmüyor).
+
+---
+
 ## 2026-08-30 (akşam) — Blok 4: 9 dialog ortak Modal'a taşındı
 
 Kullanıcı kararı (AskUser): "gerçek modalları ortak Modal'a geçir; 4 yan-çekmeceye

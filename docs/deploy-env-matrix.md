@@ -72,6 +72,11 @@ npm run preflight:auth                # 0 kalıcı admin → exit 1 = BRICK
 ```
 
 Ardından Studio'da [`audit/manual-migration-checks.sql`](audit/manual-migration-checks.sql)
-(her satır ✅ olmalı — son koşum 2026-08-30: 9/9).
+(her satır ✅ olmalı — son koşum 2026-08-30: 9/9; `017`/`029` RLS ve `110` grant
+satırları sonradan eklendi).
+
+**RLS satırları özellikle okunmalı:** `017` veya `029` `❌ … KAPALI` derse deploy
+DURDURULUR — o tablo tarayıcıdaki anon anahtarıyla okunabiliyor demektir. Gerekçe ve ölçüm:
+[`audit/2026-08-30-vibecode-guvenlik-denetimi.md`](audit/2026-08-30-vibecode-guvenlik-denetimi.md).
 
 Sonra bu dosyadaki §1 ve §2'yi Coolify env'ine karşı satır satır geçir.
