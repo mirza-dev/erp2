@@ -153,8 +153,10 @@ export default function DeveloperErrorsPage() {
                 title="Hatalar"
                 subtitle={
                     <>
-                        Aynı kusurun tüm oluşumları tek satırda gruplanır.{" "}
-                        <strong>{rows.length}</strong> grup gösteriliyor.
+                        Aynı kusurun tüm oluşumları tek satırda gruplanır.
+                        {/* Veri gelmeden sayı BASILMAZ: gövde "yükleniyor" derken
+                            üst satırın "0 grup" demesi çelişkili bir durum gösteriyordu. */}
+                        {isLoading && !data ? null : <> <strong>{rows.length}</strong> grup gösteriliyor.</>}
                     </>
                 }
                 onRefresh={() => void mutate()}

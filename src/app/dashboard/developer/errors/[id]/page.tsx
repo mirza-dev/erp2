@@ -8,6 +8,7 @@ import { ArrowLeft } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Input, { Select, Textarea, labelStyle as sharedLabelStyle } from "@/components/ui/Input";
+import { cardBodyLast, consoleRow, factCell, factGrid, factLabel, factValue, factWide, sectionTitle } from "../../console-ui";
 import Modal from "@/components/ui/Modal";
 import { ErrorState, LoadingState } from "@/components/ui/StateViews";
 import { useToast } from "@/components/ui/Toast";
@@ -93,7 +94,7 @@ export default function ErrorDetailPage({ params }: { params: Promise<{ id: stri
 
             {/* ── Genel ───────────────────────────────────────────────────── */}
             <Card>
-                <div style={{ display: "flex", gap: "10px", alignItems: "flex-start", flexWrap: "wrap" }}>
+                <div style={{ display: "flex", gap: "10px", alignItems: "flex-start", flexWrap: "wrap", padding: "14px 14px 0" }}>
                     <div style={{ flex: 1, minWidth: "260px" }}>
                         <div style={{ display: "flex", gap: "8px", alignItems: "center", marginBottom: "5px" }}>
                             <SeverityBadge severity={group.severity} />
@@ -127,7 +128,7 @@ export default function ErrorDetailPage({ params }: { params: Promise<{ id: stri
                     </div>
                 </div>
 
-                <dl style={factGrid}>
+                <dl style={{ ...factGrid, ...cardBodyLast, marginTop: "14px" }}>
                     <Fact label="Tekrar sayısı" value={String(group.occurrence_count)} />
                     <Fact label="İlk görülme" value={formatDateTime(group.first_seen_at)} />
                     <Fact label="Son görülme" value={`${formatDateTime(group.last_seen_at)} (${formatRelative(group.last_seen_at)})`} />
@@ -140,7 +141,7 @@ export default function ErrorDetailPage({ params }: { params: Promise<{ id: stri
             {bugs.length > 0 && (
                 <Card>
                     <h2 style={sectionTitle}>Bağlı Bug&apos;lar</h2>
-                    <ul style={{ margin: 0, paddingLeft: "18px" }}>
+                    <ul style={{ margin: 0, padding: "0 14px 14px 32px" }}>
                         {bugs.map(b => (
                             <li key={b.id} style={{ fontSize: "12.5px", color: "var(--text-secondary)", padding: "2px 0" }}>
                                 <Link href="/dashboard/developer/bugs" style={{ color: "var(--accent-text)", textDecoration: "none" }}>
@@ -157,17 +158,17 @@ export default function ErrorDetailPage({ params }: { params: Promise<{ id: stri
             <Card>
                 <h2 style={sectionTitle}>Son Oluşum — İstek</h2>
                 {latest ? (
-                    <dl style={factGrid}>
+                    <dl style={{ ...factGrid, ...cardBodyLast }}>
                         <Fact label="Zaman" value={formatDateTime(latest.occurred_at)} />
                         <Fact label="Method" value={latest.method ?? "—"} />
                         <Fact label="Endpoint" value={latest.endpoint ?? "—"} mono />
                         <Fact label="HTTP durumu" value={latest.status_code ? String(latest.status_code) : "—"} />
                         <Fact label="Request ID" value={latest.request_id ?? "—"} mono />
                         <Fact label="Kullanıcı" value={latest.user_id ?? "—"} mono />
-                        <Fact label="İstemci" value={latest.user_agent ?? "—"} />
+                        <Fact label="İstemci" value={latest.user_agent ?? "—"} wide />
                     </dl>
                 ) : (
-                    <p style={mutedText}>
+                    <p style={{ ...mutedText, ...cardBodyLast }}>
                         Bu grup için saklanmış tekil oluşum yok — retention süresi dolmuş
                         olabilir. Tekrar sayısı yine de doğrudur.
                     </p>
@@ -177,7 +178,7 @@ export default function ErrorDetailPage({ params }: { params: Promise<{ id: stri
             {/* ── Stack trace ─────────────────────────────────────────────── */}
             <Card>
                 <h2 style={sectionTitle}>Stack Trace</h2>
-                <StackTrace stack={latest?.stack ?? null} />
+                <div style={cardBodyLast}><StackTrace stack={latest?.stack ?? null} /></div>
             </Card>
 
             {/* ── İlişkili olaylar ────────────────────────────────────────── */}
@@ -187,12 +188,12 @@ export default function ErrorDetailPage({ params }: { params: Promise<{ id: stri
                     {latestRequestId && <> · <Mono>{latestRequestId}</Mono></>}
                 </h2>
                 {!latestRequestId ? (
-                    <p style={mutedText}>
+                    <p style={{ ...mutedText, ...cardBodyLast }}>
                         Son oluşumda korelasyon kimliği yok — bu hata istek kapsamı dışında
                         (örneğin bir cron işi) üretilmiş olabilir.
                     </p>
                 ) : related.events.length === 0 && related.errors.length === 0 ? (
-                    <p style={mutedText}>Aynı istekten başka olay kaydedilmemiş.</p>
+                    <p style={{ ...mutedText, ...cardBodyLast }}>Aynı istekten başka olay kaydedilmemiş.</p>
                 ) : (
                     <div style={{ display: "flex", flexDirection: "column" }}>
                         {related.events.map(e => (
@@ -346,30 +347,16 @@ function CreateBugModal({
 
 // ── Küçük parçalar ───────────────────────────────────────────────────────
 
-function Fact({ label, value, mono }: { label: string; value: string; mono?: boolean }) {
+function Fact({ label, value, mono, wide }: { label: string; value: string; mono?: boolean; wide?: boolean }) {
     return (
-        <div style={{ minWidth: 0 }}>
-            <dt style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "2px" }}>{label}</dt>
-            <dd style={{ margin: 0, fontSize: "12.5px", color: "var(--text-primary)", wordBreak: "break-word" }}>
+        <div style={{ ...factCell, ...(wide ? factWide : null) }}>
+            <dt style={factLabel()}>{label}</dt>
+            <dd style={{ ...factValue, fontSize: "12.5px", color: "var(--text-primary)", wordBreak: "break-word" }}>
                 {mono ? <Mono>{value}</Mono> : value}
             </dd>
         </div>
     );
 }
-
-const factGrid: React.CSSProperties = {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(190px, 1fr))",
-    gap: "12px",
-    margin: "14px 0 0",
-};
-
-const sectionTitle: React.CSSProperties = {
-    fontSize: "13px",
-    fontWeight: 650,
-    color: "var(--text-primary)",
-    margin: "0 0 8px",
-};
 
 const mutedText: React.CSSProperties = {
     fontSize: "12.5px",
@@ -381,8 +368,7 @@ const relatedRow: React.CSSProperties = {
     display: "flex",
     gap: "10px",
     alignItems: "center",
-    padding: "6px 0",
-    borderBottom: "0.5px solid var(--border-secondary)",
+    ...consoleRow("6px"),
     flexWrap: "wrap",
 };
 

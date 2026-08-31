@@ -5,7 +5,29 @@ _Son güncelleme: 2026-08-31_
 
 > Bu bölüm yalnız **güncel durumu + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda ve `memory/current_focus.md`'de. Aşağıdaki indeks son dönem oturumlarına (commit + konu) hızlı bakış içindir; daha eski dönemler (Faz 2–3d AI Import, Sprint A–C, M-3 Rate Limiting, React Doctor, Teklif V2–V7 plan turları, Paraşüt Faz 1–11) git geçmişinde.
 
-**Son tamamlanan iş:** **Frontend tutarlılığı — form etiketleri, sayfa başlıkları, yeni yüzeyler** (2026-08-31; GREEN; **migration YOK**). Kullanıcı "son yapılan işlerin frontend iyileştirmelerine odaklanalım" dedi. Rapor: `docs/audit/2026-08-31-frontend-tutarliligi.md`.
+**Son tamamlanan iş:** **Developer Console frontend turu** (2026-08-31; GREEN; **migration YOK**). Kullanıcı Chrome eklentisini bağladı (önceki turda bağlantı kurulamıyordu; Chrome yeniden başlatınca oturdu) ve konsolun frontend'ine odaklanmamızı istedi. Rapor: `docs/audit/2026-08-31-developer-console-frontend.md`.
+
+**Önce erişim açıldı.** `.env.local`'de 15 anahtar vardı, `INTERNAL_OPERATOR_EMAILS` **yoktu** — konsol kimseye açık değildi, sidebar linki bile render edilmiyordu, bu yüzden kurulduğundan beri **hiç görsel olarak incelenmemişti**. Zincirin diğer yarısı doğrulandı (`hasInternalOperatorAccess` allowlist **ve** `view_settings` ister); canlı hesaplar salt-okunur listelendi, iki gmail de zaten `["admin"]` → tek eksik allowlist'ti, `ADMIN_EMAILS`'e dokunulmadı. Dev sunucusu prod-koruma kapısına takıldı (hedef canlı fabrika) → tur `ALLOW_PROD_TARGET=1` ile **yalnız görsel inceleme** olarak yürütüldü, hiçbir mutasyon düğmesine dokunulmadı.
+
+**8 bulgu ÖLÇÜLDÜ** (ekran görüntüsü değil, `getComputedStyle`): **Y1** elle örülmüş kartlarda yatay dolgu yok — Tanılama'nın 5 kartında içerik kenarlığa **1px**, Kayıtlar hücresinin sağ kenarı (1446) kartın iç kenarıyla **birebir aynı** · **Y2** Hata Detayı'nda İstemci hücresi **192×113px, 7 satır, sağında 1019px boş** · **O1** Performans satırları **58px'e karşı 41px** (`"> 12.80 sn"` dar sütunda kırılıyor) · **O2** Yapılandırma ızgarasında taban çizgileri **610 vs 627** · **O3** `<dt>` satır içi yazılmış → **11px/450**, kanonik 600 · **O4** `sectionTitle` 3 kopya ve zaten ayrışmış (`margin` 6px'e karşı 8px) · **O5** yüklenirken "**0** grup gösteriliyor" · **D1** filtreler URL'ye yazılmıyor.
+
+**Kök örüntü: `Card` kasten dolgusuzdur, dolgu çocuğun sorumluluğudur.** `DataTable` bunu verir (`10px 14px`), elle örülen yüzeyler vermiyordu — bu yüzden konsolun `DataTable` kullanan üç sayfası (Bug'lar/Hatalar/Performans) zaten temizdi. **YENİ `src/app/dashboard/developer/console-ui.ts`**: `CONSOLE_GUTTER = "14px"` · `consoleRow(v)` (dolgu satır kutusunun İÇİNDE, `borderBottom` kenarda → **ayraç tam genişlikte kalır**, tablo görünümü bozulmaz) · `sectionTitle` (token'a bağlandı; `--font-heading-weight` zaten 650 → görsel olarak nötr) · `factGrid`/`factCell`/`factValue`/`factWide`/`factLabel`.
+
+**Kapsam kullanıcı kararı:** Y1–Y2 + O1–O5 kapatıldı, **D1 ertelendi** (davranış değişikliği, `useSearchParams` + Suspense sınırı). Y1'in yöntemi de kullanıcı kararı: satır dolgusunu 14px'e çıkar — `Card`'a padding prop'u ayraçları kartın içine çeker ve Card kullanan 12 dosyayı etkilerdi.
+
+**DERS — hizalamayı yanlış katmanda çözdüm, ölçüm yakaladı.** O2 için `factGrid`'e `alignItems: "start"` verdim; tarayıcı hâlâ **742 vs 756** gösterdi. Kayma hücreler *arasında* değil hücrenin *içinde*: bir satırlık etiketin altındaki değer, iki satırlığınkinden yukarıda kalıyor. Doğru kol `factCell` (`height:100%`, hücre satır yüksekliğine esner) + `factValue` (`marginTop:auto`). Ölçüm olmasa "düzelttim" diye geçecekti.
+
+**DERS 2 — bir önceki turun kapısı bir varyantı kaçırdı.** `form-consistency` yalnız `const labelStyle` bildirimlerine bakıyordu, konsolun `<dt>`'si satır içi yazılmıştı. *Kaynak-iddiası kuralı, ihlalin tek bir yazım biçimini değil, kavramın tüm yazım biçimlerini kapsamalı.*
+
+**DERS 3 — kendi yedekleme hatam.** Kırmızı-kanıt turunda `basename` çakışması dört farklı `page.tsx`'i aynı yedek dosyaya yazdı ve üçünü ezdi; `HEAD`'den geri alınıp düzenlemeler yeniden uygulandı, kanıt dosya-başına yedek + **SHA-256 doğrulaması** ile tekrarlandı.
+
+**Ölçülen önce/sonra:** kart içeriği 1px → **15px** · İstemci hücresi 192×113px (7 satır) → **1183×19px (1 satır)** · `<dt>` 450 → **600** (tek varyant) · Yapılandırma tabanları 610/627 → **756 (beş hücrenin hepsi)** · Performans satırları 58/41 → **41 (14 satırın hepsi)** · yatay taşma yok. O5 tarayıcıda gözlemlenemedi (SPA geçişinde SWR önbelleği yükleme penceresini yutuyor, 20 örneğin 0'ı yükleme anına düştü) — kaynak seviyesinde kilitli ve kırmızı kanıtlı.
+
+Kapı: YENİ `gate/console-consistency.test.ts` (10 test), **11/11 kırmızı kanıtlı**. `<li>` kuralın dışında — whitelist değil, kuralın doğru sınırı (liste öğesinin yatay girintisi ebeveyn `<ul>`'nin işi); muafiyet gerçek kusuru gizlemesin diye `<ul>`'nin gutter'ı taşıdığı **ayrıca** kilitlendi. tsc 0 · lint 0 · **494 dosya / 6891 test** · build 0.
+
+**AÇIK (bu turdan):** D1 URL senkronu · Developer Console mobil/dokunma hedefleri (6 sayfada `tap-44` sıfır; kullanıcı iki turda da kapsam dışı bıraktı).
+
+**Önceki iş:** **Frontend tutarlılığı — form etiketleri, sayfa başlıkları, yeni yüzeyler** (2026-08-31; GREEN; **migration YOK**). Kullanıcı "son yapılan işlerin frontend iyileştirmelerine odaklanalım" dedi. Rapor: `docs/audit/2026-08-31-frontend-tutarliligi.md`.
 
 **Ölçüm: kod çalışıyordu ama uygulama EKRANDAN EKRANA FARKLI GÖRÜNÜYORDU.** (a) Form etiketi **10 kopya / 5 varyant** — 11px/12px · tertiary/secondary · BÜYÜK HARF olan/olmayan; iki aile **tam eşit** bölünmüştü (5-5), yani "çoğunluk ne yapıyorsa o" kuralı karar veremedi → kanonik **kullanıcı kararıyla** seçildi: login `.lbl` referansı `11px / var(--font-label-weight) / --text-secondary`, **BÜYÜK HARF YOK** (Türkçe uzun etiketlerde satır kaplar). (b) **16 elle yazılmış `<h1>`, 5 farklı boyut** (16·18·19·20·24) ve 3 ağırlık — `PageHeader` **vardı** ve 15 dosyada kullanılıyordu; panonun kendi yorumu bile `{/* PageHeader */}` diyordu ama bileşeni kullanmıyordu.
 
@@ -560,6 +582,7 @@ Teklif "Gönder"e basınca müşteriye teklif belgesi `.html` ekli e-posta. Kara
 - **Paraşüt Faz 12 — Sandbox GATE:** gerçek Paraşüt API ile OAuth + list filtreleri + e-doc trackable_job + stok invariant doğrulamaları (`PARASUT_PLAN.md` §Faz 12).
 
 ### Son dönem oturum indeksi (en yeniden eskiye — detay git log'unda)
+- Developer Console frontend turu — allowlist açıldı, 8 bulgu ölçüldü, `console-ui.ts` + `gate/console-consistency`
 - Dashboard: Teklif Hattı + Yoldaki Mal kartları — 7 KPI + href navigasyon + subTone
 - Dashboard doğruluk turu — üretim limit-50/yalnız-approved ciro/FX hariç-tut+uyarı/etiket + Açık Alacak kaldırıldı
 - Ayarlar → Dosyalar sekmesi — şirket dosya arşivi (handoff implement, mig.091)

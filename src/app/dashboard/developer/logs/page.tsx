@@ -10,6 +10,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/StateViews";
 import { jsonFetcher, SWR_DEFAULTS } from "@/lib/swr-config";
 import { DEFAULT_TIME_RANGE, type TimeRange } from "@/lib/telemetry/health";
+import { CONSOLE_GUTTER, consoleRow } from "../console-ui";
 import {
     SEVERITIES,
     FEED_SOURCES,
@@ -96,7 +97,9 @@ export default function DeveloperLogsPage() {
                 subtitle={
                     <>
                         ERP&apos;nin gerçek olay kaynakları birleştirilir — ayrı bir log
-                        borusu yoktur. <strong>{entries.length}</strong> kayıt gösteriliyor.
+                        borusu yoktur.
+                        {/* Veri gelmeden sayı BASILMAZ — bkz. Hatalar ekranındaki aynı kusur. */}
+                        {isLoading && !data ? null : <> <strong>{entries.length}</strong> kayıt gösteriliyor.</>}
                     </>
                 }
                 onRefresh={() => void mutate()}
@@ -106,7 +109,13 @@ export default function DeveloperLogsPage() {
             />
 
             <Card>
-                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
+                <div style={{
+                    display: "flex",
+                    gap: "8px",
+                    flexWrap: "wrap",
+                    alignItems: "center",
+                    padding: `${CONSOLE_GUTTER} ${CONSOLE_GUTTER} 0`,
+                }}>
                     <Select
                         inputSize="sm"
                         aria-label="Seviye filtresi"
@@ -137,7 +146,13 @@ export default function DeveloperLogsPage() {
                         style={{ width: "auto", minWidth: "200px", flex: 1 }}
                     />
                 </div>
-                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap", marginTop: "9px" }}>
+                <div style={{
+                    display: "flex",
+                    gap: "6px",
+                    flexWrap: "wrap",
+                    marginTop: "9px",
+                    padding: `0 ${CONSOLE_GUTTER} ${CONSOLE_GUTTER}`,
+                }}>
                     {FEED_SOURCES.map(source => {
                         const active = sources.includes(source);
                         return (
@@ -211,8 +226,7 @@ export default function DeveloperLogsPage() {
                                         display: "flex",
                                         gap: "10px",
                                         alignItems: "baseline",
-                                        padding: "8px 0",
-                                        borderBottom: "0.5px solid var(--border-secondary)",
+                                        ...consoleRow("8px"),
                                         flexWrap: "wrap",
                                     }}
                                 >

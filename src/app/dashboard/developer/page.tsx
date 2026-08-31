@@ -10,6 +10,7 @@ import { jsonFetcher, SWR_DEFAULTS } from "@/lib/swr-config";
 import { DEFAULT_TIME_RANGE, type TimeRange } from "@/lib/telemetry/health";
 import type { OverviewPayload } from "@/lib/telemetry/console-types";
 import { FEED_SOURCE_LABELS } from "@/lib/telemetry/console-types";
+import { CONSOLE_GUTTER, consoleRow, sectionTitle } from "./console-ui";
 import {
     HealthDot,
     HealthPill,
@@ -182,8 +183,7 @@ export default function DeveloperOverviewPage() {
                                 display: "flex",
                                 alignItems: "center",
                                 gap: "10px",
-                                padding: "9px 0",
-                                borderBottom: "0.5px solid var(--border-secondary)",
+                                ...consoleRow("9px"),
                                 flexWrap: "wrap",
                             }}
                         >
@@ -201,8 +201,16 @@ export default function DeveloperOverviewPage() {
 
             {/* ── Son aktivite ────────────────────────────────────────────── */}
             <Card>
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px" }}>
-                    <h2 style={sectionTitle}>Son Olaylar</h2>
+                {/* Başlık yanında eylem taşıyan tek bölüm: yatay boşluk sarmalayıcıya
+                    verilir, yoksa "Tümü →" kartın kenarlığına yapışır. */}
+                <div style={{
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "space-between",
+                    gap: "10px",
+                    padding: `0 ${CONSOLE_GUTTER}`,
+                }}>
+                    <h2 style={{ ...sectionTitle, padding: "12px 0 8px" }}>Son Olaylar</h2>
                     <Link href="/dashboard/developer/logs" style={linkStyle}>Tümü →</Link>
                 </div>
                 {recentActivity.length === 0 ? (
@@ -219,8 +227,7 @@ export default function DeveloperOverviewPage() {
                                     display: "flex",
                                     gap: "10px",
                                     alignItems: "baseline",
-                                    padding: "7px 0",
-                                    borderBottom: "0.5px solid var(--border-secondary)",
+                                    ...consoleRow("7px"),
                                     flexWrap: "wrap",
                                 }}
                             >
@@ -247,13 +254,6 @@ export default function DeveloperOverviewPage() {
         </div>
     );
 }
-
-const sectionTitle: React.CSSProperties = {
-    fontSize: "13px",
-    fontWeight: 650,
-    color: "var(--text-primary)",
-    margin: "0 0 6px",
-};
 
 const noticeStyle: React.CSSProperties = {
     display: "flex",

@@ -271,7 +271,9 @@ function Numeric({
         ? "var(--danger-text)"
         : tone === "warning" ? "var(--warning-text)" : "var(--text-secondary)";
     return (
-        <span style={{ fontSize: "12px", fontVariantNumeric: "tabular-nums", color }}>
+        // nowrap: "> 12.80 sn" gibi taşma işaretli değerler dar sütunda ikiye
+        // kırılıp satır yüksekliğini bozuyordu (58px'e karşı 41px).
+        <span style={{ fontSize: "12px", fontVariantNumeric: "tabular-nums", whiteSpace: "nowrap", color }}>
             {children}
         </span>
     );
