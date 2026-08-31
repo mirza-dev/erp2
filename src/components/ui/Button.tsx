@@ -168,6 +168,9 @@ function getButtonStyle({
         borderRadius: "8px",
         background: v.bg,
         color: v.color,
+        // `.tap-44::after` mutlak konumlu hit-area kutusunun çapası. Bileşende
+        // mutlak konumlu alt eleman yok — yeniden çapalanacak bir şey yok.
+        position: "relative",
         cursor: disabled ? "not-allowed" : "pointer",
         opacity: disabled ? 0.56 : 1,
         fontSize: s.fontSize,
@@ -269,6 +272,7 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({
     onMouseLeave,
     onFocus,
     onBlur,
+    className,
     ...rest
 }, ref) {
     const isDisabled = disabled || loading;
@@ -278,6 +282,10 @@ const Button = forwardRef<HTMLButtonElement, ButtonProps>(function Button({
             ref={ref}
             disabled={isDisabled}
             type={type}
+            // `tap-44`: dar ekranda görünmez hit-area'yı 44×44'e çıkarır (globals.css).
+            // En büyük boy bile 40px — yani HER boy 44'ün altında, hepsi kapsanmalı.
+            // className rest'ten AYRILDI: aksi halde `{...rest}` bunu ezerdi.
+            className={className ? `tap-44 ${className}` : "tap-44"}
             style={getButtonStyle({ variant, size, fullWidth, iconOnly, disabled: isDisabled, style })}
             onMouseEnter={(e) => {
                 applyHover(e.currentTarget, variant, isDisabled, true);
@@ -320,12 +328,14 @@ export function ButtonLink({
     onFocus,
     onBlur,
     href,
+    className,
     ...rest
 }: ButtonLinkProps) {
     return (
         <Link
             href={href}
             {...rest}
+            className={className ? `tap-44 ${className}` : "tap-44"}
             aria-disabled={disabled || rest["aria-disabled"] || undefined}
             tabIndex={disabled ? -1 : rest.tabIndex}
             style={getButtonStyle({ variant, size, fullWidth, iconOnly, disabled, style })}

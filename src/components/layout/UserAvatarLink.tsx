@@ -15,6 +15,7 @@ export default function UserAvatarLink() {
     return (
         <Link
             href="/dashboard/settings?tab=kullanici"
+            className="tap-44"
             aria-label="Profil ve ayarlar"
             title={label}
             style={{

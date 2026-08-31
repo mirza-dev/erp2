@@ -5,7 +5,25 @@ _Son güncelleme: 2026-08-31_
 
 > Bu bölüm yalnız **güncel durumu + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda ve `memory/current_focus.md`'de. Aşağıdaki indeks son dönem oturumlarına (commit + konu) hızlı bakış içindir; daha eski dönemler (Faz 2–3d AI Import, Sprint A–C, M-3 Rate Limiting, React Doctor, Teklif V2–V7 plan turları, Paraşüt Faz 1–11) git geçmişinde.
 
-**Son tamamlanan iş:** **Telefon/tablet/masaüstü ölçümü + 2 kusur** (2026-08-31; GREEN; **migration YOK**). Kullanıcı "telefon tablet ve masaüstünden sorunsuz tıkır tıkır çalışır mı, evetse telefonda çalıştırma yolunu ver" dedi. Tarayıcı eklentisi bağlı değildi → **Playwright cihaz emülasyonu** (demo=viewer, **salt-okunur**, hiçbir mutasyon tetiklenmedi).
+**Son tamamlanan iş:** **Dokunma hedefleri + hover kilidi** (2026-08-31; GREEN; **migration YOK**). Telefon turunda açık bırakılan madde; kullanıcı sıradaki iş olarak bunu seçti. Envanter iPhone 14 emülasyonunda 10 rota + çekmece açık ölçüldü: **35 kontrolün en küçük kenarı 32px altında** (en kötüsü demo bandosu `×` = 13×14, teklif satırı not/sil = 22×22). **Kullanıcı kararı: yalnız kritik <32px** — 32–43px bandındaki 64 kontrol kapsam dışı (36px zaten rahat tıklanıyor; 44'e çıkarmak kenar çubuğunu ve tüm filtre şeritlerini şişirirdi).
+
+**Ararken çıkan ikinci ve daha ciddi bulgu:** `.row-reveal` mobilde **opaklık 0** — dokunmatikte hover YOKTUR, dolayısıyla Teklifler'de 16, Siparişler'de 50 satırda **SİL düğmesi telefonda hiç görünmüyordu** (görünmez olduğu hâlde dokunulabilir; iki adımlı onay anında silmeyi engelliyor). Kullanıcı kapsama aldı: mobilde hep görünür, **masaüstü hover davranışı aynen korundu**.
+
+**Yöntem — görsel büyütme DEĞİL, görünmez hit-area:** `::after` kutusu ortalanır, `width/height: 100%` + `min-*: 44px` ile **yalnız kısa olan eksende** büyür (90×17 metin linki → 90×44; 22×22 ikon → 44×44). Görsel boyut hiç değişmediği için **70/70 taşmasızlık yapısal olarak korunur** — ve yeniden ölçülerek kanıtlandı.
+
+**Kaldıraç `Button`** (44 dosya kullanıyor, hiç className yaymıyordu): `tap-44` sınıfı + `position: relative`. **className `...rest`'ten AYRILDI** — aksi halde `{...rest}` sınıfı ezerdi. `cn()`/twMerge kullanılmadı: repoda hiç kullanımı yok ve proje Tailwind kullanmıyor; çevredeki idyom düz birleştirme.
+
+**Genişletmenin kendi tuzağı (işin asıl inceliği):** yan yana iki küçük kontrolde hit alanları çakışır ve **DOM'da SONRA gelen kazanır** — teklif satırında bu, yıkıcı *sil* düğmesinin komşusunun alanını yutması demekti. Üç yerde boşluk açıldı: **topbar 8→16px** · **teklif satırı 2→24px** (`q-note-btn`) · **eskime filtresi satır aralığı 6→16px** (`tap-row-gap` — çipler mobilde SARIYOR; ilk ölçümde iki çip 44 yerine 36'da kalmıştı, sebebi alttaki satırın alanı yemesiydi).
+
+**TARAYICIDA KANITLANDI** — görsel kutu değil, `elementFromPoint` ile **etkin hit kutusu** ölçüldü: kapsamdaki **25 kontrolün 25'i 44px'e ulaşıyor** · teklif satırı not|sil **ikisi de 44×44, aralarında 24px, komşu alan çalmıyor** · `.row-reveal` **mobil opaklık 1 / masaüstü 0** · **5 profil × 14 ekran = 70/70 taşmasız** korundu.
+
+**Ders — kırmızı-yanma kanıtı İKİ KEZ yanmadı ve ikisinde de TEST gevşekti, kod değil:** (1) `toContain(".hamburger-btn")` seçici `::after` listesinde de geçtiği için maskeleniyordu → artık `position: relative` kuralı ve kutuyu YARATAN `content` kuralı **ayrı ayrı** aranıyor; (2) ilk `::after` iddiası ikinci bir `::after` bloğuyla maskeleniyordu. Aynı sınıf hata `pwa.test.ts`'te de vardı ("dosyada tek `cache.put`" sayım kuralı → biçim kuralına çevrildi).
+
+Kapı: YENİ `src/__tests__/gate/touch-targets.test.ts` (8 test), **8/8 kırmızı-yandığı kanıtlanarak**.
+
+tsc 0 · lint 0 · **485 dosya / 6833 test** (+8) · build temiz · **migration YOK**.
+
+**Önceki iş:** **Telefon/tablet/masaüstü ölçümü + 2 kusur** (2026-08-31; GREEN; **migration YOK**). Kullanıcı "telefon tablet ve masaüstünden sorunsuz tıkır tıkır çalışır mı, evetse telefonda çalıştırma yolunu ver" dedi. Tarayıcı eklentisi bağlı değildi → **Playwright cihaz emülasyonu** (demo=viewer, **salt-okunur**, hiçbir mutasyon tetiklenmedi).
 
 **Duyarlılık SAĞLAM, ölçüldü:** 5 profil × 14 ekran = **70 sayfa yüklemesinde yatay taşma 0** (360/390 telefon · 768/1024 tablet · 1440 masaüstü). Kenar çubuğu <768px'te hamburger çekmeceye dönüyor (768 ve 390'da **tıklanarak** açıldığı doğrulandı), listeler kendi `overflow-x` kabında kayıyor, sipariş formunun aksiyon çubuğu altta sabitleniyor. `useIsMobile`/`windowWidth < 768` kolon gizleme + düzen değiştirme yapıyor — mobil desteği kazara değil, kurulmuş.
 
@@ -21,7 +39,7 @@ Kapı `pwa.test.ts` 16 → **19 test**. "Dosyada tek `cache.put` var" **sayım**
 
 tsc 0 · lint 0 · **484 dosya / 6825 test** (+3) · build temiz · **migration YOK**.
 
-**Önceki iş:** **PWA eksiksizleştirme + TARAYICIDA doğrulama** (2026-08-31; GREEN; **migration YOK**). Kullanıcı "PWA eksiksiz hatasız ve tam olmalı" dedi. PWA çalışıyordu ama **hiçbir tarayıcıda doğrulanmamıştı** — kapı testleri yalnız kaynak metnine bakan regex iddialarıydı — ve 5 gerçek kusuru vardı.
+**Daha önceki iş:** **PWA eksiksizleştirme + TARAYICIDA doğrulama** (2026-08-31; GREEN; **migration YOK**). Kullanıcı "PWA eksiksiz hatasız ve tam olmalı" dedi. PWA çalışıyordu ama **hiçbir tarayıcıda doğrulanmamıştı** — kapı testleri yalnız kaynak metnine bakan regex iddialarıydı — ve 5 gerçek kusuru vardı.
 
 **Kapatılan kusurlar:** SW **development'ta da kaydoluyordu** → `/_next/static/` cache-first yüzünden geliştirmede bayat JS; guard yetmez (SW kaydı KALICI), bu yüzden dev'de mevcut kayıt + `roven-*` cache'leri **aktif olarak siliniyor** · önbellek **sınırsız büyüyordu** → `MAX_ENTRIES=200` FIFO tavan · **çevrimdışı yedek sayfa yoktu** → `/offline` precache + gezinme **yakalaması** (önbellekleme DEĞİL; "API/navigasyon asla önbelleğe alınmaz" invaryantı korundu) · `apple-touch-icon` iOS'un **kök-yol tahminine** güveniyordu → `src/app/apple-icon.png` (Next `<link>`i oradan basıyor) · **`safe-area-inset` kodda hiç yoktu** → mobil çekmeceye `env(safe-area-inset-bottom)`.
 

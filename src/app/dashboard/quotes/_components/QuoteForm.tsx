@@ -1596,6 +1596,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                                                         iconOnly
                                                         aria-label={`Satır ${idx + 1} not`}
                                                         aria-expanded={noteOpen}
+                                                        className="q-note-btn"
                                                         variant="icon"
                                                         size="xs"
                                                         leftIcon={<StickyNote size={12} />}

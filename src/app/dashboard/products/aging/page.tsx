@@ -350,7 +350,7 @@ export default function AgingPage() {
                         width: "200px",
                     }}
                 />
-                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+                <div className="tap-row-gap" style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
                     {FILTER_TABS.map(tab => {
                         const active = filter === tab.key;
                         const count = tab.key === "all" ? rows.length
@@ -359,6 +359,7 @@ export default function AgingPage() {
                         return (
                             <button
                                 key={tab.key}
+                                className="tap-44"
                                 onClick={() => setFilter(tab.key)}
                                 style={{
                                     fontSize: "12px", padding: "5px 12px",

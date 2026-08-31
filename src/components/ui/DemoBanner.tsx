@@ -45,6 +45,9 @@ export default function DemoBanner({
             <span style={{ flexShrink: 0, fontSize: "13px" }}>&#8505;</span>
             <span style={{ flex: 1 }}>{children}</span>
             <button
+                type="button"
+                className="tap-44"
+                aria-label="Bildirimi kapat"
                 onClick={handleDismiss}
                 style={{
                     background: "none",

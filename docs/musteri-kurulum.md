@@ -185,6 +185,17 @@ Deploy'a kadar beklemek daha güvenli.
 hamburger çekmeceye dönüyor, listeler kendi kabında yatay kayıyor, sipariş
 formunun aksiyon çubuğu altta sabitleniyor.
 
-Açık kalan: **dokunma hedefleri**. Hamburger 29×29, tema düğmesi 30×30, teklif
-satırı sil/not düğmeleri 22×22 — Apple'ın önerdiği 44×44'ün altında. Kullanılabilir
-ama parmakla ıskalanabilir; ayrı bir iş olarak duruyor.
+**Dokunma hedefleri kapatıldı (2026-08-31).** Görsel boyut değiştirilmedi — yoğun
+ERP düzeni bozulurdu. Onun yerine dar ekranda `::after` ile **görünmez hit-area**:
+`width/height: 100%` + `min-*: 44px` sayesinde yalnız kısa olan eksende büyür.
+Ölçüm: 32px altındaki 25 kontrolün **25'i** artık 44px'e ulaşıyor (13×14'lük demo
+kapat düğmesi ve 22×22'lik teklif satırı düğmeleri dahil).
+
+Genişletmenin kendi tuzağı var ve üç yerde boşluk açmak gerekti: yan yana iki küçük
+düğmede alanlar çakışır ve **DOM'da sonra gelen kazanır** — teklif satırında bu,
+yıkıcı *sil* düğmesinin komşusunun alanını yutması demekti. Topbar 8→16px, teklif
+satırı 2→24px, eskime filtresi satır aralığı 6→16px.
+
+Ayrıca: `.row-reveal` mobilde artık **her zaman görünür**. Dokunmatikte hover
+yoktur; o kurala bağlı kaldığı için Teklifler'de 16, Siparişler'de 50 satırda sil
+düğmesi telefonda hiç görünmüyordu. Masaüstünde hover davranışı aynen duruyor.

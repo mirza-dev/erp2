@@ -5,6 +5,49 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-08-31 (4) — Dokunma hedefleri + hover kilidi
+
+Kullanıcı sıradaki iş olarak dokunma hedeflerini seçti. Envanter iPhone 14
+emülasyonunda 10 rota + çekmece açık ölçüldü: **35 kontrolün en küçük kenarı 32px
+altında** (en kötüsü demo bandosu `×` = 13×14, teklif satırı not/sil = 22×22).
+Kullanıcı kararı: **yalnız kritik <32px** (32–43px bandındaki 64 kontrol kapsam
+dışı — 36px zaten rahat tıklanıyor, 44'e çıkarmak yoğun ERP düzenini şişirirdi).
+
+**Ararken çıkan ikinci ve daha ciddi bulgu:** `.row-reveal` mobilde **opaklık 0** —
+dokunmatikte hover yok, dolayısıyla Teklifler'de 16, Siparişler'de 50 satırda
+**sil düğmesi telefonda hiç görünmüyordu** (görünmez olduğu hâlde dokunulabilir).
+Kullanıcı kapsama aldı: mobilde hep görünür, masaüstü hover davranışı korundu.
+
+**Yöntem: görsel büyütme DEĞİL, görünmez hit-area.** `::after` kutusu ortalanır,
+`width/height: 100%` + `min-*: 44px` ile **yalnız kısa eksende** büyür. Görsel boyut
+hiç değişmez → 70/70 taşmasızlık yapısal olarak korunur (ve yeniden kanıtlandı).
+
+**Kaldıraç `Button`:** 44 dosya kullanıyor, hiç className yaymıyordu. `tap-44`
+sınıfı eklendi (className rest'ten AYRILDI — aksi halde `{...rest}` ezerdi) +
+`position: relative`. `cn()`/twMerge **kullanılmadı**: repoda hiç kullanımı yok ve
+proje Tailwind kullanmıyor; çevredeki idyom düz birleştirme.
+
+**Genişletmenin kendi tuzağı — planın asıl inceliği.** Yan yana iki küçük kontrolde
+alanlar çakışır ve **DOM'da sonra gelen kazanır**; teklif satırında bu, yıkıcı *sil*
+düğmesinin komşusunun alanını yutması demekti. Üç yerde boşluk açıldı: topbar
+8→16px · teklif satırı 2→24px (`q-note-btn`) · eskime filtresi satır aralığı 6→16px
+(`tap-row-gap` — çipler mobilde SARIYOR, ilk ölçümde 44 yerine 36'da kalmışlardı).
+
+**Tarayıcıda kanıtlandı** (`elementFromPoint` ile etkin hit kutusu; görsel kutu değil):
+kapsamdaki **25 kontrolün 25'i** 44px'e ulaşıyor · teklif satırı not|sil **ikisi de
+44×44, 24px boşluk, komşu alan çalmıyor** · `.row-reveal` mobil 1 / masaüstü 0 ·
+**70/70 taşmasız** korundu.
+
+**Ders (iki kez):** kırmızı-yanma kanıtı iki kez YANMADI ve ikisinde de test gevşekti,
+kod değil. (1) `toContain(".hamburger-btn")` seçici `::after` listesinde de geçtiği
+için maskeleniyordu → `position: relative` ve kutuyu YARATAN `content` kuralı ayrı
+ayrı aranıyor. (2) İlk `::after` iddiası ikinci bir `::after` bloğuyla maskeleniyordu.
+Sayım kuralları da aynı sınıf: `pwa.test.ts`'teki "dosyada tek `cache.put`" kuralı
+ikinci meşru put gelince **biçim** kuralına çevrilmişti.
+
+Kapı: YENİ `src/__tests__/gate/touch-targets.test.ts` (8 test), **8/8 kırmızı kanıtlı**.
+**485 dosya / 6833 test** · tsc 0 · lint 0 · build temiz · migration YOK.
+
 ## 2026-08-31 (3) — Telefon/tablet/masaüstü ölçümü + 2 kusur kapatıldı
 
 Kullanıcı "telefon tablet ve masaüstünden sorunsuz tıkır tıkır çalışır mı, evetse

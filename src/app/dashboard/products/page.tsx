@@ -752,6 +752,7 @@ export default function ProductsPage() {
                     />
                 )}
                 <button
+                    className="tap-44"
                     onClick={() => setCategoryDropdownOpen(prev => !prev)}
                     style={{
                         fontSize: "12px",
@@ -894,6 +895,7 @@ export default function ProductsPage() {
                     return (
                         <button
                             key={type}
+                            className="tap-44"
                             onClick={toggle}
                             style={{
                                 display: "flex", alignItems: "center", gap: "6px",

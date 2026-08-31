@@ -60,6 +60,7 @@ export default function ThemeToggle() {
     return (
         <button
             type="button"
+            className="tap-44"
             aria-label="Temayı değiştir"
             title={title}
             onClick={handleClick}

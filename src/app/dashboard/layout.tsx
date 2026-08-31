@@ -78,6 +78,7 @@ export default function DashboardLayout({
                                 Demo modundasınız — değişiklik yapabilmek için{" "}
                                 <Link
                                     href="/login"
+                                    className="tap-44-v"
                                     onClick={handleLoginFromDemo}
                                     style={{ color: "var(--accent-text)", textDecoration: "underline" }}
                                 >
