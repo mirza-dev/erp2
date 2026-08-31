@@ -1,7 +1,34 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
+import { networkInterfaces } from "node:os";
+
+/** Yalnız yerel `next dev` için gevşetmeler; üretim derlemesinde false. */
+const isDev = process.env.NODE_ENV !== "production";
+
+/**
+ * `next dev` kaynaklarına çapraz-origin erişim Next 16'da VARSAYILAN OLARAK KAPALI:
+ * yalnız `localhost` geçer. Telefondan `http://192.168.x.x:3000` açıldığında dev
+ * bundle'ı bloklanır, React HİÇ hidratlanmaz ve sayfa SESSİZCE ölür — hata kutusu
+ * yok, tıklamalar hiçbir şey yapmaz. 2026-08-31'de tam olarak bu yaşandı
+ * ("giriş yapamıyorum": tema düğmesi de ölüydü, Supabase'e hiç istek gitmiyordu;
+ * `localhost` ile aynı sunucu sorunsuz çalışıyordu).
+ *
+ * IP'yi sabit yazmak yerine makinenin KENDİ IPv4 adresleri okunuyor: DHCP adresi
+ * değiştirdiğinde kendiliğinden güncellenir. Yalnız development'ta etkili.
+ */
+const devOrigins = isDev
+    ? [
+          "127.0.0.1",
+          ...Object.values(networkInterfaces())
+              .flatMap((ifaces) => ifaces ?? [])
+              .filter((i) => i.family === "IPv4" && !i.internal)
+              .map((i) => i.address),
+      ]
+    : [];
 
 const nextConfig: NextConfig = {
+    // Yalnız development'ta dolu — üretim derlemesinde boş dizi (bkz. devOrigins).
+    allowedDevOrigins: devOrigins,
     // Coolify/Docker self-hosting için minimal Node server üretir (.next/standalone/)
     output: "standalone",
     // Faz D — mupdf'i bundle'a ALMA (external bırak). Loader wasm'ı
@@ -39,7 +66,17 @@ const nextConfig: NextConfig = {
                         value: [
                             "default-src 'self'",
                             "img-src 'self' data: blob: https:",
-                            "script-src 'self' 'unsafe-inline'",
+                            // 'unsafe-eval' YALNIZ development'ta: Next'in dev sunucusu
+                            // (React Refresh / HMR) modülleri eval ile sarar. Kural
+                            // olmadan `next dev` sayfası CSP'ye takılır, React HİÇ
+                            // hidratlanmaz ve sayfa sessizce ölür — hata kutusu bile
+                            // çıkmaz, tıklamalar hiçbir şey yapmaz. 2026-08-31'de tam
+                            // olarak bu yaşandı ("giriş yapamıyorum": tema düğmesi de
+                            // ölüydü, Supabase'e hiç istek gitmiyordu).
+                            // ÜRETİM STRING'İ DEĞİŞMEDİ — gate testi bunu kilitliyor.
+                            isDev
+                                ? "script-src 'self' 'unsafe-inline' 'unsafe-eval'"
+                                : "script-src 'self' 'unsafe-inline'",
                             "style-src 'self' 'unsafe-inline'",
                             "font-src 'self' data:",
                             // PWA: service worker ve manifest. İkisi de bugün

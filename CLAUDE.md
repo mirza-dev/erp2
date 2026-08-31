@@ -5,7 +5,23 @@ _Son güncelleme: 2026-08-31_
 
 > Bu bölüm yalnız **güncel durumu + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda ve `memory/current_focus.md`'de. Aşağıdaki indeks son dönem oturumlarına (commit + konu) hızlı bakış içindir; daha eski dönemler (Faz 2–3d AI Import, Sprint A–C, M-3 Rate Limiting, React Doctor, Teklif V2–V7 plan turları, Paraşüt Faz 1–11) git geçmişinde.
 
-**Son tamamlanan iş:** **Dokunma hedefleri + hover kilidi** (2026-08-31; GREEN; **migration YOK**). Telefon turunda açık bırakılan madde; kullanıcı sıradaki iş olarak bunu seçti. Envanter iPhone 14 emülasyonunda 10 rota + çekmece açık ölçüldü: **35 kontrolün en küçük kenarı 32px altında** (en kötüsü demo bandosu `×` = 13×14, teklif satırı not/sil = 22×22). **Kullanıcı kararı: yalnız kritik <32px** — 32–43px bandındaki 64 kontrol kapsam dışı (36px zaten rahat tıklanıyor; 44'e çıkarmak kenar çubuğunu ve tüm filtre şeritlerini şişirirdi).
+**Son tamamlanan iş:** **"giriş yapamıyorum" — dev sunucusuna LAN'dan erişim** (2026-08-31; GREEN; **migration YOK**). Kullanıcı telefondan giriş yapamadığını bildirdi.
+
+**İlk şüphe kendi değişikliğimdi ve ölçülerek ELENDİ:** dokunma hedefleri için eklenen 44px'lik görünmez `::after` kutuları giriş formunun üstüne binmiş olabilirdi — doğrulamamda küçük kontrolleri birbirine karşı sınamıştım ama **input/gönder gibi BÜYÜK kontrollerden çalıp çalmadığına bakmamıştım** (gerçek bir doğrulama boşluğu). Ölçüm: mobil ve masaüstünde e-posta/şifre/gönder üçünün de merkezi ve dört köşesi kendi elemanına ait, hiçbir şey engellemiyor.
+
+**GERÇEK SEBEP:** Next 16, **dev bundle'ına çapraz-origin erişimi VARSAYILAN OLARAK BLOKLAR** — yalnız `localhost` geçer. Kullanıcı `npm run dev` koşturmuştu (üstelik **erp2** worktree'sinden, iki commit geride) ve telefondan LAN IP'siyle açmıştı. Sonuç: sayfa **200 döner, HTML gelir, React HİÇ hidratlanmaz** — hata kutusu yok, tıklamalar hiçbir şey yapmaz, sunucu log'u tertemiz. Kanıt (aynı sunucu, aynı an): `localhost` ✓ · `127.0.0.1` ✗ · `192.168.18.15` ✗. Prod sunucusu (`next start`) üç adreste de sorunsuz — A/B ile gösterildi (prod'da sahte kimlikle `400 invalid_credentials` + "E-posta veya şifre hatalı." çıkıyor, yani giriş boru hattı sağlam).
+
+**Fix:** `next.config.ts` → `allowedDevOrigins`, **makinenin kendi IPv4 adreslerinden türetiliyor** (`os.networkInterfaces()`, `!internal`). **Sabit IP YAZILMADI** — DHCP adresi değiştirince sessizce bozulurdu. Yalnız development'ta dolu. Doğrulandı: üç adreste de React bağlanıyor ve giriş Supabase'e ulaşıyor.
+
+**İkinci, AYRI bulgu — sebep DEĞİL:** CSP'de `unsafe-eval` yok ve dev'in React Refresh'i onu istiyor. **Sebep sanıp geçmemek için ölçüldü:** `unsafe-eval` olmadan da React `localhost`'ta hidratlanıyor; yalnız konsol hatası çıkıyor ve Fast Refresh kırılıyor. Yine de dev-only kol eklendi; **üretim string'i DEĞİŞMEDİ ve teste kilitlendi**.
+
+**Ders — en pahalı arıza sınıfı: "200 döner, HTML gelir, React hidratlanmaz".** Her şey ÇALIŞIYOR görünür (sunucu log'u temiz, ağ 200, hata kutusu yok), kullanıcı bunu "giriş yapamıyorum" diye bildirir ve teşhis yanlış katmanda aranır. Hidratlasyonu DOĞRUDAN ölçmek (`__react*` anahtarı, ya da tema düğmesine basıp DOM değişimini görmek) bu sınıfı dakikalar içinde ayırıyor.
+
+Kapı: YENİ `src/__tests__/gate/client-boot.test.ts` (5 test) — "istemcinin ayağa kalkmasını sessizce engelleyebilen `next.config` ayarları". **6/6 kırmızı kanıtlı** (3 CSP + 3 devOrigins; sabit-IP yazımı da kırmızı yanıyor).
+
+tsc 0 · lint 0 · **486 dosya / 6838 test** (+5) · build 0 · **migration YOK**.
+
+**Önceki iş:** **Dokunma hedefleri + hover kilidi** (2026-08-31; GREEN; **migration YOK**). Telefon turunda açık bırakılan madde; kullanıcı sıradaki iş olarak bunu seçti. Envanter iPhone 14 emülasyonunda 10 rota + çekmece açık ölçüldü: **35 kontrolün en küçük kenarı 32px altında** (en kötüsü demo bandosu `×` = 13×14, teklif satırı not/sil = 22×22). **Kullanıcı kararı: yalnız kritik <32px** — 32–43px bandındaki 64 kontrol kapsam dışı (36px zaten rahat tıklanıyor; 44'e çıkarmak kenar çubuğunu ve tüm filtre şeritlerini şişirirdi).
 
 **Ararken çıkan ikinci ve daha ciddi bulgu:** `.row-reveal` mobilde **opaklık 0** — dokunmatikte hover YOKTUR, dolayısıyla Teklifler'de 16, Siparişler'de 50 satırda **SİL düğmesi telefonda hiç görünmüyordu** (görünmez olduğu hâlde dokunulabilir; iki adımlı onay anında silmeyi engelliyor). Kullanıcı kapsama aldı: mobilde hep görünür, **masaüstü hover davranışı aynen korundu**.
 
@@ -23,7 +39,7 @@ Kapı: YENİ `src/__tests__/gate/touch-targets.test.ts` (8 test), **8/8 kırmız
 
 tsc 0 · lint 0 · **485 dosya / 6833 test** (+8) · build temiz · **migration YOK**.
 
-**Önceki iş:** **Telefon/tablet/masaüstü ölçümü + 2 kusur** (2026-08-31; GREEN; **migration YOK**). Kullanıcı "telefon tablet ve masaüstünden sorunsuz tıkır tıkır çalışır mı, evetse telefonda çalıştırma yolunu ver" dedi. Tarayıcı eklentisi bağlı değildi → **Playwright cihaz emülasyonu** (demo=viewer, **salt-okunur**, hiçbir mutasyon tetiklenmedi).
+**Daha önceki iş:** **Telefon/tablet/masaüstü ölçümü + 2 kusur** (2026-08-31; GREEN; **migration YOK**). Kullanıcı "telefon tablet ve masaüstünden sorunsuz tıkır tıkır çalışır mı, evetse telefonda çalıştırma yolunu ver" dedi. Tarayıcı eklentisi bağlı değildi → **Playwright cihaz emülasyonu** (demo=viewer, **salt-okunur**, hiçbir mutasyon tetiklenmedi).
 
 **Duyarlılık SAĞLAM, ölçüldü:** 5 profil × 14 ekran = **70 sayfa yüklemesinde yatay taşma 0** (360/390 telefon · 768/1024 tablet · 1440 masaüstü). Kenar çubuğu <768px'te hamburger çekmeceye dönüyor (768 ve 390'da **tıklanarak** açıldığı doğrulandı), listeler kendi `overflow-x` kabında kayıyor, sipariş formunun aksiyon çubuğu altta sabitleniyor. `useIsMobile`/`windowWidth < 768` kolon gizleme + düzen değiştirme yapıyor — mobil desteği kazara değil, kurulmuş.
 
@@ -39,7 +55,7 @@ Kapı `pwa.test.ts` 16 → **19 test**. "Dosyada tek `cache.put` var" **sayım**
 
 tsc 0 · lint 0 · **484 dosya / 6825 test** (+3) · build temiz · **migration YOK**.
 
-**Daha önceki iş:** **PWA eksiksizleştirme + TARAYICIDA doğrulama** (2026-08-31; GREEN; **migration YOK**). Kullanıcı "PWA eksiksiz hatasız ve tam olmalı" dedi. PWA çalışıyordu ama **hiçbir tarayıcıda doğrulanmamıştı** — kapı testleri yalnız kaynak metnine bakan regex iddialarıydı — ve 5 gerçek kusuru vardı.
+**Daha önceki iş (2):** **PWA eksiksizleştirme + TARAYICIDA doğrulama** (2026-08-31; GREEN; **migration YOK**). Kullanıcı "PWA eksiksiz hatasız ve tam olmalı" dedi. PWA çalışıyordu ama **hiçbir tarayıcıda doğrulanmamıştı** — kapı testleri yalnız kaynak metnine bakan regex iddialarıydı — ve 5 gerçek kusuru vardı.
 
 **Kapatılan kusurlar:** SW **development'ta da kaydoluyordu** → `/_next/static/` cache-first yüzünden geliştirmede bayat JS; guard yetmez (SW kaydı KALICI), bu yüzden dev'de mevcut kayıt + `roven-*` cache'leri **aktif olarak siliniyor** · önbellek **sınırsız büyüyordu** → `MAX_ENTRIES=200` FIFO tavan · **çevrimdışı yedek sayfa yoktu** → `/offline` precache + gezinme **yakalaması** (önbellekleme DEĞİL; "API/navigasyon asla önbelleğe alınmaz" invaryantı korundu) · `apple-touch-icon` iOS'un **kök-yol tahminine** güveniyordu → `src/app/apple-icon.png` (Next `<link>`i oradan basıyor) · **`safe-area-inset` kodda hiç yoktu** → mobil çekmeceye `env(safe-area-inset-bottom)`.
 

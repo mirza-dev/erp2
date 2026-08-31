@@ -5,6 +5,44 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-08-31 (5) — "giriş yapamıyorum": dev sunucusuna LAN'dan erişim
+
+Kullanıcı telefondan giriş yapamadığını söyledi. **İlk şüphe kendi değişikliğimdi**
+(dokunma hedefleri için eklenen 44px'lik görünmez `::after` kutuları giriş formunun
+üstüne binmiş olabilirdi — doğrulamamda küçük kontrolleri birbirine karşı sınamıştım
+ama input/gönder gibi BÜYÜK kontrollerden çalıp çalmadığına bakmamıştım).
+**Ölçüldü ve elendi:** mobil ve masaüstünde e-posta/şifre/gönder üçünün de merkezi
+ve dört köşesi kendi elemanına ait, hiçbir şey engellemiyor.
+
+**Gerçek sebep: Next 16 dev bundle'ına ÇAPRAZ-ORIGIN erişimi varsayılan olarak
+bloklar — yalnız `localhost` geçer.** Kullanıcı `npm run dev` koşturmuştu (üstelik
+**erp2** worktree'sinden, iki commit geride) ve telefondan LAN IP'siyle açmıştı.
+Sonuç: sayfa 200 döner, HTML gelir, **React HİÇ hidratlanmaz** — hata kutusu yok,
+tıklamalar hiçbir şey yapmaz, sunucu log'u tertemiz. Kanıt (aynı sunucu, aynı an):
+`localhost` ✓ · `127.0.0.1` ✗ · `192.168.18.15` ✗. Prod sunucusu (`next start`) üç
+adreste de sorunsuz çalışıyordu — A/B ile gösterildi.
+
+**Fix:** `next.config.ts` → `allowedDevOrigins`, **makinenin kendi IPv4 adreslerinden
+türetiliyor** (`os.networkInterfaces()`, `!internal`). Sabit IP yazılmadı: DHCP adresi
+değiştirince sessizce bozulurdu. Yalnız development'ta dolu.
+
+**İkinci, AYRI bulgu (sebep DEĞİL):** CSP'de `unsafe-eval` yok ve dev'in React
+Refresh'i onu istiyor. Sebep sanıp geçmemek için ölçüldü: `unsafe-eval` olmadan da
+React `localhost`'ta hidratlanıyor — yalnız konsol hatası ve Fast Refresh kırılıyor.
+Yine de dev-only kol eklendi; **üretim string'i değişmedi ve teste kilitlendi**.
+
+**Ders — en pahalı arıza sınıfı:** "200 döner, HTML gelir, React hidratlanmaz".
+Her şey ÇALIŞIYOR görünür: sunucu log'u temiz, ağ 200, hata kutusu yok. Kullanıcı
+bunu "giriş yapamıyorum" diye bildirir ve teşhis yanlış katmanda (giriş kodunda)
+aranır. Hidratlasyonu doğrudan ölçmek (`__react*` anahtarı / tema düğmesine basıp
+DOM değişimini görmek) bu sınıfı dakikalar içinde ayırıyor.
+
+Kapı: YENİ `src/__tests__/gate/client-boot.test.ts` (5 test) — "istemcinin ayağa
+kalkmasını sessizce engelleyebilen next.config ayarları". 6/6 kırmızı kanıtlı
+(3 CSP + 3 devOrigins; sabit-IP yazımı da kırmızı yanıyor).
+
+**486 dosya / 6838 test** · tsc 0 · lint 0 · build 0 · migration YOK.
+
 ## 2026-08-31 (4) — Dokunma hedefleri + hover kilidi
 
 Kullanıcı sıradaki iş olarak dokunma hedeflerini seçti. Envanter iPhone 14

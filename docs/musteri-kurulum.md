@@ -155,6 +155,15 @@ Telefon **aynı Wi-Fi'da** olmalı; tarayıcıya `http://<IP>:3000`. Mac'in uyum
 için `caffeinate -i npm run start:lan`. macOS ilk seferde "node gelen bağlantıları
 kabul etsin mi" diye sorabilir — İzin Ver.
 
+> **`next dev` de LAN'dan çalışır — ama bu 2026-08-31'e kadar çalışmıyordu.**
+> Next 16, dev bundle'ına **çapraz-origin erişimi varsayılan olarak bloklar**:
+> yalnız `localhost` geçer. Telefondan LAN IP'siyle açıldığında sayfa 200 döner,
+> HTML gelir, **ama React hiç hidratlanmaz** — hata kutusu yok, tıklamalar hiçbir
+> şey yapmaz, sunucu log'u tertemiz. Kullanıcıda bu "giriş yapamıyorum" olarak
+> görünür. `next.config.ts` artık `allowedDevOrigins`'i **makinenin kendi IPv4
+> adreslerinden türetiyor** (sabit IP yazılmadı; DHCP değişince kendiliğinden
+> güncellenir). Kapı: `src/__tests__/gate/client-boot.test.ts`.
+
 > Bu bir prod değil: **canlı veritabanına bakan yerel bir sunucu**. Telefonda
 > gördüğünüz kayıtlar gerçek kayıtlardır.
 
