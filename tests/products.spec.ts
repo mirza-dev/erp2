@@ -47,11 +47,18 @@ test.describe("Ürün Listesi & Filtreler", () => {
     test("arama: SKU veya isim ile filtre", async ({ page }) => {
         const searchInput = page.getByPlaceholder(/ara|ürün|sku/i).first();
         if (await searchInput.isVisible({ timeout: 3_000 }).catch(() => false)) {
-            await searchInput.fill("NONEXISTENT-XYZ-99999");
-            await page.waitForTimeout(400);
             const rows = page.locator("table tbody tr");
-            const count = await rows.count();
-            expect(count).toBe(0);  // No match
+            // ARAMADAN ÖNCE dolu olduğu kanıtlanır: aksi halde `toHaveCount(0)`
+            // tablo henüz render olmamışken de geçer ve test sessizce
+            // sahte-yeşil yanar (filtre bozulsa bile fark edilmez).
+            await expect(rows.first()).toBeVisible({ timeout: 10_000 });
+
+            await searchInput.fill("NONEXISTENT-XYZ-99999");
+            // Arama SUNUCU tarafında: 350ms debounce → /api/products?search=…
+            // Sabit 400ms beklemek debounce'u ancak geçiyordu, ağ turu bitmeden
+            // satırlar sayılıyor ve ESKİ liste (20 satır) okunuyordu. Otomatik
+            // yeniden deneyen assertion yarışı ortadan kaldırır.
+            await expect(rows).toHaveCount(0, { timeout: 10_000 });  // No match
         }
     });
 

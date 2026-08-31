@@ -85,7 +85,15 @@ const nextConfig: NextConfig = {
                             // kırılmalarını engeller.
                             "worker-src 'self'",
                             "manifest-src 'self'",
-                            "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io",
+                            // Yerel Supabase (colima + `supabase start`) 127.0.0.1:54321'de
+                            // durur ve `*.supabase.co` desenine UYMAZ: tarayıcı giriş
+                            // isteğini CSP'de bloklar, konsolda yalnız "TypeError: Failed
+                            // to fetch" görünür — sunucu logunda hata yoktur, sanki parola
+                            // yanlışmış gibi durur. E2E kilitliyken bu hiç fark edilmezdi.
+                            // ÜRETİM STRİNGİ DEĞİŞMEDİ — gate testi onu kilitliyor.
+                            isDev
+                                ? "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io http://127.0.0.1:* ws://127.0.0.1:* http://localhost:* ws://localhost:*"
+                                : "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io",
                             "frame-ancestors 'none'",
                         ].join("; "),
                     },

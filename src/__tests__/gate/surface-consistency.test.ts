@@ -121,6 +121,16 @@ describe("GATE: yüzey + buton/kategori tutarlılığı", () => {
     });
 
     it("tek çip dili — FİLTRE sekmesi yalnız FilterChips'ten gelir", () => {
+        // KURALIN BİLİNEN SINIRI: `role="tab"` taşımayan elle örülmüş bir çip
+        // satırı buradan kaçar — 2026-08-31'de RFQ sayfasında tam olarak bu oldu
+        // ve ancak 390px mobil turunda dokunma hedefi ölçümüyle görüldü.
+        // "Aktiflikle zemini değişen her buton çiptir" diye genelleştirmek
+        // DENENDİ ve geri alındı: dosya-bırakma alanlarını, açma/kapama
+        // anahtarlarını ve kategori kutucuklarını da yakalıyordu (5 yanlış
+        // pozitif). Gürültülü kural kapatılır. Kapsama yerine
+        // `filter-chips-source.test.ts`'teki POZİTİF benimseme listesiyle
+        // sağlanıyor: bilinen her filtre yüzeyi orada tek tek kilitli.
+        //
         // Sınır bir whitelist değil, gerçek bir ayrım: `aria-controls` taşıyan
         // `role="tab"` bir PANEL DEĞİŞTİRİCİDİR (ürün detayındaki Genel/Teknik
         // sekmeleri gibi) — listeyi süzmez, içerik bölmesi değiştirir ve alt

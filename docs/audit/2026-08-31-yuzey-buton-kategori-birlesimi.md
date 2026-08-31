@@ -107,13 +107,40 @@ yanıyordu → `<PageHeader` etiketine bakacak biçimde güçlendirildi.
 | Veri Aktarım `<h1>` | 14px `<div>` | 20px / 600 |
 | Yatay taşma | yok | yok |
 
-## Ölçülemeyen
+## 390px mobil turu — SONRADAN KOŞULDU
 
-**390px mobil turu yapılamadı**: pencere OS alt sınırına takıldı (1470px'in
-altına inmedi) ve uygulama — doğru biçimde — iframe'lenmeyi reddediyor
-(`contentDocument` null). `gate/touch-targets` yeşil ve çipler `Button`'a
-geçtiği için `tap-44` KAZANDI; yine de gerçek dar-ekran turu bir sonraki tura
-kalıyor.
+Yerel dev veritabanı kurulunca (bkz. `docs/yerel-gelistirme.md`) Playwright
+viewport'uyla koşuldu: **25 rota × 2 tema = 50 ölçüm.**
+
+| | Sonuç |
+|---|---|
+| Yatay taşma | **0 / 50** |
+| Yüklenemeyen | 0 |
+| Başlıksız sayfa | **1** |
+
+**İki kusur buldu, ikisi de bu turun EKSİĞİYDİ:**
+
+1. **`products/aging`'in hiç `<h1>`'i yokmuş** — başlık 14px `<div>`, yani Veri
+   Aktarım Merkezi'nde düzeltilen kusurun birebir aynısı. 25 rotadan tek
+   başlıksız olan. `PageHeader`'a taşındı.
+
+2. **BEŞİNCİ çip lehçesi: `purchase/rfqs`** — `Tümü/Taslak/Gönderildi` elle
+   örülmüş, pasifi `--bg-tertiary` (beyaz değil). **Kapı kuralı kaçırdı çünkü o
+   butonlar `role="tab"` taşımıyordu** — kural bir YAZIMI kilitliyordu, kavramı
+   değil; bu turun kendi dersine ikinci kez düşülmüş. `FilterChips`'e taşındı.
+
+**Kuralı genelleştirme denendi ve GERİ ALINDI.** "Aktiflikle zemini değişen her
+buton çiptir" 5 yanlış pozitif verdi (dosya-bırakma alanları, açma/kapama
+anahtarı, kategori kutucukları, Paraşüt'ün bilerek bırakılan dikey listesi).
+Gürültülü kural kapatılır → yerine `filter-chips-source`'ta **pozitif benimseme
+kilidi**. Kuralın bilinen sınırı testin içine yazıldı.
+
+**Dokunma hedefi ölçümü ilk denemede YANLIŞTI:** `tap-44` hit-area'sı CSS'te bir
+SINIF LİSTESİNE veriliyor (`.topbar-brand`, `.seg button`, `.hamburger-btn`,
+`.field-link`, `.row-link`), yalnız `tap-44` sınıfına değil. Sınıf adına bakan
+tespit 50 sayfa "kusurlu" dedi; gerçek `::after` ölçüsüne göre **36**. Kalan 36
+çoğunlukla 30–43px bandında ve önceki turun "kritik aileler kapatıldı" kararının
+dışında olabilir — **doğrulanmadan bulgu sayılmadı.**
 
 ## Gate
 

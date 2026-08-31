@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import FilterChips from "@/components/ui/FilterChips";
 import { useRouter } from "next/navigation";
 import type { RfqListRow } from "@/lib/supabase/supplier-rfqs";
 import type { SupplierRfqStatus } from "@/lib/database.types";
@@ -98,15 +99,16 @@ export default function RfqListPage() {
             </div>
 
             <div style={{ display: "flex", gap: "6px", marginBottom: "14px", flexWrap: "wrap" }}>
-                {TABS.map(t => (
-                    <button key={t.key} onClick={() => setTab(t.key)} style={{
-                        padding: "6px 14px", fontSize: "12px", borderRadius: "6px", cursor: "pointer",
-                        border: "0.5px solid var(--border-secondary)",
-                        background: tab === t.key ? "var(--accent)" : "var(--bg-tertiary)",
-                        color: tab === t.key ? "#fff" : "var(--text-secondary)",
-                        fontWeight: tab === t.key ? 600 : 400,
-                    }}>{t.label}</button>
-                ))}
+                {/* 2026-08-31: elle örülmüş BEŞİNCİ çip lehçesiydi — pasifi
+                    `--bg-tertiary` (beyaz değil) ve `role="tab"` taşımadığı için
+                    ilk kapı kuralı bunu kaçırmıştı. 390px mobil turunda dokunma
+                    hedefi ölçümüyle ortaya çıktı. */}
+                <FilterChips
+                    ariaLabel="Fiyat talebi durumu filtresi"
+                    activeKey={tab}
+                    onChange={setTab}
+                    items={TABS}
+                />
                 <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Ara: talep no / başlık"
                     aria-label="Ara" style={{
                         marginLeft: "auto", fontSize: "13px", padding: "6px 10px", minWidth: "220px",

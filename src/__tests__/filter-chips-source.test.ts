@@ -2,7 +2,18 @@ import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const read = (file: string) => readFileSync(join(process.cwd(), file), "utf8");
+/**
+ * Yorumları atar.
+ *
+ * NEDEN: bu tuzağa repoda ÜÇÜNCÜ kez düşüldü — bir dosyanın KENDİ açıklaması
+ * aradığımız deseni içeriyor ve kural yanlış yere kırmızı yanıyor. RFQ sayfası
+ * `FilterChips`'e taşındı, ama taşınma gerekçesini anlatan yorumda `role="tab"`
+ * geçtiği için "elle örülmüş sekme" sanıldı.
+ */
+const stripComments = (src: string) =>
+    src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+const read = (file: string) => stripComments(readFileSync(join(process.cwd(), file), "utf8"));
 
 const CUSTOMERS = read("src/app/dashboard/customers/CustomersClient.tsx");
 const PURCHASE_ORDERS = read("src/app/dashboard/purchase/orders/PurchaseOrdersClient.tsx");
@@ -12,6 +23,9 @@ const QUOTES = read("src/app/dashboard/quotes/QuotesClient.tsx");
 const ORDERS = read("src/app/dashboard/orders/OrdersClient.tsx");
 const ALERTS = read("src/app/dashboard/alerts/page.tsx");
 const SUGGESTED = read("src/app/dashboard/purchase/suggested/page.tsx");
+// 2026-08-31: BEŞİNCİ çip lehçesiydi — `role="tab"` taşımadığı için gate kaçırdı,
+// 390px mobil turunda dokunma hedefi ölçümüyle bulundu.
+const RFQS = read("src/app/dashboard/purchase/rfqs/page.tsx");
 
 /**
  * 2026-08-31: bu dosya `underlined-filter-tabs-source.test.ts`'in yerine geçti.
@@ -25,7 +39,7 @@ const SUGGESTED = read("src/app/dashboard/purchase/suggested/page.tsx");
  * metni), eski pasif sekmenin `--text-interactive-muted`'ından daha koyu.
  */
 describe("FilterChips sayfa benimsemesi", () => {
-    const ALL = { CUSTOMERS, PURCHASE_ORDERS, PRODUCTS, NOTE_TEMPLATES, QUOTES, ORDERS, ALERTS, SUGGESTED };
+    const ALL = { CUSTOMERS, PURCHASE_ORDERS, PRODUCTS, NOTE_TEMPLATES, QUOTES, ORDERS, ALERTS, SUGGESTED, RFQS };
 
     it("kategori sekmesi olan her sayfa ortak bileşeni kullanır", () => {
         for (const [name, source] of Object.entries(ALL)) {
@@ -40,6 +54,7 @@ describe("FilterChips sayfa benimsemesi", () => {
         expect(PRODUCTS).toContain('ariaLabel="Ürün sinyal filtresi"');
         expect(ALERTS).toContain('ariaLabel="Uyarı kategorileri"');
         expect(SUGGESTED).toContain('ariaLabel="Öneri türü filtresi"');
+        expect(RFQS).toContain('ariaLabel="Fiyat talebi durumu filtresi"');
     });
 
     it("sayaçlı sekmeler sayacını vermeye devam eder", () => {

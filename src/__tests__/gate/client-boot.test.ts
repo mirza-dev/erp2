@@ -114,5 +114,16 @@ describe("GATE — CSP", () => {
         }
         // Supabase'e bağlanamazsa giriş ÇALIŞMAZ — connect-src daraltılırsa yakala.
         expect(nextConfig).toMatch(/connect-src[^"]*https:\/\/\*\.supabase\.co/);
+
+        // 2026-08-31: `connect-src` dev/prod diye İKİYE ayrıldı (yerel Supabase
+        // `*.supabase.co` desenine uymuyor). Yukarıdaki regex artık DEV kolunu
+        // yakalayıp yeşil yanabiliyor — yani üretim stringi bozulsa bile kapı
+        // sessiz kalırdı. Üretim kolu ayrıca ve BİREBİR kilitlenir.
+        const PROD_CONNECT = "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://*.sentry.io";
+        expect(nextConfig).toContain(`: "${PROD_CONNECT}"`);
+
+        // Yerel geliştirme adresleri ÜRETİME sızmamalı.
+        const prodKolu = nextConfig.match(/:\s*"(connect-src[^"]*)"/)?.[1] ?? "";
+        expect(prodKolu).not.toMatch(/localhost|127\.0\.0\.1/);
     });
 });

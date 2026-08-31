@@ -1,7 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import Link from "next/link";
+import { ButtonLink } from "@/components/ui/Button";
+import PageHeader from "@/components/ui/PageHeader";
 import { maskCurrency } from "@/lib/utils";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import type { AgingCategory, AgingRow } from "@/lib/supabase/aging";
@@ -208,26 +209,18 @@ export default function AgingPage() {
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
 
-            {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
-                <div>
-                    <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
-                        Stok Eskime Raporu
-                    </div>
-                    <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "3px" }}>
-                        Stokta bekleyen ürünler · bağlanan sermaye
-                    </div>
-                </div>
-                <Link
-                    href="/dashboard/products"
-                    style={{
-                        fontSize: "12px", fontWeight: 500, padding: "6px 12px",
-                        border: "0.5px solid var(--border-secondary)", borderRadius: "6px",
-                        background: "transparent", color: "var(--text-secondary)",
-                        textDecoration: "none", cursor: "pointer",
-                    }}
-                >← Ürünler</Link>
-            </div>
+            {/* 2026-08-31: başlık 14px `<div>`'di — sayfanın hiç `<h1>`'i yoktu
+                (390px turunda 25 rotadan tek başlıksız olan buydu). Veri Aktarım
+                Merkezi'ndeki aynı kusurun eşi; kanonik 20px `<h1>`. */}
+            <PageHeader
+                title="Stok Eskime Raporu"
+                subtitle="Stokta bekleyen ürünler · bağlanan sermaye"
+                actions={
+                    <ButtonLink href="/dashboard/products" variant="secondary" size="sm">
+                        ← Ürünler
+                    </ButtonLink>
+                }
+            />
 
             {/* Report Type Tabs */}
             <div style={{
