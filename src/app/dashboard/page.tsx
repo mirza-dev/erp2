@@ -4,6 +4,8 @@ import { useMemo, useState, useEffect } from "react";
 import { useProducts, useOrders, useProduction, useAlerts, useReorderSuggestions } from "@/lib/data-context";
 import { useExchangeRates, useUserProfile } from "@/lib/shared-hooks";
 import { usePermissions } from "@/lib/auth/use-permissions";
+import { LoadingState } from "@/components/ui/StateViews";
+import SetupProgressBanner from "@/components/dashboard/SetupProgressBanner";
 import KpiCard from "@/components/dashboard/overview/KpiCard";
 import OverviewPanel, { Dot } from "@/components/dashboard/overview/OverviewPanel";
 import TrendChart from "@/components/dashboard/overview/charts/TrendChart";
@@ -39,10 +41,10 @@ const TrendLegend = (
 
 export default function DashboardPage() {
     // Perf Faz 3: yalnız bu sayfanın ihtiyaç duyduğu domain'ler (customers ELENDİ).
-    const { products } = useProducts();
-    const { orders } = useOrders();
-    const { uretimKayitlari } = useProduction();
-    const { openAlerts } = useAlerts();
+    const { products, productsLoading } = useProducts();
+    const { orders, ordersLoading } = useOrders();
+    const { uretimKayitlari, productionLoading } = useProduction();
+    const { openAlerts, alertsLoading } = useAlerts();
     const reorderSuggestions = useReorderSuggestions(products);
     const { canViewSalesPrices, canViewPurchaseCosts } = usePermissions();
 
@@ -208,9 +210,29 @@ export default function DashboardPage() {
 
     const gap = 16;
 
+    /**
+     * İLK yükleme (madde #8). Bu ekran veri gelmeden de render ediliyordu ve KPI
+     * kartları SIFIR gösteriyordu — "0 TL ciro" ile "henüz gelmedi" ayırt
+     * edilemiyordu; yavaş bağlantıda işletme durmuş gibi görünüyordu.
+     *
+     * Koşulda hem yükleniyor bayrağı hem "elde hiç veri yok" aranıyor: SWR arka
+     * plan tazelemesi ekranı iskelete döndürmesin (veri zaten elde), ve GERÇEKTEN
+     * boş bir sistem (yeni kurulum) sonsuza kadar "yükleniyor" demesin — orada
+     * bayrak zaten false olur ve kurulum bandı devreye girer.
+     */
+    const initialLoading =
+        (productsLoading || ordersLoading || productionLoading || alertsLoading)
+        && products.length === 0 && orders.length === 0
+        && uretimKayitlari.length === 0 && openAlerts.length === 0;
+
+    if (initialLoading) {
+        return <LoadingState message="Pano hazırlanıyor…" />;
+    }
+
     return (
         <div>
         <div className="dashboard-screen-only">
+            <SetupProgressBanner />
             {/* PageHeader */}
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 14, flexWrap: "wrap", marginBottom: 16 }}>
                 <div>

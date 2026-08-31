@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+import { RECOVERY_PATH } from "@/lib/auth/recovery-route";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AlertCircle, Check, CheckCircle2, Eye, EyeOff, Lock, LogIn, Mail, Moon, Sun } from "lucide-react";
@@ -42,8 +44,10 @@ const STR = {
         errEmailInvalid: "Geçerli bir e-posta girin.",
         errPwEmpty: "Şifre gerekli.",
         errReset: "Sıfırlama bağlantısı gönderilemedi. Lütfen tekrar deneyin.",
+        errRecovery: "Sıfırlama bağlantısı geçersiz ya da süresi dolmuş. Aşağıdan yeni bir bağlantı isteyin.",
         resetSent: "Sıfırlama bağlantısı e-postanıza gönderildi.",
         themeLabel: "Temayı değiştir",
+        privacy: "Gizlilik ve Aydınlatma Metni",
     },
     en: {
         monoTag: "Industrial ERP",
@@ -72,8 +76,10 @@ const STR = {
         errEmailInvalid: "Enter a valid email.",
         errPwEmpty: "Password is required.",
         errReset: "Could not send reset link. Please try again.",
+        errRecovery: "The reset link is invalid or has expired. Request a new one below.",
         resetSent: "A reset link has been sent to your email.",
         themeLabel: "Toggle theme",
+        privacy: "Privacy Notice",
     },
 } satisfies Record<Lang, Record<string, string>>;
 
@@ -157,6 +163,10 @@ function LoginForm({ t }: { t: Strings }) {
         if (err === "oauth") {
             const reason = params.get("reason");
             setAuthError(reason === "provider" || reason === "pkce" ? t.errOAuthConfig : t.errOAuth);
+        } else if (err === "recovery") {
+            // Kurtarma linkleri tek kullanımlık ve ~1 saat ömürlü; en sık hata bu.
+            // "Google ile giriş yapılamadı" demek kullanıcıyı yanlış yere bakmaya iter.
+            setAuthError(t.errRecovery);
         } else if (err === "unauthorized") {
             // `attempted` ham URL param'ı — yalnız GEÇERLİ e-posta ise yansıt
             // (React escape ettiğinden XSS yok ama crafted link keyfi metin gösterebilir).
@@ -231,8 +241,13 @@ function LoginForm({ t }: { t: Strings }) {
             return;
         }
         const supabase = createClient();
+        // Dönüş adresi /login DEĞİL: @supabase/ssr PKCE akışında link `?code=` ile
+        // döner ve o kodun oturuma çevrilmesi gerekir. /login bunu yapmıyordu —
+        // kullanıcı e-postadaki linke basıyor, giriş ekranına düşüyor ve HÂLÂ
+        // giremiyordu (2026-08-31 denetimi, madde #4). `/auth/callback` exchange'i
+        // zaten yapıyor; `next` ona nereye bırakacağını söyler.
         const { error: resetErr } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-            redirectTo: `${window.location.origin}/login`,
+            redirectTo: `${window.location.origin}/auth/callback?next=${RECOVERY_PATH}`,
         });
         if (resetErr) {
             setAuthError(t.errReset);
@@ -380,6 +395,12 @@ function LoginForm({ t }: { t: Strings }) {
 
             <p className="login-foot">
                 {t.noAccount} <span className="login-foot-em">{t.contact}</span>
+            </p>
+            {/* Aydınlatma metni giriş YAPMADAN erişilebilir olmalı (madde #16). */}
+            <p className="login-foot" style={{ marginTop: "6px" }}>
+                <Link href="/gizlilik" className="tap-44-v" style={{ color: "inherit", textDecoration: "underline", opacity: 0.75 }}>
+                    {t.privacy}
+                </Link>
             </p>
         </form>
     );

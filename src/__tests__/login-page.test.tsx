@@ -244,7 +244,14 @@ describe("LoginPage (Monolith)", () => {
         await waitFor(() => {
             expect(mockResetPasswordForEmail).toHaveBeenCalledWith(
                 "user@example.com",
-                expect.objectContaining({ redirectTo: expect.stringContaining("/login") }),
+                // 2026-08-31 (madde #4): eskiden `/login` bekleniyordu ve TAM DA BU
+                // testin kilitlediği şey kırık davranıştı — `/login` PKCE `?code=`'unu
+                // hiç işlemiyordu, kullanıcı giriş ekranına düşüp kilitli kalıyordu.
+                // Dönüş artık exchange'i yapan handler'a gider ve kurtarma ekranını
+                // işaret eder.
+                expect.objectContaining({
+                    redirectTo: expect.stringContaining("/auth/callback?next=/sifre-yenile"),
+                }),
             );
         });
         const status = await screen.findByRole("status");

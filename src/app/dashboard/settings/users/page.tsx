@@ -7,9 +7,10 @@ import { createClient } from "@/lib/supabase/client";
 import { ROLES, ROLE_LABELS, type Role } from "@/lib/auth/permissions";
 import Button from "@/components/ui/Button";
 import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
-import { Pencil, Plus, Trash2 } from "lucide-react";
+import { KeyRound, Pencil, Plus, Trash2 } from "lucide-react";
 import { fieldStyle } from "@/components/ui/Input";
-import { MIN_PASSWORD_LENGTH } from "@/lib/auth/password-policy";
+import { MIN_PASSWORD_LENGTH, checkPasswordPolicy } from "@/lib/auth/password-policy";
+import Modal from "@/components/ui/Modal";
 
 interface User {
     id: string;
@@ -107,6 +108,11 @@ export default function UsersPage() {
     const [editingRolesId, setEditingRolesId] = useState<string | null>(null);
     const [editRolesDraft, setEditRolesDraft] = useState<Role[]>([]);
     const [savingRoles, setSavingRoles] = useState(false);
+    // Şifre sıfırlama (madde #4): self-servis akış e-postaya bağlı, bu değil.
+    const [resetUser, setResetUser] = useState<User | null>(null);
+    const [resetPassword, setResetPassword] = useState("");
+    const [resetError, setResetError] = useState<string | null>(null);
+    const [resetting, setResetting] = useState(false);
 
     const toggleNewRole = (r: Role) =>
         setNewRoles(prev => prev.includes(r) ? prev.filter(x => x !== r) : [...prev, r]);
@@ -193,6 +199,43 @@ export default function UsersPage() {
             toast({ type: "error", message: "Beklenmeyen bir hata oluştu." });
         } finally {
             setSubmitting(false);
+        }
+    };
+
+    const openReset = (user: User) => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        setResetUser(user);
+        setResetPassword("");
+        setResetError(null);
+    };
+
+    const handleResetPassword = async () => {
+        if (!resetUser) return;
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        // Sunucu otoriter; bu yalnız UX aynası (aynı fonksiyon, kopya eşik yok).
+        const policyError = checkPasswordPolicy(resetPassword, { email: resetUser.email });
+        if (policyError) { setResetError(policyError); return; }
+
+        setResetting(true);
+        setResetError(null);
+        try {
+            const res = await fetch(`/api/admin/users/${resetUser.id}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ password: resetPassword }),
+            });
+            if (res.ok) {
+                toast({ type: "success", message: `${resetUser.email} için şifre güncellendi.` });
+                setResetUser(null);
+                setResetPassword("");
+            } else {
+                const data = await res.json().catch(() => null);
+                setResetError(data?.error || "Şifre güncellenemedi.");
+            }
+        } catch {
+            setResetError("Beklenmeyen bir hata oluştu.");
+        } finally {
+            setResetting(false);
         }
     };
 
@@ -315,16 +358,28 @@ export default function UsersPage() {
             cell: user => {
                 const isSelf = user.email === currentEmail;
                 return (
-                    <Button
-                        variant="dangerSoft"
-                        size="xs"
-                        leftIcon={<Trash2 size={13} />}
-                        onClick={() => handleDelete(user)}
-                        disabled={isDemo || isSelf || deletingId === user.id}
-                        title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                    >
-                        {deletingId === user.id ? "Siliniyor..." : "Sil"}
-                    </Button>
+                    <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
+                        <Button
+                            variant="secondary"
+                            size="xs"
+                            leftIcon={<KeyRound size={13} />}
+                            onClick={() => openReset(user)}
+                            disabled={isDemo}
+                            title={isDemo ? DEMO_DISABLED_TOOLTIP : "Kullanıcı için yeni şifre belirle"}
+                        >
+                            Şifre sıfırla
+                        </Button>
+                        <Button
+                            variant="dangerSoft"
+                            size="xs"
+                            leftIcon={<Trash2 size={13} />}
+                            onClick={() => handleDelete(user)}
+                            disabled={isDemo || isSelf || deletingId === user.id}
+                            title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                        >
+                            {deletingId === user.id ? "Siliniyor..." : "Sil"}
+                        </Button>
+                    </div>
                 );
             },
         },
@@ -436,6 +491,53 @@ export default function UsersPage() {
                     />
                 )}
             </div>
+
+            {/* Şifre sıfırlama — madde #4'ün e-postadan BAĞIMSIZ kolu.
+                Self-servis akış (login → /sifre-yenile) e-posta teslimine bağlı;
+                bu yol hiçbir dış servise bağlı değil. */}
+            {resetUser && (
+                <Modal
+                    onClose={() => setResetUser(null)}
+                    labelledBy="sifre-sifirla-baslik"
+                    dismissible={!resetting}
+                >
+                    <h2 id="sifre-sifirla-baslik" style={{ fontSize: "15px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
+                        Şifre sıfırla
+                    </h2>
+                    <p style={{ fontSize: "13px", color: "var(--text-tertiary)", lineHeight: 1.6, margin: 0 }}>
+                        <strong style={{ color: "var(--text-primary)" }}>{resetUser.email}</strong> için yeni bir
+                        şifre belirleyin. Kullanıcıya bu şifreyi güvenli bir yoldan iletin; ilk girişinden
+                        sonra Ayarlar &rarr; Kullanıcı Profili&apos;nden kendisi değiştirebilir.
+                    </p>
+
+                    {resetError && (
+                        <div role="alert" style={{ fontSize: "12.5px", lineHeight: 1.5, color: "var(--danger)" }}>
+                            {resetError}
+                        </div>
+                    )}
+
+                    <label htmlFor="sifirla-yeni-sifre" style={{ fontSize: "12px", fontWeight: 500, color: "var(--text-secondary)" }}>
+                        Yeni şifre (min. {MIN_PASSWORD_LENGTH} karakter)
+                    </label>
+                    <input
+                        id="sifirla-yeni-sifre"
+                        type="password"
+                        autoComplete="new-password"
+                        value={resetPassword}
+                        onChange={(e) => { setResetPassword(e.target.value); setResetError(null); }}
+                        style={fieldStyle("lg")}
+                    />
+
+                    <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
+                        <Button variant="secondary" onClick={() => setResetUser(null)} disabled={resetting}>
+                            Vazgeç
+                        </Button>
+                        <Button variant="primary" onClick={handleResetPassword} disabled={resetting || !resetPassword}>
+                            {resetting ? "Kaydediliyor..." : "Şifreyi güncelle"}
+                        </Button>
+                    </div>
+                </Modal>
+            )}
         </div>
     );
 }

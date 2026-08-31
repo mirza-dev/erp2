@@ -8,8 +8,11 @@
  * iki işi var:
  *
  *   1. Politikanın kendisi doğru davranıyor mu (davranış testi).
- *   2. **Dört çağrı yerinin dördü de ortak yardımcıyı kullanıyor mu** (kaynak
- *      iddiası) — biri elle `8`e dönerse burada yakalanır.
+ *   2. **Her çağrı yeri ortak yardımcıyı kullanıyor mu** (kaynak iddiası) —
+ *      biri elle `8`e dönerse burada yakalanır. 2026-08-31'de liste DÖRTTEN
+ *      ALTIYA çıktı: parola kurtarma ekranı (`/sifre-yenile`) ve admin
+ *      sıfırlama kolu (`PATCH /api/admin/users/[id]`) eklendi. Yeni bir şifre
+ *      belirleme yüzeyi açılıp bu listeye girmezse en gevşek yüzey kazanır.
  *
  * Karmaşıklık kuralı BİLEREK yok (NIST 800-63B); onun yerine uzunluk + zayıf-liste
  * + bağlam reddi. Bu bir eksiklik değil, karar — testte de böyle sabitlendi.
@@ -67,12 +70,15 @@ describe("GATE — parola politikası", () => {
         expect(list.split(",").filter((x) => x.trim().startsWith('"')).length).toBeGreaterThanOrEqual(20);
     });
 
-    it("DÖRT çağrı yerinin dördü de ortak yardımcıyı kullanıyor", () => {
+    it("ALTI çağrı yerinin altısı da ortak yardımcıyı kullanıyor", () => {
         const callers: [string, RegExp][] = [
             ["src/app/api/settings/user/password/route.ts", /checkPasswordPolicy\(/],
             ["src/app/api/admin/users/route.ts", /checkPasswordPolicy\(/],
             ["src/app/dashboard/settings/page.tsx", /checkPasswordPolicy\(/],
             ["src/app/dashboard/settings/users/page.tsx", /MIN_PASSWORD_LENGTH/],
+            // 2026-08-31, madde #4 — parola kurtarma zinciriyle gelen iki yüzey:
+            ["src/app/sifre-yenile/page.tsx", /checkPasswordPolicy\(/],
+            ["src/app/api/admin/users/[id]/route.ts", /checkPasswordPolicy\(/],
         ];
         for (const [file, needle] of callers) {
             const src = readFileSync(join(root, file), "utf8");

@@ -13,6 +13,7 @@ import DemoBanner from "@/components/ui/DemoBanner";
 import RealtimeSyncBridge from "@/components/layout/RealtimeSyncBridge";
 import TelemetryBridge from "@/components/layout/TelemetryBridge";
 import ForbiddenBanner from "@/components/ui/ForbiddenBanner";
+import OfflineBanner from "@/components/ui/OfflineBanner";
 import { isDemoMode, clearDemoMode } from "@/lib/demo-utils";
 import { useRouter } from "next/navigation";
 
@@ -73,6 +74,9 @@ export default function DashboardLayout({
                             minWidth: 0,
                         }}
                     >
+                        {/* Çevrimdışı bandı demo bandının ÜSTÜNDE: bağlantı yoksa
+                            kullanıcının önce bunu görmesi gerekir. */}
+                        <OfflineBanner />
                         {isDemo && (
                             <DemoBanner storageKey="demo-readonly">
                                 Demo modundasınız — değişiklik yapabilmek için{" "}

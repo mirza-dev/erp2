@@ -28,12 +28,14 @@ import { REQUEST_ID_HEADER, newRequestId } from "@/lib/telemetry/request-id";
 // ikisi de yoksa 401/403 döner. CRON_PATHS'e konulsaydı oturum yolu 401 yerdi.
 // DİKKAT: yalnız bu TEK yol açık — diğer /api/developer/* uçları normal
 // oturum + internalOperator kapısından geçer.
+// `/gizlilik` de bir uç değil, sayfa: aydınlatma metnini giriş yapmamış bir
+// kişinin de okuyabilmesi gerekir — kapının arkasındaysa yükümlülük karşılanmaz.
 // `/offline` bir UÇ DEĞİL, sayfa — ama listede olmak ZORUNDA. Service worker onu
 // kurulumda precache'ler; kapının arkasındayken oturumsuz ziyaretçide /login'e 307
 // dönüyordu ve önbelleğe GİRİŞ SAYFASI yazılıyordu. Dahası yönlendirilmiş bir yanıt
 // bir gezinme isteğini karşılayamaz (SW spec) → çevrimdışı yedek sayfa hiç
 // çalışmıyordu, tarayıcının ağ hatası ekranı çıkıyordu. Sayfa sunucu verisi OKUMAZ.
-const ALWAYS_PUBLIC = ["/api/health", "/api/auth/demo", "/api/seed", "/api/alerts/scan", "/api/alerts/ai-suggest", "/api/ai/purchase-copilot", "/api/parasut/oauth/callback", "/api/email/webhooks/resend", "/auth/callback", "/api/quotes/shared", "/api/developer/retention", "/offline"];
+const ALWAYS_PUBLIC = ["/api/health", "/api/auth/demo", "/api/seed", "/api/alerts/scan", "/api/alerts/ai-suggest", "/api/ai/purchase-copilot", "/api/parasut/oauth/callback", "/api/email/webhooks/resend", "/auth/callback", "/api/quotes/shared", "/api/developer/retention", "/offline", "/gizlilik"];
 
 // Sadece CRON_SECRET Bearer token ile erişilir — session bypass YOK
 // Not: /api/alerts/scan ve /api/alerts/ai-suggest buraya dahil DEĞİL — ikisi de

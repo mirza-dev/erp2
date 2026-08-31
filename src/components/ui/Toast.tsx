@@ -1,6 +1,7 @@
 "use client";
 
 import { createContext, useContext, useState, useCallback, ReactNode } from "react";
+import { isBrowserOffline } from "@/lib/network-status";
 
 type ToastType = "success" | "error" | "warning" | "info";
 
@@ -65,8 +66,23 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
     const toast = useCallback(({ type, message, action, duration }: { type: ToastType; message: string; action?: ToastAction; duration?: number }) => {
         const id = ++nextId;
+        // Madde #10 — çevrimdışıyken hata mesajını DÜRÜST hâle getir.
+        //
+        // Bu kural neden burada, 53 çağrı yerinde değil: mesajlar ("Ürün
+        // kaydedilemedi.", "Beklenmeyen bir hata oluştu.") kullanıcıyı veride
+        // hata aramaya itiyor, oysa sebep bağlantı. Her `catch` bloğunu tek tek
+        // düzeltmek hem 53 dokunuş hem de bir dahaki `toast({type:"error"})`
+        // yazıldığında yeniden unutulacak bir kural demekti. Tek huniden geçiyor.
+        //
+        // EKLENİR, DEĞİŞTİRİLMEZ: gerçek bir doğrulama hatası çevrimdışıyken de
+        // olabilir; onu gizlemek yerine sebebi yanına yazıyoruz. `navigator.onLine`
+        // yalnız `false` yönünde güvenilir (bkz. network-status.ts) — bu yüzden
+        // kural yalnız o yönde çalışır.
+        const decorated = type === "error" && isBrowserOffline()
+            ? `${message} İnternet bağlantısı yok — işlem sunucuya ulaşmadı.`
+            : message;
         setToasts(prev => {
-            const next = [...prev, { id, type, message, action }];
+            const next = [...prev, { id, type, message: decorated, action }];
             return next.length > 3 ? next.slice(-3) : next;
         });
         const ms = duration ?? DURATIONS[type];

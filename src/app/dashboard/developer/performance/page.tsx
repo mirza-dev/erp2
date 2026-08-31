@@ -9,7 +9,7 @@ import PageHeader from "@/components/ui/PageHeader";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/StateViews";
 import { jsonFetcher, SWR_DEFAULTS } from "@/lib/swr-config";
 import { DEFAULT_TIME_RANGE, type TimeRange } from "@/lib/telemetry/health";
-import type { EndpointPerformance, PerformanceResponse } from "@/lib/telemetry/console-types";
+import type { EndpointPerformance, PageUsage, PerformanceResponse } from "@/lib/telemetry/console-types";
 import {
     MetricCard,
     MetricGrid,
@@ -29,6 +29,22 @@ export default function DeveloperPerformancePage() {
         jsonFetcher,
         { ...SWR_DEFAULTS, refreshInterval: 30_000 },
     );
+
+    /** Modül kullanımı tablosu — yol + sayım; performans sütunlarıyla karışmasın. */
+    const pageUsageColumns: DataTableColumn<PageUsage>[] = [
+        {
+            key: "path",
+            header: "Ekran",
+            cell: row => <Mono>{row.path}</Mono>,
+        },
+        {
+            key: "views",
+            header: "Görüntüleme",
+            align: "right",
+            width: "120px",
+            cell: row => <Numeric>{row.views}</Numeric>,
+        },
+    ];
 
     const columns: DataTableColumn<EndpointPerformance>[] = [
         {
@@ -208,6 +224,36 @@ export default function DeveloperPerformancePage() {
                             minWidth="960px"
                         />
                     )}
+
+                    {/* Modül kullanımı (madde #14) — "hangi ekran gerçekten
+                        açılıyor". Performans tablosundan AYRI duruyor çünkü
+                        farklı soru soruyor: yukarısı "ne yavaş", burası "ne
+                        kullanılıyor". PMT pilotunda hangi modülün karşılığı
+                        olduğunu ölçmenin tek yolu bu. */}
+                    <div style={{ marginTop: "20px" }}>
+                        <h2 style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", margin: "0 0 4px" }}>
+                            Modül kullanımı
+                        </h2>
+                        <p style={{ fontSize: "12px", color: "var(--text-tertiary)", margin: "0 0 10px", lineHeight: 1.5 }}>
+                            Bu aralıkta hangi ekranın kaç kez açıldığı. Yalnız panel içi gezinme
+                            sayılır; giriş ve tanıtım sayfaları kapsam dışıdır.
+                        </p>
+                        {(data.pageUsage ?? []).length === 0 ? (
+                            <Card>
+                                <EmptyState
+                                    title="Henüz gezinme kaydı yok"
+                                    description="Bu aralıkta sayfa görüntüleme kaydedilmedi."
+                                />
+                            </Card>
+                        ) : (
+                            <DataTable
+                                columns={pageUsageColumns}
+                                rows={data.pageUsage}
+                                rowKey={row => row.path}
+                                minWidth="420px"
+                            />
+                        )}
+                    </div>
                 </>
             )}
         </div>

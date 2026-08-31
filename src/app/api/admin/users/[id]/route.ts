@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { createClient } from "@/lib/supabase/server";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { parseRoles, normalizeAssignedRoles } from "@/lib/auth/permissions";
+import { checkPasswordPolicy } from "@/lib/auth/password-policy";
 
 function adminEmails(): string[] {
     return (process.env.ADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
@@ -46,8 +47,16 @@ async function countAdmins(svc: ReturnType<typeof createServiceClient>): Promise
     return { count: adminIds.size, targetIsAdmin: (id) => adminIds.has(id) };
 }
 
-// PATCH /api/admin/users/[id] — kullanıcının rollerini güncelle
-// Body: { roles: string[] }
+// PATCH /api/admin/users/[id] — rolleri ve/veya şifreyi güncelle
+// Body: { roles?: string[], password?: string }  (en az biri zorunlu)
+//
+// ŞİFRE KOLU NEDEN VAR (2026-08-31, madde #4): self-servis sıfırlama e-posta
+// teslimine bağlı — `EMAIL_FROM` boşken ve Supabase'in yerleşik SMTP'si saatte
+// birkaç mailde tıkanırken tek güvenilir kurtarma yolu bu. Yeni bir yetki yüzeyi
+// AÇMAZ: admin bu kullanıcıyı zaten silip yeniden oluşturabiliyor.
+//
+// Şifre kolu `checkPasswordPolicy`'den geçer — admin'in belirlediği şifre,
+// kullanıcının kendi belirlediğinden daha zayıf olamaz.
 export async function PATCH(
     req: NextRequest,
     { params }: { params: Promise<{ id: string }> }
@@ -58,28 +67,79 @@ export async function PATCH(
         const { id } = await params;
         const parsed = await safeParseJson(req);
         if (!parsed.ok) return parsed.response;
-        const { roles } = parsed.data as { roles?: unknown };
-        if (!Array.isArray(roles)) {
+        const { roles, password } = parsed.data as { roles?: unknown; password?: unknown };
+
+        const wantsRoles = roles !== undefined;
+        const wantsPassword = password !== undefined;
+        if (!wantsRoles && !wantsPassword) {
+            return NextResponse.json({ error: "roles veya password gerekli." }, { status: 400 });
+        }
+        if (wantsRoles && !Array.isArray(roles)) {
             return NextResponse.json({ error: "roles bir dizi olmalıdır." }, { status: 400 });
         }
-        const newRoles = normalizeAssignedRoles(roles);
 
         const svc = createServiceClient();
+        const update: { app_metadata?: { roles: string[] }; password?: string } = {};
+        let newRoles: string[] | null = null;
 
-        // Last-admin lockout guard: admin'i admin'likten düşürüyorsak ve son admin'se → 409
-        const { count, targetIsAdmin } = await countAdmins(svc);
-        if (targetIsAdmin(id) && !newRoles.includes("admin") && count <= 1) {
-            return NextResponse.json(
-                { error: "Son admin'in admin rolü kaldırılamaz." },
-                { status: 409 }
-            );
+        if (wantsRoles) {
+            newRoles = normalizeAssignedRoles(roles as unknown[]);
+
+            // Last-admin lockout guard: admin'i admin'likten düşürüyorsak ve son admin'se → 409
+            const { count, targetIsAdmin } = await countAdmins(svc);
+            if (targetIsAdmin(id) && !newRoles.includes("admin") && count <= 1) {
+                return NextResponse.json(
+                    { error: "Son admin'in admin rolü kaldırılamaz." },
+                    { status: 409 }
+                );
+            }
+            update.app_metadata = { roles: newRoles };
         }
 
-        const { data, error } = await svc.auth.admin.updateUserById(id, {
-            app_metadata: { roles: newRoles },
-        });
+        if (wantsPassword) {
+            // Politika bağlamı hedefin KENDİ e-postası — "kendi adresini şifre yapma"
+            // kuralı admin sıfırlamasında da geçerli olsun.
+            const { data: target, error: lookupError } = await svc.auth.admin.getUserById(id);
+            if (lookupError || !target?.user) {
+                return NextResponse.json({ error: "Kullanıcı bulunamadı." }, { status: 404 });
+            }
+            const policyError = checkPasswordPolicy(
+                typeof password === "string" ? password : "",
+                { email: target.user.email },
+            );
+            if (policyError) {
+                return NextResponse.json({ error: policyError }, { status: 400 });
+            }
+            update.password = password as string;
+        }
+
+        const { data, error } = await svc.auth.admin.updateUserById(id, update);
         if (error) return handleApiError(error, "PATCH /api/admin/users/[id]");
-        return NextResponse.json({ id: data.user.id, email: data.user.email, roles: newRoles });
+
+        if (wantsPassword) {
+            // Başkasının şifresini değiştirmek iz bırakmalı — kim, kime, ne zaman.
+            try {
+                const actor = (await (await createClient()).auth.getUser()).data.user;
+                await svc.from("audit_log").insert({
+                    actor: actor?.email ?? null,
+                    action: "password_reset_by_admin",
+                    entity_type: "user",
+                    entity_id: null,
+                    source: "ui",
+                    before_state: null,
+                    after_state: { user_id: id, email: data.user.email },
+                });
+            } catch {
+                /* non-fatal — şifre değişti, log eksik kalabilir */
+            }
+        }
+
+        return NextResponse.json({
+            id: data.user.id,
+            email: data.user.email,
+            roles: newRoles ?? parseRoles(data.user.app_metadata, data.user.email, adminEmails()),
+            passwordReset: wantsPassword,
+        });
     } catch (err) {
         return handleApiError(err, "PATCH /api/admin/users/[id]");
     }

@@ -7,6 +7,7 @@ import { usePermissions } from "@/lib/auth/use-permissions";
 import { mapProduct } from "@/lib/api-mappers";
 import type { Product } from "@/lib/mock-data";
 import Button, { ButtonLink } from "@/components/ui/Button";
+import { LoadingState } from "@/components/ui/StateViews";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { computeTotalPages, PAGE_SIZE } from "@/hooks/usePagination";
@@ -82,6 +83,10 @@ export default function ProductsPage() {
     const [currentPage, setCurrentPage] = useState(1);
     const [counts, setCounts] = useState<{ total: number; categories: Record<string, number>; critical: number } | null>(null);
     const [loadError, setLoadError] = useState<string | null>(null);
+    // Madde #8: ilk yüklemede `pageRows` boş olduğu için tablo "Ürün bulunamadı"
+    // diyordu — katalog dolu olsa bile. Boş olmak ile HENÜZ GELMEMİŞ olmak
+    // farklı iki durum ve kullanıcı için farklı iki eylem demek.
+    const [listLoading, setListLoading] = useState(true);
     const [refreshing, setRefreshing] = useState(false);
     const [search, setSearch] = useState("");
     const [committedSearch, setCommittedSearch] = useState("");
@@ -179,6 +184,8 @@ export default function ProductsPage() {
             }
         } catch {
             setLoadError("Ürünler yüklenemedi.");
+        } finally {
+            setListLoading(false);
         }
     }, [buildListParams]);
 
@@ -1000,7 +1007,9 @@ export default function ProductsPage() {
                     rowStyle={product => (product.isActive ? {} : { opacity: 0.55 })}
                     rowAriaLabel={product => `${product.name} detayını gör`}
                     minWidth={isMobile ? "360px" : "640px"}
-                    emptyMessage={
+                    emptyMessage={listLoading ? (
+                        <LoadingState message="Ürünler yükleniyor…" />
+                    ) : (
                         <>
                             <div style={{ fontWeight: 500, color: "var(--text-secondary)", marginBottom: "4px" }}>
                                 Ürün bulunamadı
@@ -1023,7 +1032,7 @@ export default function ProductsPage() {
                                 </Button>
                             )}
                         </>
-                    }
+                    )}
                     footer={total > 0 ? (
                         <Pagination
                             currentPage={currentPage}

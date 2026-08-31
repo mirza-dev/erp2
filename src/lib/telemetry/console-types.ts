@@ -113,10 +113,22 @@ export interface PerformanceSummary {
     truncated: boolean;
 }
 
+/** Modül kullanımı satırı (madde #14) — normalize sayfa yolu + görüntüleme. */
+export interface PageUsage {
+    path: string;
+    views: number;
+}
+
 export interface PerformanceResponse extends PerformanceSummary {
     range: TimeRange;
     measurement: "client";
     note: string;
+    /**
+     * Hangi modül ne sıklıkta açıldı. `endpoints` ile AYNI tablodan gelir ama
+     * ayrı alan: biri istek performansı, öteki kullanım. Karıştırılırlarsa
+     * p95 ve hata oranı bozulur (bkz. dbPerformanceSummary'deki `/api/%`).
+     */
+    pageUsage: PageUsage[];
 }
 
 // ── Genel bakış ──────────────────────────────────────────────────────────

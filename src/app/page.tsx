@@ -316,6 +316,9 @@ export default function LandingPage() {
                     <RovenLogo size={16} wordmarkSize={14} />
                 </span>
                 <span className="rv-foot-tag">Yapay zeka destekli ERP — endüstriyel ve B2B işletmeler için</span>
+                <Link href="/gizlilik" className="rv-foot-tag tap-44-v" style={{ color: "inherit", textDecoration: "underline" }}>
+                    Gizlilik ve Aydınlatma Metni
+                </Link>
                 <span className="rv-foot-copy">© {new Date().getFullYear()} Roven</span>
             </footer>
         </div>

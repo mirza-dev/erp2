@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { handleApiError } from "@/lib/api-error";
 import { requireInternalOperatorFor } from "@/lib/auth/internal-access";
 import { resolveAuthContext } from "@/lib/auth/role-guard";
-import { dbPerformanceSummary } from "@/lib/supabase/telemetry";
+import { dbPageUsageSummary, dbPerformanceSummary } from "@/lib/supabase/telemetry";
 import { parseTimeRange, rangeStartISO } from "@/lib/telemetry/health";
 
 /**
@@ -27,7 +27,12 @@ export async function GET(req: NextRequest) {
         if (guard) return guard;
 
         const range = parseTimeRange(req.nextUrl.searchParams.get("range"));
-        const summary = await dbPerformanceSummary(rangeStartISO(range));
+        const since = rangeStartISO(range);
+        // İki okuma bağımsız — sırayla beklemek uç süresini iki katına çıkarırdı.
+        const [summary, pageUsage] = await Promise.all([
+            dbPerformanceSummary(since),
+            dbPageUsageSummary(since),
+        ]);
 
         return NextResponse.json({
             ...summary,
@@ -35,6 +40,7 @@ export async function GET(req: NextRequest) {
             measurement: "client",
             note: "İstemci gözlemli (RUM) — ağ süresi dahildir; yalnız arayüzün "
                 + "çağırdığı uçları kapsar.",
+            pageUsage,
         });
     } catch (err) {
         return handleApiError(err, "GET /api/developer/performance");

@@ -171,3 +171,29 @@ export function resetRumCollector(): void {
 export function pendingSampleCount(): number {
     return buffer.length;
 }
+
+/**
+ * Sayfa görüntüleme kaydı — "hangi modül gerçekten kullanılıyor" (madde #14).
+ *
+ * NEDEN AYRI BİR ALTYAPI DEĞİL: `request_metrics` tablosu, ingest ucu, normalize
+ * + allowlist doğrulaması, 30 günlük retention ve RLS ZATEN VAR; `KNOWN_ENDPOINTS`
+ * 41 `/dashboard/*` yolunun tamamını zaten tanıyor ve `SAFE_PATH_RE` `/dashboard`
+ * önekini zaten kabul ediyor. Eksik olan tek şey bu çağrıydı. Üçüncü taraf bir
+ * analitik script'i eklemek CSP'yi ve KVKK yüzeyini büyütürdü — gerekmedi.
+ *
+ * NE KAYDEDİLİR: normalize yol + sayı. Kişisel veri yok; sorgu dizesi
+ * `normalizeEndpoint` tarafından zaten düşürülüyor (arama kutusuna yazılan
+ * müşteri adı oraya sızmasın diye).
+ *
+ * `method: "GET"` ve `status: 200` sabit: bu bir gezinme, bir istek değil — ama
+ * şema `request_metrics` olduğu için alanlar doldurulmalı. Okuma tarafı iki
+ * kümeyi `/api/` ve `/dashboard/` önekiyle ayırır.
+ */
+export function recordPageView(path: string, durationMs = 0): void {
+    if (typeof window === "undefined") return;
+    try {
+        enqueue({ endpoint: path, method: "GET", status: 200, durationMs });
+    } catch {
+        // Ölçüm hiçbir koşulda gezinmeyi etkilemez.
+    }
+}

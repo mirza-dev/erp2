@@ -439,6 +439,12 @@ export async function dbPerformanceSummary(sinceISO: string): Promise<Performanc
     const { data, error } = await supabase
         .from("request_metrics")
         .select("*")
+        // YALNIZ API uçları (2026-08-31, madde #14). Aynı tablo artık sayfa
+        // görüntülemelerini de taşıyor ve onlar birer İSTEK DEĞİL: süreleri 0,
+        // statüleri her zaman 200. Karışsalardı p95 aşağı çekilir, hata oranı
+        // suni olarak düşer ve `errorRateCorroborated` sağlık kararı bozulurdu —
+        // yani panel "her şey yolunda" derken gerçek uçlar yavaşlıyor olabilirdi.
+        .like("endpoint", "/api/%")
         .gte("bucket_at", sinceISO)
         .order("bucket_at", { ascending: false })
         .limit(PERFORMANCE_SCAN_LIMIT + 1);
@@ -533,6 +539,43 @@ export async function dbPerformanceSummary(sinceISO: string): Promise<Performanc
 function sortWeight(e: EndpointPerformance): number {
     if (e.p95Overflow) return Math.max(e.maxMs, e.p95Ms ?? 0);
     return e.p95Ms ?? e.avgMs ?? 0;
+}
+
+// ── Modül kullanımı (madde #14) ──────────────────────────────────────────
+
+export interface PageUsageRow {
+    /** Normalize sayfa yolu — `/dashboard/products/[id]` gibi. */
+    path: string;
+    /** Görüntüleme sayısı. */
+    views: number;
+}
+
+/**
+ * Hangi modül ne sıklıkta açılıyor.
+ *
+ * `dbPerformanceSummary`'nin aynadaki karşılığı: o `/api/%`, bu `/dashboard/%`.
+ * Ayrı tablo YOK — `request_metrics` zaten saatlik kovalarda topluyor, RLS'i ve
+ * 30 günlük retention'ı var. Süre/statü alanları burada anlamsız olduğu için
+ * yalnız sayım okunur.
+ */
+export async function dbPageUsageSummary(sinceISO: string): Promise<PageUsageRow[]> {
+    const supabase = createServiceClient();
+    const { data, error } = await supabase
+        .from("request_metrics")
+        .select("endpoint, sample_count")
+        .like("endpoint", "/dashboard%")
+        .gte("bucket_at", sinceISO)
+        .order("bucket_at", { ascending: false })
+        .limit(PERFORMANCE_SCAN_LIMIT);
+    if (error) throw new Error(error.message);
+
+    const byPath = new Map<string, number>();
+    for (const r of (data ?? []) as { endpoint: string; sample_count: number }[]) {
+        byPath.set(r.endpoint, (byPath.get(r.endpoint) ?? 0) + r.sample_count);
+    }
+    return [...byPath.entries()]
+        .map(([path, views]) => ({ path, views }))
+        .sort((a, b) => b.views - a.views);
 }
 
 // ── Retention ────────────────────────────────────────────────────────────

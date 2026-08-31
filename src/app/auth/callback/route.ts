@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { isProvisionedUser } from "@/lib/auth/permissions";
 import { reconcileOAuthUserRoles } from "@/lib/auth/oauth-provision";
+import { RECOVERY_PATH, resolveNextPath } from "@/lib/auth/recovery-route";
 
 /**
  * Supabase OAuth (Google) dönüş noktası — PKCE `?code=` server-side exchange.
@@ -47,8 +48,27 @@ export async function GET(request: Request) {
         return redirect307("/login?error=oauth&reason=provider");
     }
 
+    // Kurtarma linki de buradan geçer; hata mesajı ona göre ayrışmalı — aksi hâlde
+    // süresi dolmuş bir sıfırlama linki "Google ile giriş yapılamadı" der ve
+    // kullanıcı yanlış yerde sorun arar.
+    //
+    // `next` bir URL parametresidir ve nereye gidileceğini belirler — react-doctor
+    // bunu haklı olarak işaretler. Üç savunma var: (1) `resolveNextPath` SERBEST
+    // path kabul etmez, küçük bir kümeyle TAM eşleşme arar, tanınmayan her değer
+    // /dashboard'a düşer; (2) her iki hedef de oturum sahibinin zaten
+    // gidebileceği sayfalar — ayrıcalık yükseltmesi yok; (3) gate testi her iki
+    // yönü de kilitliyor (`gate/password-reset.test.ts`).
+    //
+    // Çerezle taşımak DENENMEDİ ÇÜNKÜ KIRILIRDI: kurtarma linki çoğu zaman
+    // istekte bulunulandan BAŞKA bir cihazda açılır (dizüstünde iste, telefonda aç)
+    // ve orada çerez yoktur. URL parametresi bu akışın doğru mekanizmasıdır.
+    // react-doctor-disable-next-line react-doctor/url-prefilled-privileged-action
+    const isRecovery = resolveNextPath(searchParams.get("next")) === RECOVERY_PATH;
+
     const code = searchParams.get("code");
-    if (!code) return redirect307("/login?error=oauth&reason=no_code");
+    if (!code) {
+        return redirect307(isRecovery ? "/login?error=recovery" : "/login?error=oauth&reason=no_code");
+    }
 
     const supabase = await createClient();
     const { error } = await supabase.auth.exchangeCodeForSession(code);
@@ -56,6 +76,7 @@ export async function GET(request: Request) {
         console.error("[auth/callback] exchange failed:", error.message);
         // "code verifier" sınıfı hata = PKCE cookie'si bu domain'de yok →
         // tipik kök: Supabase Redirect URLs allowlist'inde bu domain kayıtlı değil.
+        if (isRecovery) return redirect307("/login?error=recovery");
         const reason = /verifier/i.test(error.message) ? "pkce" : "exchange";
         return redirect307(`/login?error=oauth&reason=${reason}`);
     }
@@ -75,5 +96,8 @@ export async function GET(request: Request) {
         }
     }
 
-    return redirect307("/dashboard");
+    // Parola kurtarma da bu handler'dan geçer (2026-08-31, madde #4): tek fark
+    // nereye bırakıldığı. `resolveNextPath` serbest path kabul etmez — tanınmayan
+    // her değer /dashboard'a düşer, yani `next` bir açık yönlendirme kolu değil.
+    return redirect307(resolveNextPath(searchParams.get("next")));
 }
