@@ -21,7 +21,7 @@ import Pagination from "@/components/ui/Pagination";
 import { computeTotalPages } from "@/hooks/usePagination";
 import { useSelection } from "@/hooks/useSelection";
 import { Ban, Plus, RotateCcw, Trash2 } from "lucide-react";
-import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
+import FilterChips from "@/components/ui/FilterChips";
 import type { CustomerTab } from "@/lib/supabase/customers";
 import PageHeader from "@/components/ui/PageHeader";
 
@@ -513,7 +513,7 @@ export default function CustomersClient(props: CustomersClientProps) {
                 />
 
                 <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
-                    <UnderlinedFilterTabs
+                    <FilterChips
                         ariaLabel="Cari durumu filtresi"
                         items={[
                             { key: "all", label: "Tümü", count: displayCounts.all },

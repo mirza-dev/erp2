@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from "react";
 import PageHeader from "@/components/ui/PageHeader";
+import Button from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import type { IntegrationSyncLogRow, SalesOrderRow } from "@/lib/database.types";
@@ -254,23 +255,18 @@ export default function ParasutPage() {
                     title="Paraşüt Muhasebe Entegrasyonu"
                     subtitle="api.parasut.com · Otomatik sync: her 6 saatte bir"
                     actions={<div style={{ display: "flex", gap: "8px" }}>
-                    <button
+                    {/* Sayfanın ASIL aksiyonu — mavi. Eskiden `--accent-bg`
+                        (%10 tint) idi, "mavi" okunmuyordu. */}
+                    <Button
+                        variant="primary"
+                        size="sm"
                         onClick={runSync}
                         disabled={isDemo || syncStatus === "syncing" || connection === "disconnected"}
                         title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                        style={{
-                            fontSize: "12px",
-                            padding: "6px 14px",
-                            border: "0.5px solid var(--accent-border)",
-                            borderRadius: "6px",
-                            background: syncStatus === "syncing" ? "var(--bg-tertiary)" : "var(--accent-bg)",
-                            color: syncStatus === "syncing" ? "var(--text-tertiary)" : "var(--accent-text)",
-                            cursor: isDemo || syncStatus === "syncing" || connection === "disconnected" ? "not-allowed" : "pointer",
-                            opacity: isDemo || connection === "disconnected" ? 0.5 : 1,
-                        }}
+                        loading={syncStatus === "syncing"}
                     >
                         {syncStatus === "syncing" ? "Sync ediliyor..." : "▶ Manuel Sync"}
-                    </button>
+                    </Button>
                 </div>}
                 />
             </div>
@@ -280,7 +276,8 @@ export default function ParasutPage() {
                 {/* A -- Connection Status Card */}
                 <div
                     style={{
-                        background: "var(--bg-secondary)",
+                        background: "var(--surface-raised)",
+                        boxShadow: "var(--surface-shadow-sm)",
                         border: `0.5px solid ${connection === "connected" ? "var(--success-border)" : "var(--danger-border)"}`,
                         borderRadius: "8px",
                         padding: "16px 20px",
@@ -419,24 +416,16 @@ export default function ParasutPage() {
                             >
                                 Paraşüt&apos;e bağlan
                             </a>
-                            <button
-                                type="button"
+                            <Button
+                                variant="secondary"
+                                size="xs"
                                 onClick={refreshOAuthToken}
                                 disabled={isDemo || oauthRefreshing}
                                 title={isDemo ? DEMO_DISABLED_TOOLTIP : "Refresh token ile access token yenile"}
-                                style={{
-                                    fontSize: "11px",
-                                    padding: "5px 12px",
-                                    border: "0.5px solid var(--border-secondary)",
-                                    borderRadius: "4px",
-                                    background: "var(--bg-tertiary)",
-                                    color: "var(--text-secondary)",
-                                    cursor: isDemo || oauthRefreshing ? "not-allowed" : "pointer",
-                                    opacity: isDemo || oauthRefreshing ? 0.5 : 1,
-                                }}
+                                loading={oauthRefreshing}
                             >
                                 {oauthRefreshing ? "Yenileniyor…" : "↻ Yenile"}
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </div>
@@ -445,7 +434,8 @@ export default function ParasutPage() {
                 {syncStatus !== "idle" && (
                     <div
                         style={{
-                            background: "var(--bg-secondary)",
+                            background: "var(--surface-raised)",
+                        boxShadow: "var(--surface-shadow-sm)",
                             border: `0.5px solid ${syncStatus === "done" ? "var(--success-border)" : "var(--warning-border)"}`,
                             borderRadius: "8px",
                             padding: "14px 20px",
@@ -480,7 +470,8 @@ export default function ParasutPage() {
                         <div
                             key={card.label}
                             style={{
-                                background: "var(--bg-secondary)",
+                                background: "var(--surface-raised)",
+                        boxShadow: "var(--surface-shadow-sm)",
                                 border: "0.5px solid var(--border-tertiary)",
                                 borderRadius: "8px",
                                 padding: "14px 16px",
@@ -493,23 +484,15 @@ export default function ParasutPage() {
                                 <div style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
                                     {card.label}
                                 </div>
-                                <button
+                                <Button
+                                    variant="secondary"
+                                    size="xs"
                                     onClick={runSync}
                                     disabled={isDemo || syncStatus === "syncing" || connection === "disconnected"}
                                     title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                                    style={{
-                                        fontSize: "10px",
-                                        padding: "2px 7px",
-                                        border: "0.5px solid var(--border-secondary)",
-                                        borderRadius: "4px",
-                                        background: "transparent",
-                                        color: "var(--text-tertiary)",
-                                        cursor: isDemo || syncStatus === "syncing" || connection === "disconnected" ? "not-allowed" : "pointer",
-                                        opacity: isDemo || syncStatus === "syncing" || connection === "disconnected" ? 0.4 : 1,
-                                    }}
                                 >
                                     Sync Et
-                                </button>
+                                </Button>
                             </div>
                             <div style={{ fontSize: "22px", fontWeight: 600, color: "var(--text-primary)" }}>
                                 {card.count}
@@ -529,7 +512,8 @@ export default function ParasutPage() {
                     {/* Step dağılımı */}
                     <div
                         style={{
-                            background: "var(--bg-secondary)",
+                            background: "var(--surface-raised)",
+                        boxShadow: "var(--surface-shadow-sm)",
                             border: "0.5px solid var(--border-tertiary)",
                             borderRadius: "8px",
                             padding: "14px 16px",
@@ -577,7 +561,8 @@ export default function ParasutPage() {
                     {/* Error kind dağılımı */}
                     <div
                         style={{
-                            background: "var(--bg-secondary)",
+                            background: "var(--surface-raised)",
+                        boxShadow: "var(--surface-shadow-sm)",
                             border: "0.5px solid var(--border-tertiary)",
                             borderRadius: "8px",
                             padding: "14px 16px",
@@ -626,7 +611,8 @@ export default function ParasutPage() {
                 {/* C -- Son Faturalar (otomatik gonderilen) */}
                 <div
                     style={{
-                        background: "var(--bg-secondary)",
+                        background: "var(--surface-raised)",
+                        boxShadow: "var(--surface-shadow-sm)",
                         border: "0.5px solid var(--border-tertiary)",
                         borderRadius: "8px",
                         overflowX: "auto",
@@ -698,7 +684,8 @@ export default function ParasutPage() {
                 {/* D -- Sync Log Table */}
                 <div
                     style={{
-                        background: "var(--bg-secondary)",
+                        background: "var(--surface-raised)",
+                        boxShadow: "var(--surface-shadow-sm)",
                         border: "0.5px solid var(--border-tertiary)",
                         borderRadius: "8px",
                         overflowX: "auto",
@@ -776,25 +763,17 @@ export default function ParasutPage() {
                                 <option value="pending">Bekliyor</option>
                             </select>
                             {(logFilterStep || logFilterErrorKind || logFilterStatus) && (
-                                <button
-                                    type="button"
+                                <Button
+                                    variant="secondary"
+                                    size="xs"
                                     onClick={() => {
                                         setLogFilterStep("");
                                         setLogFilterErrorKind("");
                                         setLogFilterStatus("");
                                     }}
-                                    style={{
-                                        fontSize: "11px",
-                                        padding: "4px 8px",
-                                        border: "0.5px solid var(--border-secondary)",
-                                        borderRadius: "4px",
-                                        background: "transparent",
-                                        color: "var(--text-tertiary)",
-                                        cursor: "pointer",
-                                    }}
                                 >
                                     Temizle
-                                </button>
+                                </Button>
                             )}
                         </div>
                     </div>

@@ -1,17 +1,26 @@
-import type { CSSProperties, ReactNode } from "react";
+import type { CSSProperties, HTMLAttributes, ReactNode } from "react";
 
-export interface CardProps {
+export interface CardProps extends HTMLAttributes<HTMLElement> {
     children: ReactNode;
     style?: CSSProperties;
+    /**
+     * Anlamsal etiket. Varsayılan `div`.
+     *
+     * Neden gerekli: bir kart aynı zamanda landmark olabiliyor — Veri Aktarım
+     * Merkezi'ndeki "Excel şablonları" bloğu `<section aria-label>` olmak
+     * zorunda. Bu kol olmadan o yüzeyler kartı ELLE örüyor ve yüzey token'ları
+     * ayrışıyordu (2026-08-31 tespiti).
+     */
+    as?: "div" | "section" | "article" | "aside";
 }
 
 /**
  * Yuvarlatılmış kenarlı içerik kapsayıcısı. Liste tabloları, panel blokları vb.
  * tekrar eden "bordered surface" stilini tek yerden toplar.
  */
-export default function Card({ children, style }: CardProps) {
+export default function Card({ children, style, as: Tag = "div", ...rest }: CardProps) {
     return (
-        <div
+        <Tag
             style={{
                 background: "var(--surface-raised)",
                 border: "var(--line-width) solid var(--surface-border)",
@@ -20,8 +29,9 @@ export default function Card({ children, style }: CardProps) {
                 overflow: "hidden",
                 ...style,
             }}
+            {...rest}
         >
             {children}
-        </div>
+        </Tag>
     );
 }

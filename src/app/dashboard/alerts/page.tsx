@@ -12,13 +12,15 @@ import { useIsDemo, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { AiUnavailableBanner } from "@/components/ai/AiUnavailableBanner";
 import { ALERT_TYPE_LABEL } from "@/lib/alert-labels";
 import {
-    ALERT_CLASSES, matchesAlertClass, expandAlertOccurrences, getOccurrencesForDate, getCalendarStats,
+    ALERT_CLASSES, matchesAlertClass, buildAlertClassItems, expandAlertOccurrences, getOccurrencesForDate, getCalendarStats,
     formatRelativeAiRun,
     getMonthDays, timeFromISO, type CalendarAlert, type Occurrence,
 } from "@/lib/alert-calendar";
 import { getCalendarNotesForDate, type CalendarNote } from "@/lib/calendar-notes";
 import { CalendarHeader } from "@/components/alerts/CalendarHeader";
-import { ClassificationTabs } from "@/components/alerts/ClassificationTabs";
+import FilterChips from "@/components/ui/FilterChips";
+import PageHeader from "@/components/ui/PageHeader";
+import Button from "@/components/ui/Button";
 import { CalendarGrid } from "@/components/alerts/CalendarGrid";
 import { DayDetailPanel } from "@/components/alerts/DayDetailPanel";
 import { AlertCalendarDrawer } from "@/components/alerts/AlertCalendarDrawer";
@@ -129,6 +131,7 @@ export default function AlertsPage() {
     const [viewMonth, setViewMonth] = useState(now.getMonth());
     const [selectedDate, setSelectedDate] = useState<Date | null>(now);
     const [activeClass, setActiveClass] = useState("all");
+
     // Aktif işler önceliklidir; çözülen/yoksayılan geçmiş kullanıcı isteğiyle açılır.
     const [showResolved, setShowResolved] = useState(false);
     const [search, setSearch] = useState("");
@@ -199,6 +202,15 @@ export default function AlertsPage() {
             ? calendarAlerts
             : calendarAlerts.filter((a) => a.status === "open" || a.status === "acknowledged"),
         [calendarAlerts, showResolved],
+    );
+    // Kategori çipleri — sayaç kuralı `buildAlertClassItems`'ta (saf yardımcı,
+    // DOM'suz test edilebilir); burada yalnız ikon süslemesi giydiriliyor.
+    const classItems = useMemo(
+        () => buildAlertClassItems(visibleAlerts, calendarNotes.length).map((it) => ({
+            ...it,
+            icon: <span style={{ fontSize: "11px", opacity: 0.8 }}>{it.icon}</span>,
+        })),
+        [visibleAlerts, calendarNotes],
     );
 
     const filteredAlerts = useMemo(() => {
@@ -475,6 +487,14 @@ export default function AlertsPage() {
 
     return (
         <div style={pageRootStyle}>
+            {/* 2026-08-31: bu sayfanın HİÇ sayfa başlığı yoktu — dashboard'daki
+                tek `<h1>`siz ekrandı. Takvim düzeni sabit yükseklikli olduğu
+                için başlık yüksekliği `layoutStyle`'dan sihirli sayıyla değil,
+                flex ile düşülür (aşağıda `flex: 1` + `minHeight: 0`). */}
+            <PageHeader
+                title="Uyarılar"
+                subtitle="Stok, sipariş ve vade uyarıları · takvim görünümü"
+            />
             {aiUnavailable && (
                 <AiUnavailableBanner
                     message={
@@ -530,7 +550,13 @@ export default function AlertsPage() {
                     />
 
                     <div style={controlsRowStyle}>
-                        <ClassificationTabs activeClass={activeClass} onSelect={setActiveClass} visibleAlerts={visibleAlerts} visibleNotesCount={calendarNotes.length} />
+                        <FilterChips
+                            ariaLabel="Uyarı kategorileri"
+                            activeKey={activeClass}
+                            onChange={setActiveClass}
+                            items={classItems}
+                            style={{ padding: "0 0 14px" }}
+                        />
                         <div style={{ display: "flex", alignItems: "center", gap: "10px", flexShrink: 0, paddingBottom: "14px" }}>
                             <input
                                 type="search"
@@ -570,9 +596,9 @@ export default function AlertsPage() {
                 >
                     {dayHasOpen && (
                         <div style={{ display: "flex", justifyContent: "flex-end", padding: "8px 20px 0" }}>
-                            <button type="button" onClick={dismissDay} disabled={isDemo} style={dismissDayBtnStyle}>
+                            <Button variant="secondary" size="xs" onClick={dismissDay} disabled={isDemo}>
                                 Günü Yoksay
-                            </button>
+                            </Button>
                         </div>
                     )}
                     <DayDetailPanel
@@ -652,18 +678,23 @@ export default function AlertsPage() {
 
 // ── Stiller (inline + CSS değişkenleri) ──────────────────────────────────────
 const pageRootStyle: React.CSSProperties = {
-    display: "flex", flexDirection: "column", minWidth: 0,
+    display: "flex", flexDirection: "column", minWidth: 0, gap: "14px",
+    // Topbar (52px) + main padding (18px*2) çıkarılır. Yükseklik ARTIK BURADA:
+    // başlık eklendiği için takvim kalan alanı flex ile alır, sihirli sayı yok.
+    height: "calc(100vh - 52px - 36px)",
+    minHeight: "540px",
 };
 const layoutStyle: React.CSSProperties = {
     display: "grid",
     gridTemplateColumns: "1fr 380px",
-    // Topbar (52px) + main padding (18px*2) çıkarılır → içerik-alanı yüksekliği
-    height: "calc(100vh - 52px - 36px)",
-    minHeight: "480px",
+    // Yükseklik ebeveynden geliyor (pageRootStyle); burada kalan alan alınır.
+    flex: 1,
+    minHeight: 0,
     border: "0.5px solid var(--border-tertiary)",
     borderRadius: "10px",
     overflow: "hidden",
-    background: "var(--surface-subtle)",
+    background: "var(--surface-raised)",
+    boxShadow: "var(--surface-shadow-sm)",
 };
 const controlsRowStyle: React.CSSProperties = {
     display: "flex", alignItems: "flex-start", justifyContent: "space-between",
@@ -672,7 +703,7 @@ const controlsRowStyle: React.CSSProperties = {
 const dayPanelStyle: React.CSSProperties = {
     display: "flex", flexDirection: "column",
     borderLeft: "0.5px solid var(--border-tertiary)",
-    background: "var(--surface-subtle)", minWidth: 0, overflow: "hidden",
+    background: "var(--surface-raised)", minWidth: 0, overflow: "hidden",
 };
 const searchStyle: React.CSSProperties = {
     height: "32px", padding: "0 10px", borderRadius: "8px",
@@ -682,9 +713,4 @@ const searchStyle: React.CSSProperties = {
 const toggleLabelStyle: React.CSSProperties = {
     display: "inline-flex", alignItems: "center", gap: "6px",
     fontSize: "12px", color: "var(--text-secondary)", cursor: "pointer", whiteSpace: "nowrap",
-};
-const dismissDayBtnStyle: React.CSSProperties = {
-    fontSize: "11px", fontWeight: 500, padding: "4px 10px",
-    border: "1px solid var(--border-tertiary)", borderRadius: "8px",
-    background: "transparent", color: "var(--text-secondary)", cursor: "pointer",
 };

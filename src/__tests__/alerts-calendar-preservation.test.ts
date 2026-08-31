@@ -73,6 +73,6 @@ describe("alerts takvim — korunan davranışlar", () => {
         expect(src).toContain("CalendarGrid");
         expect(src).toContain("DayDetailPanel");
         expect(src).toContain("AlertCalendarDrawer");
-        expect(src).toContain("ClassificationTabs");
+        expect(src).toContain("FilterChips");
     });
 });

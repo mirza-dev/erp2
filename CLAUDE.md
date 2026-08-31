@@ -5,6 +5,24 @@ _Son güncelleme: 2026-08-31_
 
 > Bu bölüm yalnız **güncel durumu + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda ve `memory/current_focus.md`'de. Aşağıdaki indeks son dönem oturumlarına (commit + konu) hızlı bakış içindir; daha eski dönemler (Faz 2–3d AI Import, Sprint A–C, M-3 Rate Limiting, React Doctor, Teklif V2–V7 plan turları, Paraşüt Faz 1–11) git geçmişinde.
 
+**Son tamamlanan iş:** **Kart yüzeyi + buton/kategori dili birleştirmesi** (2026-08-31; GREEN; **migration YOK**). Kullanıcı beş sayfayı gösterdi (Öneriler · Teknik Şablonlar · Uyarılar · Veri Aktarım Merkezi · Paraşüt) — *"arka plan rengi kartlar vs güzel değil, sistemin geri kalanıyla paralel değil"* — ve bütün sistemde butonlar/kategoriler beyaz, mavi olması gerekenler mavi, "Yenile" beyaz olsun istedi. Rapor: `docs/audit/2026-08-31-yuzey-buton-kategori-birlesimi.md`.
+
+**Kök sebep tek satır: `--bg-secondary` HER İKİ TEMADA `--app-bg` ile birebir aynı renk** (koyu `#131518` = `#131518`, aydınlık `#e8eef5` = `#e8eef5`). O kartların **yüzeyi hiç yoktu**, yalnız kenarlıkları görünüyordu. Token bozuk DEĞİL — `--bg-secondary` bir **iç oyuk** rengi, zeminle aynı olması doğru; kusur oyuk renginin **yükseltilmiş kart** olarak kullanılmasıydı. Token'a dokunulmadı, kullanım düzeltildi.
+
+**Tarayıcıda ölçüldü (önce):** Öneriler'in 3 metrik kartı `rgb(232,238,245)` = zemin + `box-shadow: none`; tablo sarmalayıcı `rgba(0,0,0,0)` şeffaf; **Yenile butonu `rgb(232,238,245)` = ZEMİN RENGİ** (`variant="toolbar"` = `transparent`); aktif çip `rgba(18,63,115,0.10)` (%10 tint); pasif çip şeffaf. Ayrıca **Uyarılar'ın hiç `<h1>`'i yoktu** (dashboard'daki tek başlıksız ekran), Veri Aktarım'ınki 14px `<div>`'di.
+
+**Referans sistemde zaten vardı: login ekranı.** Ölçüldü → MAVİ `linear-gradient(#1f609d→#123f73)` = `Button` `primary`; BEYAZ `linear-gradient(#fff→#f4f7fa)` = `secondary`. **Yeni token yok, yeni buton tasarımı yok** — hedef uygulanmıştı, iş onu doğru yerlere bağlamaktı.
+
+**YENİ `src/components/ui/FilterChips.tsx`** — kendi rengini YAZMAZ, `Button`'ı sürer (`active ? primary : secondary`). "Butonlar ve kategoriler aynı tasarım" isteği böylece **yapısal olarak** garanti; ayrışacak ikinci palet yok, `tap-44` bedava geliyor. Kategori sekmesi için sistemde **dört ayrı dil** vardı → tek bileşen; `UnderlinedFilterTabs.tsx` + `ClassificationTabs.tsx` **silindi** (plan onayıyla). Sayaç mantığı `buildAlertClassItems`'a (saf yardımcı, DOM'suz test edilir). **`PageHeader`: Yenile `toolbar`→`secondary` — tek satır, 12 sayfa.** `Card`'a `as` + HTML attribute geçişi (bir kart aynı zamanda landmark olabiliyor).
+
+**Bilerek dokunulmayanlar:** iç oyuklar (Paraşüt'te 10 `--bg-tertiary`, tablo `<thead>` bandı) · Paraşüt'ün adım/hata **dikey dağılım listeleri** (plan bunları çipe taşıyacaktı, kod okununca yanlış olduğu görüldü: yatay çip satırı değil, biri aktifken kırmızı=anlam) · ürün detayının `aria-controls`'lu PANEL sekmeleri (listeyi süzmez, bölme değiştirir) · `ghost`/`icon` varyantları.
+
+**Kapı:** YENİ `gate/surface-consistency.test.ts` (7 kural); ilki bir iddia değil **gerekçe** — token eşitliği doğrulanır, biri ayırırsa yasak gevşetilebilir. **7/7 kırmızı-kanıtlı** (dosya-başına yedek + SHA-256). Kanıt turu bir kuralın ZAYIF olduğunu yakaladı: başlık kuralı `PageHeader`'ı yalnız import edip render etmeyen dosyada da yeşil yanıyordu → `<PageHeader` etiketine bakacak şekilde güçlendirildi.
+
+**Sonra (ölçüm):** Öneriler kartları **`rgb(255,255,255)`** + gölge (4/4) · Yenile **login'deki beyaz gradyanın aynısı** · aktif çip **login'deki mavi gradyanın aynısı** · **KOYU temada Paraşüt 7/7 kart zeminle aynıydı → 0/7** · iki sayfaya 20px/600 `<h1>` · yatay taşma yok. **Ölçülemeyen:** 390px mobil turu — pencere OS alt sınırına takıldı (1470px) ve uygulama doğru biçimde iframe'lenmeyi reddediyor; sonraki tura kaldı.
+
+**Gate:** tsc 0 · lint 0 · **495 dosya / 6902 test** · build 0 · migration YOK.
+
 **Son tamamlanan iş:** **Developer Console frontend turu** (2026-08-31; GREEN; **migration YOK**). Kullanıcı Chrome eklentisini bağladı (önceki turda bağlantı kurulamıyordu; Chrome yeniden başlatınca oturdu) ve konsolun frontend'ine odaklanmamızı istedi. Rapor: `docs/audit/2026-08-31-developer-console-frontend.md`.
 
 **Önce erişim açıldı.** `.env.local`'de 15 anahtar vardı, `INTERNAL_OPERATOR_EMAILS` **yoktu** — konsol kimseye açık değildi, sidebar linki bile render edilmiyordu, bu yüzden kurulduğundan beri **hiç görsel olarak incelenmemişti**. Zincirin diğer yarısı doğrulandı (`hasInternalOperatorAccess` allowlist **ve** `view_settings` ister); canlı hesaplar salt-okunur listelendi, iki gmail de zaten `["admin"]` → tek eksik allowlist'ti, `ADMIN_EMAILS`'e dokunulmadı. Dev sunucusu prod-koruma kapısına takıldı (hedef canlı fabrika) → tur `ALLOW_PROD_TARGET=1` ile **yalnız görsel inceleme** olarak yürütüldü, hiçbir mutasyon düğmesine dokunulmadı.

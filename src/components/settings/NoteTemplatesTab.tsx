@@ -7,7 +7,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import type { NoteTemplate, NoteTemplateKind } from "@/lib/mock-data";
 import { CircleOff, Eye, Pencil, Plus, RotateCcw } from "lucide-react";
-import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
+import FilterChips from "@/components/ui/FilterChips";
 import { fieldStyle } from "@/components/ui/Input";
 
 /**
@@ -225,7 +225,7 @@ export default function NoteTemplatesTab() {
                 </Button>
             </div>
 
-            <UnderlinedFilterTabs
+            <FilterChips
                 ariaLabel="Not şablonu kategorisi filtresi"
                 items={[
                     { key: "all", label: "Tümü", count: templates.length },

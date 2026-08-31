@@ -18,7 +18,7 @@ import Pagination from "@/components/ui/Pagination";
 import { useSelection } from "@/hooks/useSelection";
 import { getValidUntilBadge, canDeleteQuote } from "./_utils/quote-display";
 import { Plus, Trash2 } from "lucide-react";
-import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
+import FilterChips from "@/components/ui/FilterChips";
 import type { QuoteTab } from "@/lib/supabase/quotes";
 import PageHeader from "@/components/ui/PageHeader";
 
@@ -338,7 +338,7 @@ export default function QuotesClient(props: QuotesClientProps) {
 
             {/* Toolbar */}
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
-                <UnderlinedFilterTabs
+                <FilterChips
                     ariaLabel="Teklif durumu filtresi"
                     items={filterTabs.map((t) => ({ key: t.id, label: t.label, count: displayCounts[t.id] }))}
                     activeKey={tab}

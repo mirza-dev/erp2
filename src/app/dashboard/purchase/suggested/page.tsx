@@ -2,6 +2,8 @@
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
 import PageHeader from "@/components/ui/PageHeader";
+import FilterChips from "@/components/ui/FilterChips";
+import Card from "@/components/ui/Card";
 import { useProducts, useReorderSuggestions, invalidateAllData } from "@/lib/data-context";
 import { computeCoverageDays, computeTargetStock, daysColor, daysBg, dateDaysFromToday } from "@/lib/stock-utils";
 import type { Product } from "@/lib/mock-data";
@@ -1270,32 +1272,19 @@ export default function PurchaseSuggestedPage() {
                             Son güncelleme: {lastRefreshed}
                         </span>
                     )}
-                    <button
+                    {/* 2026-08-31: elle örülmüştü ve `--bg-secondary` kullanıyordu —
+                        o token sayfa zemininin ta kendisi, yani buton ZEMİN RENGİNDEYDİ
+                        (ölçüm: #e8eef5). Ortak `Button` beyaz `secondary` veriyor. */}
+                    <Button
+                        variant="secondary"
+                        size="sm"
                         onClick={handleRefresh}
                         disabled={isDemo || refreshing || aiLoading}
                         title={isDemo ? DEMO_DISABLED_TOOLTIP : "Verileri yenile"}
-                        style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "6px",
-                            padding: "6px 12px",
-                            fontSize: "12px",
-                            fontWeight: 500,
-                            color: (isDemo || refreshing || aiLoading) ? "var(--text-tertiary)" : "var(--text-secondary)",
-                            background: "var(--bg-secondary)",
-                            border: "1px solid var(--border-secondary)",
-                            borderRadius: "6px",
-                            cursor: (isDemo || refreshing || aiLoading) ? "not-allowed" : "pointer",
-                            opacity: isDemo ? 0.6 : 1,
-                            flexShrink: 0,
-                        }}
+                        loading={refreshing || aiLoading}
                     >
-                        <span style={{
-                            display: "inline-block",
-                            animation: (refreshing || aiLoading) ? "spin 0.8s linear infinite" : "none",
-                        }}>↻</span>
                         {refreshing ? "Yenileniyor..." : "Yenile"}
-                    </button>
+                    </Button>
                 </>}
             />
             <div style={{ marginTop: "4px", fontSize: "11px" }}>
@@ -1361,7 +1350,12 @@ export default function PurchaseSuggestedPage() {
             {reorderSuggestions.length > 0 && (
                 <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: "12px", marginTop: "20px" }}>
                     <div style={{
-                        background: "var(--bg-secondary)",
+                        // 2026-08-31: `--bg-secondary` HER İKİ TEMADA sayfa
+                        // zeminiyle birebir aynı renk — bu kartların yüzeyi hiç
+                        // yoktu, yalnız renkli kenarlıkları görünüyordu (tarayıcı
+                        // ölçümü: backgroundColor #e8eef5 = --app-bg).
+                        background: "var(--surface-raised)",
+                        boxShadow: "var(--surface-shadow-sm)",
                         border: "1px solid var(--danger-border)",
                         borderRadius: "8px",
                         padding: "14px 16px",
@@ -1378,7 +1372,12 @@ export default function PurchaseSuggestedPage() {
                     </div>
 
                     <div style={{
-                        background: "var(--bg-secondary)",
+                        // 2026-08-31: `--bg-secondary` HER İKİ TEMADA sayfa
+                        // zeminiyle birebir aynı renk — bu kartların yüzeyi hiç
+                        // yoktu, yalnız renkli kenarlıkları görünüyordu (tarayıcı
+                        // ölçümü: backgroundColor #e8eef5 = --app-bg).
+                        background: "var(--surface-raised)",
+                        boxShadow: "var(--surface-shadow-sm)",
                         border: "1px solid var(--warning-border)",
                         borderRadius: "8px",
                         padding: "14px 16px",
@@ -1410,7 +1409,12 @@ export default function PurchaseSuggestedPage() {
                     </div>
 
                     <div style={{
-                        background: "var(--bg-secondary)",
+                        // 2026-08-31: `--bg-secondary` HER İKİ TEMADA sayfa
+                        // zeminiyle birebir aynı renk — bu kartların yüzeyi hiç
+                        // yoktu, yalnız renkli kenarlıkları görünüyordu (tarayıcı
+                        // ölçümü: backgroundColor #e8eef5 = --app-bg).
+                        background: "var(--surface-raised)",
+                        boxShadow: "var(--surface-shadow-sm)",
                         border: "1px solid var(--border-secondary)",
                         borderRadius: "8px",
                         padding: "14px 16px",
@@ -1556,42 +1560,12 @@ export default function PurchaseSuggestedPage() {
                         width: "200px",
                     }}
                 />
-                <div style={{ display: "flex", gap: "8px" }}>
-                {tabs.map(tab => {
-                    const active = filter === tab.key;
-                    return (
-                        <button
-                            key={tab.key}
-                            onClick={() => setFilter(tab.key)}
-                            style={{
-                                padding: "6px 14px",
-                                fontSize: "13px",
-                                fontWeight: 500,
-                                border: "1px solid",
-                                borderColor: active ? "var(--accent-border)" : "var(--border-secondary)",
-                                borderRadius: "6px",
-                                background: active ? "var(--accent-bg)" : "transparent",
-                                color: active ? "var(--accent-text)" : "var(--text-secondary)",
-                                cursor: "pointer",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "6px",
-                            }}
-                        >
-                            {tab.label}
-                            <span style={{
-                                fontSize: "11px",
-                                background: active ? "var(--accent)" : "var(--bg-tertiary)",
-                                color: active ? "#fff" : "var(--text-tertiary)",
-                                padding: "1px 6px",
-                                borderRadius: "8px",
-                            }}>
-                                {tab.count}
-                            </span>
-                        </button>
-                    );
-                })}
-                </div>
+                <FilterChips
+                    ariaLabel="Öneri türü filtresi"
+                    activeKey={filter}
+                    onChange={setFilter}
+                    items={tabs}
+                />
             </div>
 
             {/* Segment banner */}
@@ -1731,12 +1705,7 @@ export default function PurchaseSuggestedPage() {
                 </div>
             ) : (
                 /* Desktop table */
-                <div style={{
-                    marginTop: "16px",
-                    border: "1px solid var(--border-secondary)",
-                    borderRadius: "8px",
-                    overflow: "hidden",
-                }}>
+                <Card style={{ marginTop: "16px" }}>
                     <table style={{ width: "100%", borderCollapse: "collapse", fontSize: "13px" }}>
                         <thead>
                             <tr style={{ background: "var(--bg-secondary)" }}>
@@ -1926,7 +1895,7 @@ export default function PurchaseSuggestedPage() {
                             })}
                         </tbody>
                     </table>
-                </div>
+                </Card>
             )}
 
             {/* AI Detail Drawer — AI analizi + karar aksiyonları */}

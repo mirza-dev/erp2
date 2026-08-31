@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { renderToStaticMarkup } from "react-dom/server";
 import { NoteFormModal } from "@/components/alerts/NoteFormModal";
 import { CalendarNoteDetailModal } from "@/components/alerts/CalendarNoteDetailModal";
-import { ClassificationTabs } from "@/components/alerts/ClassificationTabs";
+import { buildAlertClassItems } from "@/lib/alert-calendar";
 import type { CalendarNote } from "@/lib/calendar-notes";
 
 const noop = () => {};
@@ -35,9 +35,12 @@ describe("calendar note UI", () => {
         expect(owner).toContain("Oluşturma");
     });
 
+    // Sayaç kuralı bileşenden saf yardımcıya taşındı (ClassificationTabs ->
+    // ortak FilterChips). DOM render etmeden doğrulanıyor.
     it("Notlar filtresi ayrı sayılır; Tümü sayısı notları da içerir", () => {
-        const html = renderToStaticMarkup(<ClassificationTabs activeClass="all" onSelect={noop} visibleAlerts={[]} visibleNotesCount={3} />);
-        expect(html).toContain('aria-label="Tümü (3)"');
-        expect(html).toContain('aria-label="Notlar (3)"');
+        const items = buildAlertClassItems([], 3);
+        expect(items.find((i) => i.key === "all")?.count).toBe(3);
+        expect(items.find((i) => i.key === "note")?.count).toBe(3);
+        expect(items.find((i) => i.key === "stock")?.count).toBe(0);
     });
 });

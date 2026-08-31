@@ -510,7 +510,7 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
                             <Pencil size={13} />
                         </button>
                         {field.is_active && (
-                            <Button variant="toolbar" size="xs" onClick={() => void toggleRequired(field)} disabled={blocked}>
+                            <Button variant="secondary" size="xs" onClick={() => void toggleRequired(field)} disabled={blocked}>
                                 {field.required ? "Opsiyonel" : "Zorunlu"}
                             </Button>
                         )}

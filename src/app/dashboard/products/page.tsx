@@ -19,7 +19,7 @@ import { DynamicFieldEdit } from "@/components/products/DynamicFieldEdit";
 import type { ProductTypeRow, ProductTypeFieldRow } from "@/lib/database.types";
 import { missingRequiredTechnicalFields } from "@/lib/technical-templates";
 import { Plus, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
-import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
+import FilterChips from "@/components/ui/FilterChips";
 import PageHeader from "@/components/ui/PageHeader";
 
 
@@ -702,7 +702,7 @@ export default function ProductsPage() {
                 </>}
                 actions={<>
                     <Button
-                        variant="toolbar"
+                        variant="secondary"
                         size="md"
                         onClick={handleRefresh}
                         disabled={refreshing}
@@ -909,7 +909,11 @@ export default function ProductsPage() {
                                 fontSize: "12px", padding: "5px 10px",
                                 border: `var(--line-width) solid ${active ? "var(--accent-border)" : "var(--border-secondary)"}`,
                                 borderRadius: "6px",
-                                background: active ? "var(--accent-bg)" : "transparent",
+                                // 2026-08-31: pasifken `transparent`'tı ve aynı satırdaki
+                                // `FilterChips` beyaza geçince tek başına dolgusuz kalıyordu.
+                                // Bu bir ÇOKLU SEÇİM kutucuğu (tab değil), o yüzden
+                                // FilterChips'e taşınmıyor — yalnız yüzeyi hizalanıyor.
+                                background: active ? "var(--accent-bg)" : "var(--surface-raised)",
                                 color: active ? "var(--accent-text)" : "var(--text-interactive-muted)",
                                 cursor: "pointer", fontWeight: active ? 600 : "var(--font-ui-weight)",
                             }}
@@ -951,7 +955,7 @@ export default function ProductsPage() {
                 <span style={{ fontSize: "10px", color: "var(--text-tertiary)", marginRight: "2px", fontWeight: 500, textTransform: "uppercase", letterSpacing: "0.04em" }}>
                     Sinyal:
                 </span>
-                <UnderlinedFilterTabs
+                <FilterChips
                     ariaLabel="Ürün sinyal filtresi"
                     items={[
                         { key: "tumu", label: "Tümü", count: totalProductCount },

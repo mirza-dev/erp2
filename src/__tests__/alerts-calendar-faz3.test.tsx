@@ -174,7 +174,9 @@ describe("Faz 3 — tema + reduced-motion kilitleri", () => {
     const ALERT_FILES = [
         "src/components/alerts/CalendarGrid.tsx",
         "src/components/alerts/CalendarHeader.tsx",
-        "src/components/alerts/ClassificationTabs.tsx",
+        // ClassificationTabs ortak `FilterChips`e taşındı (2026-08-31) — kural
+        // bileşeni değil KAVRAMI takip ediyor: uyarı kategorileri hâlâ burada.
+        "src/components/ui/FilterChips.tsx",
         "src/components/alerts/DayDetailPanel.tsx",
         "src/components/alerts/AlertCalendarDrawer.tsx",
         "src/components/alerts/SevBadge.tsx",

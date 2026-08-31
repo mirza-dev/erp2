@@ -17,6 +17,7 @@ import Button, { ButtonLink } from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import PageHeader from "@/components/ui/PageHeader";
 import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
+import Card from "@/components/ui/Card";
 import { useToast } from "@/components/ui/Toast";
 import { DEMO_BLOCK_TOAST, DEMO_DISABLED_TOOLTIP, useIsDemo } from "@/lib/demo-utils";
 import { usePermissions } from "@/lib/auth/use-permissions";
@@ -36,20 +37,12 @@ const metricGridStyle: React.CSSProperties = {
     marginBottom: "14px",
 };
 
-const metricStyle: React.CSSProperties = {
-    border: "0.5px solid var(--border-tertiary)",
-    borderRadius: "8px",
-    background: "var(--bg-secondary)",
-    padding: "12px 14px",
-    minHeight: "70px",
-};
-
-const tableWrapStyle: React.CSSProperties = {
-    border: "0.5px solid var(--border-tertiary)",
-    borderRadius: "8px",
-    overflow: "hidden",
-    background: "var(--bg-primary)",
-};
+// 2026-08-31: `metricStyle` `--bg-secondary`, `tableWrapStyle` `--bg-primary`
+// kullanıyordu. `--bg-secondary` HER İKİ TEMADA sayfa zeminiyle birebir aynı
+// renk (#e8eef5 / #131518) — yani metrik kartlarının yüzeyi hiç yoktu, yalnız
+// kenarlıkları görünüyordu. İkisi de ortak `Card`'a bağlandı; `Card` dolgusuz
+// olduğu için iç boşluk çağıranın işi.
+const metricPadStyle: React.CSSProperties = { padding: "12px 14px", minHeight: "70px" };
 
 // Ortak form alanı stili — token tek kaynaktan (`--input-bg`/`--input-border`/
 // `--line-width`). Eskiden burada 0.5px + `--border-secondary` + `--bg-tertiary`
@@ -69,14 +62,14 @@ function Metric({
     icon: React.ReactNode;
 }) {
     return (
-        <div style={metricStyle}>
+        <Card style={metricPadStyle}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
                 <span style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</span>
                 <span style={{ color: "var(--text-tertiary)" }}>{icon}</span>
             </div>
             <div style={{ fontSize: "22px", fontWeight: 700, color: "var(--text-primary)", lineHeight: 1 }}>{value}</div>
             <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "6px" }}>{sub}</div>
-        </div>
+        </Card>
     );
 }
 
@@ -351,7 +344,7 @@ export default function TechnicalTemplatesPage() {
                 </div>
             )}
 
-            <div style={tableWrapStyle}>
+            <Card>
                 {loading ? (
                     <div style={{ padding: "12px", color: "var(--text-tertiary)", fontSize: "13px" }}>Yükleniyor…</div>
                 ) : (
@@ -363,7 +356,7 @@ export default function TechnicalTemplatesPage() {
                         emptyMessage="Teknik şablon yok."
                     />
                 )}
-            </div>
+            </Card>
 
             {showCreate && (
                 <Modal onClose={() => setShowCreate(false)} ariaLabel="Yeni teknik şablon" dismissible={!creating}>

@@ -5,7 +5,6 @@ import { describe, expect, it } from "vitest";
 const read = (file: string) => readFileSync(join(process.cwd(), file), "utf8");
 
 const GLOBALS = read("src/app/globals.css");
-const UNDERLINED_TABS = read("src/components/ui/UnderlinedFilterTabs.tsx");
 const QUOTES_PAGE = read("src/app/dashboard/quotes/QuotesClient.tsx");
 const ORDERS_PAGE = read("src/app/dashboard/orders/OrdersClient.tsx");
 const PRODUCTS_PAGE = read("src/app/dashboard/products/page.tsx");
@@ -21,12 +20,13 @@ describe("interactive muted text readability", () => {
         expect(GLOBALS).toContain("--text-interactive-muted: #536275;");
     });
 
-    it("quote and order filter tabs use the interactive muted token with UI weight", () => {
-        expect(UNDERLINED_TABS).toContain('fontWeight: active ? 600 : "var(--font-ui-weight)"');
-        expect(UNDERLINED_TABS).toContain('color: active ? "var(--accent-text)" : "var(--text-interactive-muted)"');
-
+    // 2026-08-31: teklif/sipariş sekmeleri ortak `FilterChips`e geçti. Pasif
+    // çipin metni artık `--text-primary` (secondary buton metni) — muted
+    // token'dan DAHA koyu, yani bu testin koruduğu okunurluk zayıflamadı.
+    // Token hâlâ canlı: stok kategori/tip kontrolleri ve Excel sihirbazı.
+    it("quote and order filter tabs use the shared chip component", () => {
         for (const source of [QUOTES_PAGE, ORDERS_PAGE]) {
-            expect(source).toContain("UnderlinedFilterTabs");
+            expect(source).toContain("FilterChips");
             expect(source).not.toContain("fontWeight: activeTab === tab.id ? 600 : 400");
         }
     });
@@ -36,7 +36,9 @@ describe("interactive muted text readability", () => {
         expect(IMPORT_PAGE).toContain('fontWeight: active ? 600 : "var(--font-ui-weight)"');
 
         expect(PRODUCTS_PAGE).toContain('ariaLabel="Ürün sinyal filtresi"');
-        expect(PRODUCTS_PAGE).toContain("UnderlinedFilterTabs");
+        expect(PRODUCTS_PAGE).toContain("FilterChips");
+        // Token'ın asıl yaşadığı yer: kategori açılırı + tip filtreleri.
+        expect(PRODUCTS_PAGE).toContain('"var(--text-interactive-muted)"');
     });
 
     it("non-interactive helper and empty-state copy remains tertiary, not promoted globally", () => {

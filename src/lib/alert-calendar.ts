@@ -67,6 +67,29 @@ export const ALERT_CLASSES: AlertClass[] = [
  *  - tip-bazlı sekmeler AI kaynaklıları DIŞLAR (çifte sayım olmaz);
  *  - "Tümü" hepsini gösterir.
  */
+/**
+ * Kategori çiplerinin etiket + sayaç listesi.
+ *
+ * Sayaç mantığı eskiden `ClassificationTabs` bileşeninin İÇİNDEYDİ; bileşen
+ * ortak `FilterChips`'e taşınınca buraya alındı — böylece "Notlar ayrı sayılır,
+ * Tümü notları da içerir" kuralı DOM render etmeden doğrulanabiliyor.
+ */
+export function buildAlertClassItems(
+    visibleAlerts: { type: AlertType; source: string | null }[],
+    visibleNotesCount = 0,
+): { key: string; label: string; icon: string; count: number }[] {
+    return [
+        ...ALERT_CLASSES.map((cat) => ({
+            key: cat.id,
+            label: cat.label,
+            icon: cat.icon,
+            count: visibleAlerts.filter((alert) => matchesAlertClass(alert, cat)).length
+                + (cat.id === "all" ? visibleNotesCount : 0),
+        })),
+        { key: "note", label: "Notlar", icon: "✎", count: visibleNotesCount },
+    ];
+}
+
 export function matchesAlertClass(a: { type: AlertType; source: string | null }, cls: AlertClass): boolean {
     if (cls.source === "ai") return a.source === "ai";
     if (!cls.types) return true;

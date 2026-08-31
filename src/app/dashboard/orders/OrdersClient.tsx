@@ -22,7 +22,7 @@ import { computeTotalPages } from "@/hooks/usePagination";
 import Pagination from "@/components/ui/Pagination";
 import { useSelection } from "@/hooks/useSelection";
 import { CircleOff, Plus } from "lucide-react";
-import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
+import FilterChips from "@/components/ui/FilterChips";
 import PageHeader from "@/components/ui/PageHeader";
 
 const commercialStatusConfig: Record<CommercialStatus, { label: string; cls: string }> = {
@@ -402,7 +402,7 @@ export default function OrdersClient(props: OrdersClientProps) {
 
             {/* Toolbar */}
             <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
-                <UnderlinedFilterTabs
+                <FilterChips
                     ariaLabel="Sipariş durumu filtresi"
                     items={filterTabs.map((t) => ({ key: t.id, label: t.label, count: displayCounts[t.id] }))}
                     activeKey={tab}

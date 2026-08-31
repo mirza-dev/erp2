@@ -112,7 +112,12 @@ export default function PageHeader({
                 }}>
                     {onRefresh && (
                         <Button
-                            variant="toolbar"
+                            // 2026-08-31: `toolbar` = `background: transparent`
+                            // idi; sayfa zemini içinden göründüğü için Yenile
+                            // BEYAZ değil zemin rengindeydi (ölçüm: butonun
+                            // backgroundColor'ı #e8eef5 = --app-bg). `secondary`
+                            // login'deki "Google ile devam et" ile aynı beyaz.
+                            variant="secondary"
                             size="md"
                             onClick={onRefresh}
                             disabled={refreshing}

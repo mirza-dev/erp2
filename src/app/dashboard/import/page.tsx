@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
+import Card from "@/components/ui/Card";
+import PageHeader from "@/components/ui/PageHeader";
 import { useRouter } from "next/navigation";
 import { AlertTriangle, Download, FileSpreadsheet, ShieldCheck } from "lucide-react";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP } from "@/lib/demo-utils";
@@ -131,15 +133,12 @@ export default function ImportPage() {
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            {/* Header */}
-            <div>
-                <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
-                    Veri Aktarım Merkezi
-                </div>
-                <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "3px" }}>
-                    Sistemi kurarken listelerini buradan taşırsın; sonrasında toplu güncelleme ve belge ekleme de buradan.
-                </div>
-            </div>
+            {/* 2026-08-31: başlık elle yazılmış 14px `<div>`'di — kanonik sayfa
+                başlığı 20px/600 ve `<h1>`. Sayfanın hiç `<h1>`'i yoktu. */}
+            <PageHeader
+                title="Veri Aktarım Merkezi"
+                subtitle="Sistemi kurarken listelerini buradan taşırsın; sonrasında toplu güncelleme ve belge ekleme de buradan."
+            />
 
             {/* Kurulum durumu — sıra ve eksikler. Sayılar gerçek veriden. */}
             <SetupStatusPanel
@@ -177,8 +176,12 @@ export default function ImportPage() {
             {aiFiles.length === 0 && (
                 <output
                     style={{
+                        display: "block",
                         padding: "14px 18px",
-                        background: "var(--surface-subtle)",
+                        // Yüzey kanonik karta hizalandı (`--surface-subtle` zeminden
+                        // zor ayrılıyordu); KESİKLİ kenarlık bilerek korunuyor —
+                        // bu bir ipucu kutusu, dolu bir kart değil.
+                        background: "var(--surface-raised)",
                         border: "var(--line-width) dashed var(--surface-border)",
                         borderRadius: "8px",
                         boxShadow: "var(--surface-shadow-sm)",
@@ -216,14 +219,12 @@ export default function ImportPage() {
             />
 
             {/* Şablon satırı — eski 290 satırlık rehber bloğunun sade hali */}
-            <section
+            <Card
+                as="section"
                 aria-label="Excel şablonları"
                 style={{
                     display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap",
                     padding: "10px 14px",
-                    background: "var(--surface-subtle)",
-                    border: "var(--line-width) solid var(--surface-border)",
-                    borderRadius: "8px",
                 }}
             >
                 <span style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px", fontWeight: 600, color: "var(--text-primary)" }}>
@@ -282,7 +283,7 @@ export default function ImportPage() {
                         )}
                     </span>
                 )}
-            </section>
+            </Card>
 
             {/* Güven satırı — detaylar tooltip'te */}
             <div

@@ -22,7 +22,7 @@ import { ConfirmModal } from "@/components/ui/Modal";
 import Badge, { type BadgeTone } from "@/components/ui/Badge";
 import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 import { CircleOff, Plus } from "lucide-react";
-import UnderlinedFilterTabs from "@/components/ui/UnderlinedFilterTabs";
+import FilterChips from "@/components/ui/FilterChips";
 import PageHeader from "@/components/ui/PageHeader";
 
 const STATUS_TABS: { key: PurchaseOrderTab; label: string }[] = [
@@ -272,7 +272,7 @@ export default function PurchaseOrdersClient(props: PurchaseOrdersClientProps) {
                 />
             </div>
 
-            <UnderlinedFilterTabs
+            <FilterChips
                 ariaLabel="Satın alma siparişi durumu filtresi"
                 items={STATUS_TABS.map((t) => ({ key: t.key, label: t.label, count: displayCounts[t.key] }))}
                 activeKey={tab}
