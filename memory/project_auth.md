@@ -31,5 +31,5 @@ type: project
 ## Landing Page
 
 - `src/app/page.tsx` — herkese açık (hero, 6 feature card, stack footer, GitHub linki)
-- Butonlar: "Giriş Yap" → `/login` · "Demo Gez" → `enterDemoMode()` · "Kaynak Kod" → GitHub
+- Butonlar: "Giriş Yap" → `/login` · "Demo Gez" → `GET /api/auth/demo` (sunucu yönlendirmesi; `enterDemoMode()` 2026-08-31'de ölü kod olarak kaldırıldı) · "Kaynak Kod" → GitHub
 - Auth'd kullanıcı `/`'e gelirse → `/dashboard`'a yönlendiriliyor (middleware)

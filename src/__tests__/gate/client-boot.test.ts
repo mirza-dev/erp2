@@ -55,6 +55,35 @@ describe("GATE — dev sunucusuna LAN'dan erişim", () => {
     });
 });
 
+describe("GATE — Next sürüm tabanı", () => {
+    // 2026-08-31: `npm audit` 6 YÜKSEK açık gösterdi ve biri Next'in kendisindeydi:
+    // "Middleware / Proxy bypass in App Router applications". Bu uygulamanın auth
+    // kapısı (`src/proxy.ts`) TAM OLARAK middleware — yani o açık, kapının
+    // atlanabilmesi demekti. 16.2.9 → 16.3.3 kapattı (kırıcı değil).
+    // Sürüm geri alınırsa açık sessizce geri gelir; bu yüzden taban kilitli.
+    const pkg = JSON.parse(readFileSync(join(root, "package.json"), "utf8")) as {
+        dependencies: Record<string, string>;
+        devDependencies: Record<string, string>;
+    };
+    const cmp = (a: string, b: string) => {
+        const pa = a.replace(/^[^0-9]*/, "").split(".").map(Number);
+        const pb = b.replace(/^[^0-9]*/, "").split(".").map(Number);
+        for (let i = 0; i < 3; i++) if ((pa[i] ?? 0) !== (pb[i] ?? 0)) return (pa[i] ?? 0) - (pb[i] ?? 0);
+        return 0;
+    };
+
+    it("next >= 16.3.3 (middleware-bypass düzeltmesi)", () => {
+        expect(cmp(pkg.dependencies.next, "16.3.3")).toBeGreaterThanOrEqual(0);
+    });
+
+    it("eslint-config-next next ile AYNI sürümde", () => {
+        // Ayrışırsa lint kuralları framework'ten farklı bir sürümü denetler ve
+        // yeni kuralların yakalayacağı sorunlar sessizce geçer.
+        expect(pkg.devDependencies["eslint-config-next"].replace(/^[^0-9]*/, ""))
+            .toBe(pkg.dependencies.next.replace(/^[^0-9]*/, ""));
+    });
+});
+
 describe("GATE — CSP", () => {
     it("script-src satırları bulunabiliyor (çıkarım boşsa aşağısı sahte-yeşil olurdu)", () => {
         expect(scriptSrcLines.length).toBeGreaterThanOrEqual(2); // dev + prod kolu

@@ -9,6 +9,7 @@ import Button from "@/components/ui/Button";
 import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { fieldStyle } from "@/components/ui/Input";
+import { MIN_PASSWORD_LENGTH } from "@/lib/auth/password-policy";
 
 interface User {
     id: string;
@@ -382,11 +383,11 @@ export default function UsersPage() {
                             />
                         </label>
                         <label>
-                            <span style={labelStyle}>Şifre (min. 8 karakter)</span>
+                            <span style={labelStyle}>Şifre (min. {MIN_PASSWORD_LENGTH} karakter)</span>
                             <input
                                 type="password"
                                 required
-                                minLength={8}
+                                minLength={MIN_PASSWORD_LENGTH}
                                 value={newPassword}
                                 onChange={(e) => setNewPassword(e.target.value)}
                                 placeholder="••••••••"

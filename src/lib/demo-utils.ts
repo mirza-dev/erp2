@@ -30,11 +30,12 @@ export function isDemoMode(): boolean {
     return document.cookie.split(";").some(c => c.trim().startsWith(`${DEMO_COOKIE}=1`));
 }
 
-/** Set demo cookie and navigate to dashboard */
-export function enterDemoMode(): void {
-    document.cookie = `${DEMO_COOKIE}=1; path=/; max-age=86400; SameSite=Lax`;
-    window.location.href = "/dashboard";
-}
+/* `enterDemoMode()` KALDIRILDI (2026-08-31). Sıfır çağrı yeri vardı: demo girişi
+   `GET /api/auth/demo` sunucu yönlendirmesiyle yapılıyor — o rota cookie'yi
+   sunucuda yazıyor ve kendi yorumunda neden tercih edildiğini anlatıyor (React
+   olay sistemi / Google Translate sorunları). Ayrıca eslint-config-next 16.3.3
+   ile gelen `no-location-assign-relative-destination` kuralının repodaki TEK
+   kaynağıydı. Demo girişine ihtiyaç olursa doğru yol o rotadır. */
 
 /** Clear demo cookie */
 export function clearDemoMode(): void {

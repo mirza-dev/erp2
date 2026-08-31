@@ -103,7 +103,7 @@ describe("POST — roller ile kullanıcı yaratma", () => {
 
     it("roller normalize edilip app_metadata.roles'a yazılır (viewer-dedup)", async () => {
         mockCreateUser.mockResolvedValue({ data: { user: { id: "new-1", email: "n@pmt.com" } }, error: null });
-        const res = await POST(jsonReq({ email: "n@pmt.com", password: "12345678", roles: ["sales", "viewer"] }));
+        const res = await POST(jsonReq({ email: "n@pmt.com", password: "mavi-liman-77-defter", roles: ["sales", "viewer"] }));
         expect(res.status).toBe(201);
         expect(mockCreateUser).toHaveBeenCalledWith(
             expect.objectContaining({ app_metadata: { roles: ["sales"] } }),
@@ -114,7 +114,7 @@ describe("POST — roller ile kullanıcı yaratma", () => {
 
     it("rol verilmezse → viewer (sessiz yetki YOK)", async () => {
         mockCreateUser.mockResolvedValue({ data: { user: { id: "new-2", email: "m@pmt.com" } }, error: null });
-        const res = await POST(jsonReq({ email: "m@pmt.com", password: "12345678" }));
+        const res = await POST(jsonReq({ email: "m@pmt.com", password: "mavi-liman-77-defter" }));
         expect(res.status).toBe(201);
         expect(mockCreateUser).toHaveBeenCalledWith(
             expect.objectContaining({ app_metadata: { roles: ["viewer"] } }),

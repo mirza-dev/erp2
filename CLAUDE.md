@@ -5,7 +5,27 @@ _Son güncelleme: 2026-08-31_
 
 > Bu bölüm yalnız **güncel durumu + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda ve `memory/current_focus.md`'de. Aşağıdaki indeks son dönem oturumlarına (commit + konu) hızlı bakış içindir; daha eski dönemler (Faz 2–3d AI Import, Sprint A–C, M-3 Rate Limiting, React Doctor, Teklif V2–V7 plan turları, Paraşüt Faz 1–11) git geçmişinde.
 
-**Son tamamlanan iş:** **"giriş yapamıyorum" — dev sunucusuna LAN'dan erişim** (2026-08-31; GREEN; **migration YOK**). Kullanıcı telefondan giriş yapamadığını bildirdi.
+**Son tamamlanan iş:** **20 maddelik "vibe-coded" listesi denetimi + 2 açığın kapatılması** (2026-08-31; GREEN; **migration YOK**). Kullanıcı sosyal medyadaki "20 NICHE ways to get your vibe coded app hacked" listesini paylaşıp sistemde var mı diye sordu. **Yirmisi de ölçüldü** (kaynak + `npm audit` + git geçmişi + canlı probe); 2026-08-30'un 10 maddesiyle örtüşenler devralındı, kalan 16'sı bu turda ölçüldü. Tam tablo + ölçüm komutları: `docs/audit/2026-08-31-20-madde-liste-denetimi.md`.
+
+**Sonuç: 17 kapalı · 2 zayıf · 1 açık.** Kapalıların dayanağı raporda tek tek: CORS başlığı **hiç yok** (same-origin) · tüm PK'ler **uuid** · `signUp` **hiçbir yerde yok** → genel kayıt kapalı · 8 `dangerouslySetInnerHTML`'in **hepsi sabit CSS** · auth **cookie'de**, localStorage'da yalnız teklif taslağı · webhook imzası **fail-closed** · prod'da generic hata mesajı · dosya yüklemede MIME allowlist + 10 MB · git geçmişinde yalnız `.env.example`.
+
+**#18 asıl bulgu — 17 bağımlılık açığı, 6 YÜKSEK.** Biri **Next'in kendisinde** ve başlığı **"Middleware / Proxy bypass in App Router applications"** — bu uygulamanın auth kapısı (`src/proxy.ts`) tam olarak middleware, yani kapının atlanabilmesi demekti. `next` **+** `eslint-config-next` birlikte **16.2.9 → 16.3.3** (minor, kırıcı değil; `@sentry/nextjs` peer aralığı `^16.0.0-0` kapsıyor) + `npm audit fix` → **17 → 1**.
+
+**Kalan tek açık bilerek bırakıldı:** `@anthropic-ai/sdk` (orta) — iki uyarı da **yerel dosya sistemi Memory Tool**'una dair, düzeltmesi **kırıcı major** (0.80 → 0.122). Ölçüldü: bu projede memory tool / `betas` / dosya-sistemi aracı **hiç kullanılmıyor**. Kullanılmayan bir özellik için kırıcı major'a atlamak kazançsız risk olurdu; yeniden değerlendirme tetikleyicisi raporda yazılı. `npm audit fix --force` **bilerek koşulmadı**.
+
+**#19 parola politikası:** kural **DÖRT yere kopyalanmıştı** ve dördü de yalnız `length >= 8`. Kopyalanmış kuralın asıl tehlikesi ayrışmadır — kullanıcı **en gevşek yüzeyden** parolasını belirler. Tek saf yardımcı: **YENİ `src/lib/auth/password-policy.ts`** (12 karakter · zayıf-liste · TR karakter katlama `ŞİFRE≡sifre` · e-posta bağlam reddi · tekrar/ardışık dizi reddi). **Karmaşıklık kuralı BİLEREK YOK** — NIST 800-63B önermiyor, `Sifre123!` kalıbına itiyor (kullanıcı kararı). Sunucu otoriter, istemci aynalıyor (`validateQuoteForSend` kalıbı). **Mevcut kullanıcılar zorla değiştirilmiyor** (davetiye-bazlı, 3 kalıcı admin, brick riski).
+
+**Yan bulgu — ölü kod:** `enterDemoMode()` **sıfır çağrı yeriyle** duruyordu ve `eslint-config-next@16.3.3`'ün yeni `no-location-assign-relative-destination` kuralının repodaki **TEK kaynağıydı**. Demo girişi zaten `GET /api/auth/demo` sunucu yönlendirmesi. Kaldırıldı (gerekçe yorumu bırakıldı); `memory/project_auth.md`'deki bayat not da düzeltildi.
+
+**Ders:** yükseltme + politika **4 mevcut testi kırdı** ve dördü de 8 karakterlik test verisi kullanıyordu (`"12345678"` hem kısa hem ardışık dizi). **Test verisi de politikanın müşterisidir.** Düzeltirken eşik testte elle yazılmadı, `MIN_PASSWORD_LENGTH`'ten okundu — iki yerde ayrışmasın.
+
+**TARAYICIDA DOĞRULANDI** (Next minor'ı her şeye dokunur): giriş boru hattı sahte kimlikle `auth 400` + "E-posta veya şifre hatalı." · PWA `localhost`'ta SW **`activated`** · dev sunucusu **LAN IP'sinden hidratlanıyor** (`allowedDevOrigins` bozulmadı) · duyarlılık **70/70 taşmasız**.
+
+Kapı: YENİ `password-policy.test.ts` (7 test — **dört çağrı yerinin hepsini kilitliyor**) + `client-boot.test.ts`'e Next sürüm tabanı (+2). **9/9 kırmızı-yandığı kanıtlanarak.**
+
+tsc 0 · lint 0 · **487 dosya / 6847 test** (+9) · build 0 · **migration YOK**.
+
+**Önceki iş:** **"giriş yapamıyorum" — dev sunucusuna LAN'dan erişim** (2026-08-31; GREEN; **migration YOK**). Kullanıcı telefondan giriş yapamadığını bildirdi.
 
 **İlk şüphe kendi değişikliğimdi ve ölçülerek ELENDİ:** dokunma hedefleri için eklenen 44px'lik görünmez `::after` kutuları giriş formunun üstüne binmiş olabilirdi — doğrulamamda küçük kontrolleri birbirine karşı sınamıştım ama **input/gönder gibi BÜYÜK kontrollerden çalıp çalmadığına bakmamıştım** (gerçek bir doğrulama boşluğu). Ölçüm: mobil ve masaüstünde e-posta/şifre/gönder üçünün de merkezi ve dört köşesi kendi elemanına ait, hiçbir şey engellemiyor.
 
@@ -21,7 +41,7 @@ Kapı: YENİ `src/__tests__/gate/client-boot.test.ts` (5 test) — "istemcinin a
 
 tsc 0 · lint 0 · **486 dosya / 6838 test** (+5) · build 0 · **migration YOK**.
 
-**Önceki iş:** **Dokunma hedefleri + hover kilidi** (2026-08-31; GREEN; **migration YOK**). Telefon turunda açık bırakılan madde; kullanıcı sıradaki iş olarak bunu seçti. Envanter iPhone 14 emülasyonunda 10 rota + çekmece açık ölçüldü: **35 kontrolün en küçük kenarı 32px altında** (en kötüsü demo bandosu `×` = 13×14, teklif satırı not/sil = 22×22). **Kullanıcı kararı: yalnız kritik <32px** — 32–43px bandındaki 64 kontrol kapsam dışı (36px zaten rahat tıklanıyor; 44'e çıkarmak kenar çubuğunu ve tüm filtre şeritlerini şişirirdi).
+**Daha önceki iş:** **Dokunma hedefleri + hover kilidi** (2026-08-31; GREEN; **migration YOK**). Telefon turunda açık bırakılan madde; kullanıcı sıradaki iş olarak bunu seçti. Envanter iPhone 14 emülasyonunda 10 rota + çekmece açık ölçüldü: **35 kontrolün en küçük kenarı 32px altında** (en kötüsü demo bandosu `×` = 13×14, teklif satırı not/sil = 22×22). **Kullanıcı kararı: yalnız kritik <32px** — 32–43px bandındaki 64 kontrol kapsam dışı (36px zaten rahat tıklanıyor; 44'e çıkarmak kenar çubuğunu ve tüm filtre şeritlerini şişirirdi).
 
 **Ararken çıkan ikinci ve daha ciddi bulgu:** `.row-reveal` mobilde **opaklık 0** — dokunmatikte hover YOKTUR, dolayısıyla Teklifler'de 16, Siparişler'de 50 satırda **SİL düğmesi telefonda hiç görünmüyordu** (görünmez olduğu hâlde dokunulabilir; iki adımlı onay anında silmeyi engelliyor). Kullanıcı kapsama aldı: mobilde hep görünür, **masaüstü hover davranışı aynen korundu**.
 
@@ -39,7 +59,7 @@ Kapı: YENİ `src/__tests__/gate/touch-targets.test.ts` (8 test), **8/8 kırmız
 
 tsc 0 · lint 0 · **485 dosya / 6833 test** (+8) · build temiz · **migration YOK**.
 
-**Daha önceki iş:** **Telefon/tablet/masaüstü ölçümü + 2 kusur** (2026-08-31; GREEN; **migration YOK**). Kullanıcı "telefon tablet ve masaüstünden sorunsuz tıkır tıkır çalışır mı, evetse telefonda çalıştırma yolunu ver" dedi. Tarayıcı eklentisi bağlı değildi → **Playwright cihaz emülasyonu** (demo=viewer, **salt-okunur**, hiçbir mutasyon tetiklenmedi).
+**Daha önceki iş (2):** **Telefon/tablet/masaüstü ölçümü + 2 kusur** (2026-08-31; GREEN; **migration YOK**). Kullanıcı "telefon tablet ve masaüstünden sorunsuz tıkır tıkır çalışır mı, evetse telefonda çalıştırma yolunu ver" dedi. Tarayıcı eklentisi bağlı değildi → **Playwright cihaz emülasyonu** (demo=viewer, **salt-okunur**, hiçbir mutasyon tetiklenmedi).
 
 **Duyarlılık SAĞLAM, ölçüldü:** 5 profil × 14 ekran = **70 sayfa yüklemesinde yatay taşma 0** (360/390 telefon · 768/1024 tablet · 1440 masaüstü). Kenar çubuğu <768px'te hamburger çekmeceye dönüyor (768 ve 390'da **tıklanarak** açıldığı doğrulandı), listeler kendi `overflow-x` kabında kayıyor, sipariş formunun aksiyon çubuğu altta sabitleniyor. `useIsMobile`/`windowWidth < 768` kolon gizleme + düzen değiştirme yapıyor — mobil desteği kazara değil, kurulmuş.
 
@@ -55,7 +75,7 @@ Kapı `pwa.test.ts` 16 → **19 test**. "Dosyada tek `cache.put` var" **sayım**
 
 tsc 0 · lint 0 · **484 dosya / 6825 test** (+3) · build temiz · **migration YOK**.
 
-**Daha önceki iş (2):** **PWA eksiksizleştirme + TARAYICIDA doğrulama** (2026-08-31; GREEN; **migration YOK**). Kullanıcı "PWA eksiksiz hatasız ve tam olmalı" dedi. PWA çalışıyordu ama **hiçbir tarayıcıda doğrulanmamıştı** — kapı testleri yalnız kaynak metnine bakan regex iddialarıydı — ve 5 gerçek kusuru vardı.
+**Daha önceki iş (3):** **PWA eksiksizleştirme + TARAYICIDA doğrulama** (2026-08-31; GREEN; **migration YOK**). Kullanıcı "PWA eksiksiz hatasız ve tam olmalı" dedi. PWA çalışıyordu ama **hiçbir tarayıcıda doğrulanmamıştı** — kapı testleri yalnız kaynak metnine bakan regex iddialarıydı — ve 5 gerçek kusuru vardı.
 
 **Kapatılan kusurlar:** SW **development'ta da kaydoluyordu** → `/_next/static/` cache-first yüzünden geliştirmede bayat JS; guard yetmez (SW kaydı KALICI), bu yüzden dev'de mevcut kayıt + `roven-*` cache'leri **aktif olarak siliniyor** · önbellek **sınırsız büyüyordu** → `MAX_ENTRIES=200` FIFO tavan · **çevrimdışı yedek sayfa yoktu** → `/offline` precache + gezinme **yakalaması** (önbellekleme DEĞİL; "API/navigasyon asla önbelleğe alınmaz" invaryantı korundu) · `apple-touch-icon` iOS'un **kök-yol tahminine** güveniyordu → `src/app/apple-icon.png` (Next `<link>`i oradan basıyor) · **`safe-area-inset` kodda hiç yoktu** → mobil çekmeceye `env(safe-area-inset-bottom)`.
 

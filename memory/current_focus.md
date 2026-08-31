@@ -5,6 +5,55 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-08-31 (6) — 20 maddelik "vibe-coded" listesi denetimi
+
+Kullanıcı sosyal medyadaki "20 NICHE ways to get your vibe coded app hacked"
+listesini paylaşıp sistemde var mı diye sordu. **Yirmisi de ölçüldü**
+(kaynak + `npm audit` + git geçmişi). 2026-08-30'un 10 maddesiyle örtüşenler
+devralındı, kalan 16'sı bu turda ölçüldü → rapor
+`docs/audit/2026-08-31-20-madde-liste-denetimi.md`.
+
+**Sonuç: 17 kapalı · 2 zayıf · 1 açık.** Kapalı olanların dayanağı raporda tek tek
+yazılı (CORS başlığı hiç yok · tüm PK'ler uuid · `signUp` hiçbir yerde yok →
+genel kayıt kapalı · 8 `dangerouslySetInnerHTML`'in hepsi sabit CSS · auth
+cookie'de, localStorage'da yalnız teklif taslağı · webhook imzası fail-closed ·
+prod'da generic hata mesajı · dosya yüklemede MIME allowlist + 10 MB).
+
+**#18 asıl bulguydu: 17 bağımlılık açığı, 6 YÜKSEK.** Biri Next'in kendisinde ve
+başlığı **"Middleware / Proxy bypass in App Router"** — bu uygulamanın auth kapısı
+(`proxy.ts`) tam olarak middleware. `next` + `eslint-config-next` birlikte
+**16.2.9 → 16.3.3** (minor, kırıcı değil; Sentry peer aralığı kapsıyor) +
+`npm audit fix` → **17 → 1**.
+
+Kalan tek açık `@anthropic-ai/sdk` (orta): iki uyarı da **yerel dosya sistemi
+Memory Tool**'una dair, düzeltmesi kırıcı major. **Ölçüldü: bu projede memory
+tool / betas / dosya-sistemi aracı hiç kullanılmıyor** → kullanılmayan özellik
+için kırıcı major'a atlanmadı. Tetikleyici raporda yazılı.
+
+**#19 parola politikası:** kural DÖRT yere kopyalanmıştı ve dördü de yalnız
+`length >= 8`. Kopyalanmış kuralın tehlikesi ayrışmadır — kullanıcı **en gevşek
+yüzeyden** parolasını belirler. Tek saf yardımcı: `src/lib/auth/password-policy.ts`
+(12 karakter + zayıf-liste + TR karakter katlama + e-posta bağlam reddi +
+tekrar/dizi reddi). **Karmaşıklık kuralı BİLEREK yok** — NIST 800-63B önermiyor
+(kullanıcı kararı). Mevcut kullanıcılar zorla değiştirilmiyor (brick riski).
+
+**Yan bulgu — ölü kod:** `enterDemoMode()` sıfır çağrı yeriyle duruyordu ve
+`eslint-config-next@16.3.3`'ün yeni `no-location-assign-relative-destination`
+kuralının repodaki TEK kaynağıydı. Demo girişi zaten `/api/auth/demo` sunucu
+yönlendirmesi. Kaldırıldı (gerekçe yorumu bırakıldı); hafızadaki bayat not da
+düzeltildi.
+
+**Ders:** yükseltme 4 mevcut testi kırdı ve dördü de **8 karakterlik test verisi**
+kullanıyordu (`"12345678"` hem kısa hem ardışık dizi). Test verisi de politikanın
+müşterisidir; eşik değiştiğinde onlar da gider. Düzeltirken sayı testte elle
+yazılmadı, `MIN_PASSWORD_LENGTH`'ten okundu — iki yerde ayrışmasın.
+
+Kapı: YENİ `password-policy.test.ts` (7 test, **dört çağrı yerinin hepsini
+kilitliyor**) + `client-boot.test.ts`'e Next sürüm tabanı (+2). **9/9 kırmızı
+kanıtlı.**
+
+**487 dosya / 6847 test** · tsc 0 · lint 0 · build 0 · migration YOK.
+
 ## 2026-08-31 (5) — "giriş yapamıyorum": dev sunucusuna LAN'dan erişim
 
 Kullanıcı telefondan giriş yapamadığını söyledi. **İlk şüphe kendi değişikliğimdi**

@@ -38,6 +38,7 @@ import {
     type SettingsTabDefinition,
     type SettingsTab,
 } from "@/lib/settings-tabs";
+import { checkPasswordPolicy } from "@/lib/auth/password-policy";
 
 const settingsTabIcons: Record<SettingsTab, LucideIcon> = {
     firma: Building2,
@@ -656,7 +657,9 @@ function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void 
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         if (isMutating) return; // concurrent guard
         if (!pwForm.current) { setPwError("Mevcut şifrenizi girin."); return; }
-        if (pwForm.next.length < 8) { setPwError("Yeni şifre en az 8 karakter olmalı."); return; }
+        // Sunucu otoriter; bu yalnız UX aynası (repodaki validateQuoteForSend kalıbı).
+        const pwPolicyError = checkPasswordPolicy(pwForm.next, { email: profile?.email });
+        if (pwPolicyError) { setPwError(pwPolicyError); return; }
         if (pwForm.next !== pwForm.confirm) { setPwError("Yeni şifreler eşleşmiyor."); return; }
         if (pwForm.current === pwForm.next) { setPwError("Yeni şifre mevcut şifreden farklı olmalı."); return; }
 

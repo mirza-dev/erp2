@@ -3,6 +3,7 @@ import { createClient as createSupabaseJsClient } from "@supabase/supabase-js";
 import { createClient } from "@/lib/supabase/server";
 import { createServiceClient } from "@/lib/supabase/service";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
+import { checkPasswordPolicy } from "@/lib/auth/password-policy";
 
 // POST /api/settings/user/password
 // Body: { currentPassword: string, newPassword: string }
@@ -38,8 +39,9 @@ export async function POST(req: NextRequest) {
         if (!currentPassword) {
             return NextResponse.json({ error: "Mevcut şifre gerekli." }, { status: 400 });
         }
-        if (newPassword.length < 8) {
-            return NextResponse.json({ error: "Yeni şifre en az 8 karakter olmalı." }, { status: 400 });
+        const policyError = checkPasswordPolicy(newPassword, { email: user.email });
+        if (policyError) {
+            return NextResponse.json({ error: policyError }, { status: 400 });
         }
         if (currentPassword === newPassword) {
             return NextResponse.json({ error: "Yeni şifre mevcut şifreden farklı olmalı." }, { status: 400 });

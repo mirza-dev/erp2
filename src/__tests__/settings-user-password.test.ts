@@ -34,6 +34,7 @@ vi.mock("@supabase/supabase-js", () => ({
 }));
 
 import { POST } from "@/app/api/settings/user/password/route";
+import { MIN_PASSWORD_LENGTH } from "@/lib/auth/password-policy";
 
 beforeEach(() => {
     vi.clearAllMocks();
@@ -69,15 +70,21 @@ describe("POST /api/settings/user/password", () => {
         expect(body.error).toContain("Mevcut şifre");
     });
 
-    it("newPassword < 8 karakter → 400", async () => {
+    // 2026-08-31: eşik 8 → 12 (parola politikası tek yardımcıya taşındı).
+    // Sayı testte ELLE yazılmıyor — politika değişirse bu test onunla birlikte
+    // gitsin, iki yerde ayrışmasın.
+    it("politikayı geçmeyen newPassword → 400", async () => {
         const res = await POST(makeReq({ currentPassword: "old", newPassword: "short" }));
         expect(res.status).toBe(400);
         const body = await res.json();
-        expect(body.error).toContain("8 karakter");
+        expect(body.error).toContain(`${MIN_PASSWORD_LENGTH} karakter`);
     });
 
     it("currentPassword === newPassword → 400", async () => {
-        const res = await POST(makeReq({ currentPassword: "samepass", newPassword: "samepass" }));
+        // Politikayı GEÇEN bir parola seçilmeli; aksi halde uzunluk kuralına
+        // takılır ve bu testin ölçtüğü "aynı olamaz" kuralına hiç gelinmez.
+        const same = "mavi-liman-77-defter";
+        const res = await POST(makeReq({ currentPassword: same, newPassword: same }));
         expect(res.status).toBe(400);
         const body = await res.json();
         expect(body.error).toContain("farklı");

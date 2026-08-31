@@ -3,6 +3,7 @@ import { createServiceClient } from "@/lib/supabase/service";
 import { createClient } from "@/lib/supabase/server";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { parseRoles, normalizeAssignedRoles } from "@/lib/auth/permissions";
+import { checkPasswordPolicy } from "@/lib/auth/password-policy";
 
 function adminEmails(): string[] {
     return (process.env.ADMIN_EMAILS ?? "").split(",").map(e => e.trim()).filter(Boolean);
@@ -69,11 +70,9 @@ export async function POST(req: NextRequest) {
         if (!email?.trim()) {
             return NextResponse.json({ error: "E-posta zorunludur." }, { status: 400 });
         }
-        if (!password || password.length < 8) {
-            return NextResponse.json(
-                { error: "Şifre en az 8 karakter olmalıdır." },
-                { status: 400 }
-            );
+        const policyError = checkPasswordPolicy(password ?? "", { email });
+        if (policyError) {
+            return NextResponse.json({ error: policyError }, { status: 400 });
         }
 
         // RBAC Faz 5: roller normalize (verilmezse → ["viewer"], sessiz yetki YOK)
