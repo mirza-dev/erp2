@@ -33,7 +33,33 @@ export interface PageHeaderProps {
     refreshAriaLabel?: string;
     /** Sağ taraftaki ek içerik: birincil aksiyon, arama kutusu, filtre… */
     actions?: ReactNode;
+    /**
+     * Başlığın YANINDA duran küçük içerik — tipik olarak bir durum rozeti.
+     *
+     * Neden ayrı bir yuva: bu kalıp ERP'de her belge ekranında var (sipariş
+     * numarası + "Onaylandı", RFQ numarası + "Gönderildi"). `title`'ı ReactNode
+     * yapmak da olurdu ama o zaman `refreshAriaLabel` varsayılanı (`${title}
+     * listesini yenile`) metin üretemezdi. Başlık metin kalıyor, süs ayrı geliyor.
+     */
+    titleAdornment?: ReactNode;
+    /**
+     * Dikey hiza. Varsayılan `center` — tek satırlık aksiyonlarda doğrusu bu.
+     *
+     * `start`: sağdaki aksiyon bloğu ÇOK SATIRLIYSA (ör. Üretim ekranında
+     * etiketli tarih seçici + düğme + durum satırı). Orada `center` başlığı
+     * bloğun ortasına, yani gözle görülür biçimde aşağı kaydırırdı. Bu bir
+     * kaçamak değil: hiza sayfanın içeriğine bağlı gerçek bir düzen kararı,
+     * tipografi ise her iki durumda da ortak.
+     */
+    align?: "center" | "start";
 }
+
+const titleStyle: React.CSSProperties = {
+    fontSize: "20px",
+    fontWeight: 600,
+    color: "var(--text-primary)",
+    margin: 0,
+};
 
 export default function PageHeader({
     title,
@@ -42,24 +68,29 @@ export default function PageHeader({
     refreshing = false,
     refreshAriaLabel,
     actions,
+    titleAdornment,
+    align = "center",
 }: PageHeaderProps) {
     return (
         <div style={{
             display: "flex",
-            alignItems: "center",
+            alignItems: align === "start" ? "flex-start" : "center",
             justifyContent: "space-between",
             flexWrap: "wrap",
             gap: "8px",
         }}>
             <div>
-                <h1 style={{
-                    fontSize: "20px",
-                    fontWeight: 600,
-                    color: "var(--text-primary)",
-                    margin: 0,
-                }}>
-                    {title}
-                </h1>
+                {/* Süs YOKSA sarmalayıcı da YOK: mevcut 20+ çağıranın DOM'u
+                    birebir aynı kalsın (yapı testleri buna bakıyor) ve
+                    kullanılmayan bir özellik için düğüm eklenmesin. */}
+                {titleAdornment ? (
+                    <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>
+                        <h1 style={titleStyle}>{title}</h1>
+                        {titleAdornment}
+                    </div>
+                ) : (
+                    <h1 style={titleStyle}>{title}</h1>
+                )}
                 {subtitle != null && subtitle !== "" && (
                     <p style={{
                         fontSize: "13px",

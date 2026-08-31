@@ -1,6 +1,7 @@
 "use client";
 
 import { Suspense, useState, useRef, useEffect, useCallback, useMemo } from "react";
+import { fieldStyle, labelStyle as sharedLabelStyle } from "@/components/ui/Input";
 import { updateUserProfileCache } from "@/lib/shared-hooks";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -56,27 +57,11 @@ const settingsGroupLabels: Record<SettingsTabDefinition["scope"], string> = {
     personal: "Kişisel Ayarlar",
 };
 
-const inputStyle: React.CSSProperties = {
-    fontSize: "13px",
-    padding: "7px 10px",
-    border: "var(--line-width) solid var(--border-secondary)",
-    borderRadius: "6px",
-    background: "var(--input-bg)",
-    color: "var(--text-primary)",
-    fontWeight: "var(--font-ui-weight)",
-    width: "100%",
-    boxSizing: "border-box",
-};
+// `fieldStyle` + bu ekranın kendi metin ağırlığı. Ağırlık ortak yardımcıya
+// BİLEREK girmiyor (Input.tsx notu: yalnız 3 dosyada vardı) — burada korunuyor.
+const inputStyle: React.CSSProperties = { ...fieldStyle("md"), fontWeight: "var(--font-ui-weight)" };
 
-const labelStyle: React.CSSProperties = {
-    fontSize: "12px",
-    color: "var(--text-secondary)",
-    fontWeight: "var(--font-label-weight)",
-    marginBottom: "4px",
-    display: "block",
-    textTransform: "uppercase",
-    letterSpacing: "0.04em",
-};
+const labelStyle: React.CSSProperties = { ...sharedLabelStyle(), display: "block", marginBottom: "4px" };
 
 const sectionTitle: React.CSSProperties = {
     fontSize: "11px",

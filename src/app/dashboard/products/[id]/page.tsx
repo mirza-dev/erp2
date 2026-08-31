@@ -16,7 +16,7 @@ import { DynamicFieldEdit, FieldEdit } from "@/components/products/DynamicFieldE
 import SupplierPricesPanel from "@/components/products/SupplierPricesPanel";
 import ProductVendorsPanel from "@/components/products/ProductVendorsPanel";
 import { missingRequiredTechnicalFields } from "@/lib/technical-templates";
-import { fieldStyle } from "@/components/ui/Input";
+import { fieldStyle, labelStyle as sharedLabelStyle } from "@/components/ui/Input";
 
 // Mirror of server-side ALLOWED_MIME — client-safe (no server module imports).
 // Source of truth: src/lib/supabase/product-attachments.ts ALLOWED_MIME.
@@ -154,12 +154,7 @@ const fieldRowStyle: React.CSSProperties = {
     borderBottom: "0.5px solid var(--border-tertiary)",
 };
 
-const labelStyle: React.CSSProperties = {
-    fontSize: "11px",
-    color: "var(--text-tertiary)",
-    textTransform: "uppercase",
-    letterSpacing: "0.04em",
-};
+const labelStyle: React.CSSProperties = { ...sharedLabelStyle() };
 
 const sectionTitleStyle: React.CSSProperties = {
     fontSize: "11px",

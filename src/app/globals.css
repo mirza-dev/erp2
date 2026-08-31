@@ -1080,8 +1080,12 @@ body {
 .settings-page-header h1 {
   margin: 0;
   color: var(--text-primary);
-  font-size: 16px;
-  font-weight: var(--font-heading-weight);
+  /* 2026-08-31: 16px → 20px VE ağırlık 650 → 600. Ortak `PageHeader` ile aynı
+     ölçek. Ayarlar kabuğu kendi kenarlık/boşluk düzenini taşıdığı için bileşene
+     taşınmadı; yalnız tipografi hizalandı. (Ölçümde boyut düzelmiş ama ağırlık
+     `--font-heading-weight`=650'de kalmıştı — tek sayfada farklı görünüyordu.) */
+  font-size: 20px;
+  font-weight: 600;
   line-height: 1.2;
 }
 

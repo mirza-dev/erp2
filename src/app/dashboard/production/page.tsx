@@ -1,6 +1,8 @@
 "use client";
 
 import { Fragment, Suspense, useState, useCallback, useEffect, useRef } from "react";
+import PageHeader from "@/components/ui/PageHeader";
+import { fieldStyle } from "@/components/ui/Input";
 import { useSearchParams } from "next/navigation";
 import { useProducts, useProduction, buildLoadError } from "@/lib/data-context";
 import { formatNumber, safeRandomUUID } from "@/lib/utils";
@@ -131,16 +133,7 @@ export function donemOzeti(
     return { adet, hurda, kalem };
 }
 
-const inputStyle: React.CSSProperties = {
-    fontSize: "13px",
-    padding: "6px 10px",
-    border: "var(--line-width) solid var(--input-border)",
-    borderRadius: "6px",
-    background: "var(--input-bg)",
-    color: "var(--text-primary)",
-    width: "100%",
-    boxSizing: "border-box",
-};
+const inputStyle: React.CSSProperties = fieldStyle("md");
 
 const thStyle: React.CSSProperties = {
     textAlign: "left",
@@ -463,17 +456,13 @@ function ProductionPageInner() {
                     ⚠ {loadError}
                 </div>
             )}
-            {/* Header */}
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", flexWrap: "wrap", gap: "12px" }}>
-                <div>
-                    <h1 style={{ fontSize: "20px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
-                        Üretim Girişi
-                    </h1>
-                    <p style={{ fontSize: "13px", color: "var(--text-tertiary)", margin: "4px 0 0" }}>
-                        Günlük üretim miktarlarını girerek stoğu güncelle
-                    </p>
-                </div>
-                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "7px", maxWidth: "100%" }}>
+            {/* Header — `align="start"`: sağdaki blok çok satırlı (tarih seçici +
+                düğme + durum satırı), `center` başlığı aşağı kaydırırdı. */}
+            <PageHeader
+                title="Üretim Girişi"
+                subtitle="Günlük üretim miktarlarını girerek stoğu güncelle"
+                align="start"
+                actions={<div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "7px", maxWidth: "100%" }}>
                     <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "flex-end", flexWrap: "wrap", gap: "8px" }}>
                         <label style={{ display: "flex", flexDirection: "column", gap: "4px" }}>
                             <span style={{
@@ -528,8 +517,8 @@ function ProductionPageInner() {
                             Geçmiş tarih seçili. Kaydedilen üretim stoğu şimdi günceller.
                         </output>
                     )}
-                </div>
-            </div>
+                </div>}
+            />
 
             {/* Form */}
             <div style={{

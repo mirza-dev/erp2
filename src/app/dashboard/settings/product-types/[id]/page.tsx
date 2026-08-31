@@ -21,7 +21,7 @@ import { usePermissions } from "@/lib/auth/use-permissions";
 import { generateTechnicalFieldKey } from "@/lib/technical-templates";
 import type { ProductFieldType, ProductTypeFieldRow, ProductTypeRow } from "@/lib/database.types";
 import type { ProductTypeStatsRow } from "@/lib/supabase/product-types";
-import { fieldStyle } from "@/components/ui/Input";
+import { fieldStyle, labelStyle as sharedLabelStyle } from "@/components/ui/Input";
 import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 
 const FIELD_TYPE_LABELS: Record<ProductFieldType, string> = {
@@ -80,14 +80,7 @@ const cardStyle: React.CSSProperties = {
 // farklı duruyordu (2026-08-24 tespiti).
 const inputStyle: React.CSSProperties = fieldStyle("lg");
 
-const labelStyle: React.CSSProperties = {
-    fontSize: "11px",
-    color: "var(--text-tertiary)",
-    textTransform: "uppercase",
-    letterSpacing: "0.04em",
-    marginBottom: "5px",
-    display: "block",
-};
+const labelStyle: React.CSSProperties = { ...sharedLabelStyle(), display: "block", marginBottom: "5px" };
 
 function parseFieldOptions(field: ProductTypeFieldRow | FieldDraft): string {
     return Array.isArray(field.options) ? field.options.join("\n") : "";

@@ -7,7 +7,7 @@ import useSWR from "swr";
 import { ArrowLeft } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
-import Input, { Select, Textarea } from "@/components/ui/Input";
+import Input, { Select, Textarea, labelStyle as sharedLabelStyle } from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import { ErrorState, LoadingState } from "@/components/ui/StateViews";
 import { useToast } from "@/components/ui/Toast";
@@ -386,9 +386,4 @@ const relatedRow: React.CSSProperties = {
     flexWrap: "wrap",
 };
 
-const labelStyle: React.CSSProperties = {
-    fontSize: "12px",
-    fontWeight: 500,
-    color: "var(--text-secondary)",
-    marginTop: "4px",
-};
+const labelStyle: React.CSSProperties = { ...sharedLabelStyle(), marginTop: "4px" };

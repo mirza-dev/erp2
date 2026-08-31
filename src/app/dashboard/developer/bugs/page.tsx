@@ -6,7 +6,7 @@ import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
-import Input, { Select, Textarea } from "@/components/ui/Input";
+import Input, { Select, Textarea, labelStyle as sharedLabelStyle } from "@/components/ui/Input";
 import Modal from "@/components/ui/Modal";
 import PageHeader from "@/components/ui/PageHeader";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/StateViews";
@@ -351,11 +351,4 @@ function BugModal({
     );
 }
 
-const labelStyle: React.CSSProperties = {
-    display: "block",
-    fontSize: "12px",
-    fontWeight: 500,
-    color: "var(--text-secondary)",
-    marginTop: "4px",
-    marginBottom: "3px",
-};
+const labelStyle: React.CSSProperties = { ...sharedLabelStyle(), display: "block", marginTop: "4px", marginBottom: "3px" };

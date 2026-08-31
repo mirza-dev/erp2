@@ -5,7 +5,25 @@ _Son güncelleme: 2026-08-31_
 
 > Bu bölüm yalnız **güncel durumu + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda ve `memory/current_focus.md`'de. Aşağıdaki indeks son dönem oturumlarına (commit + konu) hızlı bakış içindir; daha eski dönemler (Faz 2–3d AI Import, Sprint A–C, M-3 Rate Limiting, React Doctor, Teklif V2–V7 plan turları, Paraşüt Faz 1–11) git geçmişinde.
 
-**Son tamamlanan iş:** **Lansman öncesi 20 maddelik ÜRÜN OLGUNLUĞU listesi — denetim + 6 maddenin kapatılması** (2026-08-31; GREEN; **migration YOK**). Kullanıcı ikinci bir 20 maddelik liste paylaştı ("20 things to tell Claude before launching your app") — bu sefer güvenlik değil ürün olgunluğu. Tam tablo: `docs/audit/2026-08-31-20-madde-urun-olgunlugu.md`.
+**Son tamamlanan iş:** **Frontend tutarlılığı — form etiketleri, sayfa başlıkları, yeni yüzeyler** (2026-08-31; GREEN; **migration YOK**). Kullanıcı "son yapılan işlerin frontend iyileştirmelerine odaklanalım" dedi. Rapor: `docs/audit/2026-08-31-frontend-tutarliligi.md`.
+
+**Ölçüm: kod çalışıyordu ama uygulama EKRANDAN EKRANA FARKLI GÖRÜNÜYORDU.** (a) Form etiketi **10 kopya / 5 varyant** — 11px/12px · tertiary/secondary · BÜYÜK HARF olan/olmayan; iki aile **tam eşit** bölünmüştü (5-5), yani "çoğunluk ne yapıyorsa o" kuralı karar veremedi → kanonik **kullanıcı kararıyla** seçildi: login `.lbl` referansı `11px / var(--font-label-weight) / --text-secondary`, **BÜYÜK HARF YOK** (Türkçe uzun etiketlerde satır kaplar). (b) **16 elle yazılmış `<h1>`, 5 farklı boyut** (16·18·19·20·24) ve 3 ağırlık — `PageHeader` **vardı** ve 15 dosyada kullanılıyordu; panonun kendi yorumu bile `{/* PageHeader */}` diyordu ama bileşeni kullanmıyordu.
+
+**Çözüm deseni (tekrar kullanılacak):** merkezî yardımcı **yalnız tipografi** taşır, yerleşim çağıranda kalır; yerel sabitin **GÖVDESİ** bağlanır, çağrı yerleri hiç değişmez — `fieldStyle`'ın 2026-08-24'te kurduğu emsal, **blast radius sıfır**. `Input.tsx` → `labelStyle()`; 10 dosya bağlandı. Ayrıca 3 elle yazılmış `inputStyle` → `fieldStyle("md")` (`vendors`/`production` birebir aynıydı; `settings` sürüklenmiş olandı).
+
+**Başlık göçü:** 11 dosya `PageHeader`'a (6'sı **görsel değişimsiz** — zaten 20px/600). `PageHeader`'a iki isteğe bağlı yuva: **`titleAdornment`** (belge ekranlarında başlık yanındaki durum rozeti; **süs yoksa sarmalayıcı düğüm de ÜRETİLMİYOR** → mevcut 20+ çağıranın DOM'u birebir aynı kaldı, mevcut yapı testi bu yüzden kırılmadı) ve **`align="start"`** (Üretim ekranının çok satırlı aksiyon bloğu). **8 kasıtlı istisna** gerekçesiyle kapı testinde kayıtlı.
+
+**Kapı testi yazılırken İKİ GERÇEK KUSUR çıktı, ikisi de sessizdi:** `--danger-soft-bg` **yok** (benzer ad `--button-danger-soft-bg`, ayrı şey) → `/sifre-yenile` hata kutusu `transparent` arka planla render ediliyordu; `--danger-rgb` **yok** ve satır içi yedeği **koyu tema kırmızısıydı** → `import/excel`'de eksik-veri satırı **aydınlık temada yanlış renkte**. **Ders: `var(--x, yedek)` hatayı YUTAR — yanlış yazılmış token uyarı üretmez, yalnız yanlış görünür.**
+
+**Ders 2:** kapı kuralı ilk hâlinde `<h1 style={{…}}` arıyordu; ölçüm `/gizlilik` ve `/sifre-yenile`'nin stili `const h1Style` diye çıkarıp **kuralın altından geçtiğini** gösterdi → desen `<h1 style={` olarak daraltıldı.
+
+**DOĞRULAMA — hesaplanmış stil ölçümü** (ekran görüntüsü değil): prod build üzerinde `getComputedStyle` ile **altı ekranda başlık `20px/600`**. Ayarlar ilk turda `20px/**650**` çıktı (CSS sınıfı `--font-heading-weight` taşıyordu, yalnız boyutu değiştirmiştim) → düzeltilip yeniden ölçüldü. Duyarlılık **70/70 taşmasız**.
+
+**ÖLÇÜM SINIRI (yeni kısıt):** demo/viewer RBAC nedeniyle production/vendors/settings-users/rfqs/purchase/parasut ekranlarına **giremiyor** (hepsi `/dashboard`'a döner) → o ekranların görsel doğrulaması **kullanıcıda**. Developer Console ise `INTERNAL_OPERATOR_EMAILS` **boş** olduğu için kimseye açık değil, sidebar linki bile render edilmiyor.
+
+Kapı: YENİ `gate/form-consistency.test.ts` (8 test). tsc 0 · lint 0 · **493 dosya / 6881 test** · build 0 · **6/6 kırmızı kanıtlı**.
+
+**Önceki iş:** **Lansman öncesi 20 maddelik ÜRÜN OLGUNLUĞU listesi — denetim + 6 maddenin kapatılması** (2026-08-31; GREEN; **migration YOK**). Kullanıcı ikinci bir 20 maddelik liste paylaştı ("20 things to tell Claude before launching your app") — bu sefer güvenlik değil ürün olgunluğu. Tam tablo: `docs/audit/2026-08-31-20-madde-urun-olgunlugu.md`.
 
 **Denetim: 9 kapalı · 6 kısmi · 4 eksik/kırık · 1 kullanıcı-tarafı → 6 madde kapatıldı** (#1, #4, #8, #9, #10, #14, #16).
 

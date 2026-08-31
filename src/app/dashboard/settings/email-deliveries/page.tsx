@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import PageHeader from "@/components/ui/PageHeader";
 import { AlertTriangle, CheckCircle2, MailCheck, RefreshCw, ShieldOff, Wrench, X } from "lucide-react";
 import Button from "@/components/ui/Button";
 import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
@@ -149,13 +150,11 @@ export default function EmailDeliveriesPage() {
 
     return (
         <div style={{ padding: "22px 24px 40px", display: "grid", gap: "18px" }}>
-            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 16, flexWrap: "wrap" }}>
-                <div>
-                    <h1 style={{ margin: 0, fontSize: 20, color: "var(--text-primary)" }}>E-posta Teslimatları</h1>
-                    <p style={{ margin: "5px 0 0", color: "var(--text-secondary)", fontSize: 13 }}>Outbox, Resend teslimatı ve suppression kayıtlarını güvenli biçimde izleyin.</p>
-                </div>
-                <Button variant="secondary" size="sm" leftIcon={<RefreshCw size={14} />} onClick={() => void load()} loading={loading}>Yenile</Button>
-            </div>
+            <PageHeader
+                title="E-posta Teslimatları"
+                subtitle="Outbox, Resend teslimatı ve suppression kayıtlarını güvenli biçimde izleyin."
+                actions={<Button variant="secondary" size="sm" leftIcon={<RefreshCw size={14} />} onClick={() => void load()} loading={loading}>Yenile</Button>}
+            />
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10 }}>
                 {[

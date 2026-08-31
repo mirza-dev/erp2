@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo, use } from "react";
+import PageHeader from "@/components/ui/PageHeader";
 import Modal from "@/components/ui/Modal";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
@@ -151,26 +152,26 @@ export default function RfqDetailPage({ params }: { params: Promise<{ id: string
 
     return (
         <div style={{ maxWidth: "1100px", margin: "0 auto" }}>
-            {/* Header */}
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" }}>
-                <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <h1 style={{ fontSize: "20px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>{rfq.rfq_number}</h1>
-                        <span style={{ padding: "2px 10px", borderRadius: "5px", fontSize: "11px", fontWeight: 600, background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>{STATUS_LABEL[rfq.status]}</span>
-                    </div>
-                    {rfq.title && <div style={{ color: "var(--text-secondary)", fontSize: "13px", marginTop: "4px" }}>{rfq.title}</div>}
-                    <div style={{ color: "var(--text-tertiary)", fontSize: "12px", marginTop: "4px" }}>
+            {/* Header — belge kalıbı: numara + durum rozeti yan yana (titleAdornment). */}
+            <div style={{ marginBottom: "16px" }}>
+            <PageHeader
+                title={rfq.rfq_number}
+                titleAdornment={<span style={{ padding: "2px 10px", borderRadius: "5px", fontSize: "11px", fontWeight: 600, background: "var(--bg-tertiary)", color: "var(--text-secondary)" }}>{STATUS_LABEL[rfq.status]}</span>}
+                subtitle={<>
+                    {rfq.title && <span style={{ color: "var(--text-secondary)", display: "block" }}>{rfq.title}</span>}
+                    <span style={{ fontSize: "12px", display: "block", marginTop: rfq.title ? "4px" : 0 }}>
                         Yanıt son tarihi: {fmtDate(rfq.due_date)} · {respondedCount}/{rfq.vendors.length} tedarikçi yanıtladı
-                    </div>
-                </div>
-                <div style={{ display: "flex", gap: "8px" }}>
+                    </span>
+                </>}
+                actions={<>
                     {rfq.status === "draft" && <button onClick={() => router.push(`/dashboard/purchase/rfqs/new`)} style={btn("ghost")}>Geri</button>}
                     {(rfq.status === "draft" || rfq.status === "sent") && (
                         <button onClick={handleSend} disabled={busy} style={btn("primary")}>{rfq.status === "draft" ? "Gönder" : "Yeniden Gönder"}</button>
                     )}
                     {rfq.status === "sent" && <button onClick={() => setTab("compare")} style={btn("primary")}>Karşılaştır & Karar</button>}
                     {rfq.status !== "awarded" && rfq.status !== "cancelled" && <button onClick={handleCancel} disabled={busy} style={btn("danger")}>İptal</button>}
-                </div>
+                </>}
+            />
             </div>
 
             {/* KOBİ-sim Y4 — teknik şartname notu.

@@ -67,13 +67,13 @@ export default function SetupProgressBanner() {
             style={{
                 display: "flex",
                 alignItems: "center",
-                gap: "10px",
-                padding: "9px 14px",
+                gap: "8px",
+                padding: "7px 14px",
                 background: "var(--accent-bg)",
                 border: "var(--line-width) solid var(--accent-border)",
                 borderRadius: "6px",
                 marginBottom: "16px",
-                fontSize: "12.5px",
+                fontSize: "12px",
                 color: "var(--accent-text)",
                 flexWrap: "wrap",
             }}

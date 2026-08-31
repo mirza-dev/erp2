@@ -24,12 +24,12 @@ export default function OfflineBanner() {
                 alignItems: "center",
                 gap: "8px",
                 padding: "7px 14px",
-                background: "var(--danger-bg, var(--bg-tertiary))",
-                border: "var(--line-width) solid var(--danger)",
+                background: "var(--danger-bg)",
+                border: "var(--line-width) solid var(--danger-border)",
                 borderRadius: "6px",
                 marginBottom: "16px",
                 fontSize: "12px",
-                color: "var(--danger)",
+                color: "var(--danger-text)",
             }}
         >
             <WifiOff size={14} strokeWidth={2} aria-hidden="true" style={{ flexShrink: 0 }} />

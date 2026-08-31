@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, useMemo } from "react";
+import PageHeader from "@/components/ui/PageHeader";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import type { IntegrationSyncLogRow, SalesOrderRow } from "@/lib/database.types";
@@ -247,22 +248,12 @@ export default function ParasutPage() {
                 style={{
                     padding: "20px 24px 16px",
                     borderBottom: "0.5px solid var(--border-tertiary)",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "space-between",
-                    flexWrap: "wrap",
-                    gap: "8px",
                 }}
             >
-                <div>
-                    <h1 style={{ fontSize: "16px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
-                        Paraşüt Muhasebe Entegrasyonu
-                    </h1>
-                    <div style={{ fontSize: "12px", color: "var(--text-tertiary)", marginTop: "2px" }}>
-                        api.parasut.com · Otomatik sync: her 6 saatte bir
-                    </div>
-                </div>
-                <div style={{ display: "flex", gap: "8px" }}>
+                <PageHeader
+                    title="Paraşüt Muhasebe Entegrasyonu"
+                    subtitle="api.parasut.com · Otomatik sync: her 6 saatte bir"
+                    actions={<div style={{ display: "flex", gap: "8px" }}>
                     <button
                         onClick={runSync}
                         disabled={isDemo || syncStatus === "syncing" || connection === "disconnected"}
@@ -280,7 +271,8 @@ export default function ParasutPage() {
                     >
                         {syncStatus === "syncing" ? "Sync ediliyor..." : "▶ Manuel Sync"}
                     </button>
-                </div>
+                </div>}
+                />
             </div>
 
             <div style={{ padding: "20px 24px", display: "flex", flexDirection: "column", gap: "20px" }}>

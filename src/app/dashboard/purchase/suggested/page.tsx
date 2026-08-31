@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, useRef } from "react";
+import PageHeader from "@/components/ui/PageHeader";
 import { useProducts, useReorderSuggestions, invalidateAllData } from "@/lib/data-context";
 import { computeCoverageDays, computeTargetStock, daysColor, daysBg, dateDaysFromToday } from "@/lib/stock-utils";
 import type { Product } from "@/lib/mock-data";
@@ -1257,12 +1258,13 @@ export default function PurchaseSuggestedPage() {
 
     return (
         <div style={{ padding: "24px 32px" }}>
-            {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px" }}>
-                <h1 style={{ fontSize: "20px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
-                    Satın Alma Önerileri
-                </h1>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap", justifyContent: "flex-end" }}>
+            {/* Header — PageHeader'a taşındı (2026-08-31). Yenile düğmesi AYNEN
+                korunuyor: PageHeader'ın kendi `onRefresh`'i demo guard'ını, AI
+                yükleniyor durumunu ve dönen ikonu taşımıyor. */}
+            <PageHeader
+                title="Satın Alma Önerileri"
+                subtitle="Minimum stok seviyesinin altına düşen ürünler · Öncelik sırasına göre"
+                actions={<>
                     {lastRefreshed && (
                         <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
                             Son güncelleme: {lastRefreshed}
@@ -1294,11 +1296,8 @@ export default function PurchaseSuggestedPage() {
                         }}>↻</span>
                         {refreshing ? "Yenileniyor..." : "Yenile"}
                     </button>
-                </div>
-            </div>
-            <p style={{ fontSize: "13px", color: "var(--text-tertiary)", marginTop: "4px" }}>
-                Minimum stok seviyesinin altına düşen ürünler · Öncelik sırasına göre
-            </p>
+                </>}
+            />
             <div style={{ marginTop: "4px", fontSize: "11px" }}>
                 {isDemo ? (
                     <span style={{ color: "var(--text-tertiary)" }}>Demo modu — AI önerileri devre dışı</span>

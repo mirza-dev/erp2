@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useEffect } from "react";
+import PageHeader from "@/components/ui/PageHeader";
 import { useProducts, useOrders, useProduction, useAlerts, useReorderSuggestions } from "@/lib/data-context";
 import { useExchangeRates, useUserProfile } from "@/lib/shared-hooks";
 import { usePermissions } from "@/lib/auth/use-permissions";
@@ -233,13 +234,14 @@ export default function DashboardPage() {
         <div>
         <div className="dashboard-screen-only">
             <SetupProgressBanner />
-            {/* PageHeader */}
-            <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 14, flexWrap: "wrap", marginBottom: 16 }}>
-                <div>
-                    <h1 style={{ fontSize: 19, fontWeight: 650, letterSpacing: "-0.01em", color: "var(--text-primary)" }}>Genel Bakış</h1>
-                    <p style={{ fontSize: 12.5, color: "var(--text-tertiary)", marginTop: 3 }}>{dateStr} · PMT Endüstriyel</p>
-                </div>
-                <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            {/* Başlık — 2026-08-31'de ortak `PageHeader`'a taşındı (19px/650 →
+                kanonik 20px/600). Yorumu "PageHeader" diyordu ama bileşen
+                kullanılmıyordu; uygulamadaki beş farklı başlık boyutundan biriydi. */}
+            <div style={{ marginBottom: 16 }}>
+            <PageHeader
+                title="Genel Bakış"
+                subtitle={`${dateStr} · PMT Endüstriyel`}
+                actions={<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                     <div className="seg" role="group" aria-label="Dönem aralığı">
                         {RANGES.map((r) => (
                             <button key={r} className={range === r ? "is-active" : ""} aria-pressed={range === r} onClick={() => setRange(r)} type="button">{r}</button>
@@ -265,7 +267,8 @@ export default function DashboardPage() {
                         </svg>
                         Raporu yazdır / PDF
                     </button>
-                </div>
+                </div>}
+            />
             </div>
 
             {/* KPI şeridi — sarmalayan ızgara.

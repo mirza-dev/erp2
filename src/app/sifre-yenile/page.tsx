@@ -28,7 +28,7 @@ import { AlertCircle, CheckCircle2, Eye, EyeOff, KeyRound } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { checkPasswordPolicy, MIN_PASSWORD_LENGTH } from "@/lib/auth/password-policy";
 import Button from "@/components/ui/Button";
-import Input from "@/components/ui/Input";
+import Input, { labelStyle as sharedLabelStyle } from "@/components/ui/Input";
 
 type Phase = "checking" | "ready" | "expired" | "done";
 
@@ -205,13 +205,7 @@ const hintStyle: React.CSSProperties = {
     margin: "0 0 18px",
 };
 
-const labelStyle: React.CSSProperties = {
-    display: "block",
-    fontSize: "12px",
-    fontWeight: 500,
-    color: "var(--text-secondary)",
-    marginBottom: "6px",
-};
+const labelStyle: React.CSSProperties = { ...sharedLabelStyle(), display: "block", marginBottom: "6px" };
 
 const errorBoxStyle: React.CSSProperties = {
     display: "flex",
@@ -219,9 +213,12 @@ const errorBoxStyle: React.CSSProperties = {
     gap: "8px",
     fontSize: "12.5px",
     lineHeight: 1.5,
-    color: "var(--danger)",
-    background: "var(--danger-soft-bg, transparent)",
-    border: "var(--line-width) solid var(--danger)",
+    // 2026-08-31 düzeltmesi: `--danger-soft-bg` diye bir token YOK (repodaki
+    // benzer ad `--button-danger-soft-bg`, ayrı bir şey) → arka plan sessizce
+    // `transparent`a düşüyordu. Repodaki standart hata kutusu üçlüsü kullanılıyor.
+    color: "var(--danger-text)",
+    background: "var(--danger-bg)",
+    border: "var(--line-width) solid var(--danger-border)",
     borderRadius: "var(--radius-md)",
     padding: "9px 11px",
     marginBottom: "14px",

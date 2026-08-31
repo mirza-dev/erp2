@@ -50,6 +50,33 @@ export function fieldStyle(size: FieldSize): CSSProperties {
     };
 }
 
+/**
+ * Form etiketi — KANONİK tipografi.
+ *
+ * 2026-08-31 ölçümü: kural **on yere kopyalanmış** ve beş ayrı varyanta ayrışmıştı
+ * — 11px/12px, `--text-tertiary`/`--text-secondary`, BÜYÜK HARF olan/olmayan,
+ * ağırlık kimi yerde 500 kimi yerde tanımsız. Kullanıcı tedarikçi formunu doldurup
+ * RFQ formuna geçtiğinde etiketler boyut ve renk değiştiriyordu.
+ *
+ * REFERANS `.login-field > .lbl` (globals.css): login repodaki en son tasarlanmış
+ * yüzey ve etiketi tam bu. BÜYÜK HARF yok — Türkçe uzun etiketlerde
+ * ("İLGİLİ KİŞİ" vs "İlgili kişi") satır kaplaması artıyor. (Kullanıcı kararı.)
+ *
+ * `fieldStyle` ile AYNI SÖZLEŞME: yalnız TİPOGRAFİ taşır, yerleşim taşımaz.
+ * `display`/`marginBottom` gibi düzen özellikleri çağıran dosyada kalır — çünkü
+ * onlar forma göre değişir ve burada sabitlenirse her ekranı aynı boşluğa zorlar:
+ *
+ *     const labelStyle: React.CSSProperties = { ...sharedLabelStyle(), display: "block", marginBottom: "4px" };
+ */
+export function labelStyle(): CSSProperties {
+    return {
+        fontSize: "11px",
+        fontWeight: "var(--font-label-weight)",
+        color: "var(--text-secondary)",
+        lineHeight: 1.3,
+    };
+}
+
 export interface InputProps extends InputHTMLAttributes<HTMLInputElement> {
     /** Alan boyutu (padding ekseni). Default `md`. */
     inputSize?: FieldSize;

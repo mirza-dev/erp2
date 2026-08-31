@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import PageHeader from "@/components/ui/PageHeader";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { createClient } from "@/lib/supabase/client";
@@ -8,7 +9,7 @@ import { ROLES, ROLE_LABELS, type Role } from "@/lib/auth/permissions";
 import Button from "@/components/ui/Button";
 import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 import { KeyRound, Pencil, Plus, Trash2 } from "lucide-react";
-import { fieldStyle } from "@/components/ui/Input";
+import { fieldStyle, labelStyle as sharedLabelStyle } from "@/components/ui/Input";
 import { MIN_PASSWORD_LENGTH, checkPasswordPolicy } from "@/lib/auth/password-policy";
 import Modal from "@/components/ui/Modal";
 
@@ -73,14 +74,7 @@ function RoleCheckboxes({
 // farklı duruyordu (2026-08-24 tespiti).
 const inputStyle: React.CSSProperties = fieldStyle("lg");
 
-const labelStyle: React.CSSProperties = {
-    fontSize: "12px",
-    color: "var(--text-secondary)",
-    marginBottom: "4px",
-    display: "block",
-    textTransform: "uppercase",
-    letterSpacing: "0.04em",
-};
+const labelStyle: React.CSSProperties = { ...sharedLabelStyle(), display: "block", marginBottom: "4px" };
 
 function formatDate(iso: string | null) {
     if (!iso) return "—";
@@ -387,17 +381,10 @@ export default function UsersPage() {
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
-            {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div>
-                    <h1 style={{ fontSize: "16px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
-                        Kullanıcılar
-                    </h1>
-                    <p style={{ fontSize: "12px", color: "var(--text-tertiary)", marginTop: "2px", marginBottom: 0 }}>
-                        Sisteme erişim yetkisi olan hesaplar
-                    </p>
-                </div>
-                <Button
+            <PageHeader
+                title="Kullanıcılar"
+                subtitle="Sisteme erişim yetkisi olan hesaplar"
+                actions={<Button
                     size="cta"
                     leftIcon={!showForm ? <Plus size={15} /> : undefined}
                     onClick={() => setShowForm(prev => !prev)}
@@ -405,8 +392,8 @@ export default function UsersPage() {
                     title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
                 >
                     {showForm ? "İptal" : "Kullanıcı Ekle"}
-                </Button>
-            </div>
+                </Button>}
+            />
 
             {/* Add user form */}
             {showForm && (

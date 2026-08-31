@@ -137,8 +137,8 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 function Blank({ children }: { children: React.ReactNode }) {
     return (
         <span style={{
-            background: "var(--warning-bg, var(--bg-tertiary))",
-            color: "var(--warning-text, var(--text-secondary))",
+            background: "var(--warning-bg)",
+            color: "var(--warning-text)",
             padding: "1px 6px",
             borderRadius: "4px",
             fontSize: "0.95em",
@@ -189,9 +189,9 @@ const metaStyle: React.CSSProperties = {
 const draftNoticeStyle: React.CSSProperties = {
     fontSize: "12.5px",
     lineHeight: 1.6,
-    color: "var(--warning-text, var(--text-secondary))",
-    background: "var(--warning-bg, var(--bg-tertiary))",
-    border: "var(--line-width) solid var(--warning-border, var(--border-secondary))",
+    color: "var(--warning-text)",
+    background: "var(--warning-bg)",
+    border: "var(--line-width) solid var(--warning-border)",
     borderRadius: "var(--radius-md)",
     padding: "10px 13px",
 };

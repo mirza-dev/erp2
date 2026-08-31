@@ -1,20 +1,19 @@
 "use client";
 
 import { useState, useEffect, useMemo, useCallback, Suspense } from "react";
+import PageHeader from "@/components/ui/PageHeader";
 import { useRouter, useSearchParams } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import type { VendorRow, ProductRow, PurchaseOrderRow, PurchaseOrderLineRow, ProductVendorLinkRow } from "@/lib/database.types";
-import { fieldStyle } from "@/components/ui/Input";
+import { fieldStyle, labelStyle as sharedLabelStyle } from "@/components/ui/Input";
 
 // Ortak form alanı stili — token tek kaynaktan (`--input-bg`/`--input-border`/
 // `--line-width`). Eskiden burada 0.5px + `--border-secondary` + `--bg-tertiary`
 // vardı; koyu temada fark görünmüyordu ama AYDINLIK temada her form ekranı
 // farklı duruyordu (2026-08-24 tespiti).
 const inputStyle: React.CSSProperties = fieldStyle("md");
-const labelStyle: React.CSSProperties = {
-    fontSize: "11px", color: "var(--text-tertiary)", display: "block", marginBottom: "3px",
-};
+const labelStyle: React.CSSProperties = { ...sharedLabelStyle(), display: "block", marginBottom: "3px" };
 
 interface LineDraft {
     product_id: string;
@@ -254,9 +253,9 @@ function NewPurchaseOrderPageInner() {
 
     return (
         <div style={{ maxWidth: "900px", margin: "0 auto" }}>
-            <h1 style={{ fontSize: "20px", fontWeight: 600, color: "var(--text-primary)", margin: "0 0 20px" }}>
-                Yeni Satın Alma Siparişi
-            </h1>
+            <div style={{ marginBottom: "20px" }}>
+                <PageHeader title="Yeni Satın Alma Siparişi" />
+            </div>
 
             {loadError && (
                 <div role="alert" aria-live="polite" style={{

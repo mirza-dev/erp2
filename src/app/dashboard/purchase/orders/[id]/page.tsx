@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback, use } from "react";
+import PageHeader from "@/components/ui/PageHeader";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Check, CircleOff, Pencil, Printer, RotateCcw, Send, Truck } from "lucide-react";
@@ -281,23 +282,14 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
 
             {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>
-                <div>
-                    <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
-                        <h1 style={{ fontSize: "20px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
-                            {po.po_number}
-                        </h1>
-                        <span style={{
-                            fontSize: "11px", padding: "2px 8px", borderRadius: "5px",
-                            background: STATUS_BG[po.status].bg, color: STATUS_BG[po.status].text, fontWeight: 500,
-                        }}>{STATUS_LABEL[po.status]}</span>
-                    </div>
-                    <p style={{ fontSize: "13px", color: "var(--text-tertiary)", margin: "4px 0 0" }}>
-                        {vendor?.name ?? "—"} · Beklenen: {formatExpectedDate(po.expected_date)}
-                    </p>
-                </div>
-
-                {/* Status action buttons */}
-                <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
+                <PageHeader
+                    title={po.po_number}
+                    titleAdornment={<span style={{
+                        fontSize: "11px", padding: "2px 8px", borderRadius: "5px",
+                        background: STATUS_BG[po.status].bg, color: STATUS_BG[po.status].text, fontWeight: 500,
+                    }}>{STATUS_LABEL[po.status]}</span>}
+                    subtitle={`${vendor?.name ?? "—"} · Beklenen: ${formatExpectedDate(po.expected_date)}`}
+                    actions={<>
                     {isDraft && (
                         <Button variant="secondary" leftIcon={<Send size={14} />} onClick={() => doTransition("send", "Sipariş gönderildi olarak işaretlendi.")}
                             disabled={isDemo || actionBusy !== null}
@@ -346,7 +338,8 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                         title="Sipariş belgesini yazdır veya PDF olarak kaydet"
                         aria-label="Sipariş belgesini yazdır veya PDF olarak kaydet"
                     >Yazdır / PDF</ButtonLink>
-                </div>
+                    </>}
+                />
             </div>
 
             {/* Summary cards */}

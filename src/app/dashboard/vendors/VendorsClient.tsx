@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { fieldStyle, labelStyle as sharedLabelStyle } from "@/components/ui/Input";
 import { useListUrlState, useDebouncedSearch } from "@/hooks/useListUrlState";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
@@ -21,23 +22,9 @@ import PageHeader from "@/components/ui/PageHeader";
 
 // ── Styles ────────────────────────────────────────────────────
 
-const inputStyle: React.CSSProperties = {
-    fontSize: "13px",
-    padding: "6px 10px",
-    border: "var(--line-width) solid var(--input-border)",
-    borderRadius: "6px",
-    background: "var(--input-bg)",
-    color: "var(--text-primary)",
-    width: "100%",
-    boxSizing: "border-box",
-};
+const inputStyle: React.CSSProperties = fieldStyle("md");
 
-const labelStyle: React.CSSProperties = {
-    fontSize: "11px",
-    color: "var(--text-tertiary)",
-    display: "block",
-    marginBottom: "3px",
-};
+const labelStyle: React.CSSProperties = { ...sharedLabelStyle(), display: "block", marginBottom: "3px" };
 
 const drawerOverlayStyle: React.CSSProperties = {
     position: "fixed",
