@@ -68,3 +68,10 @@ pmt/
 /backups/
 # Şema paketi — migration'lardan türetilir (npm run schema:bundle)
 /supabase/schema-bundle/
+# Tasarım teslimat paketleri (mockup JSX/HTML/CSS/PNG) — kaynak kod DEĞİL, üretilmiş
+# teslimat; 2026-08-31'de kullanıcı kararıyla repo dışında tutuluyor. Yerelde
+# duruyorlar, silinmediler. İçeri almak isterseniz bu bloğu kaldırın.
+/design_handoff_alerts_calendar/
+/design_handoff_login_monolith/
+/design_handoff_settings_files_tab/
+/roven-dashboard 2/
