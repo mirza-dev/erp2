@@ -79,18 +79,24 @@ test("demo modda yazma işlemi (müşteri ekleme) engellenir", async ({ page }) 
     await gotoApp(page, "/dashboard/customers");
 
     const addBtn = page.getByRole("button", { name: /müşteri ekle|yeni müşteri/i });
-    if (await addBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
-        const isDisabled = await addBtn.isDisabled();
-        if (isDisabled) {
-            // Button is disabled — demo mode is blocking writes as expected
-            expect(isDisabled).toBe(true);
-        } else {
-            // Button is enabled — click and expect a toast block
-            await addBtn.click();
-            const toast = page.getByText(/demo modunda değişiklik yapılamaz/i);
-            await expect(toast).toBeVisible({ timeout: 5_000 });
-        }
-    }
+
+    // 2026-09-05 — HİDRASYON YARIŞI düzeltildi (bu test iki koşumda da düştü).
+    //
+    // `useIsDemo()` cookie'yi ilk İSTEMCİ render'ında okur; sunucuda `document`
+    // olmadığı için SSR HTML'i `isDemo=false` ile boyanır. Yani buton bir an
+    // ETKİN görünüyor, hidrasyondan sonra `disabled` oluyor. Eski kurgu
+    // görünürlüğü o pencerede ölçüp "etkin" dalına giriyor, sonra devre dışı
+    // kalmış butona tıklamayı deniyor ve Playwright eyleme geçebilirlik için
+    // 60 sn bekleyip düşüyordu.
+    //
+    // Çözüm beklemeyi KARARLI HÂLE bağlamak: Playwright bu iddiaları
+    // kendiliğinden yeniden dener. `if (görünürse)` sarmalayıcısı da kalktı —
+    // buton bulunamazsa test sessizce GEÇİYORDU, yani hiçbir şey kanıtlamıyordu.
+    await expect(addBtn).toBeVisible({ timeout: 10_000 });
+    await expect(addBtn).toBeDisabled({ timeout: 15_000 });
+    await expect(addBtn).toHaveAttribute("title", /demo/i);
+    // Sunucu tarafı yasak ayrıca vitest'te: `demo-mode-middleware.test.ts`
+    // (POST/PATCH/DELETE → 403). Buradaki iddia UI guard'ının kendisi.
 });
 
 test("demo modda buton title attribute 'Demo modunda...' içerir", async ({ page }) => {
@@ -100,13 +106,14 @@ test("demo modda buton title attribute 'Demo modunda...' içerir", async ({ page
     });
     await gotoApp(page, "/dashboard/products");
 
-    // "+ Yeni Ürün" butonu disabled veya title içeriyor
+    // "Yeni Ürün" butonu demo modda devre dışı ve sebebini `title`da söylüyor.
+    // Aynı hidrasyon yarışı (yukarıdaki teste bak): attribute'lar SSR anında
+    // henüz yazılmamış oluyordu, `expect(...).toBeTruthy()` false görüyordu.
+    // Anlık okuma yerine Playwright'ın yeniden deneyen iddiaları kullanılıyor.
     const newProductBtn = page.getByRole("button", { name: /yeni ürün/i });
-    if (await newProductBtn.isVisible()) {
-        const title    = await newProductBtn.getAttribute("title") ?? "";
-        const disabled = await newProductBtn.getAttribute("disabled");
-        expect(title.toLowerCase().includes("demo") || disabled !== null).toBeTruthy();
-    }
+    await expect(newProductBtn).toBeVisible({ timeout: 10_000 });
+    await expect(newProductBtn).toBeDisabled({ timeout: 15_000 });
+    await expect(newProductBtn).toHaveAttribute("title", /demo/i);
 });
 
 test("çıkış yap → /login sayfasına yönlendirir", async ({ page }) => {

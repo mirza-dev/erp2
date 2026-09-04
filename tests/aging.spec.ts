@@ -56,10 +56,25 @@ test("arama input'u çalışıyor", async ({ page }) => {
     await expect(page.locator("main")).toBeVisible();
 });
 
-test("kategori filtre butonları görünür", async ({ page }) => {
-    await expect(page.getByRole("button", { name: /tümü/i }).first()).toBeVisible({ timeout: 8_000 });
-    await expect(page.getByRole("button", { name: /aktif/i })).toBeVisible({ timeout: 5_000 });
-    await expect(page.getByRole("button", { name: /ölü/i })).toBeVisible({ timeout: 5_000 });
+/**
+ * 2026-09-05: `role` BUTTON → TAB.
+ *
+ * Eskime filtresi 2026-09-04'te `FilterChips`e taşındı ve o bileşen bir
+ * `tablist` üretiyor — yani bu çiplerin rolü artık `tab`. Test `button`
+ * arıyordu ve iki denemede de düştü; vitest bunu göremezdi (kaynak-kilidi
+ * testleri işaretlemenin ANLAMINI değil metnini görür), E2E suite'i de
+ * dönüşümden beri hiç koşmamıştı.
+ *
+ * İddia GEVŞETİLMEDİ, taşındı: üç kategori çipi hâlâ görünür olmalı.
+ * Erişilebilir ad artık sayacı da içeriyor ("Tümü (42)") — regex zaten kısmi
+ * eşleşiyor.
+ */
+test("kategori filtre çipleri görünür", async ({ page }) => {
+    await expect(page.getByRole("tab", { name: /tümü/i }).first()).toBeVisible({ timeout: 8_000 });
+    await expect(page.getByRole("tab", { name: /aktif/i })).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByRole("tab", { name: /ölü/i })).toBeVisible({ timeout: 5_000 });
+    // Bileşen sözleşmesi: çipler bir tablist içinde yaşar.
+    await expect(page.getByRole("tablist", { name: /eskime/i })).toBeVisible();
 });
 
 test("'← Ürünler' linki çalışıyor", async ({ page }) => {

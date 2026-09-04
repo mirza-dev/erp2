@@ -14,17 +14,18 @@ import { Page, expect } from "@playwright/test";
  * Yerine iki deterministik koşul: DOM hazır + `main` görünür. Veriye bağlı
  * iddialar zaten kendi `timeout`'larıyla yeniden deniyor.
  *
- * DİKKAT — hidrasyon: bu bekleme kabuğun BOYANDIĞINI kanıtlar, React'in
- * hidrasyonu bittiğini DEĞİL. Sayfa açılır açılmaz kontrollü bir input'a
- * `fill` yapan testler yarışa girebilir: hidrasyondan önce yazılan değer
- * React'in `value` prop'u tarafından geri alınır ve etkileşim sessizce
- * kaybolur. Böyle bir adımı `expect(async () => { …fill…; …iddia… }).toPass()`
- * içine al (örnek: `production.spec` tarih seçimi). Eski `networkidle`
- * beklemesi bunu tesadüfen örtüyordu.
+ * HİDRASYON (2026-09-05): artık BEKLENİYOR — bkz. `waitForHydration`.
+ * Eskiden bu bekleme yalnız kabuğun BOYANDIĞINI kanıtlıyordu; React'in
+ * olay dinleyicilerini bağlamış olmasını değil. Ölçüldü: `domcontentloaded`
+ * anında `main` üzerinde HİÇ `__react*` anahtarı yok, ~2 sn sonra var.
+ * O pencerede yapılan her etkileşim SESSİZCE kayboluyordu — dosya seçimi
+ * native `change` olayını atıyor ama React'in `onChange`i henüz bağlı
+ * olmadığı için sihirbaz idle'da kalıyordu.
  */
 export async function gotoApp(page: Page, path: string, timeout = 45_000): Promise<void> {
     await page.goto(path, { waitUntil: "domcontentloaded", timeout });
     await expect(page.locator("main")).toBeVisible({ timeout });
+    await waitForHydration(page, timeout);
 
     // Oturum düştüyse ERKEN ve AÇIK patla. Giriş sayfasının da `main`'i var;
     // bu kontrol olmadan test, gerçek iddiasında "element bulunamadı" diye
@@ -39,7 +40,36 @@ export async function gotoApp(page: Page, path: string, timeout = 45_000): Promi
     }
 }
 
-/** Zaten açık bir sayfada kabuğun boyanmasını bekler (goto'suz). */
+/** Zaten açık bir sayfada kabuğun boyanmasını + hidrasyonu bekler (goto'suz). */
 export async function waitForApp(page: Page, timeout = 30_000): Promise<void> {
     await expect(page.locator("main")).toBeVisible({ timeout });
+    await waitForHydration(page, timeout);
+}
+
+/**
+ * React'in hidrasyonunu DOĞRUDAN ölçer.
+ *
+ * React, sahiplendiği DOM düğümlerine `__reactFiber$…` / `__reactProps$…`
+ * anahtarlarını hidrasyon sırasında yazar. Ölçüm (2026-09-05, bu depo):
+ * `domcontentloaded` anında `main` üzerinde `[]`, ~2 sn sonra iki anahtar;
+ * dosya input'unda ayrıca `__reactEvents$…`. Yani bu, "kabuk boyandı" ile
+ * "olay dinleyicileri bağlandı" arasındaki farkın gözlenebilir hâli.
+ *
+ * Neden bu sinyal: 2026-09-05 baseline koşumunda 8 test "flaky" çıktı ve
+ * dördü tek bir kalıptı — `setInputFiles` hidrasyondan ÖNCE çalışınca native
+ * `change` olayı boşa gidiyor, sihirbaz idle'da kalıyor, test 30 sn bekleyip
+ * düşüyor, retry'da (sayfa artık hızlı) geçiyordu. Timeout büyütmek çözmez:
+ * 2026-08-30'da 15→30 sn denendi, yarış sürdü. Doğru düzeltme beklemeyi
+ * SÜREYE değil OLAYA bağlamak.
+ *
+ * İfade STRING olarak veriliyor: fonksiyon olarak geçilirse derleyicinin
+ * `keepNames` sarmalayıcısı tarayıcıda tanımsız `__name`e dönüşebiliyor.
+ */
+export async function waitForHydration(page: Page, timeout = 20_000): Promise<void> {
+    await page.waitForFunction(
+        "(() => { const el = document.querySelector('main');" +
+        " return !!el && Object.keys(el).some(k => k.startsWith('__react')); })()",
+        undefined,
+        { timeout, polling: 50 },
+    );
 }

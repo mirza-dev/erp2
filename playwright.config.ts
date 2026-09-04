@@ -19,7 +19,14 @@ export default defineConfig({
     // navigasyon tek başına 30 sn'yi aşabiliyor — aynı test yeniden denemede
     // 5 sn'de geçiyor. Kısa timeout gerçek kusuru değil, soğuk derlemeyi ölçer.
     timeout: 60_000,
-    retries: process.env.CI ? 2 : 1,
+    // 2026-09-05: yerelde 1 → 0. Retry, kusuru DÜZELTMEZ; GİZLER. Bu suite
+    // aylarca "yeşil" görünüyordu çünkü 8 test ilk denemede düşüp retry'da
+    // geçiyordu ve rapor onları yalnız "flaky" diye işaretliyordu. Kök sebepler
+    // bulunup kapatıldıktan sonra (hidrasyon yarışı + soğuk derleme) iki ardışık
+    // koşumda 94/94 retry'sız geçti — yani retry'a artık gerek yok ve varlığı
+    // bir sonraki yarışı yine gizlerdi. CI'da 2 kalıyor: orada amaç kusuru
+    // görmek değil, altyapı hıçkırığında boşuna kırmızı yakmamak.
+    retries: process.env.CI ? 2 : 0,
     fullyParallel: false,   // share a single dev server; parallelism risks data races
     workers: 1,
     reporter: process.env.CI ? "github" : [["list"], ["html", { open: "never" }]],
