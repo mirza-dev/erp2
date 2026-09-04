@@ -29,9 +29,16 @@ vi.mock("@/components/ui/Toast", () => ({
     useToast: () => ({ toast: vi.fn() }),
 }));
 
+// 2026-09-04: `ButtonLink` de mock'lanmak ZORUNDA. "İncele →" düz `<Link>`
+// iken buton diline (`ButtonLink`) taşındı; mock yalnız `default` taşıdığı için
+// `ButtonLink` undefined kalıyor ve React render'da patlıyordu — testler
+// "elementi bulamadım" diye DOLAYLI hata veriyordu (gövde tamamen boştu).
 vi.mock("@/components/ui/Button", () => ({
     default: ({ children, onClick, disabled, ...rest }: { children: React.ReactNode; onClick?: () => void; disabled?: boolean } & Record<string, unknown>) => (
         <button onClick={onClick} disabled={disabled} {...rest}>{children}</button>
+    ),
+    ButtonLink: ({ children, href, ...rest }: { children: React.ReactNode; href: string } & Record<string, unknown>) => (
+        <a href={href} {...rest}>{children}</a>
     ),
 }));
 

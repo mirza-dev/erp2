@@ -31,9 +31,13 @@ describe("interactive muted text readability", () => {
         }
     });
 
+    // 2026-09-04: Excel sihirbazının `tabBtnStyle`'ı da `FilterChips`e geçti —
+    // teklif/sipariş ile aynı gerekçe. Eskiden burada iki dize aranıyordu
+    // (`--text-interactive-muted` pasif metin + `--font-ui-weight`); ikisi de
+    // yalnız `tabBtnStyle` içinde yaşıyordu, helper ölünce dizeler de gitti.
+    // Okunurluk zayıflamadı: pasif çipin metni artık `--text-primary`.
     it("product and import filter controls inherit the readable muted pattern", () => {
-        expect(IMPORT_PAGE).toContain('color: active ? "var(--accent-text)" : "var(--text-interactive-muted)"');
-        expect(IMPORT_PAGE).toContain('fontWeight: active ? 600 : "var(--font-ui-weight)"');
+        expect(IMPORT_PAGE).toContain("FilterChips");
 
         expect(PRODUCTS_PAGE).toContain('ariaLabel="Ürün sinyal filtresi"');
         expect(PRODUCTS_PAGE).toContain("FilterChips");

@@ -112,3 +112,61 @@ tamamı AI'lı yolu bekliyor.
 `import.spec.ts`'teki diğer testlerin kararsızlığının da muhtemel sebebi bu.
 
 **Yapılacak:** Anthropic anahtarını yenile → bu test ve küme düzelmeli.
+
+---
+
+## Telefona PWA kurmak (geçici test tüneli)
+
+Uygulamayı telefona kurmak için **HTTPS bir adres** gerekiyor. Üç kısıt bunu
+birlikte dayatıyor; üçü de kod kusuru değil, bilinçli tasarım:
+
+1. **`npm run dev` service worker kaydetmez** — `ServiceWorkerRegister.tsx`
+   production dışında SW'yi kaydetmek yerine aktif olarak **söker** (dev'de
+   bayat chunk servis etmesin diye). Gerçek kurulum `npm run build && npm start`
+   ister.
+2. **Kurulum güvenli bağlam ister.** `http://192.168.x.x:3000` güvenli bağlam
+   değildir → SW kaydolmaz → Android'de "Uygula" çıkmaz, iOS'ta ikon çıkar ama
+   içi çevrimdışı yeteneği olmayan bir kabuktur.
+3. **Üretim derlemesinde CSP `connect-src` yalnız `*.supabase.co`'ya izin
+   verir** (`next.config.ts`). Yani `http://127.0.0.1:54321` hem CSP'de
+   bloklanır hem de telefonun KENDİ localhost'unu gösterir. Sonuç:
+   **telefondan çalışan bir kurulum zorunlu olarak canlı Supabase kullanır.**
+
+### Adımlar
+
+```bash
+cp .env.local .env.yerel.local     # yerel yapılandırmayı sakla
+cp .env.canli.local .env.local     # canlı Supabase'e çevir
+npm run build && npm start         # SW yalnız burada kaydolur
+cloudflared tunnel --url http://localhost:3000
+```
+
+`cloudflared` yoksa: `brew install cloudflared`. Hesap gerekmez.
+
+Bittiğinde **geri al** — yoksa `npm run dev` prod hedefi gördüğü için
+`predev` kapısında haklı olarak reddeder:
+
+```bash
+cp .env.yerel.local .env.local
+```
+
+### Telefonda
+
+- **iPhone (Safari):** URL'yi aç → Paylaş → **Ana Ekrana Ekle**. Girişi
+  kurduktan SONRA, ana ekrandaki ikondan yap: iOS'ta ana ekran uygulamasının
+  çerez kabı Safari'den AYRIDIR, tarayıcıda açılan oturum taşınmaz.
+- **Android (Chrome):** URL'yi aç → ⋮ → **Uygulamayı yükle**.
+
+### Bilinmesi gerekenler
+
+- **PWA origin'e bağlıdır.** `trycloudflare.com` adresi tünel kapanınca ölür ve
+  ana ekrandaki ikon çalışmaz hale gelir. Kalıcı kurulum ancak gerçek alan adı
+  yayına girince yapılmalı; bu yol yalnız **test** içindir.
+- **Tünel giriş sayfasını internete açar.** Rastgele alt alan adı + auth kapısı
+  + rate limit var, ama işin bitince tüneli kapat.
+- **Canlı veritabanı.** Telefondan yapılan her yazma gerçektir.
+- **`next start` + `output: standalone` uyarısı** beklenen; `public/` ve tüm
+  rotalar yine de doğru servis ediliyor (manifest/sw/ikon 200 ile doğrulandı).
+- macOS'un sistem çözümleyicisi yeni `*.trycloudflare.com` adını bazen
+  `ENOTFOUND` döndürür (`dns.resolve4` bulur, `getaddrinfo` bulamaz). Mac'e
+  özgüdür; telefon etkilenmez.

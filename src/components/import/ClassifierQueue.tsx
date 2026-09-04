@@ -10,10 +10,9 @@
  * Pure helpers live in @/lib/classifier-helpers and @/lib/import-file-helpers.
  */
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import type { ImportDocumentRow, DocumentClassification } from "@/lib/database.types";
 import { useIsDemo, DEMO_BLOCK_TOAST, DEMO_DISABLED_TOOLTIP } from "@/lib/demo-utils";
-import Button from "@/components/ui/Button";
+import Button, { ButtonLink } from "@/components/ui/Button";
 import { formatBytes, validateClassifyUpload } from "@/lib/import-file-helpers";
 import {
     isExtractionSupportedType,
@@ -266,17 +265,9 @@ export default function ClassifierQueue({
                     Sınıflandırma kuyruğu ({queue.length})
                 </div>
                 {onClear && (
-                    <button
-                        type="button"
-                        onClick={clearAll}
-                        style={{
-                            fontSize: "11px", padding: "3px 8px",
-                            background: "transparent", border: "0.5px solid var(--border-secondary)",
-                            borderRadius: "4px", color: "var(--text-secondary)", cursor: "pointer",
-                        }}
-                    >
+                    <Button type="button" variant="secondary" size="xs" onClick={clearAll}>
                         Listeyi Temizle
-                    </button>
+                    </Button>
                 )}
             </div>
             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
@@ -355,17 +346,13 @@ export default function ClassifierQueue({
                                     </Button>
                                 )}
                                 {q.status === "classified" && c && q.documentId && isExtractionSupportedType(c.document_type) && (
-                                    <Link
+                                    <ButtonLink
                                         href={`/dashboard/import/extract/${q.documentId}`}
-                                        style={{
-                                            fontSize: "12px", padding: "6px 12px",
-                                            background: "var(--accent-bg)", color: "var(--accent-text)",
-                                            border: "0.5px solid var(--accent-border)", borderRadius: "5px",
-                                            fontWeight: 600, textDecoration: "none", cursor: "pointer",
-                                        }}
+                                        variant="primary"
+                                        size="sm"
                                     >
                                         İncele →
-                                    </Link>
+                                    </ButtonLink>
                                 )}
                                 {q.status === "classified" && c && isMigrationExcelType(c.document_type) && (
                                     onOpenExcelWizard ? (

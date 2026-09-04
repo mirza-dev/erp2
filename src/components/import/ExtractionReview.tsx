@@ -873,24 +873,26 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                                                 </td>
                                                 <td style={td}>
                                                     <div style={{ display: "flex", gap: "6px", flexWrap: "nowrap", justifyContent: "flex-start" }}>
-                                                        <button
+                                                        <Button
                                                             type="button"
+                                                            variant="secondary"
+                                                            size="xs"
                                                             onClick={() => handleMarkNew(line)}
                                                             disabled={isDemo || isDocApplied || isDocApplying}
                                                             aria-label={`Satır ${line.line_number} yeni ürün`}
-                                                            style={btnSecondary}
                                                         >
                                                             Yeni
-                                                        </button>
-                                                        <button
+                                                        </Button>
+                                                        <Button
                                                             type="button"
+                                                            variant="secondary"
+                                                            size="xs"
                                                             onClick={() => handleSkip(line)}
                                                             disabled={isDemo || isDocApplied || isDocApplying}
                                                             aria-label={`Satır ${line.line_number} atla`}
-                                                            style={btnSecondary}
                                                         >
                                                             Atla
-                                                        </button>
+                                                        </Button>
                                                     </div>
                                                 </td>
                                             </tr>
@@ -1149,12 +1151,10 @@ const td: React.CSSProperties = {
     overflowWrap: "anywhere",
 };
 
-const btnSecondary: React.CSSProperties = {
-    padding: "4px 10px", fontSize: "11px",
-    background: "transparent", color: "var(--text-secondary)",
-    border: "0.5px solid var(--border-secondary)", borderRadius: "4px",
-    cursor: "pointer", minWidth: "56px", whiteSpace: "nowrap",
-};
+// 2026-09-04: `btnSecondary` SİLİNDİ — "Yeni"/"Atla" satır aksiyonları
+// `Button variant="secondary" size="xs"`e geçti, çağıran kalmadı. Aynı adlı
+// helper'lar teklif/sipariş tarafında da temizlenmişti; `button-source-
+// regression.test.ts` orada `btnPrimary|btnSecondary` yokluğunu zaten kilitler.
 
 const productFieldCheckStyle = (muted: boolean): React.CSSProperties => ({
     display: "inline-flex",

@@ -19,6 +19,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, ChevronDown, ChevronRight, Circle, Download, Upload } from "lucide-react";
+import Button from "@/components/ui/Button";
 import type { ImportSetupStatus } from "@/lib/supabase/import-setup-status";
 import type { ExcelImportTemplateKind } from "@/lib/import-center";
 
@@ -238,23 +239,17 @@ export default function SetupStatusPanel({ onOpenStep, disabled, disabledTooltip
                                         <Download size={12} aria-hidden /> Şablon
                                     </a>
                                     {step.wizardKind && onOpenStep && (
-                                        <button
+                                        <Button
                                             type="button"
+                                            variant="primary"
+                                            size="xs"
                                             onClick={() => onOpenStep(step.wizardKind!)}
                                             disabled={disabled}
                                             title={disabled ? disabledTooltip : `${step.title} için sihirbazı aç`}
-                                            style={{
-                                                display: "inline-flex", alignItems: "center", gap: "4px",
-                                                fontSize: "11px", fontWeight: 600, padding: "4px 9px", borderRadius: "5px",
-                                                border: "var(--line-width) solid var(--accent-border)",
-                                                background: disabled ? "var(--bg-tertiary)" : "var(--accent-bg)",
-                                                color: disabled ? "var(--text-tertiary)" : "var(--accent-text)",
-                                                cursor: disabled ? "not-allowed" : "pointer",
-                                                whiteSpace: "nowrap",
-                                            }}
+                                            leftIcon={<Upload size={13} aria-hidden />}
                                         >
-                                            <Upload size={12} aria-hidden /> Yükle
-                                        </button>
+                                            Yükle
+                                        </Button>
                                     )}
                                 </div>
                             )}

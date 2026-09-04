@@ -19,6 +19,8 @@ import { invalidateAllData } from "@/lib/data-context";
 import * as XLSX from "xlsx";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { useToast } from "@/components/ui/Toast";
+import Button, { ButtonLink } from "@/components/ui/Button";
+import FilterChips from "@/components/ui/FilterChips";
 import { IMPORT_FIELDS, REQUIRED_FIELDS } from "@/lib/import-fields";
 import { stashImportFile, takeImportFile } from "@/lib/import-file-transfer";
 import {
@@ -135,16 +137,13 @@ const STOCK_OP_META: Record<StockOperationType, { label: string; hint: string }>
     stock_movement: { label: "Hareket", hint: "Dosyadaki miktarı mevcut stoğa EKLER/ÇIKARIR" },
 };
 
-// ─── Styles ────────────────────────────────────────────────────────────────
-const tabBtnStyle = (active: boolean): React.CSSProperties => ({
-    fontSize: "12px", padding: "5px 12px",
-    border: "var(--line-width) solid " + (active ? "var(--accent-border)" : "var(--border-secondary)"),
-    borderRadius: "5px",
-    background: active ? "var(--accent-bg)" : "transparent",
-    color: active ? "var(--accent-text)" : "var(--text-interactive-muted)",
-    cursor: "pointer", whiteSpace: "nowrap",
-    fontWeight: active ? 600 : "var(--font-ui-weight)",
-});
+// 2026-09-04: `tabBtnStyle` SİLİNDİ — sheet ve kayıt-türü sekmeleri ortak
+// `FilterChips`e geçti, çağıran kalmadı. Sildiğim şey depodaki DÖRDÜNCÜ hap
+// çipi lehçesiydi: aktif `--accent-bg` (%10 tint, "mavi" değil), pasif
+// `transparent` (beyaz değil) — kullanıcının açıkça reddettiği ikilinin ta
+// kendisi. Pasif metin `--text-interactive-muted` idi; `secondary` butonun
+// metni `--text-primary`, yani DAHA koyu — okunurluk zayıflamadı (aynı gerekçe
+// `interactive-muted-text.test.ts`'te teklif/sipariş için de yazılı).
 
 export function validateFileSize(size: number): { ok: boolean; sizeMb?: string } {
     const MAX = 25 * 1024 * 1024;
@@ -639,11 +638,9 @@ export default function ImportExcelWizardPage() {
                     </div>
                 </div>
                 {state !== "idle" && state !== "analyzing" && (
-                    <button type="button" onClick={reset} style={{
-                        fontSize: "12px", padding: "5px 12px",
-                        border: "var(--line-width) solid var(--border-secondary)", borderRadius: "6px",
-                        background: "transparent", color: "var(--text-secondary)", cursor: "pointer",
-                    }}>Yeni Dosya</button>
+                    <Button type="button" variant="secondary" size="sm" onClick={reset}>
+                        Yeni Dosya
+                    </Button>
                 )}
             </div>
 
@@ -774,11 +771,15 @@ export default function ImportExcelWizardPage() {
                                     Veriler önizleme ve onaydan önce kaydedilmez.
                                 </div>
                                 <div style={{ display: "flex", gap: "8px", marginTop: "12px", flexWrap: "wrap", alignItems: "center" }}>
-                                    <button type="button" onClick={() => fileInputRef.current?.click()} style={{
-                                        padding: "8px 14px", background: "var(--accent)", color: "#fff",
-                                        border: "none", borderRadius: "6px", fontSize: "12px", fontWeight: 700, cursor: "pointer",
-                                        display: "inline-flex", alignItems: "center", gap: "7px",
-                                    }}><Upload size={15} aria-hidden />Dosya Seç</button>
+                                    <Button
+                                        type="button"
+                                        variant="primary"
+                                        size="sm"
+                                        onClick={() => fileInputRef.current?.click()}
+                                        leftIcon={<Upload size={14} aria-hidden />}
+                                    >
+                                        Dosya Seç
+                                    </Button>
                                     <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>veya dosyayı buraya sürükle</span>
                                 </div>
                             </div>
@@ -987,12 +988,19 @@ export default function ImportExcelWizardPage() {
                             Bu dosya serbest katalog/belge mi? AI ile analiz et →
                         </button>
                         <div style={{ marginLeft: "auto", display: "flex", gap: "8px" }}>
-                            <button type="button" onClick={reset} style={{ fontSize: "12px", padding: "7px 14px", border: "var(--line-width) solid var(--border-secondary)", borderRadius: "6px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>← Geri</button>
-                            <button type="button" onClick={handleDetectColumns} disabled={isDemo || importableSelected.length === 0}
+                            <Button type="button" variant="secondary" size="sm" onClick={reset}>
+                                ← Geri
+                            </Button>
+                            <Button
+                                type="button"
+                                variant="primary"
+                                size="sm"
+                                onClick={handleDetectColumns}
+                                disabled={isDemo || importableSelected.length === 0}
                                 title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                                style={{ fontSize: "12px", padding: "7px 18px", border: "var(--line-width) solid var(--accent-border)", borderRadius: "6px", background: (!isDemo && importableSelected.length > 0) ? "var(--accent-bg)" : "var(--bg-tertiary)", color: (!isDemo && importableSelected.length > 0) ? "var(--accent-text)" : "var(--text-tertiary)", cursor: (!isDemo && importableSelected.length > 0) ? "pointer" : "not-allowed", fontWeight: 600 }}>
+                            >
                                 Kolon Eşleştirmeye Geç →
-                            </button>
+                            </Button>
                         </div>
                     </div>
                 </>
@@ -1015,13 +1023,12 @@ export default function ImportExcelWizardPage() {
                         <>
                             {/* Sheet tabs */}
                             {importableSelected.length > 1 && (
-                                <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                                    {importableSelected.map(s => (
-                                        <button type="button" key={s.name} onClick={() => setActiveTab(s.name)} style={tabBtnStyle(activeTab === s.name)}>
-                                            {s.displayName}
-                                        </button>
-                                    ))}
-                                </div>
+                                <FilterChips
+                                    ariaLabel="Sayfa (sheet) seçimi"
+                                    activeKey={activeTab}
+                                    onChange={setActiveTab}
+                                    items={importableSelected.map(s => ({ key: s.name, label: s.displayName }))}
+                                />
                             )}
 
                             {importableSelected.reduce<SheetInfo[]>((acc, sheet) => {
@@ -1095,13 +1102,20 @@ export default function ImportExcelWizardPage() {
                             </div>
 
                             <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                                <button type="button" onClick={() => {
-                                    if (batchId) { fetch(`/api/import/${batchId}`, { method: "DELETE" }).catch(() => {}); }
-                                    setState("sheet_select"); setColumnMappings({}); setBatchId(null);
-                                }} style={{ fontSize: "12px", padding: "7px 14px", border: "var(--line-width) solid var(--border-secondary)", borderRadius: "6px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>← Geri</button>
-                                <button type="button" onClick={handleApplyMappings} style={{ fontSize: "12px", padding: "7px 18px", border: "var(--line-width) solid var(--accent-border)", borderRadius: "6px", background: "var(--accent-bg)", color: "var(--accent-text)", cursor: "pointer", fontWeight: 600 }}>
+                                <Button
+                                    type="button"
+                                    variant="secondary"
+                                    size="sm"
+                                    onClick={() => {
+                                        if (batchId) { fetch(`/api/import/${batchId}`, { method: "DELETE" }).catch(() => {}); }
+                                        setState("sheet_select"); setColumnMappings({}); setBatchId(null);
+                                    }}
+                                >
+                                    ← Geri
+                                </Button>
+                                <Button type="button" variant="primary" size="sm" onClick={handleApplyMappings}>
                                     Eşleştirmeyi Uygula →
-                                </button>
+                                </Button>
                             </div>
                         </>
                     )}
@@ -1112,17 +1126,16 @@ export default function ImportExcelWizardPage() {
             {state === "preview" && (
                 <>
                     {/* Tab bar */}
-                    <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                        {draftEntityTypes.map(type => {
-                            const count = drafts.filter(d => d.entity_type === type).length;
-                            return (
-                                <button type="button" key={type} onClick={() => { setActiveTab(type); setBulkField(""); setBulkValue(""); setPreviewPage(0); }} style={tabBtnStyle(activeTab === type)}>
-                                    {entityTypeLabels[type] ?? type}
-                                    <span style={{ marginLeft: "5px", fontSize: "10px", opacity: 0.7 }}>{count}</span>
-                                </button>
-                            );
-                        })}
-                    </div>
+                    <FilterChips
+                        ariaLabel="İçe aktarılacak kayıt türü filtresi"
+                        activeKey={activeTab}
+                        onChange={type => { setActiveTab(type); setBulkField(""); setBulkValue(""); setPreviewPage(0); }}
+                        items={draftEntityTypes.map(type => ({
+                            key: type,
+                            label: entityTypeLabels[type] ?? type,
+                            count: drafts.filter(d => d.entity_type === type).length,
+                        }))}
+                    />
 
                     {/* Summary + bulk fill */}
                     {(() => {
@@ -1181,9 +1194,9 @@ export default function ImportExcelWizardPage() {
                                 </select>
                                 <input aria-label="Toplu doldurma değeri" value={bulkValue} onChange={e => setBulkValue(e.target.value)} placeholder="Değer…" onKeyDown={e => { if (e.key === "Enter") applyBulkFill(); }}
                                     style={{ fontSize: "11px", padding: "3px 8px", background: "var(--bg-primary)", color: "var(--text-primary)", border: "var(--line-width) solid var(--border-secondary)", borderRadius: "4px", width: "120px" }} />
-                                <button type="button" onClick={applyBulkFill} disabled={!bulkField || bulkValue === ""} style={{ fontSize: "11px", padding: "3px 10px", background: bulkField && bulkValue ? "var(--accent-bg)" : "var(--bg-tertiary)", color: bulkField && bulkValue ? "var(--accent-text)" : "var(--text-tertiary)", border: "var(--line-width) solid var(--border-secondary)", borderRadius: "4px", cursor: bulkField && bulkValue ? "pointer" : "not-allowed" }}>
+                                <Button type="button" variant="primary" size="xs" onClick={applyBulkFill} disabled={!bulkField || bulkValue === ""}>
                                     Boşlara Uygula
-                                </button>
+                                </Button>
                             </div>
                         );
                     })()}
@@ -1303,15 +1316,13 @@ export default function ImportExcelWizardPage() {
                                     const totalPages = Math.ceil(filteredDrafts.length / PAGE_SIZE);
                                     return (
                                         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: "12px", padding: "10px 12px", background: "var(--bg-secondary)", borderTop: "var(--line-width) solid var(--border-tertiary)", fontSize: "12px", color: "var(--text-secondary)" }}>
-                                            <button type="button" onClick={() => setPreviewPage(p => Math.max(0, p - 1))} disabled={previewPage === 0}
-                                                style={{ fontSize: "12px", padding: "4px 12px", background: previewPage === 0 ? "var(--bg-tertiary)" : "var(--bg-primary)", color: previewPage === 0 ? "var(--text-tertiary)" : "var(--text-primary)", border: "var(--line-width) solid var(--border-secondary)", borderRadius: "4px", cursor: previewPage === 0 ? "not-allowed" : "pointer" }}>
+                                            <Button type="button" variant="secondary" size="sm" onClick={() => setPreviewPage(p => Math.max(0, p - 1))} disabled={previewPage === 0}>
                                                 ← Önceki
-                                            </button>
+                                            </Button>
                                             <span>Sayfa {previewPage + 1} / {totalPages} (toplam {filteredDrafts.length} satır)</span>
-                                            <button type="button" onClick={() => setPreviewPage(p => Math.min(totalPages - 1, p + 1))} disabled={previewPage >= totalPages - 1}
-                                                style={{ fontSize: "12px", padding: "4px 12px", background: previewPage >= totalPages - 1 ? "var(--bg-tertiary)" : "var(--bg-primary)", color: previewPage >= totalPages - 1 ? "var(--text-tertiary)" : "var(--text-primary)", border: "var(--line-width) solid var(--border-secondary)", borderRadius: "4px", cursor: previewPage >= totalPages - 1 ? "not-allowed" : "pointer" }}>
+                                            <Button type="button" variant="secondary" size="sm" onClick={() => setPreviewPage(p => Math.min(totalPages - 1, p + 1))} disabled={previewPage >= totalPages - 1}>
                                                 Sonraki →
-                                            </button>
+                                            </Button>
                                         </div>
                                     );
                                 })()}
@@ -1348,11 +1359,19 @@ export default function ImportExcelWizardPage() {
                     </label>
 
                     <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px" }}>
-                        <button type="button" onClick={() => { setState("column_mapping"); setDrafts([]); }} style={{ fontSize: "12px", padding: "7px 14px", border: "var(--line-width) solid var(--border-secondary)", borderRadius: "6px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>← Geri</button>
-                        <button type="button" onClick={handleImport} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                            style={{ fontSize: "12px", padding: "7px 18px", border: "var(--line-width) solid var(--accent-border)", borderRadius: "6px", background: isDemo ? "var(--bg-tertiary)" : "var(--accent-bg)", color: isDemo ? "var(--text-tertiary)" : "var(--accent-text)", cursor: isDemo ? "not-allowed" : "pointer", fontWeight: 600, opacity: isDemo ? 0.5 : 1 }}>
+                        <Button type="button" variant="secondary" size="sm" onClick={() => { setState("column_mapping"); setDrafts([]); }}>
+                            ← Geri
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="primary"
+                            size="sm"
+                            onClick={handleImport}
+                            disabled={isDemo}
+                            title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                        >
                             Onayla ve İçe Aktar →
-                        </button>
+                        </Button>
                     </div>
                 </>
             )}
@@ -1502,18 +1521,28 @@ export default function ImportExcelWizardPage() {
                     <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                         {batchId && (
                             <>
-                                <Link href={`/api/import/${batchId}/report?format=xlsx`} style={{ display: "inline-flex", alignItems: "center", gap: "6px", fontSize: "12px", padding: "6px 14px", border: "var(--line-width) solid var(--border-secondary)", borderRadius: "6px", background: "var(--bg-secondary)", color: "var(--text-primary)", textDecoration: "none", fontWeight: 500 }}>
-                                    <Download size={14} /> Rapor XLSX
-                                </Link>
-                                <Link href={`/api/import/${batchId}/report?format=csv`} style={{ fontSize: "12px", padding: "6px 14px", border: "var(--line-width) solid var(--border-secondary)", borderRadius: "6px", background: "var(--bg-secondary)", color: "var(--text-primary)", textDecoration: "none", fontWeight: 500 }}>
+                                <ButtonLink
+                                    href={`/api/import/${batchId}/report?format=xlsx`}
+                                    variant="secondary"
+                                    size="sm"
+                                    leftIcon={<Download size={14} aria-hidden />}
+                                >
+                                    Rapor XLSX
+                                </ButtonLink>
+                                <ButtonLink href={`/api/import/${batchId}/report?format=csv`} variant="secondary" size="sm">
                                     Rapor CSV
-                                </Link>
+                                </ButtonLink>
                             </>
                         )}
-                        <Link href="/dashboard/customers" style={{ fontSize: "12px", padding: "6px 14px", border: "var(--line-width) solid var(--accent-border)", borderRadius: "6px", background: "var(--accent-bg)", color: "var(--accent-text)", textDecoration: "none", fontWeight: 500 }}>Cariler sayfasına git →</Link>
-                        <Link href="/dashboard/orders" style={{ fontSize: "12px", padding: "6px 14px", border: "var(--line-width) solid var(--accent-border)", borderRadius: "6px", background: "var(--accent-bg)", color: "var(--accent-text)", textDecoration: "none", fontWeight: 500 }}>Siparişler sayfasına git →</Link>
-                        <Link href="/dashboard/products" style={{ fontSize: "12px", padding: "6px 14px", border: "var(--line-width) solid var(--accent-border)", borderRadius: "6px", background: "var(--accent-bg)", color: "var(--accent-text)", textDecoration: "none", fontWeight: 500 }}>Stok & Ürünler →</Link>
-                        <button type="button" onClick={reset} style={{ fontSize: "12px", padding: "6px 16px", border: "var(--line-width) solid var(--border-secondary)", borderRadius: "6px", background: "transparent", color: "var(--text-secondary)", cursor: "pointer" }}>Yeni Dosya Yükle</button>
+                        {/* Üçü de EŞİT hedef — biri "asıl aksiyon" değil, bu yüzden
+                            hiçbiri `primary` yapılmadı. Eskiden üçü de `--accent-bg`
+                            (%10 tint) ile çiziliyordu: ne mavi ne beyaz. */}
+                        <ButtonLink href="/dashboard/customers" variant="secondary" size="sm">Cariler sayfasına git →</ButtonLink>
+                        <ButtonLink href="/dashboard/orders" variant="secondary" size="sm">Siparişler sayfasına git →</ButtonLink>
+                        <ButtonLink href="/dashboard/products" variant="secondary" size="sm">Stok &amp; Ürünler →</ButtonLink>
+                        <Button type="button" variant="secondary" size="sm" onClick={reset}>
+                            Yeni Dosya Yükle
+                        </Button>
                     </div>
                 </div>
             )}

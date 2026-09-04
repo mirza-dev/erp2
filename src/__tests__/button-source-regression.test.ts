@@ -160,4 +160,62 @@ describe("premium button source regression", () => {
         expect(source).not.toMatch(/btnPrimary|btnSecondary|btnDanger/);
         expect(source).not.toContain("📄 Yazdır / PDF");
     });
+
+    // ── Veri Aktarım sihirbazı (2026-09-04) ─────────────────────────────────
+    //
+    // Kural POZİTİF: "dosya Button'ı kullanıyor + ölü lehçe geri gelmemiş".
+    // Depo geneline "buton şekli" araması BİLEREK yapılmıyor — 2026-08-31'de o
+    // yaklaşım 5 yanlış pozitif üretip (dropzone dragOver, tercih toggle'ı,
+    // kategori onay kutuları, Paraşüt'ün dikey listesi) kuralın geri
+    // alınmasına yol açtı.
+    //
+    // stripComments ZORUNLU: aşağıda aranan `tabBtnStyle`/`btnSecondary`
+    // adları, o helper'ları silerken bıraktığım GEREKÇE YORUMLARINDA geçiyor.
+    // Yorum soyulmazsa kural kendi açıklamasına takılıp hep kırmızı yanar —
+    // bu tuzağa depoda dört kez düşüldü.
+    it("Veri Aktarım sihirbazı tek buton diline bağlı, ölü çip lehçesi geri gelmiyor", () => {
+        const stripComments = (src: string) =>
+            src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+        const readCode = (file: string) =>
+            stripComments(readFileSync(join(projectRoot, file), "utf8"));
+
+        const WIZARD_FILES = [
+            "src/app/dashboard/import/excel/page.tsx",
+            "src/components/import/ExtractionReview.tsx",
+            "src/components/import/ClassifierQueue.tsx",
+            "src/components/import/SetupStatusPanel.tsx",
+        ];
+
+        for (const file of WIZARD_FILES) {
+            const source = readCode(file);
+            expect(source, file).toContain('from "@/components/ui/Button"');
+            // Silinen iki yerel stil helper'ı: sihirbazın kendi çip/buton lehçesi.
+            expect(source, file).not.toMatch(/\btabBtnStyle\b|\bbtnSecondary\b/);
+        }
+
+        const wizard = readCode(WIZARD_FILES[0]);
+
+        // Kurulum akışının ana aksiyonları: eskiden `--accent-bg` (%10 tint) ile
+        // çiziliyorlardı — ne mavi ne beyaz. Artık login'deki mavi `primary`.
+        //
+        // Kural MESAFEYE değil YAPIYA bağlı: varyant ile etiket AYNI <Button>
+        // elemanının içinde olmalı. İlk hâli "en fazla 320 karakter" diyordu ve
+        // derin girinti onu aştı — karakter sayısı, prop eklendikçe kayan
+        // kırılgan bir ölçüdür.
+        const withinElement = (tag: string, attr: string, label: string) =>
+            new RegExp(`<${tag}(?:(?!</${tag}>)[\\s\\S])*?${attr}(?:(?!</${tag}>)[\\s\\S])*?${label}`);
+
+        for (const label of ["Kolon Eşleştirmeye Geç", "Eşleştirmeyi Uygula", "Onayla ve İçe Aktar", "Dosya Seç"]) {
+            expect(wizard, label).toMatch(withinElement("Button", 'variant="primary"', label));
+        }
+
+        // Sheet + kayıt-türü sekmeleri ortak çip diline geçti (dördüncü lehçe öldü).
+        expect(wizard).toContain('from "@/components/ui/FilterChips"');
+        expect(wizard.match(/<FilterChips/g) ?? []).toHaveLength(2);
+
+        // Bitiş ekranındaki beş buton-görünümlü <Link> ButtonLink oldu; ikisi
+        // zemin renginde (`--bg-secondary` == `--app-bg`), üçü tint'teydi.
+        expect(wizard).toMatch(withinElement("ButtonLink", 'variant="secondary"', "Rapor XLSX"));
+        expect(wizard.match(/<ButtonLink/g) ?? []).toHaveLength(5);
+    });
 });

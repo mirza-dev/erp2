@@ -5,6 +5,26 @@ _Son güncelleme: 2026-08-31_
 
 > Bu bölüm yalnız **güncel durumu + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda ve `memory/current_focus.md`'de. Aşağıdaki indeks son dönem oturumlarına (commit + konu) hızlı bakış içindir; daha eski dönemler (Faz 2–3d AI Import, Sprint A–C, M-3 Rate Limiting, React Doctor, Teklif V2–V7 plan turları, Paraşüt Faz 1–11) git geçmişinde.
 
+**Son tamamlanan iş:** **Buton dili — Dilim 1: Veri Aktarım sihirbazı** (2026-09-04; GREEN; **migration YOK**; saf sunum). `deferred_backlog` §A6'da bekleyen "kalan elle örülmüş butonlar" turunun ilk dilimi. Rapor: `docs/audit/2026-09-04-buton-dili-dilim1-veri-aktarim.md`.
+
+**Ölçüm:** **50 dosyada 127 elle örülmüş `<button>`**, `gate/surface-consistency` kapsamı DIŞINDA (§A6'nın "~115/49" notu bayattı). Buton gövdelerindeki `background` dağılımı: `transparent` 35 · `none` 10 · `--bg-tertiary` 5 · `--accent` 5 · **`--accent-bg` 3** · diğer 6.
+
+**Sihirbaz 26 → 8 buton.** Üç ana aksiyon `--accent-bg` = `rgba(18,63,115,0.10)` ile çiziliyordu — kullanıcının açıkça reddettiği **%10 tint**, üstelik kurulum akışının kalbinde ("Dosya Seç" · "Kolon Eşleştirmeye Geç →" · "Eşleştirmeyi Uygula →"). **`tabBtnStyle` SİLİNDİ** (depodaki DÖRDÜNCÜ hap-çipi lehçesi: aktif tint, pasif şeffaf) → sheet + kayıt-türü sekmeleri `FilterChips`e; **`btnSecondary` SİLİNDİ** → satır aksiyonları `secondary xs`.
+
+**`<button>` taraması YETMEDİ — yeni ölçüm sınıfı:** bitiş ekranında **beş buton-görünümlü `<Link>`** vardı; ikisi `--bg-secondary` (= `--app-bg`, yüzeyi hiç yok — beş sayfa turunun kök kusurunun aynısı), üçü tint. Hepsi `ButtonLink`. Depo geneline bakıldı, bu sınıftan **2** kaldı (`PurchaseOrderDocument`, `AiPanel`).
+
+**Bilerek bırakılan 8 buton** gerekçeleriyle raporda (ikon-only kapatıcılar · bağlantı gibi davranan satır içi metinler · hücre affordance'ı · form çoklu-seçim çipleri · `--warning-bg`'li aksiyon [yanındaki `<span>` ile EŞLEŞEN çift] · disclosure header). Ayrıca **3 hata sınırı kapsam dışı**: ölçüldü, yalnız `react` + `@sentry/nextjs` import ediyorlar — uygulama çöktüğünde çalışan son çare arayüzü, hata verebilecek bir bileşene bağlanmaz.
+
+**DOĞRULAMA — hesaplanmış stil, referans CANLI DOM'dan:** hatırlanan hex yerine aynı oturumda zaten kanonik olan iki yüzey ölçüldü (PageHeader "Yenile" + aktif FilterChip). Aydınlık: primary `linear-gradient(rgb(31,96,157)→rgb(18,63,115))` beyaz 650 · secondary `linear-gradient(rgb(255,255,255)→rgb(244,247,250))` `rgb(23,32,51)` kenar `rgb(184,199,213)` 560 — sihirbazın dördü de **birebir aynı**. Koyu temada da birebir. Hepsi `tap-44`; hiçbiri `--app-bg` (`#e8eef5`/`#131518`) değil.
+
+**BULUNAN ama DÜZELTİLMEYEN — 390px'te 6px taşma** (`/dashboard/import/excel`; ölçülen 7 rotanın yalnız bunda). **Benim turumdan gelmiyor:** dosya geçici olarak HEAD'e döndürülüp aynı ölçüm tekrarlandı → **396, birebir aynı**, sonra SHA-256 ile geri yüklendi. Sebep `.topbar-right`'ın `min-width:0` ile ÇELİŞEN `flex-shrink: 0`'ı — sağ küme (döviz ticker'ı) küçülmeyi reddediyor, bu rotanın başlığı uzun olduğu için kabuk 396'ya itiliyor. Paylaşılan üst bar → 34 rota × 2 tema, ayrı tur (`deferred_backlog` §A7).
+
+**Kapı:** yeni rakip kapı AÇILMADI — mevcut `button-source-regression.test.ts` genişletildi (pozitif benimseme kilidi). Depo geneline "buton şekli" araması bilerek yapılmadı (2026-08-31'de o yaklaşım 5 yanlış pozitif üretip geri alınmıştı). **6/6 kırmızı kanıtlı** (dosya-başına yedek + SHA-256 geri yükleme).
+
+**DERSLER:** (1) **yorum self-match tuzağı 4. kez** — kuralın aradığı `tabBtnStyle`/`btnSecondary` adları, o helper'ları silerken bıraktığım GEREKÇE YORUMLARINDA geçiyor; `stripComments` olmasa kural kendi açıklamasına takılırdı. (2) **Kaynak-iddiası kuralı MESAFEYE değil YAPIYA bağlanmalı** — "varyant ile etiket arası ≤320 karakter" derin girintide aştı; `(?:(?!</Button>)[\s\S])*?` ile "aynı eleman içinde"ye çevrildi. (3) **Mock yüzeyi bileşenle birlikte büyür** — `classifier-queue-interaction` `Button`'ı yalnız `default` ile mock'luyordu; `ButtonLink` eklenince `undefined` kalıp React render'da patladı ve **8 test "elementi bulamadım" diye DOLAYLI** hata verdi (gövde tamamen boştu). İzole koşumda görünmüyordu, **tam suite yakaladı.** (4) `role` locator'ı bileşenin işaretlemesini izler: `FilterChips` → `role="tab"`, `ButtonLink` → `role="link"`; `getByRole("button")` ikisini de bulamaz.
+
+**Gate:** tsc 0 · lint 0 · **495 dosya / 6903 test** · build 0 · migration YOK.
+
 **Son tamamlanan iş:** **Kart yüzeyi + buton/kategori dili birleştirmesi** (2026-08-31; GREEN; **migration YOK**). Kullanıcı beş sayfayı gösterdi (Öneriler · Teknik Şablonlar · Uyarılar · Veri Aktarım Merkezi · Paraşüt) — *"arka plan rengi kartlar vs güzel değil, sistemin geri kalanıyla paralel değil"* — ve bütün sistemde butonlar/kategoriler beyaz, mavi olması gerekenler mavi, "Yenile" beyaz olsun istedi. Rapor: `docs/audit/2026-08-31-yuzey-buton-kategori-birlesimi.md`.
 
 **Kök sebep tek satır: `--bg-secondary` HER İKİ TEMADA `--app-bg` ile birebir aynı renk** (koyu `#131518` = `#131518`, aydınlık `#e8eef5` = `#e8eef5`). O kartların **yüzeyi hiç yoktu**, yalnız kenarlıkları görünüyordu. Token bozuk DEĞİL — `--bg-secondary` bir **iç oyuk** rengi, zeminle aynı olması doğru; kusur oyuk renginin **yükseltilmiş kart** olarak kullanılmasıydı. Token'a dokunulmadı, kullanım düzeltildi.
@@ -600,6 +620,7 @@ Teklif "Gönder"e basınca müşteriye teklif belgesi `.html` ekli e-posta. Kara
 - **Paraşüt Faz 12 — Sandbox GATE:** gerçek Paraşüt API ile OAuth + list filtreleri + e-doc trackable_job + stok invariant doğrulamaları (`PARASUT_PLAN.md` §Faz 12).
 
 ### Son dönem oturum indeksi (en yeniden eskiye — detay git log'unda)
+- Buton dili Dilim 1 — Veri Aktarım sihirbazı 26→8 buton, tabBtnStyle+btnSecondary silindi, 5 buton-görünümlü Link → ButtonLink
 - Developer Console frontend turu — allowlist açıldı, 8 bulgu ölçüldü, `console-ui.ts` + `gate/console-consistency`
 - Dashboard: Teklif Hattı + Yoldaki Mal kartları — 7 KPI + href navigasyon + subTone
 - Dashboard doğruluk turu — üretim limit-50/yalnız-approved ciro/FX hariç-tut+uyarı/etiket + Açık Alacak kaldırıldı
