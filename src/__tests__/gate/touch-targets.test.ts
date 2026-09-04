@@ -114,9 +114,14 @@ describe("GATE — dokunma hedefleri", () => {
         // Sarmalayan çip satırları: 30px çip 44'e çıkınca 7px yukarı/aşağı taşar;
         // 6px satır aralığında alttaki satır üsttekinin alanını yerdi (ölçümde
         // eskime filtresi 44 yerine 36'da kalmıştı).
-        expect(MOBILE_CSS).toMatch(/\.tap-row-gap \{\s*row-gap: 16px !important/);
-        expect(readFileSync(join(root, "src/app/dashboard/products/aging/page.tsx"), "utf8"))
-            .toContain('className="tap-row-gap"');
+        // 2026-09-04: sarma kaynaklı çakışma artık CSS yamasıyla DEĞİL, yerleşimle
+        // önleniyor. Tek çip-satırı üreticisi `FilterChips` ve o sarmıyor:
+        // `nowrap` + `overflow-x: auto` → ikinci satır hiç oluşmaz. Ölçüm
+        // (390px, eskime filtresi): 6/6 çip 44×44, gövde taşması 0.
+        const filterChips = readFileSync(join(root, "src/components/ui/FilterChips.tsx"), "utf8");
+        expect(filterChips, "FilterChips sarmamalı — sararsa satırlar hit alanını yer")
+            .toMatch(/flexWrap:\s*"nowrap"/);
+        expect(filterChips).toMatch(/overflowX:\s*"auto"/);
     });
 
     it("ölçümde kritik çıkan her aile bir kurala bağlanmış", () => {
@@ -146,7 +151,8 @@ describe("GATE — dokunma hedefleri", () => {
             ["src/components/ui/DemoBanner.tsx", "tap-44"],
             ["src/app/dashboard/layout.tsx", "tap-44-v"],
             ["src/app/dashboard/products/page.tsx", "tap-44"],
-            ["src/app/dashboard/products/aging/page.tsx", "tap-44"],
+            // Eskime filtresi `FilterChips`e geçti; `tap-44`ü artık `Button` veriyor.
+            ["src/app/dashboard/products/aging/page.tsx", "FilterChips"],
             ["src/app/dashboard/quotes/_components/QuoteForm.tsx", "q-note-btn"],
         ];
         for (const [file, needle] of files) {

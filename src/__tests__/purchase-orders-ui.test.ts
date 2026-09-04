@@ -343,7 +343,10 @@ describe("New form — loadData sessiz hata yutmuyor (loadError state)", () => {
         expect(newSrc).toMatch(/loadError && \(/);
         expect(newSrc).toContain('role="alert"');
         expect(newSrc).toContain("Form verileri yüklenemedi");
-        expect(newSrc).toMatch(/Yeniden dene[^]*<\/button>/);
+        // 2026-09-04: elle `<button>` → ortak `Button`. Sözleşme aynı kaldı
+        // (banner içinde loadData'yı yeniden çağıran bir "Yeniden dene"
+        // kontrolü var); yalnız işaretleme değişti.
+        expect(newSrc).toMatch(/<Button[^>]*onClick=\{\(\) => void loadData\(\)\}[\s\S]{0,80}Yeniden dene/);
         expect(newSrc).toContain("void loadData()");
     });
 });

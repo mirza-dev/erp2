@@ -36,6 +36,15 @@ type ButtonLinkBaseProps = Omit<AnchorHTMLAttributes<HTMLAnchorElement>, "childr
     leftIcon?: ReactNode;
     rightIcon?: ReactNode;
     disabled?: boolean;
+    /**
+     * 2026-09-04: `prefetch` tipe AÇIKÇA eklendi. `AnchorHTMLAttributes` onu
+     * içermez (Next'e ait bir prop, anchor attribute'u değil) — ama gövde
+     * `{...rest}`'i `<Link>`e geçirdiği için çalışma zamanında zaten işliyordu.
+     * Gerekçe: bu bileşen ARTIK route handler'lara da bağlanıyor (rapor
+     * indirme, RFQ arşiv belgesi). Onlar sayfa değil; ön-yükleme belge
+     * ÜRETİMİNİ tetikleyebilir. Böyle hedeflerde `prefetch={false}` verilir.
+     */
+    prefetch?: boolean;
 };
 
 type TextButtonLinkProps = ButtonLinkBaseProps & {

@@ -862,23 +862,16 @@ export default function ParasutPage() {
                                                             Maks. deneme ({log.retry_count}/3)
                                                         </span>
                                                     ) : (
-                                                        <button
-                                                            onClick={() => retrySync(log.id)}
-                                                            disabled={isDemo || retryingId === log.id}
-                                                            title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                                                            style={{
-                                                                fontSize: "11px",
-                                                                padding: "3px 8px",
-                                                                border: "0.5px solid var(--warning-border)",
-                                                                borderRadius: "4px",
-                                                                background: "var(--warning-bg)",
-                                                                color: "var(--warning-text)",
-                                                                cursor: isDemo || retryingId === log.id ? "not-allowed" : "pointer",
-                                                                opacity: isDemo || retryingId === log.id ? 0.5 : 1,
-                                                            }}
-                                                        >
-                                                            {retryingId === log.id ? "..." : `↻ Dene (${log.retry_count ?? 0}/3)`}
-                                                        </button>
+                                                            <Button
+                                                                variant="secondary"
+                                                                size="xs"
+                                                                onClick={() => retrySync(log.id)}
+                                                                disabled={isDemo || retryingId === log.id}
+                                                                loading={retryingId === log.id}
+                                                                title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                                                            >
+                                                                Dene ({log.retry_count ?? 0}/3)
+                                                            </Button>
                                                     )
                                                 )}
                                             </td>

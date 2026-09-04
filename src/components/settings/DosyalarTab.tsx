@@ -488,18 +488,24 @@ export default function DosyalarTab() {
     const rowActions = (f: CompanyFileRow) => (
         <div className="file-row-actions">
             {f.mime_type !== "image/svg+xml" && (
-                <button type="button" className="file-action-btn" title="Önizle" aria-label={`Önizle: ${f.display_name}`} onClick={() => void handlePreview(f)}>
+                <Button variant="ghost" size="xs" iconOnly title="Önizle" aria-label={`Önizle: ${f.display_name}`} onClick={() => void handlePreview(f)}>
                     <Eye size={14} aria-hidden="true" />
-                </button>
+                </Button>
             )}
-            <button type="button" className="file-action-btn" title="İndir" aria-label={`İndir: ${f.display_name}`} onClick={() => void handleDownload(f)}>
+            <Button variant="ghost" size="xs" iconOnly title="İndir" aria-label={`İndir: ${f.display_name}`} onClick={() => void handleDownload(f)}>
                 <Download size={14} aria-hidden="true" />
-            </button>
+            </Button>
             {confirmId === f.id ? (
                 <Button variant="dangerSoft" size="xs" onClick={() => void handleDelete(f)} onMouseLeave={() => setConfirmId(null)}>
                     Sil?
                 </Button>
             ) : (
+                /* 2026-09-04: BU BİRİ elle kaldı. `.is-danger` hover'da kırmızı
+                   veriyor (yıkıcı aksiyon işareti) ve `Button`'da karşılığı olan
+                   bir varyant YOK: `ghost` nötr hover, `dangerSoft` ise sürekli
+                   kırmızı dolgu — satır ikonunda ikisi de yanlış. Sinyali
+                   kaybetmemek için sınıf korundu; ihtiyaç `deferred_backlog`'a
+                   yazıldı. */
                 <button
                     type="button"
                     className="file-action-btn is-danger"

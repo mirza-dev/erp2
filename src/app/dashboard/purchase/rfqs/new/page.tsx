@@ -8,6 +8,8 @@ import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-u
 import type { VendorRow, ProductRow, ProductVendorLinkRow } from "@/lib/database.types";
 import { suggestVendorsForProducts } from "@/lib/rfq-suggest";
 import { fieldStyle, labelStyle as sharedLabelStyle } from "@/components/ui/Input";
+import Button from "@/components/ui/Button";
+import { Trash2 } from "lucide-react";
 
 // Ortak form alanı stili — token tek kaynaktan (`--input-bg`/`--input-border`/
 // `--line-width`). Eskiden burada 0.5px + `--border-secondary` + `--bg-tertiary`
@@ -149,7 +151,8 @@ export default function NewRfqPage() {
 
             {loadError && (
                 <div role="alert" style={{ padding: "10px 14px", marginBottom: "16px", fontSize: "13px", background: "var(--danger-bg)", color: "var(--danger-text)", border: "0.5px solid var(--danger-border)", borderRadius: "6px" }}>
-                    Form verileri yüklenemedi. <button onClick={() => void load()} style={{ marginLeft: 8, cursor: "pointer" }}>Yeniden dene</button>
+                    Form verileri yüklenemedi.{" "}
+                    <Button variant="secondary" size="xs" onClick={() => void load()}>Yeniden dene</Button>
                 </div>
             )}
 
@@ -174,7 +177,7 @@ export default function NewRfqPage() {
             <div style={{ background: "var(--bg-primary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "8px", padding: "16px", marginBottom: "16px" }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
                     <strong style={{ fontSize: "13px", color: "var(--text-primary)" }}>İstenen Kalemler</strong>
-                    <button onClick={addLine} style={{ padding: "4px 12px", fontSize: "12px", background: "var(--bg-tertiary)", color: "var(--text-primary)", border: "0.5px solid var(--border-secondary)", borderRadius: "6px", cursor: "pointer" }}>+ Kalem Ekle</button>
+                    <Button variant="secondary" size="sm" onClick={addLine}>+ Kalem Ekle</Button>
                 </div>
                 {lines.map((l, idx) => (
                     <div key={idx} style={{ display: "grid", gridTemplateColumns: "3fr 1fr 1fr 1.2fr auto", gap: "8px", alignItems: "end", marginBottom: "10px" }}>
@@ -197,7 +200,16 @@ export default function NewRfqPage() {
                             {idx === 0 && <label style={labelStyle}>İstenen Teslim</label>}
                             <input type="date" value={l.target_date} onChange={e => updateLine(idx, { target_date: e.target.value })} aria-label={`Kalem ${idx + 1} teslim`} style={inputStyle} />
                         </div>
-                        <button onClick={() => removeLine(idx)} disabled={lines.length === 1} aria-label={`Kalem ${idx + 1} sil`} style={{ padding: "6px 10px", fontSize: "12px", background: "transparent", color: "var(--danger-text)", border: "0.5px solid var(--border-tertiary)", borderRadius: "6px", cursor: lines.length === 1 ? "not-allowed" : "pointer", opacity: lines.length === 1 ? 0.4 : 1 }}>✕</button>
+                        <Button
+                            variant="icon"
+                            size="sm"
+                            iconOnly
+                            onClick={() => removeLine(idx)}
+                            disabled={lines.length === 1}
+                            aria-label={`Kalem ${idx + 1} sil`}
+                        >
+                            <Trash2 size={14} aria-hidden />
+                        </Button>
                     </div>
                 ))}
             </div>
@@ -209,9 +221,9 @@ export default function NewRfqPage() {
                         Tedarikçiler {vendorIds.length > 0 && <span style={{ color: "var(--text-tertiary)", fontWeight: 400 }}>({vendorIds.length} seçili)</span>}
                     </strong>
                     {suggestions.size > 0 && (
-                        <button onClick={selectSuggested} style={{ padding: "4px 12px", fontSize: "12px", background: "var(--accent-bg)", color: "var(--accent-text)", border: "0.5px solid var(--border-secondary)", borderRadius: "6px", cursor: "pointer" }}>
+                        <Button variant="secondary" size="sm" onClick={selectSuggested}>
                             Önerilenleri seç ({suggestions.size})
-                        </button>
+                        </Button>
                     )}
                 </div>
                 {vendors.length === 0 ? (
@@ -254,8 +266,17 @@ export default function NewRfqPage() {
             )}
 
             <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginBottom: "16px" }}>
-                <button onClick={() => router.push("/dashboard/purchase/rfqs")} style={{ padding: "8px 16px", fontSize: "13px", background: "transparent", color: "var(--text-secondary)", border: "0.5px solid var(--border-secondary)", borderRadius: "6px", cursor: "pointer" }}>İptal</button>
-                <button onClick={handleSubmit} disabled={isDemo || saving} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined} style={{ padding: "8px 16px", fontSize: "13px", background: (isDemo || saving) ? "var(--bg-tertiary)" : "var(--accent)", color: (isDemo || saving) ? "var(--text-tertiary)" : "#fff", border: "none", borderRadius: "6px", cursor: (isDemo || saving) ? "not-allowed" : "pointer", fontWeight: 500 }}>{saving ? "Kaydediliyor..." : "Talep Oluştur"}</button>
+                <Button variant="secondary" size="md" onClick={() => router.push("/dashboard/purchase/rfqs")}>İptal</Button>
+                <Button
+                    variant="primary"
+                    size="md"
+                    onClick={handleSubmit}
+                    disabled={isDemo || saving}
+                    loading={saving}
+                    title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
+                >
+                    Talep Oluştur
+                </Button>
             </div>
 
             {formError && (

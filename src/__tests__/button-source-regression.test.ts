@@ -218,4 +218,61 @@ describe("premium button source regression", () => {
         expect(wizard).toMatch(withinElement("ButtonLink", 'variant="secondary"', "Rapor XLSX"));
         expect(wizard.match(/<ButtonLink/g) ?? []).toHaveLength(5);
     });
+
+    // ── Dilim 2·3·4 (2026-09-04) ────────────────────────────────────────────
+    //
+    // Aynı pozitif-benimseme kalıbı. `stripComments` yine ZORUNLU: silinen
+    // helper'ların adları (`btn`, `iconButtonStyle`) gerekçe yorumlarında geçiyor.
+    it("satınalma · ayarlar · dağınık yüzeyler tek buton diline bağlı", () => {
+        const stripComments = (src: string) =>
+            src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+        const readCode = (file: string) =>
+            stripComments(readFileSync(join(projectRoot, file), "utf8"));
+
+        const ADOPTED = [
+            "src/app/dashboard/purchase/rfqs/[id]/page.tsx",
+            "src/app/dashboard/purchase/rfqs/new/page.tsx",
+            "src/app/dashboard/purchase/orders/new/page.tsx",
+            "src/components/purchase/PurchaseOrderModal.tsx",
+            "src/app/dashboard/settings/product-types/[id]/page.tsx",
+            "src/components/settings/NoteTemplatesTab.tsx",
+            "src/app/dashboard/page.tsx",
+            "src/components/dashboard/AISummaryCard.tsx",
+            "src/components/ai/AiUnavailableBanner.tsx",
+            "src/app/dashboard/production/page.tsx",
+        ];
+        for (const file of ADOPTED) {
+            expect(readCode(file), file).toContain('from "@/components/ui/Button"');
+        }
+
+        // Silinen iki yerel lehçe geri gelmemeli.
+        // `btn(` yerine BİLDİRİMİ aranıyor: `Button(` gibi masum eşleşmeler olmasın.
+        expect(readCode(ADOPTED[0])).not.toMatch(/const btn\s*=/);
+        expect(readCode("src/app/dashboard/settings/product-types/[id]/page.tsx"))
+            .not.toMatch(/\biconButtonStyle\b/);
+
+        // Kurulum/oluşturma akışlarının ana aksiyonu mavi (eskiden düz --accent).
+        const withinElement = (tag: string, attr: string, label: string) =>
+            new RegExp(`<${tag}(?:(?!</${tag}>)[\\s\\S])*?${attr}(?:(?!</${tag}>)[\\s\\S])*?${label}`);
+        expect(readCode("src/app/dashboard/purchase/rfqs/new/page.tsx"))
+            .toMatch(withinElement("Button", 'variant="primary"', "Talep Oluştur"));
+        expect(readCode("src/app/dashboard/purchase/orders/new/page.tsx"))
+            .toMatch(withinElement("Button", 'variant="primary"', "Sipariş Oluştur"));
+        expect(readCode("src/app/dashboard/page.tsx"))
+            .toMatch(withinElement("Button", 'variant="primary"', "Raporu yazdır"));
+
+        // Çip lehçeleri: eskime filtresi FilterChips'e, RFQ panel sekmeleri de.
+        for (const file of [
+            "src/app/dashboard/products/aging/page.tsx",
+            "src/app/dashboard/purchase/rfqs/[id]/page.tsx",
+        ]) {
+            expect(readCode(file), file).toContain('from "@/components/ui/FilterChips"');
+        }
+
+        // Developer log filtreleri ÇOK SEÇİMLİ → FilterChips DEĞİL ama palet aynı.
+        const logs = readCode("src/app/dashboard/developer/logs/page.tsx");
+        expect(logs).toMatch(/variant=\{active \? "primary" : "secondary"\}/);
+        expect(logs).toMatch(/aria-pressed=\{active\}/);
+        expect(logs).not.toContain('from "@/components/ui/FilterChips"');
+    });
 });

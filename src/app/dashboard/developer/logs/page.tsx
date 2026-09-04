@@ -156,23 +156,21 @@ export default function DeveloperLogsPage() {
                     {FEED_SOURCES.map(source => {
                         const active = sources.includes(source);
                         return (
-                            <button
+                            /* ÇOK SEÇİMLİ — `FilterChips` DEĞİL. O bileşen tek
+                               seçimli bir tablist üretir (`activeKey`); burada
+                               kaynaklar bağımsız açılıp kapanıyor, doğru
+                               semantik `aria-pressed`. Yüzey yine de tek
+                               paletten: aktif mavi, pasif beyaz. */
+                            <Button
                                 key={source}
                                 type="button"
+                                variant={active ? "primary" : "secondary"}
+                                size="xs"
                                 aria-pressed={active}
                                 onClick={() => toggleSource(source)}
-                                style={{
-                                    fontSize: "11.5px",
-                                    padding: "4px 10px",
-                                    borderRadius: "999px",
-                                    cursor: "pointer",
-                                    border: `0.5px solid ${active ? "var(--accent-border)" : "var(--border-secondary)"}`,
-                                    background: active ? "var(--accent-bg)" : "transparent",
-                                    color: active ? "var(--accent-text)" : "var(--text-tertiary)",
-                                }}
                             >
                                 {FEED_SOURCE_LABELS[source]}
-                            </button>
+                            </Button>
                         );
                     })}
                     {sources.length > 0 && (

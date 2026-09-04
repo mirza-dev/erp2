@@ -1,6 +1,8 @@
 "use client";
 
 import type { CSSProperties } from "react";
+import { X } from "lucide-react";
+import Button from "@/components/ui/Button";
 
 interface AiUnavailableBannerProps {
     message: string;
@@ -34,40 +36,14 @@ export function AiUnavailableBanner({ message, onRetry, retryDisabled, onClose, 
             </div>
             <div style={{ display: "flex", gap: "8px", flexShrink: 0 }}>
                 {onRetry && (
-                    <button
-                        onClick={onRetry}
-                        disabled={retryDisabled}
-                        style={{
-                            fontSize: "11px",
-                            padding: "4px 10px",
-                            border: "0.5px solid var(--warning-border)",
-                            borderRadius: "4px",
-                            background: "transparent",
-                            color: "var(--warning-text)",
-                            cursor: retryDisabled ? "not-allowed" : "pointer",
-                            opacity: retryDisabled ? 0.6 : 1,
-                            whiteSpace: "nowrap",
-                        }}
-                    >
+                    <Button variant="secondary" size="xs" onClick={onRetry} disabled={retryDisabled}>
                         Yeniden dene
-                    </button>
+                    </Button>
                 )}
                 {onClose && (
-                    <button
-                        onClick={onClose}
-                        aria-label="Banner'ı kapat"
-                        style={{
-                            fontSize: "14px",
-                            padding: "0 6px",
-                            border: "none",
-                            background: "transparent",
-                            color: "var(--warning-text)",
-                            cursor: "pointer",
-                            lineHeight: 1,
-                        }}
-                    >
-                        ×
-                    </button>
+                    <Button variant="ghost" size="xs" iconOnly onClick={onClose} aria-label="Banner'ı kapat">
+                        <X size={14} aria-hidden />
+                    </Button>
                 )}
             </div>
         </div>

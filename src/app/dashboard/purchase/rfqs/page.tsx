@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import type { RfqListRow } from "@/lib/supabase/supplier-rfqs";
 import type { SupplierRfqStatus } from "@/lib/database.types";
 import { localISODate } from "@/lib/stock-utils";
-import { ButtonLink } from "@/components/ui/Button";
+import Button, { ButtonLink } from "@/components/ui/Button";
 import { Plus } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 
@@ -122,7 +122,7 @@ export default function RfqListPage() {
                     padding: "10px 14px", marginBottom: "12px", fontSize: "13px",
                     background: "var(--danger-bg)", color: "var(--danger-text)",
                     border: "0.5px solid var(--danger-border)", borderRadius: "6px",
-                }}>Liste yüklenemedi. <button onClick={() => void load()} style={{ marginLeft: 8, cursor: "pointer" }}>Yeniden dene</button></div>
+                }}>Liste yüklenemedi.{" "}<Button variant="secondary" size="xs" onClick={() => void load()}>Yeniden dene</Button></div>
             )}
 
             <div style={{ border: "0.5px solid var(--border-tertiary)", borderRadius: "8px", overflow: "hidden" }}>

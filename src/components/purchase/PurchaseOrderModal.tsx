@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useIsDemo, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { useToast } from "@/components/ui/Toast";
+import Button from "@/components/ui/Button";
+import { X } from "lucide-react";
 
 export interface ModalItem {
     recommendationId: string;
@@ -271,21 +273,9 @@ export default function PurchaseOrderModal({
                     <h2 style={{ margin: 0, fontSize: "15px", fontWeight: 600, color: "var(--text-primary)" }}>
                         {title}
                     </h2>
-                    <button
-                        onClick={onClose}
-                        aria-label="Kapat"
-                        style={{
-                            background: "none",
-                            border: "none",
-                            cursor: "pointer",
-                            fontSize: "20px",
-                            color: "var(--text-tertiary)",
-                            padding: "2px 6px",
-                            lineHeight: 1,
-                        }}
-                    >
-                        ×
-                    </button>
+                    <Button variant="ghost" size="sm" iconOnly onClick={onClose} aria-label="Kapat">
+                        <X size={16} aria-hidden />
+                    </Button>
                 </div>
 
                 {/* Scrollable body */}
@@ -484,40 +474,20 @@ export default function PurchaseOrderModal({
                     justifyContent: "flex-end",
                     flexShrink: 0,
                 }}>
-                    <button
-                        onClick={onClose}
-                        disabled={submitting}
-                        style={{
-                            padding: "8px 18px",
-                            fontSize: "13px",
-                            fontWeight: 500,
-                            borderRadius: "6px",
-                            border: "0.5px solid var(--border-secondary)",
-                            background: "transparent",
-                            color: "var(--text-secondary)",
-                            cursor: submitting ? "not-allowed" : "pointer",
-                        }}
-                    >
+                    <Button variant="secondary" size="md" onClick={onClose} disabled={submitting}>
                         İptal
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                        variant="primary"
+                        size="md"
                         onClick={handleSubmit}
                         disabled={submitting || isDemo}
+                        loading={submitting}
                         title={isDemo ? "Demo modunda devre dışı." : undefined}
                         aria-label="Siparişi oluştur"
-                        style={{
-                            padding: "8px 20px",
-                            fontSize: "13px",
-                            fontWeight: 600,
-                            borderRadius: "6px",
-                            border: "none",
-                            background: submitting || isDemo ? "var(--border-secondary)" : "var(--accent)",
-                            color: submitting || isDemo ? "var(--text-tertiary)" : "var(--accent-text)",
-                            cursor: submitting || isDemo ? "not-allowed" : "pointer",
-                        }}
                     >
-                        {submitting ? "Oluşturuluyor…" : "Siparişi Oluştur"}
-                    </button>
+                        Siparişi Oluştur
+                    </Button>
                 </div>
             </div>
         </>

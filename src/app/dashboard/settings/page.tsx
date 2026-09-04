@@ -726,23 +726,16 @@ function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void 
                     <div style={{ fontSize: "14px", fontWeight: 500, color: "var(--text-primary)" }}>
                         {profile?.fullName || profile?.email}
                     </div>
-                    <button
+                    <Button
                         type="button"
+                        variant="secondary"
+                        size="xs"
                         onClick={() => avatarFileRef.current?.click()}
                         disabled={isMutating}
-                        style={{
-                            fontSize: "11px",
-                            marginTop: "3px",
-                            padding: "3px 8px",
-                            border: "var(--line-width) solid var(--border-secondary)",
-                            borderRadius: "4px",
-                            background: "transparent",
-                            color: "var(--text-tertiary)",
-                            cursor: isMutating ? "wait" : "pointer",
-                        }}
+                        loading={avatarUploading}
                     >
-                        {avatarUploading ? "Yükleniyor…" : "Fotoğraf Değiştir"}
-                    </button>
+                        Fotoğraf Değiştir
+                    </Button>
                     <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginTop: "2px" }}>
                         PNG, JPEG, WebP · Maks 1MB
                     </div>
@@ -1297,33 +1290,17 @@ function ApiTab() {
                         >
                             Paraşüt&apos;e bağlan
                         </a>
-                        <button
+                        <Button
                             type="button"
+                            variant="secondary"
+                            size="sm"
                             onClick={handleRefresh}
                             disabled={refreshing || !parasutToken}
-                            style={{
-                                fontSize: "12px",
-                                padding: "6px 14px",
-                                border: "var(--line-width) solid var(--border-secondary)",
-                                borderRadius: "6px",
-                                background: "var(--bg-tertiary)",
-                                color: "var(--text-secondary)",
-                                cursor: refreshing || !parasutToken ? "not-allowed" : "pointer",
-                                opacity: refreshing || !parasutToken ? 0.5 : 1,
-                                display: "inline-flex",
-                                alignItems: "center",
-                                gap: "6px",
-                            }}
+                            loading={refreshing}
+                            leftIcon={<RefreshCw size={14} aria-hidden="true" />}
                         >
-                            {refreshing ? (
-                                "Yenileniyor…"
-                            ) : (
-                                <>
-                                    <RefreshCw size={12} aria-hidden="true" />
-                                    Token Yenile
-                                </>
-                            )}
-                        </button>
+                            Token Yenile
+                        </Button>
                     </div>
                 </div>
                 {feedback && (
@@ -1432,22 +1409,15 @@ function AiTab() {
                 <div style={{ fontSize: "13px", color: "var(--danger-text)" }}>
                     {error ?? "Bilinmeyen hata"}
                 </div>
-                <button
+                <Button
                     type="button"
+                    variant="secondary"
+                    size="xs"
+                    style={{ alignSelf: "flex-start" }}
                     onClick={() => { setLoading(true); setError(null); load(); }}
-                    style={{
-                        alignSelf: "flex-start",
-                        fontSize: "12px",
-                        padding: "6px 14px",
-                        border: "var(--line-width) solid var(--border-secondary)",
-                        borderRadius: "6px",
-                        background: "transparent",
-                        color: "var(--text-secondary)",
-                        cursor: "pointer",
-                    }}
                 >
                     Yeniden Dene
-                </button>
+                </Button>
             </div>
         );
     }

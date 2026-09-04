@@ -88,9 +88,15 @@ describe("Üretim — a11y aria-label'lar", () => {
         // içinde kazara gönderim yapar). Sabit sayı kırılgandı — mobil kart
         // görünümü üçüncü butonu getirince kırıldı (2026-08-24). Sayı yerine
         // değişmezin kendisi kilitleniyor: type'sız buton KALMAMALI.
+        // 2026-09-04: sayfada elle `<button>` KALMADI — hepsi ortak `Button`a
+        // geçti ve o `type`ı kendi basıyor. Kural yine de duruyor: biri geri
+        // gelirse `type` taşımak ZORUNDA (varsayılan "submit" form içinde
+        // kazara gönderim yapar). "En az bir buton olmalı" iddiası kaldırıldı;
+        // o, değişmezi değil o günkü sayıyı kilitliyordu.
         const buttons = PAGE_SRC.match(/<button[\s\S]*?>/g) ?? [];
-        expect(buttons.length).toBeGreaterThan(0);
         for (const b of buttons) expect(b).toMatch(/type="button"/);
+        expect(PAGE_SRC, "aksiyonlar ortak Button dilinden gelmeli")
+            .toContain('from "@/components/ui/Button"');
     });
 
     it("silme × butonu aria-label taşır — ve kayıtlar arasında AYIRT EDİLEBİLİR", () => {

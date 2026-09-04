@@ -1525,11 +1525,12 @@ export default function ImportExcelWizardPage() {
                                     href={`/api/import/${batchId}/report?format=xlsx`}
                                     variant="secondary"
                                     size="sm"
+                                    prefetch={false}
                                     leftIcon={<Download size={14} aria-hidden />}
                                 >
                                     Rapor XLSX
                                 </ButtonLink>
-                                <ButtonLink href={`/api/import/${batchId}/report?format=csv`} variant="secondary" size="sm">
+                                <ButtonLink href={`/api/import/${batchId}/report?format=csv`} variant="secondary" size="sm" prefetch={false}>
                                     Rapor CSV
                                 </ButtonLink>
                             </>

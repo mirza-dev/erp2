@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { ButtonLink } from "@/components/ui/Button";
+import FilterChips from "@/components/ui/FilterChips";
 import PageHeader from "@/components/ui/PageHeader";
 import { maskCurrency } from "@/lib/utils";
 import { usePermissions } from "@/lib/auth/use-permissions";
@@ -343,35 +344,18 @@ export default function AgingPage() {
                         width: "200px",
                     }}
                 />
-                <div className="tap-row-gap" style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                    {FILTER_TABS.map(tab => {
-                        const active = filter === tab.key;
-                        const count = tab.key === "all" ? rows.length
+                <FilterChips
+                    ariaLabel="Stok eskime filtresi"
+                    activeKey={filter}
+                    onChange={setFilter}
+                    items={FILTER_TABS.map(tab => ({
+                        key: tab.key,
+                        label: tab.label,
+                        count: tab.key === "all" ? rows.length
                             : tab.key === "no_movement" ? counts.no_movement
-                            : counts[tab.key as AgingCategory];
-                        return (
-                            <button
-                                key={tab.key}
-                                className="tap-44"
-                                onClick={() => setFilter(tab.key)}
-                                style={{
-                                    fontSize: "12px", padding: "5px 12px",
-                                    border: `0.5px solid ${active ? "var(--accent-border)" : "var(--border-secondary)"}`,
-                                    borderRadius: "6px",
-                                    background: active ? "var(--accent-bg)" : "transparent",
-                                    color: active ? "var(--accent-text)" : "var(--text-secondary)",
-                                    cursor: "pointer", fontWeight: active ? 600 : 400,
-                                    transition: "background 150ms",
-                                }}
-                            >
-                                {tab.label}
-                                <span style={{ marginLeft: "4px", color: "var(--text-tertiary)", fontWeight: 400 }}>
-                                    {count}
-                                </span>
-                            </button>
-                        );
-                    })}
-                </div>
+                            : counts[tab.key as AgingCategory],
+                    }))}
+                />
             </div>
 
             {/* Tablo */}

@@ -5,6 +5,8 @@ import PageHeader from "@/components/ui/PageHeader";
 import Modal from "@/components/ui/Modal";
 import { useRouter } from "next/navigation";
 import { useToast } from "@/components/ui/Toast";
+import Button, { ButtonLink } from "@/components/ui/Button";
+import FilterChips from "@/components/ui/FilterChips";
 import { useIsDemo, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import type { RfqDetail, RfqVendorWithPrices } from "@/lib/supabase/supplier-rfqs";
 import type { SupplierRfqStatus } from "@/lib/database.types";
@@ -20,12 +22,11 @@ const STATUS_LABEL: Record<SupplierRfqStatus, string> = {
 // vardı; koyu temada fark görünmüyordu ama AYDINLIK temada her form ekranı
 // farklı duruyordu (2026-08-24 tespiti).
 const inputStyle: React.CSSProperties = fieldStyle("sm");
-const btn = (variant: "primary" | "ghost" | "danger" = "primary"): React.CSSProperties => ({
-    padding: "7px 14px", fontSize: "13px", borderRadius: "6px", cursor: "pointer", fontWeight: 500,
-    border: variant === "ghost" ? "0.5px solid var(--border-secondary)" : "none",
-    background: variant === "primary" ? "var(--accent)" : variant === "danger" ? "var(--danger-bg)" : "transparent",
-    color: variant === "primary" ? "#fff" : variant === "danger" ? "var(--danger-text)" : "var(--text-secondary)",
-});
+// 2026-09-04: yerel `btn()` yardımcısı SİLİNDİ — kendi mini varyant sistemini
+// ("primary" | "ghost" | "danger") kuran ALTINCI buton lehçesiydi. Eşleşme:
+// primary → `variant="primary"` (eskiden düz `--accent`), ghost → **secondary**
+// (adı yanıltıcıydı: şeffaf DEĞİL, bordürlü beyaz butonun ta kendisi),
+// danger → `dangerSoft`. Boyut `md` (13px/7px 14px ile birebir).
 
 function fmtMoney(n: number | null, cur: string): string {
     if (n == null) return "—";
@@ -164,12 +165,12 @@ export default function RfqDetailPage({ params }: { params: Promise<{ id: string
                     </span>
                 </>}
                 actions={<>
-                    {rfq.status === "draft" && <button onClick={() => router.push(`/dashboard/purchase/rfqs/new`)} style={btn("ghost")}>Geri</button>}
+                    {rfq.status === "draft" && <Button variant="secondary" size="md" onClick={() => router.push(`/dashboard/purchase/rfqs/new`)}>Geri</Button>}
                     {(rfq.status === "draft" || rfq.status === "sent") && (
-                        <button onClick={handleSend} disabled={busy} style={btn("primary")}>{rfq.status === "draft" ? "Gönder" : "Yeniden Gönder"}</button>
+                        <Button variant="primary" size="md" onClick={handleSend} disabled={busy}>{rfq.status === "draft" ? "Gönder" : "Yeniden Gönder"}</Button>
                     )}
-                    {rfq.status === "sent" && <button onClick={() => setTab("compare")} style={btn("primary")}>Karşılaştır & Karar</button>}
-                    {rfq.status !== "awarded" && rfq.status !== "cancelled" && <button onClick={handleCancel} disabled={busy} style={btn("danger")}>İptal</button>}
+                    {rfq.status === "sent" && <Button variant="primary" size="md" onClick={() => setTab("compare")}>Karşılaştır & Karar</Button>}
+                    {rfq.status !== "awarded" && rfq.status !== "cancelled" && <Button variant="dangerSoft" size="md" onClick={handleCancel} disabled={busy}>İptal</Button>}
                 </>}
             />
             </div>
@@ -219,13 +220,21 @@ export default function RfqDetailPage({ params }: { params: Promise<{ id: string
                             </div>
                             <div style={{ display: "flex", gap: "6px", marginTop: "8px" }}>
                                 {rfq.status !== "cancelled" && (
-                                    <button onClick={() => setEntryVendor(v)} style={{ ...btn("ghost"), padding: "4px 10px", fontSize: "12px" }}>
+                                    <Button variant="secondary" size="sm" onClick={() => setEntryVendor(v)}>
                                         {v.prices.some(p => p.unit_price != null) ? "Fiyatları Düzenle" : "Fiyat Gir"}
-                                    </button>
+                                    </Button>
                                 )}
                                 {(rfq.status === "sent" || rfq.status === "awarded") && (
-                                    <a href={`/api/rfqs/${id}/archive?vendor=${v.vendor_id}&view=1`} target="_blank" rel="noopener noreferrer"
-                                        style={{ ...btn("ghost"), padding: "4px 10px", fontSize: "12px", textDecoration: "none", display: "inline-block" }}>Belge</a>
+                                    <ButtonLink
+                                        href={`/api/rfqs/${id}/archive?vendor=${v.vendor_id}&view=1`}
+                                        variant="secondary"
+                                        size="sm"
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        prefetch={false}
+                                    >
+                                        Belge
+                                    </ButtonLink>
                                 )}
                             </div>
                         </div>
@@ -233,10 +242,21 @@ export default function RfqDetailPage({ params }: { params: Promise<{ id: string
                 </div>
             </div>
 
-            {/* Tabs */}
-            <div style={{ display: "flex", gap: "6px", marginBottom: "12px" }}>
-                <button onClick={() => setTab("lines")} style={{ ...btn(tab === "lines" ? "primary" : "ghost") }}>İstenen Kalemler</button>
-                <button onClick={() => setTab("compare")} style={{ ...btn(tab === "compare" ? "primary" : "ghost") }}>Karşılaştırma</button>
+            {/* Panel sekmeleri. 2026-09-04 kullanıcı kararı: bölme değiştiren
+                sekmeler de beyaz/mavi dile geçer — kullanıcı gözüyle onlar da
+                kategori, gri durmaları isteğin dışında kalmalarını haklı
+                çıkarmıyor. `FilterChips` ayrıca burada OLMAYAN tablist/tab
+                semantiğini de getiriyor (eskiden rolsüz düz düğmelerdi). */}
+            <div style={{ marginBottom: "12px" }}>
+                <FilterChips
+                    ariaLabel="Fiyat talebi görünümü"
+                    activeKey={tab}
+                    onChange={setTab}
+                    items={[
+                        { key: "lines", label: "İstenen Kalemler" },
+                        { key: "compare", label: "Karşılaştırma" },
+                    ]}
+                />
             </div>
 
             {tab === "lines" ? (
@@ -337,7 +357,7 @@ function ComparisonMatrix({ rfq, best, awardSel, setAwardSel, onAward, busy }: {
             </div>
             {canAward && (
                 <div style={{ display: "flex", justifyContent: "flex-end", marginTop: "14px" }}>
-                    <button onClick={onAward} disabled={busy} style={btn("primary")}>Seçilenlerden Satın Alma Siparişi Oluştur</button>
+                    <Button variant="primary" size="md" onClick={onAward} disabled={busy}>Seçilenlerden Satın Alma Siparişi Oluştur</Button>
                 </div>
             )}
             {rfq.status === "awarded" && (
@@ -440,8 +460,8 @@ function VendorQuoteModal({ rfqId, vendor, lines, onClose, onSaved }: {
                 </table>
                 <div style={{ fontSize: "10px", color: "var(--text-tertiary)", marginTop: "6px" }}>Boş bırakılan birim fiyat = bu kalem için teklif verilmedi.</div>
                 <div style={{ display: "flex", justifyContent: "flex-end", gap: "8px", marginTop: "16px" }}>
-                    <button onClick={onClose} style={btn("ghost")}>Vazgeç</button>
-                    <button onClick={save} disabled={saving} style={btn("primary")}>{saving ? "Kaydediliyor..." : "Kaydet"}</button>
+                    <Button variant="secondary" size="md" onClick={onClose}>Vazgeç</Button>
+                    <Button variant="primary" size="md" onClick={save} disabled={saving} loading={saving}>Kaydet</Button>
                 </div>
         </Modal>
     );

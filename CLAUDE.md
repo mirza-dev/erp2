@@ -5,6 +5,26 @@ _Son güncelleme: 2026-08-31_
 
 > Bu bölüm yalnız **güncel durumu + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda ve `memory/current_focus.md`'de. Aşağıdaki indeks son dönem oturumlarına (commit + konu) hızlı bakış içindir; daha eski dönemler (Faz 2–3d AI Import, Sprint A–C, M-3 Rate Limiting, React Doctor, Teklif V2–V7 plan turları, Paraşüt Faz 1–11) git geçmişinde.
 
+**Son tamamlanan iş:** **Buton dili — Dilim 2·3·4 (satınalma · ayarlar · dağınık)** (2026-09-04; GREEN; **migration YOK**; saf sunum). Kullanıcı "kalanlarla devam et" dedi. Rapor: `docs/audit/2026-09-04-buton-dili-dilim2-3-4.md`.
+
+**Elle `<button>` 101 → 60** (bu turda 41; Dilim 1 ile birlikte **127 → 60**). Buton görünümlü `<Link>` 3 → 1. Kalan 60'ın tamamı gerekçeli dışarıda bırakılan küme: altyapı (`Toast`/`Pagination`/`DemoBanner`/`Topbar`/`ThemeToggle`/`Sidebar`) · `login` (referansın kendisi) · 3 hata sınırı · `.seg` · Ayarlar'ın dikey nav şeridi · dropzone · toggle anahtarı · menü bileşenleri · anlam taşıyan rozetler · satır içi bağlantı-benzeri metinler.
+
+**İKİ YENİ KAPSAM KARARI (kullanıcı):** (1) **Panel sekmeleri de beyaz/mavi dile geçti** — 2026-08-31'in "alt çizgili kalsın" kararı TERSİNE ÇEVRİLDİ. `rfqs/[id]` → `FilterChips` (o sekmelerin **hiç** tab semantiği yoktu; bileşen `tablist`/`tab`'i de getirdi), `products/[id]` → işaretleme elde kaldı (`aria-controls` panel bağı için gerekli, `FilterChips` üretmiyor) ama **yüzey** `Button`'dan. `gate/surface-consistency`'deki muafiyetin GEREKÇESİ yeniden yazıldı + ayrı kural eklendi. (2) **İkon-only kontroller `Button`'a** — uygulamada inceltildi: `icon` varyantı kenarlık ÇİZİYOR → **kenarlıklı → `icon`, kenarlıksız → `ghost`**; görünüm korunur, `tap-44` kazanılır.
+
+**Üç yerel lehçe silindi:** `btn()` (`rfqs/[id]` — **ALTINCI** buton lehçesi; `"ghost"` adı yanıltıcıydı: şeffaf değil **bordürlü beyaz** = `secondary`) · `iconButtonStyle` · **`.tap-row-gap`**.
+
+**`.tap-row-gap` silinmesi bir KURAL DEĞİŞİMİ:** sarma kaynaklı hit-alanı çakışması artık CSS yamasıyla değil **yerleşimle** çözülüyor — tek çip-satırı üreticisi `FilterChips` ve o **sarmıyor**. `nowrap` bileşende **AÇIKÇA** yazıldı (flex varsayılanıydı ama örtük kalırsa kilitlenemiyordu) ve `gate/touch-targets` onu arıyor. Ölçüm (390px, eskime filtresi): **6/6 çip 44×44, gövde taşması 0**.
+
+**Çip lehçeleri:** `products/aging` → `FilterChips` · `products/page` kategori tetikleyicisi → `Button` varyantı (elle `onMouseEnter/Leave` DOM mutasyonu da kalktı) · **`developer/logs` ÇOK SEÇİMLİ** (`aria-pressed`, bağımsız açılıp kapanır) → `FilterChips` **DEĞİL** (o tek seçimli tablist üretir) ama palet aynı · `DynamicFieldEdit`/`NoteFormModal`/Paraşüt dikey listeleri **dokunulmadı**.
+
+**Dokunulmayan iki yüzey, gerekçeli:** `PurchaseOrderDocument` araç çubuğu (**tema-muaf BASKI yüzeyi** — `#eee` kâğıt zemin; temaya duyarlı `Button` koyu temada açık kâğıdın üstünde koyu buton çıkarırdı) · `DosyalarTab` silme ikonu (`.is-danger` hover'da kırmızı = yıkıcı aksiyon işareti; **`Button`'da ghost-danger varyantı YOK** → backlog).
+
+**DOĞRULAMA — hesaplanmış stil, referans canlı DOM'dan:** aydınlık primary `rgb(31,96,157)→rgb(18,63,115)` / koyu `rgb(103,179,255)→rgb(74,152,245)`; eskime aktif çipi · ürün panel sekmesi · "Raporu yazdır" **üçü de birebir**. Pasif çip/sekme secondary ile birebir. Hepsi `tap-44`, taşma 0. İkon kutuları 28→26px ama **satır yüksekliği 109px** → satırı ikon belirlemiyor, kayma yok.
+
+**DERSLER:** (1) **Dinamik içerik dönüşümde sessizce düşüyor — İKİ KEZ oldu** (`({acceptedAndEditedCount})` ve `(n/3)` deneme sayacı). Yakalandı çünkü "kaldırılan her etiketi yeni kodda ara" denetimi koştum — **bu adım dönüşüm turlarının parçası olmalı**. (2) **Kaynak-kilidi testi "en az N tane olmalı" dememeli** — `production-ui` "en az bir `<button>`" diyordu, hepsi dönüşünce kırıldı; o iddia değişmezi değil o günkü sayıyı kilitliyordu. (3) **Bir CSS yaması silinirken yerine geçen garanti kilitlenmeli.**
+
+**Gate:** tsc 0 · lint 0 · **495 dosya / 6905 test** · build 0 · **7/7 kırmızı kanıtlı** · migration YOK.
+
 **Son tamamlanan iş:** **Buton dili — Dilim 1: Veri Aktarım sihirbazı** (2026-09-04; GREEN; **migration YOK**; saf sunum). `deferred_backlog` §A6'da bekleyen "kalan elle örülmüş butonlar" turunun ilk dilimi. Rapor: `docs/audit/2026-09-04-buton-dili-dilim1-veri-aktarim.md`.
 
 **Ölçüm:** **50 dosyada 127 elle örülmüş `<button>`**, `gate/surface-consistency` kapsamı DIŞINDA (§A6'nın "~115/49" notu bayattı). Buton gövdelerindeki `background` dağılımı: `transparent` 35 · `none` 10 · `--bg-tertiary` 5 · `--accent` 5 · **`--accent-bg` 3** · diğer 6.
@@ -620,6 +640,7 @@ Teklif "Gönder"e basınca müşteriye teklif belgesi `.html` ekli e-posta. Kara
 - **Paraşüt Faz 12 — Sandbox GATE:** gerçek Paraşüt API ile OAuth + list filtreleri + e-doc trackable_job + stok invariant doğrulamaları (`PARASUT_PLAN.md` §Faz 12).
 
 ### Son dönem oturum indeksi (en yeniden eskiye — detay git log'unda)
+- Buton dili Dilim 2·3·4 — 101→60 buton, btn()+iconButtonStyle+.tap-row-gap silindi, panel sekmeleri beyaz/mavi dile
 - Buton dili Dilim 1 — Veri Aktarım sihirbazı 26→8 buton, tabBtnStyle+btnSecondary silindi, 5 buton-görünümlü Link → ButtonLink
 - Developer Console frontend turu — allowlist açıldı, 8 bulgu ölçüldü, `console-ui.ts` + `gate/console-consistency`
 - Dashboard: Teklif Hattı + Yoldaki Mal kartları — 7 KPI + href navigasyon + subTone

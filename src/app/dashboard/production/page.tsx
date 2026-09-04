@@ -645,15 +645,15 @@ function ProductionPageInner() {
                                         <span style={{ fontSize: "11px", color: "var(--text-tertiary)", fontWeight: 600 }}>
                                             {idx + 1}. kalem
                                         </span>
-                                        <button
-                                            type="button"
-                                            onClick={() => removeLine(line.id)}
-                                            aria-label={`${idx + 1}. satırı kaldır`}
-                                            style={{
-                                                fontSize: "18px", color: "var(--danger-text)", background: "transparent",
-                                                border: "none", cursor: "pointer", lineHeight: 1, padding: "2px 6px",
-                                            }}
-                                        >×</button>
+                                            <Button
+                                                variant="ghost"
+                                                size="xs"
+                                                iconOnly
+                                                onClick={() => removeLine(line.id)}
+                                                aria-label={`${idx + 1}. satırı kaldır`}
+                                            >
+                                                <Trash2 size={14} aria-hidden />
+                                            </Button>
                                     </div>
 
                                     <select
@@ -818,22 +818,15 @@ function ProductionPageInner() {
                                         )}
                                     </td>
                                     <td style={{ ...tdStyle, textAlign: "center" as const }}>
-                                        <button
-                                            type="button"
-                                            onClick={() => removeLine(line.id)}
-                                            aria-label={`${idx + 1}. satırı kaldır`}
-                                            style={{
-                                                fontSize: "16px",
-                                                color: "var(--danger-text)",
-                                                background: "transparent",
-                                                border: "none",
-                                                cursor: "pointer",
-                                                opacity: 0.6,
-                                                lineHeight: 1,
-                                            }}
-                                            onMouseEnter={e => (e.currentTarget.style.opacity = "1")}
-                                            onMouseLeave={e => (e.currentTarget.style.opacity = "0.6")}
-                                        >×</button>
+                                            <Button
+                                                variant="ghost"
+                                                size="xs"
+                                                iconOnly
+                                                onClick={() => removeLine(line.id)}
+                                                aria-label={`${idx + 1}. satırı kaldır`}
+                                            >
+                                                <Trash2 size={14} aria-hidden />
+                                            </Button>
                                     </td>
                                 </tr>
                             );
@@ -844,23 +837,13 @@ function ProductionPageInner() {
                 )}
 
                 <div style={{ padding: "10px 16px", display: "flex", flexWrap: "wrap", gap: "8px", justifyContent: "space-between", alignItems: "center" }}>
-                    <button
-                        type="button"
-                        onClick={() => setLines(prev => [...prev, newLine()])}
-                        style={{
-                            fontSize: "12px",
-                            padding: "5px 12px",
-                            border: "0.5px dashed var(--border-secondary)",
-                            borderRadius: "5px",
-                            background: "transparent",
-                            color: "var(--text-secondary)",
-                            cursor: "pointer",
-                        }}
-                        onMouseEnter={e => { e.currentTarget.style.color = "var(--accent-text)"; e.currentTarget.style.borderColor = "var(--accent-border)"; }}
-                        onMouseLeave={e => { e.currentTarget.style.color = "var(--text-secondary)"; e.currentTarget.style.borderColor = "var(--border-secondary)"; }}
-                    >
-                        + Kalem Ekle
-                    </button>
+                        <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={() => setLines(prev => [...prev, newLine()])}
+                        >
+                            + Kalem Ekle
+                        </Button>
 
                     <Button variant="primary" size="md" onClick={handleSave} disabled={isDemo || !canSave || isSaving} loading={isSaving} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
                         {isSaving ? "Kaydediliyor..." : "Kaydet & Stoğu Güncelle"}

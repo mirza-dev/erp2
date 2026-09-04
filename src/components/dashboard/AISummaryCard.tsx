@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Button from "@/components/ui/Button";
 
 interface OpsMetrics {
     criticalStockCount: number;
@@ -258,21 +259,9 @@ export default function AISummaryCard() {
                     <span style={{ fontSize: "12px", color: "var(--warning-text)" }}>
                         AI servisi yanıt vermedi.
                     </span>
-                    <button
-                        onClick={() => fetchSummary(true)}
-                        style={{
-                            fontSize: "11px",
-                            padding: "4px 10px",
-                            border: "1px solid var(--warning-border)",
-                            borderRadius: "5px",
-                            background: "transparent",
-                            color: "var(--warning-text)",
-                            cursor: "pointer",
-                            flexShrink: 0,
-                        }}
-                    >
-                        Tekrar Dene
-                    </button>
+                        <Button variant="secondary" size="xs" onClick={() => fetchSummary(true)}>
+                            Tekrar Dene
+                        </Button>
                 </div>
             </div>
         );
@@ -302,20 +291,9 @@ export default function AISummaryCard() {
                 justifyContent: "flex-end",
                 marginBottom: "14px",
             }}>
-                <button
-                    onClick={() => fetchSummary(true)}
-                    style={{
-                        fontSize: "11px",
-                        padding: "4px 10px",
-                        border: "1px solid var(--border-secondary)",
-                        borderRadius: "5px",
-                        background: "transparent",
-                        color: "var(--text-secondary)",
-                        cursor: "pointer",
-                    }}
-                >
-                    Yenile
-                </button>
+                        <Button variant="secondary" size="xs" onClick={() => fetchSummary(true)}>
+                            Yenile
+                        </Button>
             </div>
 
             {/* Metrics context bar */}

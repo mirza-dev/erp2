@@ -133,9 +133,15 @@ describe("GATE: yüzey + buton/kategori tutarlılığı", () => {
         //
         // Sınır bir whitelist değil, gerçek bir ayrım: `aria-controls` taşıyan
         // `role="tab"` bir PANEL DEĞİŞTİRİCİDİR (ürün detayındaki Genel/Teknik
-        // sekmeleri gibi) — listeyi süzmez, içerik bölmesi değiştirir ve alt
-        // çizgili kalması doğrudur. `aria-controls`'suz olan ise bir filtredir
-        // ve ortak çipten gelmelidir.
+        // sekmeleri gibi) — listeyi süzmez, içerik bölmesi değiştirir.
+        //
+        // 2026-09-04 — MUAFİYETİN GEREKÇESİ DEĞİŞTİ (kullanıcı kararı). Eskiden
+        // "alt çizgili kalması doğrudur" diyordu; kullanıcı gözüyle panel
+        // sekmeleri de kategoridir ve gri/alt-çizgili durmaları "beyaz olsun"
+        // isteğinin dışında kalmalarını haklı çıkarmıyor. Artık muafiyet YALNIZ
+        // `FilterChips` BİLEŞENİNİ kullanma zorunluluğundan: o bileşen
+        // `aria-controls` üretmiyor ve panel bağını kuramıyor. YÜZEY yine tek
+        // dilden gelmek ZORUNDA — aşağıdaki kural bunu ayrıca kilitliyor.
         const walk = (dir: string, out: string[] = []): string[] => {
             for (const e of readdirSync(dir)) {
                 const full = join(dir, e);
@@ -153,5 +159,20 @@ describe("GATE: yüzey + buton/kategori tutarlılığı", () => {
             })
             .map(f => relative(root, f));
         expect(offenders).toEqual([]);
+    });
+
+    // 2026-09-04 (Karar 1): muaf tutulan panel sekmeleri de tek buton dilinden
+    // beslenmek zorunda. Muafiyet "istediğin yüzeyi yaz" demek DEĞİL; yalnız
+    // `FilterChips` bileşenini kullanma zorunluluğunu kaldırıyor.
+    it("aria-controls'lu panel sekmeleri de Button dilinden besleniyor", () => {
+        const PANEL_TAB_FILES = ["src/app/dashboard/products/[id]/page.tsx"];
+        for (const rel of PANEL_TAB_FILES) {
+            const src = stripComments(readFileSync(join(root, rel), "utf8"));
+            expect(src, rel).toMatch(/role="tab"/);
+            expect(src, rel).toMatch(/aria-controls=/);
+            // Sekme yüzeyi elle yazılmaz: aktif/pasif ayrımı `Button` varyantından.
+            expect(src, rel).toMatch(/<Button[\s\S]{0,400}variant=\{isActive \? "primary" : "secondary"\}/);
+            expect(src, rel).not.toMatch(/role="tab"[\s\S]{0,300}borderBottom:\s*isActive/);
+        }
     });
 });

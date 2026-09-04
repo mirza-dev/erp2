@@ -77,6 +77,13 @@ export default function FilterChips<Key extends string>({
                 gap: "6px",
                 // Dar ekranda çipler sarmak yerine kayar — sarmak satır
                 // yüksekliğini zıplatıyor, kaydırma düzeni sabit tutuyor.
+                //
+                // 2026-09-04: `nowrap` AÇIKÇA yazıldı. Flex varsayılanı zaten
+                // buydu ama örtük kalırsa kilitlenemiyor. Kilit önemli: sarma,
+                // 44px'e genişleyen `tap-44` kutularının alt satırda çakışmasına
+                // yol açıyor — eskime filtresi ölçümde tam bunu yaşamış ve 44
+                // yerine 36'da kalmıştı. `gate/touch-targets` bunu arıyor.
+                flexWrap: "nowrap",
                 overflowX: "auto",
                 overflowY: "hidden",
                 maxWidth: "100%",

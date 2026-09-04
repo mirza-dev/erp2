@@ -14,6 +14,7 @@ import ProductionPanel from "@/components/dashboard/overview/ProductionPanel";
 import AiPanel from "@/components/dashboard/overview/AiPanel";
 import { StockPanel, ReorderPanel, AlertsPanel, OrdersPanel, type StockPanelStats } from "@/components/dashboard/overview/RealPanels";
 import DashboardReport from "@/components/dashboard/overview/DashboardReport";
+import Button from "@/components/ui/Button";
 import {
     buildKpis, periodModel, revenueByPeriod, orderCountsByPeriod, cogsByPeriod,
     stockValueByCategoryReporting, productionDailySeries,
@@ -252,21 +253,20 @@ export default function DashboardPage() {
                         harness'tı (headless Chromium'da window.print() no-op).
                         Geriye kalan gerçek kusur: düğme "indir" diyor ama dosya
                         indirmiyor, yazdırma penceresi açıyor. */}
-                    <button
+                    <Button
                         type="button"
+                        variant="primary"
+                        size="sm"
                         onClick={() => window.print()}
                         title="Yazdırma penceresi açılır — oradan PDF olarak kaydedebilirsiniz"
-                        style={{
-                            display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 600,
-                            padding: "6px 12px", borderRadius: 7, cursor: "pointer", color: "#fff",
-                            background: "var(--accent)", border: "1px solid var(--accent-border)",
-                        }}
+                        leftIcon={
+                            <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                                <path d="M4 6V2h8v4M4 12H3a1 1 0 01-1-1V7a1 1 0 011-1h10a1 1 0 011 1v4a1 1 0 01-1 1h-1M4 10h8v4H4z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
+                            </svg>
+                        }
                     >
-                        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                            <path d="M4 6V2h8v4M4 12H3a1 1 0 01-1-1V7a1 1 0 011-1h10a1 1 0 011 1v4a1 1 0 01-1 1h-1M4 10h8v4H4z" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" />
-                        </svg>
                         Raporu yazdır / PDF
-                    </button>
+                    </Button>
                 </div>}
             />
             </div>

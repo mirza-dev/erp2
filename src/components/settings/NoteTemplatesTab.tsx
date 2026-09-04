@@ -239,7 +239,7 @@ export default function NoteTemplatesTab() {
             {loading && <div style={{ color: "var(--text-secondary)" }}>Yükleniyor...</div>}
             {error && (
                 <div style={errStyle} role="alert">
-                    {error} <button type="button" onClick={load} style={{ marginLeft: "8px", textDecoration: "underline", background: "none", border: "none", color: "var(--accent-text)", cursor: "pointer" }}>Yeniden dene</button>
+                    {error}{" "}<Button type="button" variant="secondary" size="xs" onClick={load}>Yeniden dene</Button>
                 </div>
             )}
 

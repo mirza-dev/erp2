@@ -921,14 +921,13 @@ body {
     margin-right: 24px !important;
   }
 
-  /* `tap-44` çocuklarını SARAN (flex-wrap) kapsayıcı: 30px'lik çipler 44px'e
-     genişleyince her biri 7px yukarı/aşağı taşar → 6px'lik satır aralığında
-     iki satırın alanları çakışır ve alttaki satır üsttekinin dokunma alanını
-     yer. Ölçümde eskime filtresi tam olarak bunu yaşadı (44 yerine 36'da
-     kaldı). `!important`: gap inline style'da. */
-  .tap-row-gap {
-    row-gap: 16px !important;
-  }
+  /* 2026-09-04: `.tap-row-gap` SİLİNDİ. Sarma kaynaklı hit-alanı çakışmasını
+     çözüyordu (eskime filtresi 44 yerine 36'da kalmıştı), ama tek çağıranı
+     eskime çip satırıydı ve o `FilterChips`e geçti. `FilterChips` SARMAZ —
+     `flex-wrap: nowrap` + `overflow-x: auto` ile kendi kabında kayar, yani
+     ikinci satır hiç oluşmaz ve kusur yapısal olarak imkânsızdır. Ölçüldü:
+     390px'te 6 çipin altısı da 44×44, gövde taşması 0. Kural
+     `gate/touch-targets`'ta bu YENİ garantiyle değiştirildi. */
 }
 
 /* ============================================

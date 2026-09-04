@@ -399,13 +399,13 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                                                 fontVariantNumeric: "tabular-nums",
                                             }}
                                         />
-                                        <button
+                                        <Button
+                                            variant="secondary"
+                                            size="xs"
                                             onClick={() => setReceiveQtys(prev => ({ ...prev, [l.id]: String(remaining) }))}
-                                            style={{ fontSize: "11px", padding: "3px 8px", background: "transparent",
-                                                color: "var(--accent-text)", border: "0.5px solid var(--accent-border)",
-                                                borderRadius: "4px", cursor: "pointer" }}>
+                                        >
                                             Tümü
-                                        </button>
+                                        </Button>
                                     </div>
                                 </div>
                             );

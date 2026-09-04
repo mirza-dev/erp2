@@ -1519,26 +1519,16 @@ export default function PurchaseSuggestedPage() {
                     <span style={{ fontSize: "13px", color: "var(--accent-text)" }}>
                         {acceptedAndEditedCount} kabul/düzenlenen öneri siparişe dönüştürülmeyi bekliyor.
                     </span>
-                    <button
+                    <Button
+                        variant="primary"
+                        size="sm"
                         onClick={handleBulkPo}
                         disabled={isDemo}
                         title={isDemo ? DEMO_DISABLED_TOOLTIP : "Kabul/düzenlenen tüm önerileri siparişe çevir"}
                         aria-label={`${acceptedAndEditedCount} öneriyi siparişe çevir`}
-                        style={{
-                            padding: "6px 14px",
-                            fontSize: "12px",
-                            fontWeight: 600,
-                            background: isDemo ? "var(--bg-secondary)" : "var(--accent)",
-                            color: isDemo ? "var(--text-tertiary)" : "#fff",
-                            border: "none",
-                            borderRadius: "6px",
-                            cursor: isDemo ? "not-allowed" : "pointer",
-                            opacity: isDemo ? 0.5 : 1,
-                            flexShrink: 0,
-                        }}
                     >
-                        📋 Siparişe Çevir ({acceptedAndEditedCount})
-                    </button>
+                        Siparişe Çevir ({acceptedAndEditedCount})
+                    </Button>
                 </div>
             )}
 

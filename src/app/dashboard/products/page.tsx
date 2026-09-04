@@ -758,40 +758,24 @@ export default function ProductsPage() {
                         style={{ position: "fixed", inset: 0, zIndex: 49, background: "transparent" }}
                     />
                 )}
-                <button
-                    className="tap-44"
+                {/* Açılır menü TETİKLEYİCİSİ — çip değil, ama aktifken
+                    filtrelenmiş olduğunu göstermesi gerekiyor. Yüzey artık tek
+                    paletten (aktif mavi / pasif beyaz); elle yazılmış
+                    onMouseEnter/Leave DOM mutasyonu da böylece kalktı. */}
+                <Button
+                    variant={categoryIsActive ? "primary" : "secondary"}
+                    size="sm"
                     onClick={() => setCategoryDropdownOpen(prev => !prev)}
-                    style={{
-                        fontSize: "12px",
-                        padding: "5px 12px",
-                        border: `var(--line-width) solid ${categoryIsActive ? "var(--accent-border)" : "var(--border-secondary)"}`,
-                        borderRadius: "6px",
-                        background: categoryIsActive ? "var(--accent-bg)" : "transparent",
-                        color: categoryIsActive ? "var(--accent-text)" : "var(--text-secondary)",
-                        cursor: "pointer",
-                        fontWeight: categoryIsActive ? 600 : 400,
-                        display: "flex",
-                        alignItems: "center",
-                        gap: "6px",
-                    }}
-                    onMouseEnter={e => {
-                        if (!categoryIsActive) {
-                            e.currentTarget.style.background = "var(--bg-tertiary)";
-                            e.currentTarget.style.color = "var(--text-primary)";
-                        }
-                    }}
-                    onMouseLeave={e => {
-                        if (!categoryIsActive) {
-                            e.currentTarget.style.background = "transparent";
-                            e.currentTarget.style.color = "var(--text-secondary)";
-                        }
-                    }}
+                    aria-expanded={categoryDropdownOpen}
+                    aria-haspopup="menu"
+                    rightIcon={
+                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden>
+                            <path d="M2 3.5L5 6.5l3-3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
+                        </svg>
+                    }
                 >
                     {categoryButtonLabel}
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                        <path d="M2 3.5L5 6.5l3-3" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round"/>
-                    </svg>
-                </button>
+                </Button>
 
                 {categoryDropdownOpen && (
                     <div style={{

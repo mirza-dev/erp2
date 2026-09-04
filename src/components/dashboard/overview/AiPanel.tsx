@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useCallback } from "react";
-import Link from "next/link";
+import { ButtonLink } from "@/components/ui/Button";
 import OverviewPanel, { Dot } from "./OverviewPanel";
 import { toneVar } from "./charts/chart-utils";
 import { aiPointsFromOpsSummary } from "@/lib/dashboard-view-model";
@@ -108,13 +108,15 @@ export default function AiPanel() {
                             ))}
                         </div>
                     )}
-                    <Link href="/dashboard/alerts" style={{ textDecoration: "none", display: "block", marginTop: 14 }}>
-                        <span style={{
-                            display: "block", textAlign: "center", width: "100%", padding: "8px", fontSize: 12, fontWeight: 600,
-                            background: "var(--surface-subtle)", border: "1px solid var(--border-secondary)",
-                            borderRadius: 6, color: "var(--text-secondary)", cursor: "pointer",
-                        }}>Tüm analizi gör</span>
-                    </Link>
+                    <ButtonLink
+                        href="/dashboard/alerts"
+                        variant="secondary"
+                        size="sm"
+                        fullWidth
+                        style={{ marginTop: 14, justifyContent: "center" }}
+                    >
+                        Tüm analizi gör
+                    </ButtonLink>
                 </>
             )}
         </OverviewPanel>

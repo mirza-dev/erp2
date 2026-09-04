@@ -7,6 +7,8 @@ import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import type { VendorRow, ProductRow, PurchaseOrderRow, PurchaseOrderLineRow, ProductVendorLinkRow } from "@/lib/database.types";
 import { fieldStyle, labelStyle as sharedLabelStyle } from "@/components/ui/Input";
+import Button from "@/components/ui/Button";
+import { Trash2 } from "lucide-react";
 
 // Ortak form alanı stili — token tek kaynaktan (`--input-bg`/`--input-border`/
 // `--line-width`). Eskiden burada 0.5px + `--border-secondary` + `--bg-tertiary`
@@ -265,11 +267,7 @@ function NewPurchaseOrderPageInner() {
                     border: "0.5px solid var(--danger-border)", borderRadius: "6px",
                 }}>
                     <span>Form verileri yüklenemedi (tedarikçi/ürün listesi). Lütfen tekrar deneyin.</span>
-                    <button onClick={() => void loadData()} style={{
-                        padding: "4px 12px", fontSize: "12px",
-                        background: "var(--accent)", color: "#fff",
-                        border: "none", borderRadius: "5px", cursor: "pointer", fontWeight: 500, flexShrink: 0,
-                    }}>Yeniden dene</button>
+                    <Button variant="secondary" size="xs" onClick={() => void loadData()}>Yeniden dene</Button>
                 </div>
             )}
 
@@ -308,11 +306,7 @@ function NewPurchaseOrderPageInner() {
             }}>
                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "12px" }}>
                     <strong style={{ fontSize: "13px", color: "var(--text-primary)" }}>Satırlar</strong>
-                    <button onClick={addLine} style={{
-                        padding: "4px 12px", fontSize: "12px",
-                        background: "var(--bg-tertiary)", color: "var(--text-primary)",
-                        border: "0.5px solid var(--border-secondary)", borderRadius: "6px", cursor: "pointer",
-                    }}>+ Satır Ekle</button>
+                    <Button variant="secondary" size="sm" onClick={addLine}>+ Satır Ekle</Button>
                 </div>
                 {lines.map((l, idx) => (
                     <div key={idx} style={{
@@ -364,15 +358,16 @@ function NewPurchaseOrderPageInner() {
                                 onChange={e => updateLine(idx, { discount_pct: e.target.value })}
                                 aria-label={`Line ${idx + 1} iskonto`} style={inputStyle} />
                         </div>
-                        <button onClick={() => removeLine(idx)} disabled={lines.length === 1}
+                        <Button
+                            variant="icon"
+                            size="sm"
+                            iconOnly
+                            onClick={() => removeLine(idx)}
+                            disabled={lines.length === 1}
                             aria-label={`Line ${idx + 1} sil`}
-                            style={{
-                                padding: "6px 10px", fontSize: "12px",
-                                background: "transparent", color: "var(--danger-text)",
-                                border: "0.5px solid var(--border-tertiary)", borderRadius: "6px",
-                                cursor: lines.length === 1 ? "not-allowed" : "pointer",
-                                opacity: lines.length === 1 ? 0.4 : 1,
-                            }}>✕</button>
+                        >
+                            <Trash2 size={14} aria-hidden />
+                        </Button>
                     </div>
                 ))}
             </div>
@@ -423,22 +418,17 @@ function NewPurchaseOrderPageInner() {
             {/* Actions */}
             <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: "16px" }}>
                 <div style={{ display: "flex", gap: "8px" }}>
-                    <button onClick={() => router.push("/dashboard/purchase/orders")}
-                        style={{
-                            padding: "8px 16px", fontSize: "13px",
-                            background: "transparent", color: "var(--text-secondary)",
-                            border: "0.5px solid var(--border-secondary)", borderRadius: "6px", cursor: "pointer",
-                        }}>İptal</button>
-                    <button onClick={handleSubmit} disabled={isDemo || saving}
+                    <Button variant="secondary" size="md" onClick={() => router.push("/dashboard/purchase/orders")}>İptal</Button>
+                    <Button
+                        variant="primary"
+                        size="md"
+                        onClick={handleSubmit}
+                        disabled={isDemo || saving}
+                        loading={saving}
                         title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}
-                        style={{
-                            padding: "8px 16px", fontSize: "13px",
-                            background: (isDemo || saving) ? "var(--bg-tertiary)" : "var(--accent)",
-                            color: (isDemo || saving) ? "var(--text-tertiary)" : "#fff",
-                            border: "none", borderRadius: "6px",
-                            cursor: (isDemo || saving) ? "not-allowed" : "pointer",
-                            fontWeight: 500,
-                        }}>{saving ? "Kaydediliyor..." : "Sipariş Oluştur"}</button>
+                    >
+                        Sipariş Oluştur
+                    </Button>
                 </div>
             </div>
 

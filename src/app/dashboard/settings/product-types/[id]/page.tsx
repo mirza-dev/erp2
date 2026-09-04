@@ -500,15 +500,36 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
                 const activeIndex = activeFields.findIndex(item => item.id === field.id);
                 return (
                     <div style={{ display: "inline-flex", gap: "5px", flexWrap: "wrap", justifyContent: "flex-end" }}>
-                        <button type="button" onClick={() => void moveField(field.id, "up")} disabled={!field.is_active || activeIndex <= 0 || blocked} aria-label={`${field.label_tr} yukarı taşı`} style={iconButtonStyle}>
-                            <ArrowUp size={13} />
-                        </button>
-                        <button type="button" onClick={() => void moveField(field.id, "down")} disabled={!field.is_active || activeIndex < 0 || activeIndex >= activeFields.length - 1 || blocked} aria-label={`${field.label_tr} aşağı taşı`} style={iconButtonStyle}>
-                            <ArrowDown size={13} />
-                        </button>
-                        <button type="button" onClick={() => openEditField(field)} disabled={blocked} aria-label={`${field.label_tr} düzenle`} style={iconButtonStyle}>
-                            <Pencil size={13} />
-                        </button>
+                        <Button
+                            variant="icon"
+                            size="xs"
+                            iconOnly
+                            onClick={() => void moveField(field.id, "up")}
+                            disabled={!field.is_active || activeIndex <= 0 || blocked}
+                            aria-label={`${field.label_tr} yukarı taşı`}
+                        >
+                            <ArrowUp size={13} aria-hidden />
+                        </Button>
+                        <Button
+                            variant="icon"
+                            size="xs"
+                            iconOnly
+                            onClick={() => void moveField(field.id, "down")}
+                            disabled={!field.is_active || activeIndex < 0 || activeIndex >= activeFields.length - 1 || blocked}
+                            aria-label={`${field.label_tr} aşağı taşı`}
+                        >
+                            <ArrowDown size={13} aria-hidden />
+                        </Button>
+                        <Button
+                            variant="icon"
+                            size="xs"
+                            iconOnly
+                            onClick={() => openEditField(field)}
+                            disabled={blocked}
+                            aria-label={`${field.label_tr} düzenle`}
+                        >
+                            <Pencil size={13} aria-hidden />
+                        </Button>
                         {field.is_active && (
                             <Button variant="secondary" size="xs" onClick={() => void toggleRequired(field)} disabled={blocked}>
                                 {field.required ? "Opsiyonel" : "Zorunlu"}
@@ -770,15 +791,6 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
     );
 }
 
-const iconButtonStyle: React.CSSProperties = {
-    width: "28px",
-    height: "28px",
-    border: "0.5px solid var(--border-secondary)",
-    borderRadius: "6px",
-    background: "transparent",
-    color: "var(--text-secondary)",
-    display: "inline-flex",
-    alignItems: "center",
-    justifyContent: "center",
-    cursor: "pointer",
-};
+// 2026-09-04: `iconButtonStyle` SİLİNDİ — üç satır aksiyonu (yukarı/aşağı/
+// düzenle) `Button variant="icon" size="xs"`e geçti. Kenarlıklı bir ikon
+// kutusuydu, `icon` varyantının tam karşılığı; ayrıca `tap-44` kazandı.

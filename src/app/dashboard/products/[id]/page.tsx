@@ -1052,36 +1052,29 @@ export default function ProductDetailPage() {
             )}
 
             {/* Tab nav */}
-            <div role="tablist" aria-label="Ürün sekmeleri" style={{ display: "flex", gap: "0", borderBottom: "0.5px solid var(--border-tertiary)", overflowX: "auto" }}>
+            {/* 2026-09-04 (Karar 1): panel sekmeleri de beyaz/mavi dile geçti.
+                `FilterChips` KULLANILMADI — o bileşen `aria-controls` üretmiyor
+                ve buradaki sekmeler gerçek panellere bağlı. İşaretleme elde
+                kaldı, yalnız YÜZEY `Button`'dan geliyor. Alt çizgi şeridi de
+                kalktı: hap çipiyle birlikte iki ayrı aktiflik göstergesi olurdu. */}
+            <div role="tablist" aria-label="Ürün sekmeleri" style={{ display: "flex", gap: "6px", overflowX: "auto", paddingBottom: "2px" }}>
                 {tabs.map(t => {
                     const isActive = activeTab === t.key;
                     return (
-                        <button
+                        <Button
                             key={t.key}
                             role="tab"
                             aria-selected={isActive}
                             aria-controls={`tab-panel-${t.key}`}
                             id={`tab-${t.key}`}
+                            variant={isActive ? "primary" : "secondary"}
+                            size="sm"
                             onClick={() => setActiveTab(t.key)}
                             title={t.locked ? t.lockedNote : undefined}
-                            style={{
-                                padding: "10px 14px",
-                                background: "transparent",
-                                border: "none",
-                                borderBottom: isActive ? "2px solid var(--accent)" : "2px solid transparent",
-                                color: isActive ? "var(--text-primary)" : "var(--text-tertiary)",
-                                fontSize: "13px",
-                                fontWeight: isActive ? 600 : 500,
-                                cursor: "pointer",
-                                whiteSpace: "nowrap",
-                                display: "flex",
-                                alignItems: "center",
-                                gap: "5px",
-                            }}
                         >
                             {t.label}
-                            {t.locked && <span style={{ fontSize: "10px", opacity: 0.6 }}>🔒</span>}
-                        </button>
+                            {t.locked && <span style={{ fontSize: "10px", opacity: 0.6 }} aria-hidden>🔒</span>}
+                        </Button>
                     );
                 })}
             </div>
