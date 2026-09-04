@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useUrlFilters } from "@/hooks/useUrlFilters";
+import { useDebouncedSearch } from "@/hooks/useListUrlState";
 import Link from "next/link";
 import useSWR from "swr";
 import Button from "@/components/ui/Button";
@@ -37,12 +39,36 @@ import {
  * kullanıcı hangi kaynağa baktığını bilmeli.
  */
 export default function DeveloperLogsPage() {
-    const [range, setRange] = useState<TimeRange>(DEFAULT_TIME_RANGE);
-    const [level, setLevel] = useState("");
-    const [sources, setSources] = useState<FeedSource[]>([]);
-    const [requestId, setRequestId] = useState("");
-    const [search, setSearch] = useState("");
+    /**
+     * A4: filtreler URL'de. Kaynak seçimi ÇOK SEÇİMLİ ama URL'de virgüllü tek
+     * değer — `URLSearchParams`'ın gerçeği bu, ve `?sources=audit,email` linki
+     * insan tarafından da okunur. Asıl kazanç burada: "şu request-id'nin tüm
+     * olayları" artık paylaşılabilir bir adres.
+     */
+    const { values, set } = useUrlFilters({
+        range: DEFAULT_TIME_RANGE as string,
+        level: "",
+        sources: "",
+        requestId: "",
+        search: "",
+    });
+    const { level, requestId, search } = values;
+    const range = values.range as TimeRange;
+    const sources = useMemo(
+        () => (values.sources ? values.sources.split(",").filter(Boolean) as FeedSource[] : []),
+        [values.sources],
+    );
+
+    /** Biriken sayfa imleçleri — filtre değil, URL'e yazılmaz. */
     const [cursors, setCursors] = useState<string[]>([]);
+
+    const setFilter = (partial: Partial<typeof values>) => {
+        setCursors([]);
+        set(partial);
+    };
+
+    const requestIdInput = useDebouncedSearch(requestId, v => setFilter({ requestId: v }));
+    const searchInput = useDebouncedSearch(search, v => setFilter({ search: v }));
 
     const query = useMemo(() => {
         const q = new URLSearchParams({ range });
@@ -78,16 +104,11 @@ export default function DeveloperLogsPage() {
         ...(extraPages ?? []).flatMap(p => p.unavailableSources ?? []),
     ])];
 
-    const reset = <T,>(setter: (v: T) => void) => (value: T) => {
-        setCursors([]);
-        setter(value);
-    };
-
     const toggleSource = (source: FeedSource) => {
-        setCursors([]);
-        setSources(prev =>
-            prev.includes(source) ? prev.filter(s => s !== source) : [...prev, source],
-        );
+        const next = sources.includes(source)
+            ? sources.filter(s => s !== source)
+            : [...sources, source];
+        setFilter({ sources: next.join(",") });
     };
 
     return (
@@ -105,7 +126,7 @@ export default function DeveloperLogsPage() {
                 onRefresh={() => void mutate()}
                 refreshing={isValidating}
                 refreshAriaLabel="Kayıtları yenile"
-                actions={<RangePicker value={range} onChange={reset(setRange)} />}
+                actions={<RangePicker value={range} onChange={r => setFilter({ range: r })} />}
             />
 
             <Card>
@@ -120,7 +141,7 @@ export default function DeveloperLogsPage() {
                         inputSize="sm"
                         aria-label="Seviye filtresi"
                         value={level}
-                        onChange={e => reset(setLevel)(e.target.value)}
+                        onChange={e => setFilter({ level: e.target.value })}
                         style={{ width: "auto", minWidth: "130px" }}
                     >
                         <option value="">Tüm seviyeler</option>
@@ -132,8 +153,8 @@ export default function DeveloperLogsPage() {
                         inputSize="sm"
                         aria-label="Request ID filtresi"
                         placeholder="Request ID"
-                        value={requestId}
-                        onChange={e => reset(setRequestId)(e.target.value)}
+                        value={requestIdInput.value}
+                        onChange={e => requestIdInput.setValue(e.target.value)}
                         style={{ width: "auto", minWidth: "170px" }}
                     />
                     <Input
@@ -141,8 +162,8 @@ export default function DeveloperLogsPage() {
                         type="search"
                         aria-label="Kayıtlarda ara"
                         placeholder="Mesajda ara"
-                        value={search}
-                        onChange={e => reset(setSearch)(e.target.value)}
+                        value={searchInput.value}
+                        onChange={e => searchInput.setValue(e.target.value)}
                         style={{ width: "auto", minWidth: "200px", flex: 1 }}
                     />
                 </div>
@@ -176,7 +197,7 @@ export default function DeveloperLogsPage() {
                     {sources.length > 0 && (
                         <button
                             type="button"
-                            onClick={() => { setCursors([]); setSources([]); }}
+                            onClick={() => setFilter({ sources: "" })}
                             style={{
                                 fontSize: "11.5px", padding: "4px 8px", border: "none",
                                 background: "transparent", color: "var(--text-tertiary)",
@@ -251,7 +272,7 @@ export default function DeveloperLogsPage() {
                                     {entry.requestId && (
                                         <button
                                             type="button"
-                                            onClick={() => reset(setRequestId)(entry.requestId!)}
+                                            onClick={() => setFilter({ requestId: entry.requestId! })}
                                             title="Bu isteğin tüm olaylarını göster"
                                             style={{
                                                 border: "none", background: "transparent", cursor: "pointer",

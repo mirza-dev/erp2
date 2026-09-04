@@ -160,6 +160,41 @@ describe("GATE — dokunma hedefleri", () => {
         }
     });
 
+    // ── §A7 (2026-09-04): dar ekranda YATAY TAŞMA ──────────────────────────
+    //
+    // Ölçüm (360/390px × 2 tema × 30 rota): BEŞ rota gövdeyi itiyordu —
+    // Satın Alma Siparişleri 386 · Veri Aktarım Merkezi 383 · Excel Aktarım
+    // Sihirbazı 396 · E-posta Teslimatları 378 · Developer Console 371.
+    // Sıralama tesadüf değil: hepsi ÜST BARDAKİ SAYFA BAŞLIĞININ uzunluğu.
+    //
+    // Sebep: `.dashboard-grid` dar ekranda tek kolon (`1fr`) ve bir ızgara
+    // kolonunun otomatik minimumu `auto`dur → kolon, çocuklarının MIN-CONTENT'i
+    // kadar taban alır. Başlık `white-space: nowrap` taşıyor ve `overflow:
+    // hidden` min-content'i KÜÇÜLTMEZ; `<main>`de `minWidth: 0` vardı,
+    // `.topbar-wrapper`da YOKTU → kolon başlık kadar genişliyor, üç noktalı
+    // kısaltma hiç devreye girmiyordu.
+    //
+    // Not: ilk teşhis (`.topbar-right`in `flex-shrink: 0`ı + döviz ticker'ı)
+    // YANLIŞTI — o küme ≤768px'te zaten `display: none` ve yalnız 76px.
+    it("ızgara çocukları min-content'lerini kolona dayatamaz (§A7 yatay taşma)", () => {
+        const layout = readFileSync(join(root, "src/app/dashboard/layout.tsx"), "utf8");
+
+        // İki ızgara çocuğu da alt sınırını serbest bırakmalı — biri unutulursa
+        // kolon o çocuğun min-content'ine kilitlenir ve gövde yeniden taşar.
+        expect(layout, "topbar sarmalayıcısı min-width:0 taşımalı")
+            .toMatch(/className="topbar-wrapper"[\s\S]{0,120}minWidth: 0/);
+        expect(layout, "<main> min-width:0 taşımalı")
+            .toMatch(/<main[\s\S]{0,400}minWidth: 0/);
+
+        // Serbest bırakılan alt sınırın karşılığı: başlık gerçekten KISALIYOR.
+        // Bu üç bildirim olmadan başlık kısalmaz, kırpılır ya da taşar.
+        const titleRule = css.match(/\.topbar-page-title \{([^}]*)\}/)?.[1] ?? "";
+        expect(titleRule, ".topbar-page-title kuralı bulunamadı").not.toBe("");
+        expect(titleRule).toMatch(/min-width:\s*0/);
+        expect(titleRule).toMatch(/overflow:\s*hidden/);
+        expect(titleRule).toMatch(/text-overflow:\s*ellipsis/);
+    });
+
     it("demo bandosunun kapat düğmesi erişilebilir (envanterin en kötüsüydü: 13×14)", () => {
         const banner = readFileSync(join(root, "src/components/ui/DemoBanner.tsx"), "utf8");
         expect(banner).toMatch(/aria-label="Bildirimi kapat"/);

@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useUrlFilters } from "@/hooks/useUrlFilters";
+import { useDebouncedSearch } from "@/hooks/useListUrlState";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
 import Button from "@/components/ui/Button";
@@ -38,13 +40,38 @@ interface ErrorPage extends CursorPage<SystemErrorGroupRow> {
 
 export default function DeveloperErrorsPage() {
     const { push } = useRouter();
-    const [range, setRange] = useState<TimeRange>(DEFAULT_TIME_RANGE);
-    const [severity, setSeverity] = useState("");
-    const [status, setStatus] = useState("open");
-    const [module, setModule] = useState("");
-    const [search, setSearch] = useState("");
-    /** Yüklenmiş sayfaların imleçleri — "Daha fazla" her seferinde bir sayfa ekler. */
+    /**
+     * A4: filtreler URL'de. Varsayılan `status: "open"` — "Tüm durumlar" seçmek
+     * `?status=` yazar; hook'un "yok = varsayılan, VAR (boşsa bile) = o değer"
+     * sözleşmesi olmadan bu seçim hiç ifade edilemezdi.
+     */
+    const { values, set } = useUrlFilters({
+        range: DEFAULT_TIME_RANGE as string,
+        severity: "",
+        status: "open",
+        module: "",
+        search: "",
+    });
+    const { severity, status, module, search } = values;
+    const range = values.range as TimeRange;
+
+    /**
+     * Yüklenmiş sayfaların imleçleri — "Daha fazla" her seferinde bir sayfa ekler.
+     * URL'e YAZILMAZ: biriken sayfa yığını bir filtre değil, oturum içi bir
+     * gezinme durumu; linki açan kişide yeniden kurulamaz.
+     */
     const [cursors, setCursors] = useState<string[]>([]);
+
+    /** Filtre değişimi biriken sayfaları geçersiz kılar. */
+    const setFilter = (partial: Partial<typeof values>) => {
+        setCursors([]);
+        set(partial);
+    };
+
+    // Metin alanları yazarken duyarlı, duraklayınca URL'e yazar. Yan kazanç:
+    // eskiden her tuş vuruşu yeni bir SWR anahtarı (yani yeni istek) üretiyordu.
+    const moduleInput = useDebouncedSearch(module, v => setFilter({ module: v }));
+    const searchInput = useDebouncedSearch(search, v => setFilter({ search: v }));
 
     const query = useMemo(() => {
         const q = new URLSearchParams({ range });
@@ -76,11 +103,6 @@ export default function DeveloperErrorsPage() {
     }, [data, extraPages]);
 
     const lastCursor = (extraPages ?? []).at(-1)?.nextCursor ?? data?.nextCursor ?? null;
-
-    const resetPaging = <T,>(setter: (v: T) => void) => (value: T) => {
-        setCursors([]);
-        setter(value);
-    };
 
     const columns: DataTableColumn<SystemErrorGroupRow>[] = [
         {
@@ -162,7 +184,7 @@ export default function DeveloperErrorsPage() {
                 onRefresh={() => void mutate()}
                 refreshing={isValidating}
                 refreshAriaLabel="Hataları yenile"
-                actions={<RangePicker value={range} onChange={resetPaging(setRange)} />}
+                actions={<RangePicker value={range} onChange={r => setFilter({ range: r })} />}
             />
 
             <Card>
@@ -171,7 +193,7 @@ export default function DeveloperErrorsPage() {
                         inputSize="sm"
                         aria-label="Ciddiyet filtresi"
                         value={severity}
-                        onChange={e => resetPaging(setSeverity)(e.target.value)}
+                        onChange={e => setFilter({ severity: e.target.value })}
                         style={{ width: "auto", minWidth: "130px" }}
                     >
                         <option value="">Tüm ciddiyetler</option>
@@ -183,7 +205,7 @@ export default function DeveloperErrorsPage() {
                         inputSize="sm"
                         aria-label="Durum filtresi"
                         value={status}
-                        onChange={e => resetPaging(setStatus)(e.target.value)}
+                        onChange={e => setFilter({ status: e.target.value })}
                         style={{ width: "auto", minWidth: "130px" }}
                     >
                         {STATUS_OPTIONS.map(o => (
@@ -194,8 +216,8 @@ export default function DeveloperErrorsPage() {
                         inputSize="sm"
                         aria-label="Modül filtresi"
                         placeholder="Modül (örn. quotes)"
-                        value={module}
-                        onChange={e => resetPaging(setModule)(e.target.value)}
+                        value={moduleInput.value}
+                        onChange={e => moduleInput.setValue(e.target.value)}
                         style={{ width: "auto", minWidth: "150px" }}
                     />
                     <Input
@@ -203,8 +225,8 @@ export default function DeveloperErrorsPage() {
                         type="search"
                         aria-label="Hata ara"
                         placeholder="Mesaj / endpoint ara"
-                        value={search}
-                        onChange={e => resetPaging(setSearch)(e.target.value)}
+                        value={searchInput.value}
+                        onChange={e => searchInput.setValue(e.target.value)}
                         style={{ width: "auto", minWidth: "200px", flex: 1 }}
                     />
                 </div>

@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { forwardRef, type AnchorHTMLAttributes, type ButtonHTMLAttributes, type CSSProperties, type ComponentProps, type ReactNode } from "react";
 
-type Variant = "primary" | "secondary" | "dangerSoft" | "danger" | "success" | "ghost" | "toolbar" | "icon";
+type Variant = "primary" | "secondary" | "dangerSoft" | "danger" | "success" | "ghost" | "ghostDanger" | "toolbar" | "icon";
 type Size = "xs" | "sm" | "md" | "lg" | "cta";
 
 type ButtonBaseProps = Omit<ButtonHTMLAttributes<HTMLButtonElement>, "children"> & {
@@ -121,6 +121,26 @@ const VARIANT_STYLES: Record<Variant, VariantStyle> = {
         color: "var(--text-secondary)",
         hoverBg: "var(--nav-hover-bg)",
         hoverColor: "var(--text-primary)",
+    },
+    /**
+     * 2026-09-04: satır içi YIKICI ikonlar için. `ghost`un aynısı, yalnız hover'ı
+     * kırmızı. Neden ayrı bir varyant gerekti: `ghost` nötr hover verir (silme
+     * uyarısı kaybolur), `dangerSoft` ise SÜREKLİ kırmızı dolgudur — bir satırda
+     * yan yana duran üç ikondan birini sürekli alarma çevirir. Aradaki doğru
+     * ton "dinlenirken sessiz, dokununca kırmızı"ydı ve sistemde karşılığı yoktu;
+     * `DosyalarTab` bu yüzden `.file-action-btn.is-danger` diye kendi kuralını
+     * taşıyordu (depodaki tek `--danger` hover'ı). O kural silindi.
+     */
+    ghostDanger: {
+        bg: "transparent",
+        border: "transparent",
+        // `ghost` ile AYNI: silme ikonu satır komşularıyla eşit ağırlıkta durmalı.
+        // Eski sınıf `--text-tertiary` kullanıyordu; komşuları `ghost`a geçince
+        // üç ikondan biri daha soluk kalmıştı.
+        color: "var(--text-secondary)",
+        hoverBg: "var(--danger-bg)",
+        hoverBorder: "var(--danger-border)",
+        hoverColor: "var(--danger-text)",
     },
     toolbar: {
         bg: "transparent",

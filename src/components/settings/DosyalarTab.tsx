@@ -500,15 +500,16 @@ export default function DosyalarTab() {
                     Sil?
                 </Button>
             ) : (
-                /* 2026-09-04: BU BİRİ elle kaldı. `.is-danger` hover'da kırmızı
-                   veriyor (yıkıcı aksiyon işareti) ve `Button`'da karşılığı olan
-                   bir varyant YOK: `ghost` nötr hover, `dangerSoft` ise sürekli
-                   kırmızı dolgu — satır ikonunda ikisi de yanlış. Sinyali
-                   kaybetmemek için sınıf korundu; ihtiyaç `deferred_backlog`'a
-                   yazıldı. */
-                <button
-                    type="button"
-                    className="file-action-btn is-danger"
+                /* 2026-09-04 (ikinci tur): elle örülmüş SON kontrol de buraya taşındı.
+                   İlk turda kalmıştı çünkü `.is-danger` hover'daki kırmızı YIKICI
+                   AKSİYON İŞARETİDİR ve `Button`'da karşılığı yoktu (`ghost` nötr,
+                   `dangerSoft` sürekli kırmızı). Eksik varyant eklendi:
+                   `ghostDanger` — dinlenirken komşularıyla aynı, hover'da kırmızı.
+                   `.file-action-btn` ailesi bu satırla birlikte silindi. */
+                <Button
+                    variant="ghostDanger"
+                    size="xs"
+                    iconOnly
                     title={isDemo ? DEMO_DISABLED_TOOLTIP : "Sil"}
                     aria-label={`Sil: ${f.display_name}`}
                     onClick={() => {
@@ -517,7 +518,7 @@ export default function DosyalarTab() {
                     }}
                 >
                     <Trash2 size={14} aria-hidden="true" />
-                </button>
+                </Button>
             )}
         </div>
     );

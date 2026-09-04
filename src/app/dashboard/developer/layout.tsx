@@ -1,5 +1,6 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { usePermissions } from "@/lib/auth/use-permissions";
@@ -92,7 +93,14 @@ export default function DeveloperLayout({ children }: { children: React.ReactNod
                     );
                 })}
             </nav>
-            {children}
+            {/* 2026-09-04 (A4): filtreler URL'e yazılıyor → sayfalar
+                `useSearchParams` okuyor. O kanca bir Suspense sınırı OLMADAN
+                Next build'ini kırar (Faz 4 dersi). Sınır altı sayfaya ayrı ayrı
+                değil KABUĞA tek seferde kondu — yeni bir konsol sayfası
+                eklendiğinde kimsenin hatırlaması gerekmesin. */}
+            <Suspense fallback={<LoadingState message="Yükleniyor…" />}>
+                {children}
+            </Suspense>
         </div>
     );
 }

@@ -56,7 +56,16 @@ export default function DashboardLayout({
                     }}
                 >
                     {/* Topbar — spans full width */}
-                    <div className="topbar-wrapper" style={{ gridColumn: "1 / -1" }}>
+                    {/* 2026-09-04 (§A7): `minWidth: 0` — `<main>`dekiyle AYNI sebep ve
+                        artık simetrik. Izgara kolonunun otomatik minimumu `auto`dur:
+                        kolon, çocuklarının MIN-CONTENT'iyle taban alır. Üst bardaki
+                        sayfa başlığı `white-space: nowrap` taşıyor ve `overflow: hidden`
+                        min-content'i KÜÇÜLTMEZ → başlık ne kadar uzunsa kolon o kadar
+                        genişliyordu ve üç noktalı kısaltma hiç devreye girmiyordu.
+                        Ölçüm (390px): "Excel Aktarım Sihirbazı" → gövde 396px = 6px
+                        taşma; 360px'te beş rota 371–396px. `min-width: 0` ile kolon
+                        görüntü alanında kalıyor, başlık tasarlandığı gibi kısalıyor. */}
+                    <div className="topbar-wrapper" style={{ gridColumn: "1 / -1", minWidth: 0 }}>
                         <Topbar onToggleSidebar={() => setSidebarOpen(prev => !prev)} />
                     </div>
 

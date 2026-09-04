@@ -168,4 +168,83 @@ describe("GATE: Developer Console ortak stil kaynağı", () => {
             );
         }
     });
+
+    // ── A4 (2026-09-04): filtreler URL'de ───────────────────────────────────
+    //
+    // 2026-08-31 turunda D1 olarak açık bırakılmıştı: filtreli bir görünüm
+    // paylaşılamıyor, yenileme filtreyi siliyor, "şu request-id'ye bak" demenin
+    // adresi yok. Filtre `useState`te yaşadığı sürece bunların hiçbiri mümkün değil.
+    it("filtre taşıyan konsol sayfaları filtreyi URL'den okur, çıplak state'te tutmaz", () => {
+        // Dosya → o sayfanın filtre değişkenleri. Liste sayfa eklendiğinde
+        // güncellenmeli; eksik kalırsa aşağıdaki "kapsam" iddiası uyarır.
+        const FILTERED: Record<string, string[]> = {
+            "src/app/dashboard/developer/page.tsx": ["range"],
+            "src/app/dashboard/developer/performance/page.tsx": ["range"],
+            "src/app/dashboard/developer/errors/page.tsx": ["range", "severity", "status", "module", "search"],
+            "src/app/dashboard/developer/logs/page.tsx": ["range", "level", "sources", "requestId", "search"],
+            "src/app/dashboard/developer/bugs/page.tsx": ["status", "priority", "search"],
+        };
+
+        // Yalnız SAYFA bileşeninin gövdesine bakılır. Aynı dosyada yaşayan yan
+        // bileşenlerin (bugs → `BugModal`) kendi `status`/`priority` form
+        // state'i vardır ve o meşrudur: form alanı filtre değil.
+        const pageBody = (src: string) => {
+            const start = src.indexOf("export default function");
+            if (start < 0) return src;
+            const rest = src.slice(start + 1);
+            const end = rest.search(/\n(?:function|const|export) /);
+            return end < 0 ? rest : rest.slice(0, end);
+        };
+
+        for (const [path, keys] of Object.entries(FILTERED)) {
+            const file = consoleFiles.find(f => f.path === path);
+            expect(file, path).toBeDefined();
+            const src = pageBody(file!.src);
+            expect(src, `${path} useUrlFilters kullanmalı`).toContain("useUrlFilters");
+
+            // Varsayılan sözlüğün GÖVDESİ ayrıştırılır ve iddia YALNIZ onun
+            // içinde yapılır.
+            //
+            // Kırmızı-kanıt turunun yakaladığı kusur: ilk hâli
+            // `useUrlFilters\(\{[\s\S]*?<key>:` diyordu. `[\s\S]*?` nesne
+            // literalinden ÇIKABİLİYOR — bir anahtar sözlükten silinse bile
+            // dosyanın ilerisindeki başka bir `priority:` (rozet haritası, modal
+            // state'i) desene yetiyordu ve kural YEŞİL kalıyordu. Bir kaynak
+            // iddiası, iddia ettiği SINIRIN içinde kalmalı.
+            const dict = src.match(/useUrlFilters\(\{([^}]*)\}/)?.[1];
+            expect(dict, `${path} → useUrlFilters varsayılan sözlüğü okunamadı`).toBeDefined();
+
+            for (const key of keys) {
+                expect(dict, `${path} → ${key} URL'e bağlı değil`)
+                    .toMatch(new RegExp(`\\b${key}\\s*:`));
+                // Ve aynı ad çıplak bir useState'te YAŞAMAMALI (iki kaynak =
+                // URL ile ekran ayrışır; tam olarak kaçındığımız şey).
+                // Setter'sız yıkım da sayılır: `const [priority] = useState()`.
+                expect(src, `${path} → ${key} hâlâ useState'te`)
+                    .not.toMatch(new RegExp(`\\[\\s*${key}\\s*[,\\]][^=]*=\\s*useState`));
+            }
+        }
+    });
+
+    it("biriken sayfa imleçleri URL'e YAZILMAZ (filtre değil, oturum durumu)", () => {
+        for (const path of [
+            "src/app/dashboard/developer/errors/page.tsx",
+            "src/app/dashboard/developer/logs/page.tsx",
+        ]) {
+            const src = consoleFiles.find(f => f.path === path)!.src;
+            // İmleç yığını yerel state olarak KALIR: linki açan kişide yeniden
+            // kurulamaz, kurulmaya çalışılırsa "10 sayfa yükle" gibi bir adres olur.
+            expect(src, path).toMatch(/\[cursors, setCursors\] = useState/);
+            expect(src, path).not.toMatch(/useUrlFilters\(\{[\s\S]*?cursors\s*:/);
+        }
+    });
+
+    it("konsol kabuğu Suspense sınırını taşır — `useSearchParams` onsuz build'i kırar", () => {
+        const layout = readFileSync(join(CONSOLE_DIR, "layout.tsx"), "utf8");
+        const code = stripComments(layout);
+        expect(code).toMatch(/import \{ Suspense \} from "react"/);
+        // Sınır ÇOCUKLARI sarmalı: altı sayfanın hepsi tek seferde korunsun,
+        // yeni sayfa eklenince kimse hatırlamak zorunda kalmasın.
+        expect(code).toMatch(/<Suspense[\s\S]{0,120}\{children\}[\s\S]{0,40}<\/Suspense>/);
+    });
 });

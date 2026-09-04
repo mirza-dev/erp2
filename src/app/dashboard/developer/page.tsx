@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useUrlFilters } from "@/hooks/useUrlFilters";
 import Link from "next/link";
 import useSWR from "swr";
 import Card from "@/components/ui/Card";
@@ -33,7 +33,9 @@ import { formatUptime } from "@/lib/telemetry/service-health";
 const REFRESH_MS = 30_000;
 
 export default function DeveloperOverviewPage() {
-    const [range, setRange] = useState<TimeRange>(DEFAULT_TIME_RANGE);
+    // A4: aralık URL'de — paylaşılan link aynı pencereyi açar.
+    const { values, set } = useUrlFilters({ range: DEFAULT_TIME_RANGE });
+    const range = values.range as TimeRange;
     const { data, error, isLoading, isValidating, mutate } = useSWR<OverviewPayload>(
         `/api/developer/overview?range=${range}`,
         jsonFetcher,
@@ -61,7 +63,7 @@ export default function DeveloperOverviewPage() {
                 onRefresh={() => void mutate()}
                 refreshing={isValidating}
                 refreshAriaLabel="Sistem durumunu yenile"
-                actions={<RangePicker value={range} onChange={setRange} />}
+                actions={<RangePicker value={range} onChange={r => set({ range: r })} />}
             />
 
             {/* ── Genel sağlık ────────────────────────────────────────────── */}

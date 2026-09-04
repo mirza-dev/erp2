@@ -969,7 +969,13 @@ body {
 .topbar-right {
   justify-content: flex-end;
   gap: 10px;
-  min-width: 0;
+  /* 2026-09-04: buradaki `min-width: 0` SİLİNDİ. `flex-shrink: 0` ile birlikte
+     ölü koddu (küçülmeyen bir öğede alt sınırın hükmü yok) ve ölü olmaktan
+     kötüsü, YANILTICIYDI: §A7 taşmasının ilk teşhisi "sağ küme küçülmeyi
+     reddediyor" diye tam bu satır çiftine bağlanmıştı. Ölçüm başka söyledi —
+     sağ küme 76px, taşmayı üst barın kısalmayan BAŞLIĞI üretiyordu (bkz.
+     dashboard/layout.tsx). `flex-shrink: 0` kasıtlı kalıyor: tema/profil
+     düğmeleri sıkışmamalı. */
   flex-shrink: 0;
 }
 
@@ -1628,28 +1634,13 @@ body {
   opacity: 1;
 }
 
-.file-action-btn {
-  width: 28px;
-  height: 28px;
-  display: grid;
-  place-items: center;
-  border: var(--line-width) solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text-tertiary);
-  cursor: pointer;
-  transition: background 0.12s ease, color 0.12s ease, border-color 0.12s ease;
-}
-.file-action-btn:hover {
-  background: var(--nav-hover-bg);
-  color: var(--text-primary);
-  border-color: var(--border-tertiary);
-}
-.file-action-btn.is-danger:hover {
-  background: var(--danger-bg);
-  color: var(--danger-text);
-  border-color: var(--danger-border);
-}
+/* 2026-09-04: `.file-action-btn` ailesi (temel + hover + `.is-danger:hover`)
+   SİLİNDİ. Tek çağıranı Ayarlar → Dosyalar satır aksiyonlarıydı ve o üç ikon
+   artık `Button`dan geliyor. `.is-danger:hover` depodaki TEK `--danger` hover
+   kuralıydı; karşılığı `Button`da yoktu, bu yüzden `ghostDanger` varyantı
+   eklendi — yani kural silinmedi, TAŞINDI ve `button-source-regression`
+   tarafından kilitlendi. Yan kazanç: kontrol artık `tap-44` alıyor. */
+
 
 .files-empty {
   padding: 42px 20px;

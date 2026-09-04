@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useUrlFilters } from "@/hooks/useUrlFilters";
 import useSWR from "swr";
 import Badge from "@/components/ui/Badge";
 import Card from "@/components/ui/Card";
@@ -23,7 +23,9 @@ import {
 } from "@/components/developer/console-format";
 
 export default function DeveloperPerformancePage() {
-    const [range, setRange] = useState<TimeRange>(DEFAULT_TIME_RANGE);
+    // A4: aralık URL'de.
+    const { values, set } = useUrlFilters({ range: DEFAULT_TIME_RANGE });
+    const range = values.range as TimeRange;
     const { data, error, isLoading, isValidating, mutate } = useSWR<PerformanceResponse>(
         `/api/developer/performance?range=${range}`,
         jsonFetcher,
@@ -143,7 +145,7 @@ export default function DeveloperPerformancePage() {
                 onRefresh={() => void mutate()}
                 refreshing={isValidating}
                 refreshAriaLabel="Performans verilerini yenile"
-                actions={<RangePicker value={range} onChange={setRange} />}
+                actions={<RangePicker value={range} onChange={r => set({ range: r })} />}
             />
 
             {/* Ölçümün NE OLDUĞU ekranda yazılı — rakamlar "sunucu süresi" sanılmasın. */}

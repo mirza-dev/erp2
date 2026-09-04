@@ -275,4 +275,40 @@ describe("premium button source regression", () => {
         expect(logs).toMatch(/aria-pressed=\{active\}/);
         expect(logs).not.toContain('from "@/components/ui/FilterChips"');
     });
+
+    // ── ghost-danger (2026-09-04, ikinci tur) ───────────────────────────────
+    //
+    // Dilim 3'ün TEK bilinçli istisnası kapandı. `.file-action-btn.is-danger`
+    // depodaki tek `--danger` hover kuralıydı: dinlenirken sessiz, hover'da
+    // kırmızı — yani "yıkıcı" sinyali. `Button`da karşılığı olmadığı için o
+    // kontrol elle örülmüş kalmıştı; artık varyant var, sınıf yok.
+    it("satır içi yıkıcı ikon `ghostDanger` varyantından gelir, yerel sınıf geri gelmez", () => {
+        const stripComments = (src: string) =>
+            src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+        const readCode = (file: string) =>
+            stripComments(readFileSync(join(projectRoot, file), "utf8"));
+        const withinElement = (tag: string, attr: string, label: string) =>
+            new RegExp(`<${tag}(?:(?!</${tag}>)[\\s\\S])*?${attr}(?:(?!</${tag}>)[\\s\\S])*?${label}`);
+
+        // 1) Varyant var ve YIKICI: dinlenmesi şeffaf, hover'ı danger token'ları.
+        //    Dinlenme rengi `ghost` ile aynı olmalı — satırdaki üç ikon eşit
+        //    ağırlıkta durur (eski sınıf `--text-tertiary` ile soluk kalıyordu).
+        const button = readCode("src/components/ui/Button.tsx");
+        expect(button).toMatch(/ghostDanger:\s*\{[\s\S]*?bg:\s*"transparent"/);
+        expect(button).toMatch(/ghostDanger:\s*\{[\s\S]*?color:\s*"var\(--text-secondary\)"/);
+        expect(button).toMatch(/ghostDanger:\s*\{[\s\S]*?hoverBg:\s*"var\(--danger-bg\)"/);
+        expect(button).toMatch(/ghostDanger:\s*\{[\s\S]*?hoverColor:\s*"var\(--danger-text\)"/);
+        expect(button).toMatch(/hoverBorder:\s*"var\(--danger-border\)"/);
+
+        // 2) Tüketici gerçekten bağlı — varyant yazılıp kullanılmamış olmasın.
+        const dosyalar = readCode("src/components/settings/DosyalarTab.tsx");
+        expect(dosyalar).toMatch(withinElement("Button", 'variant="ghostDanger"', "Sil: \\$\\{f.display_name\\}"));
+        expect(dosyalar).not.toContain("file-action-btn");
+
+        // 3) Silinen sınıf ailesi CSS'e geri gelemez. `stripComments` ZORUNLU:
+        //    adı, onu silerken bıraktığım gerekçe yorumunda geçiyor (depoda bu
+        //    tuzağa dört kez düşüldü).
+        const css = stripComments(readFileSync(join(projectRoot, "src/app/globals.css"), "utf8"));
+        expect(css).not.toContain("file-action-btn");
+    });
 });

@@ -1,6 +1,8 @@
 "use client";
 
 import { useMemo, useState } from "react";
+import { useUrlFilters } from "@/hooks/useUrlFilters";
+import { useDebouncedSearch } from "@/hooks/useListUrlState";
 import useSWR from "swr";
 import Badge from "@/components/ui/Badge";
 import Button from "@/components/ui/Button";
@@ -41,9 +43,10 @@ const CLOSED: readonly DeveloperBugStatus[] = ["fixed", "closed", "ignored"];
 
 export default function DeveloperBugsPage() {
     const { toast } = useToast();
-    const [status, setStatus] = useState("");
-    const [priority, setPriority] = useState("");
-    const [search, setSearch] = useState("");
+    // A4: filtreler URL'de — "açık kritik bug'lar" linki paylaşılabilir.
+    const { values, set } = useUrlFilters({ status: "", priority: "", search: "" });
+    const { status, priority, search } = values;
+    const searchInput = useDebouncedSearch(search, v => set({ search: v }));
     const [createOpen, setCreateOpen] = useState(false);
     const [editing, setEditing] = useState<DeveloperBugRow | null>(null);
 
@@ -148,7 +151,7 @@ export default function DeveloperBugsPage() {
                         inputSize="sm"
                         aria-label="Durum filtresi"
                         value={status}
-                        onChange={e => setStatus(e.target.value)}
+                        onChange={e => set({ status: e.target.value })}
                         style={{ width: "auto", minWidth: "150px" }}
                     >
                         <option value="">Tüm durumlar</option>
@@ -160,7 +163,7 @@ export default function DeveloperBugsPage() {
                         inputSize="sm"
                         aria-label="Öncelik filtresi"
                         value={priority}
-                        onChange={e => setPriority(e.target.value)}
+                        onChange={e => set({ priority: e.target.value })}
                         style={{ width: "auto", minWidth: "130px" }}
                     >
                         <option value="">Tüm öncelikler</option>
@@ -173,8 +176,8 @@ export default function DeveloperBugsPage() {
                         type="search"
                         aria-label="Bug ara"
                         placeholder="Başlık / açıklama ara"
-                        value={search}
-                        onChange={e => setSearch(e.target.value)}
+                        value={searchInput.value}
+                        onChange={e => searchInput.setValue(e.target.value)}
                         style={{ width: "auto", minWidth: "200px", flex: 1 }}
                     />
                 </div>
