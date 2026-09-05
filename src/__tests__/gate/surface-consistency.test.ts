@@ -37,6 +37,17 @@ function stripComments(src: string): string {
     return src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 }
 
+/** `src/` altındaki tüm .tsx dosyaları (testler hariç). */
+function walkSrc(dir: string = join(root, "src"), out: string[] = []): string[] {
+    for (const e of readdirSync(dir)) {
+        const full = join(dir, e);
+        if (e === "__tests__") continue;
+        if (statSync(full).isDirectory()) walkSrc(full, out);
+        else if (/\.tsx$/.test(e)) out.push(full);
+    }
+    return out;
+}
+
 const GLOBALS = read("src/app/globals.css");
 const FILTER_CHIPS = stripComments(read("src/components/ui/FilterChips.tsx"));
 const PAGE_HEADER = stripComments(read("src/components/ui/PageHeader.tsx"));
@@ -174,5 +185,72 @@ describe("GATE: yüzey + buton/kategori tutarlılığı", () => {
             expect(src, rel).toMatch(/<Button[\s\S]{0,400}variant=\{isActive \? "primary" : "secondary"\}/);
             expect(src, rel).not.toMatch(/role="tab"[\s\S]{0,300}borderBottom:\s*isActive/);
         }
+    });
+
+    // ── 2026-09-05: yan çekmeceler ────────────────────────────────
+    //
+    // Ölçüm: repoda YEDİ yan çekmece vardı — dört z-index katmanı (50 · 80/81 ·
+    // 200/201), üç dikey teknik (`height:100vh` · `100dvh` · `top/bottom:0`),
+    // iki yüzey token'ı ve yedi ayrı erişilebilirlik seviyesi. Dördünde Escape,
+    // altısında odak tuzağı, altısında odak dönüşü yoktu; beşi buna rağmen
+    // `role="dialog"` İLAN EDİYORDU. İkisi sayfaların İÇİNE gömülüydü.
+
+    it("elle yazılmış diyalog yüzeyi kalmadı — küme tam olarak bu", () => {
+        // Sayı değil KÜME iddia ediliyor: yeni bir `role="dialog"` yüzeyi
+        // eklemek ancak bu listeyi gerekçesiyle büyüterek mümkün olsun.
+        // ("en az N tane olmalı" dersi: sayı kilidi değişmezi değil o günkü
+        // durumu kilitler.)
+        const ALLOWED: Record<string, string> = {
+            "src/components/ui/Modal.tsx": "merkezî çerçevenin kendisi",
+            "src/components/ui/Drawer.tsx": "yan çekmece çerçevesinin kendisi",
+            // Merkezî önizleme; sağa yaslı değil, çekmece kapsamında değil.
+            "src/components/settings/DosyalarTab.tsx": "dosya önizleme kutusu",
+            // `product-detail-page-ekler.test.ts` bu yüzeyleri ÇERÇEVEYE
+            // TAŞINMAMAYA kilitliyor (kendi keydown'ı + `body.style.overflow`u
+            // testle isteniyor). Kasıtlı istisna, ihmal değil.
+            "src/app/dashboard/products/[id]/page.tsx": "ışık kutusu — testle muaf",
+        };
+        const found = walkSrc()
+            .filter(f => /role="dialog"/.test(stripComments(readFileSync(f, "utf8"))))
+            .map(f => relative(root, f))
+            .sort();
+        expect(found).toEqual(Object.keys(ALLOWED).sort());
+    });
+
+    it("yedi çekmecenin hepsi ortak Drawer'dan besleniyor", () => {
+        const DRAWERS = [
+            "src/components/ai/AIDetailDrawer.tsx",
+            "src/components/alerts/AlertCalendarDrawer.tsx",
+            "src/components/customers/CustomerDetailPanel.tsx",
+            "src/components/purchase/PurchaseOrderModal.tsx",
+            "src/components/vendors/VendorDetailPanel.tsx",
+            "src/app/dashboard/vendors/VendorsClient.tsx",
+            "src/app/dashboard/settings/email-deliveries/page.tsx",
+        ];
+        for (const rel of DRAWERS) {
+            const src = stripComments(read(rel));
+            expect(src, rel).toMatch(/from "@\/components\/ui\/Drawer"/);
+            expect(src, rel).toMatch(/<Drawer\b/);
+            // Kendi konumlandırmasını/katmanını geri yazamaz.
+            expect(src, rel).not.toMatch(/height:\s*"100[dv]vh"|height:\s*"100dvh"/);
+            expect(src, rel).not.toMatch(/zIndex:\s*(50|80|81|200|201)\b/);
+        }
+    });
+
+    it("davranış TEK kaynakta — iki çerçeve de kendi Escape'ini yazmaz", () => {
+        // Turun kök bulgusu buydu: aynı mantığın eksik kopyaları dağılmıştı
+        // (`AIDetailDrawer` kendi tuzağını, `PurchaseOrderModal` tuzaksız bir
+        // "focus trap"i, `AlertCalendarDrawer` üçüncü bir sürümü taşıyordu).
+        for (const rel of ["src/components/ui/Modal.tsx", "src/components/ui/Drawer.tsx"]) {
+            const src = stripComments(read(rel));
+            expect(src, rel).toMatch(/useDialogA11y/);
+            expect(src, rel).not.toMatch(/addEventListener\(\s*"keydown"/);
+        }
+        // Çekirdeğin kendisi dördünü de kuruyor.
+        const core = stripComments(read("src/components/ui/dialog-a11y.ts"));
+        expect(core).toMatch(/addEventListener\("keydown"/);
+        expect(core).toMatch(/event\.key === "Escape"/);
+        expect(core).toMatch(/event\.key !== "Tab"/);
+        expect(core).toMatch(/previouslyFocused\?\.focus\?\.\(\)/);
     });
 });

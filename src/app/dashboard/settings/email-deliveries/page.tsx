@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import PageHeader from "@/components/ui/PageHeader";
+import Drawer from "@/components/ui/Drawer";
 import { AlertTriangle, CheckCircle2, MailCheck, RefreshCw, ShieldOff, Wrench, X } from "lucide-react";
 import Button from "@/components/ui/Button";
 import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
@@ -218,31 +219,25 @@ export default function EmailDeliveriesPage() {
             </div>
 
             {selectedDelivery && (
-                <>
-                    <button
-                        type="button"
-                        aria-label="Teslimat detayını kapat"
-                        onClick={() => setSelectedDelivery(null)}
-                        style={{ position: "fixed", inset: 0, border: 0, background: "rgba(0,0,0,0.38)", zIndex: 80, cursor: "default" }}
-                    />
-                    <aside
-                        aria-label="E-posta teslimat detayı"
-                        style={{
-                            position: "fixed",
-                            zIndex: 81,
-                            top: 0,
-                            right: 0,
-                            width: "min(420px, calc(100vw - 16px))",
-                            height: "100dvh",
-                            background: "var(--surface-raised)",
-                            borderLeft: "var(--line-width) solid var(--surface-border)",
-                            boxShadow: "var(--surface-shadow)",
-                            padding: 18,
-                            overflowY: "auto",
-                        }}
+                    /* 2026-09-05: ortak `Drawer`. Bu yüzey yedi çekmece içinde
+                        erişilebilirliği EN ZAYIF olanıydı: `role="dialog"` ve
+                        `aria-modal` hiç yoktu (düz `<aside>` — ekran okuyucu için
+                        modal sınırı değil), Escape yoktu, odak yönetimi yoktu ve
+                        backdrop'ı `<button>` olduğu için tab sırasına anlamsız bir
+                        durak koyuyordu. Dördü de çerçeveden geliyor artık.
+                        `gap: 0` — çocuklar kendi `marginTop`'larını taşıyor. */
+                    <Drawer
+                        onClose={() => setSelectedDelivery(null)}
+                        labelledBy="email-delivery-detail-title"
+                        width="min(420px, calc(100vw - 16px))"
+                        surfaceStyle={{ gap: 0 }}
                     >
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, paddingBottom: 14, borderBottom: "var(--line-width) solid var(--border-tertiary)" }}>
-                            <div>
+                            {/* `labelledBy` hedefi İKİSİNİ birden sarıyor: ekran
+                                okuyucu "Teslimat Detayı ‹konu›" okur. Yalnız
+                                `<h2>`ye bağlansa tür bilgisi düşerdi, eski düz
+                                `aria-label` ise konuyu hiç söylemiyordu. */}
+                            <div id="email-delivery-detail-title">
                                 <div style={{ color: "var(--text-tertiary)", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0 }}>Teslimat Detayı</div>
                                 <h2 style={{ margin: "5px 0 0", color: "var(--text-primary)", fontSize: 16, lineHeight: 1.35 }}>{selectedDelivery.subject}</h2>
                             </div>
@@ -274,8 +269,7 @@ export default function EmailDeliveriesPage() {
                                 {selectedDelivery.error_message}
                             </div>
                         )}
-                    </aside>
-                </>
+                    </Drawer>
             )}
         </div>
     );

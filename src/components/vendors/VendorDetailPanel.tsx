@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { X } from "lucide-react";
 import Button from "@/components/ui/Button";
+import Drawer from "@/components/ui/Drawer";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { VendorSuppliedProduct, VendorPurchaseSummary } from "@/lib/vendor-detail";
 import type { VendorRow } from "@/lib/database.types";
@@ -66,24 +67,18 @@ export default function VendorDetailPanel({ vendor, onClose }: VendorDetailPanel
     const currencies = Object.entries(detail?.purchases.totalByCurrency ?? {});
 
     return (
-        <>
-            <div
-                onClick={onClose}
-                style={{ position: "fixed", inset: 0, zIndex: 50, background: "rgba(0,0,0,0.5)" }}
-            />
-            <div
-                className="animate-slide-in-right"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="vendor-detail-title"
-                style={{
-                    position: "fixed", right: 0, top: 0, zIndex: 50,
-                    height: "100vh", width: "100%", maxWidth: "460px",
-                    background: "var(--bg-primary)",
-                    borderLeft: "var(--line-width) solid var(--border-tertiary)",
-                    overflowY: "auto", display: "flex", flexDirection: "column",
-                }}
-            >
+        /* 2026-09-05: çerçeve `ui/Drawer`'a taşındı. Eskiden burada Escape,
+           odak tuzağı ve odak dönüşü YOKTU; panel z=50'deydi, yani kabuğun
+           kendi mobil menüsünün (z=99/100) ALTINDA kalıyordu; ve `height:100vh`
+           iOS Safari'de görüntü alanından taşıp panelin dibini erişilemez
+           kılıyordu. Dördü de çerçeveden geliyor artık. */
+        <Drawer
+            onClose={onClose}
+            labelledBy="vendor-detail-title"
+            width="min(460px, 100vw)"
+            padded={false}
+            surfaceStyle={{ overflowY: "auto" }}
+        >
                 <div style={{
                     display: "flex", alignItems: "center", justifyContent: "space-between",
                     padding: "14px 16px",
@@ -206,7 +201,6 @@ export default function VendorDetailPanel({ vendor, onClose }: VendorDetailPanel
                         </div>
                     </div>
                 </div>
-            </div>
-        </>
+        </Drawer>
     );
 }

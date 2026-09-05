@@ -16,7 +16,9 @@ metadata:
 2. **`cellStyle` KOLONA statiktir, satıra değil** → satır bazlı koşullu renk/stil hücre içeriğinde `<span style>` ile verilir (Stok/Satılabilir kritik-uyarı eşikleri).
 3. **DataTable ortak stili `whiteSpace: nowrap` VERMEZ.** Sayfaların yerel tdStyle'ı çoğu zaman veriyordu → gerekiyorsa kolon bazında `headerStyle`/`cellStyle` ile geri ver (`textOverflow: ellipsis` nowrap olmadan çalışmaz). Global eklemek dönüşmüş tüm listelerin sarma davranışını değiştirir.
 
-**AÇIK (Faz B #8):** `Input` (100+ dosyada tekrarlayan inline input stili) / `PageHeader` / `SectionHeader` / `NavLink` / `Stat` + drawer/form konsolidasyonu.
+**Faz B #8 — DRAWER TARAFI KAPANDI (2026-09-05).** YENİ `ui/Drawer` + `ui/dialog-a11y.ts`; **YEDİ** yan çekmecenin hepsi taşındı (kayıtlı sayı 4'tü — ikisi sayfaların İÇİNE gömülüydü: `VendorsClient` `justifyContent:"flex-end"` ile, `email-deliveries` `<aside>` olarak; **çekmece sayımı imzaya göre yapılmalı**). Kusurlar: 4'ünde Escape, 6'sında odak tuzağı, 5'inde odak dönüşü yoktu ve **beşi buna rağmen `role="dialog"` İLAN EDİYORDU**; dört z-index katmanı (50'dekiler kabuğun mobil menüsünün ALTINDA); üç dikey teknik — `height:100vh` iOS Safari'de görüntü alanından büyüktür (panelin dibi erişilemez) ve **hiç ölçülmemişti**. `Drawer`da **`height` HİÇ yazılmaz** (`top:0`+`bottom:0` — `100dvh`ten de iyi), katman 200/201, yüzey `--surface-raised`+`--surface-border`; `padded={false}` `Modal`'dan farklı olarak **flex sütunu KORUR**. Davranış-nötrlük kanıtı: `modal-ui.test.tsx`'in 17 testi **dokunulmadan** yeşil. 24 tarayıcı ölçümü temiz. Rapor `docs/audit/2026-09-05-yan-cekmeceler.md`.
+
+**AÇIK (Faz B #8 kalanı):** `SectionHeader` (~45 çağırı / 6 varyant; `console-ui.ts` aynı kusuru bir kez yaşayıp kendi kapısını kurmuş, ama yalnız `/developer` içinde) · `NavLink` (3 yüzey ama gerçekte 2 birleştirilebilir — Sidebar hover'ı hâlâ DOM MUTASYONU ve `aria-current` yok) · `Stat` (2 hazır bileşen + ~28 elle yazılmış / 9 varyant; **uyarı:** `gate/surface-consistency`'nin `var(--surface-raised)` ≥7/≥3 sayaçları `parasut`+`purchase/suggested` sayfalarına bakıyor → `Stat` çıkarımı o literalleri silince kırılacak). `Input`/`PageHeader` önceki turlarda kapandı.
 
 ---
 
@@ -33,7 +35,7 @@ metadata:
 | Faz | Konu | Açıklama |
 |-----|------|----------|
 | A | Design Token Genişletme | `globals.css`'e typography scale, spacing (4pt grid), z-index, hover tokens, skip-link, ~~reduced-motion~~ ✅ + tema token'ları (`--highlight-inset` vb. ✅) |
-| B | Component Kütüphanesi | DataTable(+onRowClick[klavye dahil]+rowAriaLabel+minWidth+rowStyle+`.row-reveal`), Card, Badge VAR; **liste tarafı 7/7 BİTTİ**: Vendors+PO+Customers+Orders+Quotes+3 settings tablosu+products (`c6f46fc`/`931c62d`/`64af65d`/`024c2d8`/`cdb5be3`/`dceb9a8`/`2095ae2`). Premium light theme entegre (`f550e83`). AÇIK: Input/PageHeader/SectionHeader/NavLink/Stat + drawer/form |
+| B | Component Kütüphanesi | DataTable(+onRowClick[klavye dahil]+rowAriaLabel+minWidth+rowStyle+`.row-reveal`), Card, Badge VAR; **liste tarafı 7/7 BİTTİ**: Vendors+PO+Customers+Orders+Quotes+3 settings tablosu+products (`c6f46fc`/`931c62d`/`64af65d`/`024c2d8`/`cdb5be3`/`dceb9a8`/`2095ae2`). Premium light theme entegre (`f550e83`). **Drawer tarafı 2026-09-05'te KAPANDI** (`ui/Drawer`+`dialog-a11y`, 7 çekmece). AÇIK: SectionHeader/NavLink/Stat |
 | C | DOM Mutation Fix | `onMouseEnter` style mutation → `useState(hovered)` — **ÇOĞU YAPILDI** (orders/quotes/products/customers/PO/production) |
 | D | Accessibility | Skip link, aria-label ✅(çoğu), focus trap (Sidebar mobile), form label-input bağlantısı — kısmen |
 | E | Görsel Yenileme | Landing, Login split-screen, Sidebar, ~~Topbar breadcrumb~~ → **Topbar "Sakin düz" yapıldı** (`bf28fb0`, sola-başlık), Dashboard, Orders |

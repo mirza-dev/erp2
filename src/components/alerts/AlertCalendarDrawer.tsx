@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useId, useRef, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import Button, { ButtonLink } from "@/components/ui/Button";
+import Drawer from "@/components/ui/Drawer";
 import { SevBadge } from "./SevBadge";
 import {
     SEVERITY_CONFIG, formatDateFull, dueCountdownLabel, type CalendarAlert,
@@ -121,19 +122,11 @@ export function AlertCalendarDrawer({
     const [shortageLoading, setShortageLoading] = useState(false);
     const [shortageError, setShortageError]     = useState<string | null>(null);
 
-    useEffect(() => {
-        const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-        window.addEventListener("keydown", handler);
-        return () => window.removeEventListener("keydown", handler);
-    }, [onClose]);
-
-    // Focus dönüşü (a11y): açılışta ilk odak kapat butonuna, kapanışta tetikleyiciye geri.
-    const closeBtnRef = useRef<HTMLButtonElement>(null);
-    useEffect(() => {
-        const prevFocus = document.activeElement as HTMLElement | null;
-        closeBtnRef.current?.focus();
-        return () => { prevFocus?.focus?.(); };
-    }, []);
+    /* Escape + açılış odağı + odak dönüşü SİLİNDİ (2026-09-05) — ortak
+       `ui/Drawer` veriyor. Bu dosyada üçü vardı ama Tab TUZAĞI yoktu: odak
+       panelden dışarı, arkadaki sayfaya kaçabiliyordu. `closeBtnRef` de
+       gereksizleşti — çerçeve İLK odaklanabilir öğeye odaklanıyor ve DOM
+       sırasında ilk o buton. */
 
     // İlgili siparişleri yükle (yalnız order_shortage + ürün entity'si varken)
     useEffect(() => {
@@ -230,19 +223,10 @@ export function AlertCalendarDrawer({
         : "var(--text-primary)";
 
     return (
-        <>
-            <div onClick={onClose} style={{ position: "fixed", inset: 0, zIndex: 200, background: "rgba(0,0,0,0.5)", backdropFilter: "blur(4px)", WebkitBackdropFilter: "blur(4px)", animation: "fade-in 0.2s ease-out" }} />
-            <div
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby={titleId}
-                style={{
-                    position: "fixed", top: 0, right: 0, bottom: 0, zIndex: 201, width: "min(480px, 100vw)",
-                    background: "var(--bg-primary)", borderLeft: "0.5px solid var(--border-secondary)",
-                    boxShadow: "-12px 0 40px rgba(0,0,0,0.3)", display: "flex", flexDirection: "column",
-                    animation: "slide-in-right 0.24s cubic-bezier(0.16,1,0.3,1)",
-                }}
-            >
+        /* Gölge ve kayma süresi ortak çerçeveninkine yakınsadı
+           (-12px/40px/0.24s → -8px/32px/0.2s): tek çekmecelik fark, sistemde
+           karşılığı olmayan bir lehçeydi. */
+        <Drawer onClose={onClose} labelledBy={titleId} width="min(480px, 100vw)" padded={false}>
                 {/* Header */}
                 <div style={{ padding: "20px 24px", display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: "12px", borderBottom: "0.5px solid var(--border-tertiary)", flexShrink: 0 }}>
                     <div style={{ flex: 1, minWidth: 0 }}>
@@ -257,7 +241,7 @@ export function AlertCalendarDrawer({
                         </div>
                         {p && <div style={{ fontSize: "12px", fontFamily: "var(--font-mono, monospace)", color: "var(--text-tertiary)", marginTop: "4px" }}>{p.sku}</div>}
                     </div>
-                    <Button ref={closeBtnRef} variant="icon" size="md" iconOnly aria-label="Kapat" onClick={onClose}>
+                    <Button variant="icon" size="md" iconOnly aria-label="Kapat" onClick={onClose}>
                         <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden><path d="M4 4l8 8M12 4l-8 8" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" /></svg>
                     </Button>
                 </div>
@@ -549,8 +533,7 @@ export function AlertCalendarDrawer({
                         </>
                     )}
                 </div>
-            </div>
-        </>
+        </Drawer>
     );
 }
 

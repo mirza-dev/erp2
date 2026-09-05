@@ -90,7 +90,15 @@ describe("reliable internal email source invariants", () => {
         for (const query of ['q.set("status"', 'q.set("type"', 'q.set("recipient"', 'q.set("entity"', 'q.set("from"', 'q.set("to"']) {
             expect(page).toContain(query);
         }
-        expect(page).toContain('aria-label="E-posta teslimat detayı"');
+        // 2026-09-05 — detay yüzeyi ortak `ui/Drawer`a taşındı. Eski iddia düz
+        // `aria-label="E-posta teslimat detayı"` arıyordu; o etiket bir `<aside>`
+        // üzerindeydi, yani `role="dialog"`/`aria-modal` YOKTU (modal sınırı
+        // değildi), Escape ve odak yönetimi de yoktu. Dördü de çerçeveden
+        // geliyor artık; erişilebilir ad GÖRÜNEN başlıktan.
+        expect(page).toMatch(/from "@\/components\/ui\/Drawer"/);
+        expect(page).toContain('labelledBy="email-delivery-detail-title"');
+        expect(page).toContain('id="email-delivery-detail-title"');
+        expect(page).toContain("Teslimat Detayı");
         expect(page).toContain("Güvenli hata özeti");
         // 2026-08-30 — Developer Console eklenirken tek koşul bir LİSTEYE
         // dönüştü (INTERNAL_ONLY_PREFIXES). Sözleşme aynı: bu sayfa middleware

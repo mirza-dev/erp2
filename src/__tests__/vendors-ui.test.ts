@@ -17,6 +17,17 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+/**
+ * Yorum ayıklama — NEGATİF iddialar için ZORUNLU.
+ *
+ * 2026-09-05: "elle yazılmış dialog kalmadı" kuralı, taşınma gerekçesini
+ * anlatan yorumda `role="dialog"` geçtiği için kırmızı yandı. Depoda bu tuzağa
+ * beşinci düşüş; `filter-chips-source.test.ts` aynı çözümü taşıyor. Kural
+ * KODU iddia etmeli, kodun anlatısını değil.
+ */
+const stripCode = (src: string) =>
+    src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
 const PAGE_SRC = readFileSync(
     join(process.cwd(), "src/app/dashboard/vendors/VendorsClient.tsx"),
     "utf8",
@@ -39,11 +50,17 @@ describe("Tedarikçiler — toplu pasifleştirme onay modalı a11y", () => {
         expect(PAGE_SRC).toMatch(/tedarikçiyi pasife al/);
     });
 
-    it("drawer panel aria-modal=true taşır (role=dialog + aria-label korunur)", () => {
-        // drawer satırı: role="dialog" aria-modal="true" aria-label={...}
-        expect(PAGE_SRC).toMatch(
-            /role="dialog"\s+aria-modal="true"\s+aria-label=\{drawerMode === "create"/,
-        );
+    it("tedarikçi formu çekmecesi ortak Drawer'dan geliyor", () => {
+        // Eski iddia `role="dialog" aria-modal="true" aria-label={drawerMode…}`
+        // satırını arıyordu: işaretleme vardı ama Escape ve odak yönetimi
+        // YOKTU. Üçü de artık `ui/Drawer`dan geliyor. Erişilebilir ad da
+        // uydurma `aria-label` yerine GÖRÜNEN başlıktan (`labelledBy`).
+        expect(PAGE_SRC).toMatch(/from "@\/components\/ui\/Drawer"/);
+        expect(PAGE_SRC).toMatch(/labelledBy="vendor-form-title"/);
+        expect(PAGE_SRC).toMatch(/id="vendor-form-title"/);
+        expect(stripCode(PAGE_SRC)).not.toMatch(/role="dialog"/);
+        // Kayıt sürerken kaçış kapalı — yarım kalan form Escape'le kaybolmasın.
+        expect(PAGE_SRC).toMatch(/dismissible=\{!saving\}/);
     });
 });
 

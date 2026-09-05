@@ -167,6 +167,30 @@ describe("Faz 3 — drawer focus dönüşü", () => {
         expect(document.activeElement).toBe(trigger);
         document.body.removeChild(trigger);
     });
+
+    // 2026-09-05: çekmece ortak `ui/Drawer`a taşındı. Bu çekmece TARAYICIDA
+    // ölçülemedi — yerel DB'de sıfır uyarı olayı var, yani onu açan "Detay"
+    // butonu hiç çizilmiyor (diğer altısı 24 ölçümle doğrulandı). O yüzden
+    // davranış BURADA, gerçek React render'ıyla (effect'ler dahil) kanıtlanıyor.
+    it("Escape çekmeceyi kapatır — davranış ortak çerçeveden geliyor", () => {
+        const onClose = vi.fn();
+        const noop = () => {};
+        render(
+            <AlertCalendarDrawer
+                alert={ca({})}
+                onClose={onClose} onAcknowledge={noop} onResolve={noop} onDismiss={noop}
+                onSyncRetry={noop} onDismissProduct={noop} onExtended={noop} onShipped={noop}
+                isDemo={false} syncRetrying={false}
+            />,
+        );
+        const panel = screen.getByRole("dialog");
+        expect(panel.getAttribute("aria-modal")).toBe("true");
+        // Çerçevenin dikey tekniği: `height` yazılmaz, top+bottom kurar.
+        expect(panel.style.height).toBe("");
+        expect(panel.style.bottom).toBe("0px");
+        fireEvent.keyDown(window, { key: "Escape" });
+        expect(onClose).toHaveBeenCalledTimes(1);
+    });
 });
 
 describe("Faz 3 — tema + reduced-motion kilitleri", () => {

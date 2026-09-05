@@ -16,6 +16,18 @@ import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 
+
+/**
+ * Yorum ayıklama — NEGATİF iddialar için ZORUNLU.
+ *
+ * 2026-09-05: "elle yazılmış dialog kalmadı" kuralı, taşınma gerekçesini
+ * anlatan yorumda `role="dialog"` geçtiği için kırmızı yandı. Depoda bu tuzağa
+ * beşinci düşüş; `filter-chips-source.test.ts` aynı çözümü taşıyor. Kural
+ * KODU iddia etmeli, kodun anlatısını değil.
+ */
+const stripCode = (src: string) =>
+    src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
 const PAGE_SRC = readFileSync(
     join(process.cwd(), "src/app/dashboard/customers/CustomersClient.tsx"),
     "utf8",
@@ -78,14 +90,22 @@ describe("Cariler — modal/panel a11y", () => {
     });
 
     it("sayfada elle yazılmış dialog KALMADI (çerçeveye taşındı)", () => {
-        expect(PAGE_SRC).not.toMatch(/role="dialog"/);
+        expect(stripCode(PAGE_SRC)).not.toMatch(/role="dialog"/);
     });
 
-    it("CustomerDetailPanel slide-in role=dialog + aria-modal + aria-labelledby + id", () => {
-        expect(PANEL_SRC).toMatch(/role="dialog"/);
-        expect(PANEL_SRC).toMatch(/aria-modal="true"/);
-        expect(PANEL_SRC).toMatch(/aria-labelledby="customer-detail-title"/);
+    it("CustomerDetailPanel ortak Drawer'ı kullanır ve başlık id'si eşleşir", () => {
+        // a11y ARTIK ORTAK ÇERÇEVEDE: `role="dialog"` + `aria-modal` + Escape +
+        // focus tuzağı + odak dönüşü `components/ui/Drawer.tsx`te (davranışı
+        // `dialog-a11y.ts` veriyor; ikisi de kendi yerinde kilitli).
+        //
+        // Eski iddia bu dosyada `role="dialog"` + `aria-modal` arıyordu ve
+        // YEŞİLDİ — ama panel klavyeyle kapatılamıyordu. İşaretlemeyi görüyor,
+        // davranışı görmüyordu. Ders bu turun kaydı: bir yüzeyin diyalog İLAN
+        // etmesi, diyalog gibi DAVRANDIĞI anlamına gelmez.
+        expect(PANEL_SRC).toMatch(/from "@\/components\/ui\/Drawer"/);
+        expect(PANEL_SRC).toMatch(/labelledBy="customer-detail-title"/);
         expect(PANEL_SRC).toMatch(/id="customer-detail-title"/);
+        expect(stripCode(PANEL_SRC)).not.toMatch(/role="dialog"/);
     });
 
     it("CustomerDetailPanel aksiyonları premium Button bileşeninden gelir", () => {

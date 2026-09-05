@@ -17,6 +17,7 @@ import Card from "@/components/ui/Card";
 import Badge from "@/components/ui/Badge";
 import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 import VendorDetailPanel from "@/components/vendors/VendorDetailPanel";
+import Drawer from "@/components/ui/Drawer";
 import { CircleOff, Pencil, Plus, RotateCcw } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
 
@@ -26,28 +27,10 @@ const inputStyle: React.CSSProperties = fieldStyle("md");
 
 const labelStyle: React.CSSProperties = { ...sharedLabelStyle(), display: "block", marginBottom: "3px" };
 
-const drawerOverlayStyle: React.CSSProperties = {
-    position: "fixed",
-    inset: 0,
-    background: "rgba(0,0,0,0.4)",
-    zIndex: 200,
-    display: "flex",
-    justifyContent: "flex-end",
-};
-
-const drawerPanelStyle: React.CSSProperties = {
-    background: "var(--surface-raised)",
-    width: "420px",
-    maxWidth: "100vw",
-    padding: "24px",
-    overflowY: "auto",
-    display: "flex",
-    flexDirection: "column",
-    gap: "16px",
-    height: "100vh",
-    borderLeft: "var(--line-width) solid var(--surface-border)",
-    boxShadow: "var(--surface-shadow)",
-};
+/* `drawerOverlayStyle` + `drawerPanelStyle` SİLİNDİ (2026-09-05): sayfaya gömülü
+   yerel çekmece lehçesiydi. Yerine geçen garanti `ui/Drawer` — konumlandırma,
+   katman, yüzey token'ları ve erişilebilirlik orada; kapı kuralı
+   `gate/surface-consistency`te. Genişlik/boşluk çağıranda kaldı. */
 
 // ── Initial form state ────────────────────────────────────────
 
@@ -558,12 +541,22 @@ export default function VendorsClient(props: VendorsClientProps) {
                 />
             )}
 
-            {/* Drawer */}
+            {/* Drawer — 2026-09-05: çerçeve `ui/Drawer`'a taşındı. Bu, sayfanın
+                İÇİNE gömülü iki yerel çekmece lehçesinden biriydi (`drawerOverlayStyle`
+                + `drawerPanelStyle`); Escape'i ve odak yönetimi yoktu. Erişilebilir
+                ad artık GÖRÜNEN başlıktan geliyor (`labelledBy`) — uydurma
+                `aria-label` yerine. `dismissible={!saving}`: kayıt sürerken
+                Escape/backdrop formu kapatmasın. */}
             {drawerMode && (
-                <div style={drawerOverlayStyle} onClick={e => { if (e.target === e.currentTarget) closeDrawer(); }}>
-                    <div style={drawerPanelStyle} role="dialog" aria-modal="true" aria-label={drawerMode === "create" ? "Yeni tedarikçi" : "Tedarikçi düzenle"}>
+                    <Drawer
+                        onClose={closeDrawer}
+                        labelledBy="vendor-form-title"
+                        width="min(420px, 100vw)"
+                        dismissible={!saving}
+                        surfaceStyle={{ padding: "24px", gap: "16px" }}
+                    >
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                            <h2 style={{ fontSize: "16px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
+                            <h2 id="vendor-form-title" style={{ fontSize: "16px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
                                 {drawerMode === "create" ? "Yeni Tedarikçi" : "Tedarikçi Düzenle"}
                             </h2>
                             <button
@@ -670,8 +663,7 @@ export default function VendorsClient(props: VendorsClientProps) {
                                 {drawerMode === "create" ? "Ekle" : "Güncelle"}
                             </Button>
                         </div>
-                    </div>
-                </div>
+                    </Drawer>
             )}
 
             <VendorDetailPanel vendor={selectedVendor} onClose={() => setSelectedVendor(null)} />

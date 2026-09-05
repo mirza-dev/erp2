@@ -1,9 +1,10 @@
 "use client";
 
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useIsDemo, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { useToast } from "@/components/ui/Toast";
 import Button from "@/components/ui/Button";
+import Drawer from "@/components/ui/Drawer";
 import { X } from "lucide-react";
 
 export interface ModalItem {
@@ -68,7 +69,6 @@ export default function PurchaseOrderModal({
 }: PurchaseOrderModalProps) {
     const isDemo = useIsDemo();
     const { toast } = useToast();
-    const panelRef = useRef<HTMLDivElement>(null);
 
     const [vendorId, setVendorId] = useState<string>(lockedVendorId ?? "");
     const [currency, setCurrency] = useState<string>("TRY");
@@ -121,22 +121,10 @@ export default function PurchaseOrderModal({
         }
     }, [selectedVendor, expectedDateDirty]);
 
-    // ESC key close
-    useEffect(() => {
-        if (!open) return;
-        const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
-        window.addEventListener("keydown", handler);
-        return () => window.removeEventListener("keydown", handler);
-    }, [open, onClose]);
-
-    // Focus trap
-    useEffect(() => {
-        if (!open) return;
-        const firstFocusable = panelRef.current?.querySelector<HTMLElement>(
-            "button, input, select, textarea",
-        );
-        firstFocusable?.focus();
-    }, [open]);
+    /* Escape + açılış odağı SİLİNDİ (2026-09-05) — ortak `ui/Drawer` veriyor.
+       Buradaki kopya eksikti: "Focus trap" diye adlandırılmıştı ama TUZAK
+       değildi, yalnız açılışta ilk öğeye odaklanıyordu; Tab panelden dışarı
+       kaçabiliyordu ve kapanışta odak açan elemana dönmüyordu. */
 
     const updateLine = useCallback(<K extends keyof LineState>(
         index: number, field: K, value: LineState[K],
@@ -228,39 +216,13 @@ export default function PurchaseOrderModal({
     };
 
     return (
-        <>
-            {/* Backdrop */}
-            <div
-                onClick={onClose}
-                style={{
-                    position: "fixed",
-                    inset: 0,
-                    zIndex: 200,
-                    background: "rgba(0,0,0,0.5)",
-                }}
-                aria-hidden="true"
-            />
-            {/* Panel */}
-            <div
-                ref={panelRef}
-                role="dialog"
-                aria-modal="true"
-                aria-label={title}
-                style={{
-                    position: "fixed",
-                    top: 0,
-                    right: 0,
-                    bottom: 0,
-                    zIndex: 201,
-                    width: "min(520px, 100vw)",
-                    background: "var(--bg-primary)",
-                    borderLeft: "0.5px solid var(--border-secondary)",
-                    boxShadow: "-8px 0 32px rgba(0,0,0,0.3)",
-                    display: "flex",
-                    flexDirection: "column",
-                    overflow: "hidden",
-                }}
-            >
+        <Drawer
+            onClose={onClose}
+            ariaLabel={title}
+            width="min(520px, 100vw)"
+            padded={false}
+            surfaceStyle={{ overflow: "hidden" }}
+        >
                 {/* Header */}
                 <div style={{
                     display: "flex",
@@ -489,7 +451,6 @@ export default function PurchaseOrderModal({
                         Siparişi Oluştur
                     </Button>
                 </div>
-            </div>
-        </>
+        </Drawer>
     );
 }

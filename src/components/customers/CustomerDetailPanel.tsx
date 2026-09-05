@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Pencil, Plus, Save, X } from "lucide-react";
 import Button from "@/components/ui/Button";
+import Drawer from "@/components/ui/Drawer";
 import { maskCurrency, formatDate } from "@/lib/utils";
 import type { Customer } from "@/lib/mock-data";
 import { primaryRevenue } from "@/lib/customer-stats";
@@ -120,39 +121,19 @@ export default function CustomerDetailPanel({
     };
 
     return (
-        <>
-            {/* Backdrop */}
-            <div
-                onClick={onClose}
-                style={{
-                    position: "fixed",
-                    inset: 0,
-                    zIndex: 50,
-                    background: "rgba(0,0,0,0.5)",
-                }}
-            />
-
-            {/* Panel */}
-            <div
-                className="animate-slide-in-right"
-                role="dialog"
-                aria-modal="true"
-                aria-labelledby="customer-detail-title"
-                style={{
-                    position: "fixed",
-                    right: 0,
-                    top: 0,
-                    zIndex: 50,
-                    height: "100vh",
-                    width: "100%",
-                    maxWidth: "380px",
-                    background: "var(--bg-primary)",
-                    borderLeft: "0.5px solid var(--border-tertiary)",
-                    overflowY: "auto",
-                    display: "flex",
-                    flexDirection: "column",
-                }}
-            >
+        /* 2026-09-05: çerçeve `ui/Drawer`'a taşındı. Eskiden burada Escape,
+           odak tuzağı ve odak dönüşü YOKTU (panel `role="dialog"` ilan ediyordu
+           ama klavyeyle kapatılamıyordu); z=50 olduğu için kabuğun kendi mobil
+           menüsünün (z=99/100) ALTINDA kalıyordu; `height:100vh` iOS Safari'de
+           görüntü alanından taşıyordu; kenarlığı `0.5px` sabitiyle çiziliyordu
+           (`--line-width` yerine). Beşi de çerçeveden geliyor artık. */
+        <Drawer
+            onClose={onClose}
+            labelledBy="customer-detail-title"
+            width="min(380px, 100vw)"
+            padded={false}
+            surfaceStyle={{ overflowY: "auto" }}
+        >
                 {/* Header */}
                 <div
                     style={{
@@ -435,8 +416,7 @@ export default function CustomerDetailPanel({
                         )}
                     </>
                 )}
-            </div>
-        </>
+        </Drawer>
     );
 }
 

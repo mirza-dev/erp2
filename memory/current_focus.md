@@ -5,6 +5,51 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+
+## 2026-09-05 (2) — Yan çekmeceler ortak `Drawer`'a (Faz B'nin açık yarısı)
+
+2026-08-30 Modal turu 9 diyaloğu ortak çerçeveye almış ama yan çekmeceleri
+**bilerek** dışarıda bırakmıştı ("Modal yanlış yüzey" — doğru gerekçe, kapanmamış
+boşluk). Kullanıcı "sıradaki işe geçelim" dedi; kapsam: **yalnız çekmeceler, tam
+birleştirme**. Rapor `docs/audit/2026-09-05-yan-cekmeceler.md`.
+
+**Kayıtlı sayı yanlıştı: 4 değil YEDİ.** İkisi sayfaların İÇİNE gömülüydü
+(`VendorsClient` `justifyContent:"flex-end"`, `email-deliveries` `<aside>`) ve
+`role="dialog"` + `right:0` araması ikisini de kaçırdı. **Çekmece sayımı imzaya
+göre yapılmalı, tek desene göre değil.**
+
+**Beş kusur:** 4'ünde Escape yok · 6'sında odak tuzağı yok · 5'inde odak dönüşü
+yok — **beşi buna rağmen `role="dialog"` İLAN EDİYORDU** · dört z-index katmanı
+(50'dekiler kabuğun mobil menüsünün ALTINDA) · üç dikey teknik (`100vh` iOS
+Safari'de görüntü alanından büyüktür → panelin dibi erişilemez; **hiç
+ölçülmemişti**, 2026-08-31 mobil turu hiçbir çekmece açmamıştı) · token
+ayrışması · gövde kaydırma kilidi hiçbirinde yok (kapsam dışı).
+
+**YENİ `dialog-a11y.ts` + `Drawer.tsx`.** Çekirdek çıkarıldı çünkü aynı mantığın
+EKSİK KOPYALARI dağılmıştı (`PurchaseOrderModal`'ınki "focus trap" adını taşıyor
+ama tuzak DEĞİLDİ). Davranış-nötrlük kanıtı: **`modal-ui.test.tsx`'in 17 testi
+dosyaya dokunulmadan yeşil.** `Drawer`da `height` HİÇ yazılmaz (`top:0`+
+`bottom:0` — `100dvh`ten de iyi); `padded={false}` `Modal`'dan farklı olarak
+flex sütunu KORUR.
+
+**24 tarayıcı ölçümü temiz** (6 çekmece × 2 tema × {1440,390}); yedincisi
+tarayıcıda AÇILAMADI çünkü yerel DB'de sıfır uyarı olayı var → gerçek React
+render'ıyla kanıtlandı.
+
+**Dersler:** (1) **bir yüzeyin diyalog İLAN etmesi, diyalog gibi DAVRANDIĞI
+anlamına gelmez** — `customers-ui`'nin kuralı tam bunu arayıp yeşil yanıyordu.
+(2) **Kırmızı-kanıt koşumunun kendisi de kanıtlanmalı**: bir mutasyonum sessizce
+boşa gitti ve "kural zayıf" raporladı; boşa giden mutasyon zayıf kuraldan
+ayırt edilemez → SHA kontrolü eklendi. (3) Gerekçe yorumu kuralı tetikledi,
+**beşinci kez** → `stripComments`. (4) Ölçü aracı yine bulguydu: rect'ler
+**kayma animasyonu sürerken** yakalanmıştı.
+
+**498 dosya / 6947 test · E2E 94/94 · 10/10 kırmızı kanıtlı · net −68 satır.**
+AÇIK (ayrı tur, kullanıcı kararı): `SectionHeader` (~45 çağırı/6 varyant) ·
+`NavLink` (3 yüzey, 2'si birleştirilebilir) · `Stat` (2 hazır + ~28 elle/9
+varyant; **uyarı:** `surface-consistency`'nin `--surface-raised` ≥7/≥3 sayaçları
+`Stat` çıkarımında kırılacak).
+
 ## 2026-08-31 (6) — 20 maddelik "vibe-coded" listesi denetimi
 
 Kullanıcı sosyal medyadaki "20 NICHE ways to get your vibe coded app hacked"

@@ -1,9 +1,31 @@
 # Roven — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-08-31_
+_Son güncelleme: 2026-09-05_
 
 > Bu bölüm yalnız **güncel durumu + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda ve `memory/current_focus.md`'de. Aşağıdaki indeks son dönem oturumlarına (commit + konu) hızlı bakış içindir; daha eski dönemler (Faz 2–3d AI Import, Sprint A–C, M-3 Rate Limiting, React Doctor, Teklif V2–V7 plan turları, Paraşüt Faz 1–11) git geçmişinde.
+
+**Son tamamlanan iş:** **Yan çekmeceler ortak `Drawer`'a alındı — Faz B'nin açık yarısı** (2026-09-05; GREEN; **migration YOK**; saf sunum/istemci). Kullanıcı "sıradaki işe geçelim" dedi; kapsam kararı: **yalnız çekmeceler, tam birleştirme** (üç bileşen — `SectionHeader`/`NavLink`/`Stat` — ayrı tura). Rapor: `docs/audit/2026-09-05-yan-cekmeceler.md`.
+
+**KAYITLI SAYI YANLIŞTI: 4 değil YEDİ çekmece.** İkisi sayfaların İÇİNE gömülüydü (`VendorsClient` `justifyContent:"flex-end"` ile, `email-deliveries` `<aside>` olarak) ve `role="dialog"` + `right:0` araması ikisini de kaçırdı. **Ders: çekmece sayımı imzaya göre yapılmalı, tek desene göre değil.**
+
+**Ölçülen beş kusur:** (1) **a11y** — 4'ünde Escape, 6'sında odak tuzağı, 5'inde odak dönüşü yok; **beşi buna rağmen `role="dialog"` İLAN EDİYORDU**, #7'de işaretleme de yoktu ve backdrop'ı `<button>` olduğu için tab sırasına anlamsız durak koyuyordu. (2) **dört z-index katmanı** (50 · 80/81 · 200/201) — 50'dekiler kabuğun kendi mobil menüsünün (z=99/100) ALTINDA. (3) **üç dikey teknik** — `height:100vh` (3) · `100dvh` (1) · `top/bottom:0` (3); `100vh` iOS Safari'de görüntü alanından BÜYÜKTÜR, panelin dibi erişilemez olur. **Hiç ölçülmemişti: 2026-08-31 mobil turu "70/70 taşmasız" dedi ama hiçbir çekmece açmamıştı.** (4) token ayrışması. (5) gövde kaydırma kilidi hiçbirinde yok (`Modal` dahil; kapsam dışı bırakıldı).
+
+**YENİ `src/components/ui/dialog-a11y.ts`** — `Modal`'ın tek `useEffect`'i (açılış odağı · Escape · Tab tuzağı · odak dönüşü) `useDialogA11y`ye çıkarıldı. Sebep: aynı mantığın EKSİK KOPYALARI çekmecelere dağılmıştı — `PurchaseOrderModal`'ınki "focus trap" adını taşıyor ama tuzak DEĞİLDİ. **Davranış-nötrlük kanıtı: `modal-ui.test.tsx`'in 17 testi dosyaya HİÇ DOKUNULMADAN yeşil kaldı.**
+
+**YENİ `src/components/ui/Drawer.tsx`** — sözleşmesi `Modal` ile aynı, yerleşimi farklı. **`height` HİÇ yazılmaz** (`top:0`+`bottom:0`; `100dvh`ten de iyi — birim tartışması kalmıyor) · katman 200/201 · yüzey `--surface-raised`+`--surface-border` (`Card`'ın kanonik ikilisi). **Ölçüldü: `--bg-primary` ile `--surface-raised` iki temada da BİREBİR aynı** → dört çekmecenin yüzey değişimi sıfır piksel. `padded={false}`da bilinçli fark: `Modal` `display:block`a düşer, `Drawer` **flex sütunu korur** (sabit başlık + esneyen gövde ona bağlı).
+
+**İki görünür yakınsama, gizlenmiyor:** backdrop 4 çekmecede `rgba(0,0,0,0.54)`+blur oldu; kayma animasyonu 5 çekmeceye geldi (CLAUDE.md'nin "animasyon sadece gerekli yerde" kuralı + `Modal`'ın backdrop `fade-in` emsali; reduced-motion global kuralla susuyor).
+
+**DOĞRULAMA — 24 tarayıcı ölçümü (6 çekmece × 2 tema × {1440,390}), hepsi temiz:** katman 24/24 201/200 · `top/bottom/right=0px` · **panelin dibi 24/24 görüntü alanında** (asıl kazanç, ilk kez ölçüldü) · yüzey ve kenarlık 24/24 aynı · Escape 24/24 · **odak dönüşü 24/24 GERÇEK tetikleyiciye** · yatay taşma 0.
+
+**ÖLÇÜ ARACININ KENDİSİ YİNE BULGUYDU.** İlk koşum `x=1341,w=380` verdi — toplam 1721, görüntü alanı 1440. Panel değil ölçüm kusurluydu: **kayma animasyonu sürerken yakalanmıştı.** 500ms bekleme → gerçek değer (x=1060, sağ kenar tam 1440).
+
+**Yedinci çekmece tarayıcıda ölçülemedi, sebebi kayıtlı:** yerel DB'de sıfır uyarı olayı var → `AlertCalendarDrawer`'ı açan "Detay" butonu hiç çizilmiyor. Gerçek React render'ıyla kanıtlandı (`alerts-calendar-faz3` odak testi dönüşümden sonra DEĞİŞMEDEN geçti; üstüne Escape + `aria-modal` + "`height` yazılmıyor" eklendi).
+
+**DERSLER:** (1) **Bir yüzeyin diyalog İLAN etmesi, diyalog gibi DAVRANDIĞI anlamına gelmez** — `customers-ui`'nin kuralı tam bunu arayıp YEŞİL yanıyordu, panel klavyeyle kapatılamazken. (2) **Kırmızı-kanıt koşumunun kendisi de kanıtlanmalı**: bir mutasyonum `<div` aradı, dosya `<Tag` kullanıyor → sessizce boşa gitti ve "kural zayıf" raporladı; **boşa giden mutasyon zayıf kuraldan ayırt edilemez**. Betiğe SHA karşılaştırması eklendi. (3) **Gerekçe yorumu kuralı tetikledi — BEŞİNCİ kez**; `stripComments` emsali uygulandı.
+
+**Kapı:** YENİ `drawer-ui.test.tsx` (15 davranış testi) + `gate/surface-consistency`'ye üç kural (elle diyalog **KÜMESİ** allowlist'e eşit — sayı değil küme; yedi tüketici `Drawer`'dan besleniyor ve kendi katmanını yazamıyor; davranış tek kaynakta). Üç mevcut kaynak kilidi emsale göre güncellendi. **10/10 kırmızı kanıtlı.** tsc 0 · lint 0 · **498 dosya / 6947 test** · build 0 uyarı · **E2E 94/94** · net −68 satır.
 
 **Son tamamlanan iş:** **Yedek geri-yükleme PROVA EDİLDİ — yordam dört yerinden kırıkmış** (2026-09-05; GREEN; **migration YOK**). Lansman olgunluk listesinin **#11**'i kapandı. Kullanıcı "ikincisini hallet" dedi; kapsam kararı: **yerel DB sıfırlanıp geri yüklensin** (tam sadık prova). Rapor: `docs/backup-restore.md` §Prova.
 
@@ -686,6 +708,7 @@ Teklif "Gönder"e basınca müşteriye teklif belgesi `.html` ekli e-posta. Kara
 - **Paraşüt Faz 12 — Sandbox GATE:** gerçek Paraşüt API ile OAuth + list filtreleri + e-doc trackable_job + stok invariant doğrulamaları (`PARASUT_PLAN.md` §Faz 12).
 
 ### Son dönem oturum indeksi (en yeniden eskiye — detay git log'unda)
+- Yan çekmeceler → ortak `Drawer` — 7 çekmece (2'si gömülü), 4 z-katmanı → 1, `height:100vh` → `bottom:0`, 24 ölçüm
 - Yedek geri-yükleme provası — tek geçişte 64/64 · 4 gerçek kusur (restoreOrder/tohum satırları/obje türü) · npm run restore
 - E2E suite yeşillendirme — 85/8flaky/1fail·32,8dk → 94/94 retries=0·2,3dk (hidrasyon + soğuk derleme + taşınmış rol)
 - Kalan üç madde — §A7 taşma (teşhis düzeltildi: ızgara min-content) · Button.ghostDanger · A4 konsol URL filtreleri
