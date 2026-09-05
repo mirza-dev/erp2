@@ -27,9 +27,9 @@ Sütunlar:
 
 | Değişken | Yerel | Eksikse |
 |---|---|---|
-| `EMAIL_FROM` | ❌ **YOK** | **Şu an canlıdaki sorun bu.** `email-service.ts:56` erken döner; bildirimler `notification_outbox`'ta `waiting_config` olarak birikir (bugün 10 kayıt, en eskisi 12 Haz). `RESEND_API_KEY` set olsa bile yetmiyor — ikisi birlikte gerekiyor |
+| `EMAIL_FROM` | ✅ **yerelde set** (2026-09-05) | `email-service.ts:56` erken döner; bildirimler `notification_outbox`'ta `waiting_config` olarak birikir. **DİKKAT — iki ayrı eşik var:** *doğrudan* gönderim (teklif "Gönder", test ucu, admin parola sıfırlama) yalnız `RESEND_API_KEY` ∧ `EMAIL_FROM` ister; *outbox* dispatch ise `configured` ister, yani **`RESEND_WEBHOOK_SECRET` de zorunlu**. Yalnız `EMAIL_FROM` set etmek outbox'ı AÇMAZ. Gönderici doğrulanmış bir domain'den olmalı — gmail adresi gönderici olamaz |
 | `RESEND_API_KEY` | ✅ | Aynı yol: gönderim yok, outbox birikir |
-| `RESEND_WEBHOOK_SECRET` | ❌ YOK | Teslimat durumu (bounce/delivered) geri okunamaz; `email-webhook-service.ts` imzayı doğrulayamaz → webhook reddedilir |
+| `RESEND_WEBHOOK_SECRET` | ❌ YOK | **Yalnız teslimat durumu değil — OUTBOX'I DA BLOKLAR.** `processNotificationOutbox` `getEmailRuntimeStatus().configured` eşiğine bakar ve o eşik ÜÇÜNÜ birden ister (`RESEND_API_KEY` ∧ `EMAIL_FROM` ∧ `RESEND_WEBHOOK_SECRET`); biri eksikse kayıtlar `waiting_config`te kalır. Ayrıca `email-webhook-service.ts` imzayı doğrulayamaz → bounce/delivered geri okunamaz |
 | `ANTHROPIC_API_KEY` | ⚠️ **SET ama 401** | AI kolon eşleştirme, `ai/parse`, `ai/score`, purchase-copilot, ops-summary kapalı. `/api/ai/health` `auth_failed` döner ve Ayarlar'da kırmızı görünür. 2026-08-30 probe: `api.anthropic.com/v1/models` → **HTTP 401** |
 | `OPENAI_API_KEY` | ✅ | Sesli giriş kapanır — `voice-service.ts:20` **ikisini birden** ister (`OPENAI_API_KEY` ∧ `ANTHROPIC_API_KEY`), yani Anthropic 401'i sesli girişi de düşürüyor |
 | `CRON_SECRET` | ✅ | Zamanlanmış uçların hepsi 401: outbox drenajı, alert taraması, Paraşüt senkronları, telemetri purge |

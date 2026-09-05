@@ -2,6 +2,8 @@
  * email-service tests — notifyUsersByEmail (preferences + dedup + Resend send).
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 
 // ─── Mocks ───────────────────────────────────────────────────────────────────
 
@@ -275,5 +277,57 @@ describe("sendDirectEmail", () => {
         const r = await sendDirectEmail({ to: "a@b.com", subject: "S", html: "<p>h</p>", text: "t" });
         expect(r.ok).toBe(false);
         expect(r.error).toBe("Invalid from");
+    });
+
+    /**
+     * 2026-09-05 — E-POSTA YAPILANDIRMASININ İKİ AYRI EŞİĞİ VAR ve belge bunu
+     * yanlış anlatıyordu.
+     *
+     * `deploy-env-matrix.md` `EMAIL_FROM`u "canlıdaki sorun bu" diye tek suçlu
+     * gösteriyor, `RESEND_WEBHOOK_SECRET`i ise yalnız "teslimat durumu geri
+     * okunamaz" diye yazıyordu. Kod başka söylüyor:
+     *
+     *   · DOĞRUDAN gönderim (teklif "Gönder", test ucu, admin parola sıfırlama)
+     *     → yalnız `RESEND_API_KEY` ∧ `EMAIL_FROM` ister.
+     *   · OUTBOX dispatch (10 birikmiş bildirim + 11 uyarı tipi)
+     *     → `configured`, yani ÜÇÜ BİRDEN ister.
+     *
+     * Yani yalnız `EMAIL_FROM` set etmek outbox'ı AÇMAZ; kayıtlar
+     * `waiting_config`te kalır ve sebebi görünmez. Deploy gününde tam olarak
+     * bu tuzağa düşülürdü.
+     */
+    describe("yapılandırma eşikleri (doğrudan gönderim ≠ outbox)", () => {
+        it("`configured` ÜÇ değişkenin hepsini ister", () => {
+            const src = readFileSync(join(process.cwd(), "src/lib/services/email-service.ts"), "utf8");
+            expect(src).toMatch(/configured:\s*hasApiKey\s*&&\s*hasFrom\s*&&\s*hasWebhookSecret/);
+        });
+
+        it("doğrudan gönderim webhook secret'ı İSTEMEZ (yalnız key + from)", () => {
+            const src = readFileSync(join(process.cwd(), "src/lib/services/email-service.ts"), "utf8");
+            expect(src).toMatch(/const resend = getResend\(\);[\s\S]{0,200}?if \(!resend \|\| !from\) return/);
+        });
+
+        it("outbox dispatch `configured` eşiğine bağlı — biri eksikse waiting_config", () => {
+            const src = readFileSync(join(process.cwd(), "src/lib/services/notification-outbox-service.ts"), "utf8");
+            expect(src).toMatch(/if \(!runtime\.configured\)\s*\{\s*await markWaitingForConfig/);
+        });
+
+        it("belge iki eşiği de anlatıyor — `EMAIL_FROM` tek suçlu gösterilmiyor", () => {
+            const matrix = readFileSync(join(process.cwd(), "docs/deploy-env-matrix.md"), "utf8");
+            // Satır SATIR BAŞINDAN seçilir. `includes` ile arandığında kural
+            // yanlış satırı yakalıyordu: `EMAIL_FROM` satırı da bu değişkenin
+            // adını geçiriyor ve tabloda ÖNCE geliyor → kural, hedefindeki satır
+            // bozulsa bile yeşil kalıyordu. (Kırmızı-kanıt turu yakaladı; aynı
+            // sınıf hata bu hafta üçüncü kez: iddia hedefini tam adreslemeli.)
+            const row = matrix.split("\n").find((l) => l.startsWith("| `RESEND_WEBHOOK_SECRET`")) ?? "";
+            expect(row, "webhook secret satırı bulunamadı").not.toBe("");
+            // Zayıf kural tuzağı (kırmızı-kanıt turu yakaladı): "outbox geçiyor mu"
+            // demek YETMİYOR — satır zaten başka bağlamda o kelimeyi taşıyordu.
+            // Kural, iddianın KENDİSİNİ aramalı: bu değişkenin outbox eşiğinin
+            // ORTAK KOŞULU olduğu, yani diğer ikisiyle BİRLİKTE arandığı.
+            expect(row, "satır `configured` eşiğine atıf yapmalı").toMatch(/configured/);
+            expect(row, "satır eşiğin diğer bileşenlerini de saymalı").toMatch(/EMAIL_FROM/);
+            expect(row, "satır RESEND_API_KEY'i de saymalı").toMatch(/RESEND_API_KEY/);
+        });
     });
 });
