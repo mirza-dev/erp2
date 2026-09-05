@@ -226,10 +226,58 @@ kalıp: bileşen + stil yardımcısı aynı dosyada).
 
 ---
 
+## Ek tur — bilinen boşluk kapatıldı: `orders/[id]` + `quotes/[id]` `PageHeader`
+
+Kullanıcı, turun sonunda kayda geçen boşluğu kapatmak istedi: iki detay
+sayfasında hâlâ `<h1>` yoktu.
+
+**Emsal hazırdı:** `purchase/orders/[id]` — geri-kırıntı AYRI satırda, altında
+`PageHeader` (`title`=belge no · `titleAdornment`=durum rozeti · `subtitle` ·
+`actions`). İki satış sayfası aynı kalıba oturdu, yani satın alma belge
+sayfasıyla da hizalandılar.
+
+| | önce | sonra |
+|---|---|---|
+| `orders/[id]` belge no | 14px `<div>`, kırıntının içinde | **20px `<h1>`** |
+| `quotes/[id]` belge no | 12px **mono** `<span>`, kırıntının parçası | **20px `<h1>`** |
+| `orders/[id]` başlık sayısı | **0** | **5** (h1 + 4 h2) |
+| `quotes/[id]` başlık sayısı | **0** | **1** (h1; gövdesi `QuoteForm`) |
+
+**Görünür değişiklikler, gizlenmiyor:** başlık ayrı satıra çıktı (tek satıra
+20px başlık + kırıntı + rozetler + butonlar sığmıyor) · kırıntı ayraçları
+(chevron SVG ve `/`) silindi — başlık ayrı satıra çıkınca anlamlarını
+yitirdiler · teklif numarası monospace'i kaybetti (`PageHeader` tipografisi
+20+ sayfada ortak) · teklif durumu açıklaması artık `subtitle`.
+`quotes/[id]`'nin tam genişlikli şerit kimliği (alt kenarlık + kendi zemini)
+KORUNDU; değişen yalnız şeridin içi.
+
+**Doğrulama — 8 ölçüm (2 sayfa × 2 tema × {1440, 390}):** başlık ağacı
+yukarıdaki gibi · seviye atlaması 0/8 · yatay taşma 0/8 · görünür metin kaybı
+yok (silinen tek şey kırıntı ayraçları).
+
+**Ölçü aracı yine bulguydu.** İlk koşumda `quotes/[id]` dört ölçümden
+**birinde "0 başlık"** raporladı: 900ms'lik sabit bekleme o koşumda yükleniyor
+ekranını yakalamıştı. Bekleme olaya bağlandı (`waitForSelector("h1")`) → 4/4
+tutarlı.
+
+**Kapı:** `gate/form-consistency`e **detay sayfası h1 kaynağı** kuralı — yedi
+belge/detay sayfasının her biri ya `PageHeader`dan beslenir ya da gerekçeli
+istisnadır. **Kırmızı-kanıt bir kural zayıflığı yakaladı:** `title={` deseni
+`subtitle={` dizesinin İÇİNDE geçtiği için `title`ı `titleAdornment`a
+çevirdiğimde kural yeşil kaldı; desene `\s` sınırı eklendi. *(Deponun
+tekrarlayan tuzağı: bir kaynak iddiası, iddia ettiği SINIRIN içinde kalmalı —
+bu dördüncü tekrarı.)* 3/3 kırmızı-kanıtlı.
+
+**Kalan:** `quotes/[id]`nin gövdesi `QuoteForm` ve onun kendi bölüm başlıkları
+hâlâ `<div>` — ayrı bir tur (form belgenin ekran ikizi, `#0072BC` marka
+mavisiyle baskı dilinde).
+
+---
+
 ## Kapsam dışı — bilerek, kayıtlı
 
-- **`orders/[id]` ve `quotes/[id]`ye `PageHeader`** — kullanıcı kararı; iki
-  sayfa h1'siz kalıyor, h2'den başlıyor. **Bilinen boşluk.**
+- ~~**`orders/[id]` ve `quotes/[id]`ye `PageHeader`**~~ → **kapatıldı**, bkz.
+  "Ek tur" bölümü. Kalan: `QuoteForm`un kendi bölüm başlıkları (baskı dilinde).
 - **`KpiCard`** — sparkline + delta + `href` + `scrollIntoView`;
   `kpi-card-render` ve `dashboard-overview-preservation` uçtan uca kilitliyor
   (138px yükseklik · JS hover YASAK · ikon YASAK). Ayrı bir tür.
@@ -252,6 +300,7 @@ kalıp: bileşen + stil yardımcısı aynı dosyada).
 
 ## Toplam
 
-tsc 0 · lint 0 · **501 dosya / 7006 test** (+58) · build 0 uyarı ·
-**E2E 94/94 retries=0** · **18/18 kırmızı-kanıtlı** · migration YOK.
-52 dosya · üç yeni bileşen 437 satır · tüketici tarafında **net −187 satır**.
+tsc 0 · lint 0 · **501 dosya / 7007 test** (+59) · build 0 uyarı ·
+**E2E 94/94 retries=0** · **21/21 kırmızı-kanıtlı** (18 + ek turun 3'ü) ·
+migration YOK. 54 dosya · üç yeni bileşen 437 satır · tüketici tarafında
+**net −187 satır**. Toplam **48 tarayıcı ölçümü** (40 + ek turun 8'i), hepsi temiz.

@@ -14,6 +14,7 @@ import Button, { ButtonLink } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import SectionHeader from "@/components/ui/SectionHeader";
+import PageHeader from "@/components/ui/PageHeader";
 type ParasutStepKey = "contact" | "product" | "shipment" | "invoice" | "edoc";
 
 interface ParasutStatusPayload {
@@ -547,18 +548,20 @@ export default function OrderDetailPage() {
     return (
         <>
             <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-                {/* Header */}
-                <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "10px" }}>
-                    <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                        <ButtonLink href="/dashboard/orders" variant="secondary" size="sm" leftIcon={<ArrowLeft size={14} />}>
-                            Siparişler
-                        </ButtonLink>
-                        <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                            <path d="M3 2l3 3-3 3" stroke="var(--text-tertiary)" strokeWidth="1" strokeLinecap="round" />
-                        </svg>
-                        <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
-                            {order.orderNumber}
-                        </div>
+                {/* Geri-kırıntı — `purchase/orders/[id]` emsali: kırıntı AYRI
+                    satırda, altında `PageHeader`. 2026-09-05'e kadar sipariş
+                    numarası 14px'lik bir `<div>`di ve bu sayfada HİÇ `<h1>`
+                    yoktu; belge numarası görsel olarak başlıktı ama semantik
+                    olarak hiçbir şeydi. */}
+                <div>
+                    <ButtonLink href="/dashboard/orders" variant="secondary" size="sm" leftIcon={<ArrowLeft size={14} />}>
+                        Siparişler
+                    </ButtonLink>
+                </div>
+
+                <PageHeader
+                    title={order.orderNumber}
+                    titleAdornment={<>
                         {/* Primary badge: commercial status */}
                         <span className={`badge ${commercialCfg.cls}`} style={{ fontSize: "12px", padding: "3px 10px", fontWeight: 700 }}>
                             {commercialCfg.label}
@@ -569,10 +572,8 @@ export default function OrderDetailPage() {
                                 {fulfillmentCfg.label}
                             </span>
                         )}
-                    </div>
-
-                    {/* Action buttons by status */}
-                    <div style={{ display: "flex", gap: "8px" }}>
+                    </>}
+                    actions={<>
                         {commercialStatus === "draft" && (
                             <>
                                 <Button
@@ -650,8 +651,8 @@ export default function OrderDetailPage() {
                                 </div>
                             </div>
                         )}
-                    </div>
-                </div>
+                    </>}
+                />
 
                 {/* Teklif süresi doldu uyarısı */}
                 {order.quoteValidUntil &&

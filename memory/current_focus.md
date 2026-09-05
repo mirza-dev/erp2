@@ -78,8 +78,7 @@ kırmızı-kanıtlı · React Doctor 260→262 (ikisi de birleştirmenin mekaniz
 **Dersler:** görünmek ≠ olmak · bir kapı yalnız BAKTIĞI yerde korur · bir kural
 iddia ettiğinden fazlasını söylememeli · ön tarama envanter değildir.
 
-**Bilinen boşluk (kullanıcı kararı):** `orders/[id]` ve `quotes/[id]` h1'siz,
-h2'den başlıyor.
+**Bilinen boşluk KAPATILDI (ek tur):** kullanıcı "`orders/[id]` ve `quotes/[id]`'ye `PageHeader` ekleyelim" dedi. Emsal hazırdı (`purchase/orders/[id]`: geri-kırıntı AYRI satırda, altında `PageHeader`). **`orders/[id]` 0 → 5 başlık** (h1 + 4 h2), **`quotes/[id]` 0 → 1** (h1; gövdesi `QuoteForm`, ayrı tur). Belge numarası 14px `<div>` / 12px MONO `<span>` iken artık **20px `<h1>`**. Görünür değişiklikler: başlık ayrı satıra çıktı · kırıntı ayraçları (chevron + `/`) silindi (anlamlarını yitirdiler) · teklif numarası mono'yu kaybetti · durum açıklaması `subtitle` oldu; `quotes/[id]`nin tam genişlikli şerit kimliği KORUNDU. **8 ölçüm temiz** (2 sayfa × 2 tema × {1440,390}), seviye atlaması 0, taşma 0. **Ölçü aracı yine bulguydu:** 900ms sabit bekleme dört ölçümden BİRİNDE yükleniyor ekranını yakalayıp "0 başlık" raporladı → bekleme olaya bağlandı. Kapı: `form-consistency`e **detay sayfası h1 kaynağı** kuralı (7 sayfa: ya `PageHeader` ya gerekçeli istisna). **Kırmızı-kanıt bir zayıflık yakaladı:** `title={` deseni `subtitle={` dizesinin İÇİNDE geçiyor → `titleAdornment`a çevirdiğimde kural yeşil kaldı; `\s` sınırı eklendi (**"bir kaynak iddiası, iddia ettiği SINIRIN içinde kalmalı" dersinin DÖRDÜNCÜ tekrarı**). 3/3 kırmızı-kanıtlı. 501 dosya / 7007 test.
 
 ## 2026-08-31 (6) — 20 maddelik "vibe-coded" listesi denetimi
 

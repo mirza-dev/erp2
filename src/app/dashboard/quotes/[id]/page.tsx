@@ -13,6 +13,7 @@ import { applySendResultToast, sendQuoteEmail } from "../_utils/send-result";
 import QuoteForm from "../_components/QuoteForm";
 import type { QuoteDetail } from "@/lib/mock-data";
 import type { QuoteStatus } from "@/lib/database.types";
+import PageHeader from "@/components/ui/PageHeader";
 
 // ── Status config ────────────────────────────────────────────────────────────
 
@@ -307,50 +308,46 @@ export default function QuoteDetailPage() {
 
     return (
         <div style={{ position: "relative" }}>
-            {/* ── Status Header ── */}
+            {/* ── Status Header ──
+                Şeridin KİMLİĞİ korunuyor (tam genişlik + alt kenarlık + kendi
+                zemini); içi `purchase/orders/[id]` emsaline oturdu: kırıntı ayrı
+                satırda, altında `PageHeader`. 2026-09-05'e kadar teklif numarası
+                12px MONO bir `<span>`di ve bu sayfada HİÇ `<h1>` yoktu — belge
+                numarası görsel olarak bile başlık değildi, kırıntının parçasıydı.
+                Durum açıklaması artık `subtitle`. */}
             <div style={{
-                display: "flex",
-                alignItems: "center",
-                gap: "10px",
                 padding: "12px 20px",
                 borderBottom: "0.5px solid var(--border-tertiary)",
                 background: "var(--bg-primary)",
-                flexWrap: "wrap",
             }}>
                 {/* Back + breadcrumb */}
-                <Link href="/dashboard/quotes" style={{ color: "var(--text-tertiary)", textDecoration: "none", fontSize: "13px" }}>
-                    ← Teklifler
-                </Link>
-                <span style={{ color: "var(--text-tertiary)", fontSize: "13px" }}>/</span>
-                <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "12px", color: "var(--text-primary)", fontWeight: 500 }}>
-                    {quote.quoteNumber}
-                </span>
+                <div style={{ marginBottom: "8px" }}>
+                    <Link href="/dashboard/quotes" style={{ color: "var(--text-tertiary)", textDecoration: "none", fontSize: "13px" }}>
+                        ← Teklifler
+                    </Link>
+                </div>
 
-                {/* Status badge */}
-                <span style={{
-                    display: "inline-flex",
-                    alignItems: "center",
-                    gap: "5px",
-                    padding: "2px 10px",
-                    borderRadius: "4px",
-                    fontSize: "11px",
-                    fontWeight: 600,
-                    background: statusCfg.bg,
-                    color: statusCfg.color,
-                    border: `0.5px solid ${statusCfg.border}`,
-                }}>
-                    <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "currentColor" }} />
-                    {statusCfg.label}
-                </span>
-
-                {/* Status description */}
-                <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
-                    {statusCfg.description}
-                </span>
-
-                {/* Spacer */}
-                <div style={{ flex: 1 }} />
-
+                <PageHeader
+                    title={quote.quoteNumber}
+                    subtitle={statusCfg.description}
+                    titleAdornment={
+                        <span style={{
+                            display: "inline-flex",
+                            alignItems: "center",
+                            gap: "5px",
+                            padding: "2px 10px",
+                            borderRadius: "4px",
+                            fontSize: "11px",
+                            fontWeight: 600,
+                            background: statusCfg.bg,
+                            color: statusCfg.color,
+                            border: `0.5px solid ${statusCfg.border}`,
+                        }}>
+                            <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "currentColor" }} />
+                            {statusCfg.label}
+                        </span>
+                    }
+                    actions={<>
                 {/* Action buttons (status transitions) */}
                 {actions.length > 0 && (
                     <div style={{ display: "flex", gap: "8px" }}>
@@ -482,6 +479,8 @@ export default function QuoteDetailPage() {
                         Revizyon {quote.revisionNo} — kaynak: {quote.revisionOf.quoteNumber}
                     </Link>
                 )}
+                    </>}
+                />
             </div>
 
             {/* ── Quote Form ── */}

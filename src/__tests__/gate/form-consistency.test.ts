@@ -198,6 +198,45 @@ describe("GATE — form ve başlık tipografisi", () => {
         expect(users).toBeGreaterThanOrEqual(20);
     });
 
+    it("belge DETAY sayfalarının da bir `<h1>`i var", () => {
+        // 2026-09-05 turunda ölçülen boşluk: `orders/[id]` ve `quotes/[id]`
+        // sayfalarının h1/h2/h3 sayısı SIFIRDI. Belge numarası görsel olarak
+        // başlıktı (orders: 14px `<div>`, quotes: 12px mono `<span>`) ama
+        // semantik olarak hiçbir şeydi. `purchase/orders/[id]` emsali:
+        // geri-kırıntı AYRI satırda, altında `PageHeader`.
+        //
+        // Kural sayfanın h1 KAYNAĞINI iddia ediyor: ya `PageHeader`, ya
+        // belgelenmiş bir istisna. Aksi hâlde bir detay sayfası yeniden
+        // başlıksız kalabilir ve kimse fark etmez.
+        const DETAIL_PAGES: Record<string, "PageHeader" | string> = {
+            "src/app/dashboard/orders/[id]/page.tsx": "PageHeader",
+            "src/app/dashboard/quotes/[id]/page.tsx": "PageHeader",
+            "src/app/dashboard/purchase/orders/[id]/page.tsx": "PageHeader",
+            "src/app/dashboard/purchase/rfqs/[id]/page.tsx": "PageHeader",
+            "src/app/dashboard/products/[id]/page.tsx": "başlığın SOLUNDA 80px ürün görseli — kendi <h1>'ini yazar (HEADER_EXCEPTIONS)",
+            "src/app/dashboard/settings/product-types/[id]/page.tsx": "detay kahramanı: geri-kırıntı + ikon + durum çipleri (HEADER_EXCEPTIONS)",
+            "src/app/dashboard/developer/errors/[id]/page.tsx": "<h1> bir HATA MESAJI, belge başlığı değil (HEADER_EXCEPTIONS)",
+        };
+        for (const [rel, how] of Object.entries(DETAIL_PAGES)) {
+            const code = stripComments(readFileSync(join(root, rel), "utf8"));
+            if (how === "PageHeader") {
+                expect(code, `${rel}: PageHeader'dan beslenmiyor`).toMatch(/<PageHeader[\s\n]/);
+                // Belge numarası başlığın KENDİSİ olmalı, süsü değil.
+                //
+                // `\s` ZORUNLU: `subtitle={` dizesi `title={` desenini İÇERİYOR.
+                // Kırmızı-kanıt turunda yakalandı — `title`ı `titleAdornment`a
+                // çevirdim ve kural YEŞİL kaldı, çünkü desen bir alt satırdaki
+                // `subtitle={`ye ulaşıyordu. (Deponun tekrarlayan tuzağı: bir
+                // kaynak iddiası, iddia ettiği SINIRIN içinde kalmalı.)
+                expect(code, `${rel}: PageHeader'a title verilmemiş`)
+                    .toMatch(/<PageHeader[\s\S]{0,200}?\stitle=\{/);
+            } else {
+                expect(code, `${rel}: elle <h1> beklenirken bulunamadı`).toMatch(/<h1[\s\n]/);
+                expect(how.length, `${rel} için gerekçe çok kısa`).toBeGreaterThan(25);
+            }
+        }
+    });
+
     it("ortak yardımcılar tek dosyada ve login referansıyla aynı", () => {
         const src = readFileSync(join(root, "src/components/ui/Input.tsx"), "utf8");
         const body = src.match(/export function labelStyle\(\): CSSProperties \{[\s\S]*?\n\}/)?.[0] ?? "";

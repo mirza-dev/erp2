@@ -32,7 +32,7 @@ metadata:
 
 **Kapı:** `surface-consistency` +7 · `form-consistency` +4 (**`<h2>` için bugüne kadar HİÇ kapı yoktu**) · `console-consistency` ada değil tipografiye bağlandı · üç yeni davranış testi (47 test). 18/18 kırmızı-kanıtlı. 501 dosya / 7006 test · E2E 94/94 · tüketici tarafında net −187 satır.
 
-**KAPSAM DIŞI, kayıtlı:** `orders/[id]`+`quotes/[id]`ye `PageHeader` (kullanıcı kararı — h1'siz kalıyorlar, **bilinen boşluk**) · `KpiCard` (uçtan uca test kilidi) · `Fact` ×2 · `StatsCards` (ölü ama silinmesi yasak) · baskı belgeleri · landing. Kalan 4 DOM-mutasyonlu hover dosyası artık kapı allowlist'inde gerekçeli.
+**KAPSAM DIŞI, kayıtlı:** ~~`orders/[id]`+`quotes/[id]`ye `PageHeader`~~ → **EK TURDA KAPATILDI** (0→5 ve 0→1 başlık; `purchase/orders/[id]` emsali; kalan: `QuoteForm`un kendi bölüm başlıkları) · `KpiCard` (uçtan uca test kilidi) · `Fact` ×2 · `StatsCards` (ölü ama silinmesi yasak) · baskı belgeleri · landing. Kalan 4 DOM-mutasyonlu hover dosyası artık kapı allowlist'inde gerekçeli.
 
 ---
 
