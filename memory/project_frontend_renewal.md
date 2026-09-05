@@ -18,7 +18,21 @@ metadata:
 
 **Faz B #8 — DRAWER TARAFI KAPANDI (2026-09-05).** YENİ `ui/Drawer` + `ui/dialog-a11y.ts`; **YEDİ** yan çekmecenin hepsi taşındı (kayıtlı sayı 4'tü — ikisi sayfaların İÇİNE gömülüydü: `VendorsClient` `justifyContent:"flex-end"` ile, `email-deliveries` `<aside>` olarak; **çekmece sayımı imzaya göre yapılmalı**). Kusurlar: 4'ünde Escape, 6'sında odak tuzağı, 5'inde odak dönüşü yoktu ve **beşi buna rağmen `role="dialog"` İLAN EDİYORDU**; dört z-index katmanı (50'dekiler kabuğun mobil menüsünün ALTINDA); üç dikey teknik — `height:100vh` iOS Safari'de görüntü alanından büyüktür (panelin dibi erişilemez) ve **hiç ölçülmemişti**. `Drawer`da **`height` HİÇ yazılmaz** (`top:0`+`bottom:0` — `100dvh`ten de iyi), katman 200/201, yüzey `--surface-raised`+`--surface-border`; `padded={false}` `Modal`'dan farklı olarak **flex sütunu KORUR**. Davranış-nötrlük kanıtı: `modal-ui.test.tsx`'in 17 testi **dokunulmadan** yeşil. 24 tarayıcı ölçümü temiz. Rapor `docs/audit/2026-09-05-yan-cekmeceler.md`.
 
-**AÇIK (Faz B #8 kalanı):** `SectionHeader` (~45 çağırı / 6 varyant; `console-ui.ts` aynı kusuru bir kez yaşayıp kendi kapısını kurmuş, ama yalnız `/developer` içinde) · `NavLink` (3 yüzey ama gerçekte 2 birleştirilebilir — Sidebar hover'ı hâlâ DOM MUTASYONU ve `aria-current` yok) · `Stat` (2 hazır bileşen + ~28 elle yazılmış / 9 varyant; **uyarı:** `gate/surface-consistency`'nin `var(--surface-raised)` ≥7/≥3 sayaçları `parasut`+`purchase/suggested` sayfalarına bakıyor → `Stat` çıkarımı o literalleri silince kırılacak). `Input`/`PageHeader` önceki turlarda kapandı.
+**FAZ B KAPANDI (2026-09-05).** Son üç bileşen tek turda, üç dilimde: `NavLink` (`4745cae`) · `SectionHeader` (`b05f23d`) · `Stat` (`497d717`). Rapor `docs/audit/2026-09-05-uc-bilesen.md`.
+
+**ÜÇ KAYITLI SAYININ ÜÇÜ DE DÜŞÜKTÜ** (hepsi önceki turun ÖN TARAMASINDAN geliyordu): `SectionHeader` ~45 değil **85 çağrı / 42 varyant** · `Stat` ~28 değil **3 paylaşılan + 7 dosya-yerel + 26 elle / 20 değer tipografisi** · `NavLink` eksenleri ÇAPRAZ çıktı.
+
+**`NavLink`:** görsel ikili Sidebar+Ayarlar (aynı üç nav token'ı + 2px sol accent şeridi, iki ayrı uygulama), mantık ikilisi Sidebar+Developer (`isActive` birebir iki kopya) → iki eksen AYRI çözüldü, Developer'ın alt-çizgi dili KASTEN korundu. Asıl kusur a11y: **Sidebar'ın 16-18 bağlantısında `aria-current` YOKTU**, altı işaret de yalnız görseldi. Hover'daki 6 satır DOM mutasyonu silindi, görünüm `.nav-rail-item` CSS sınıfına geçti. Altı ölçü kayması ölçümle tek değere indi.
+
+**`SectionHeader`: GÖRÜNMEK ≠ OLMAK** (Drawer dersinin tersi). 44 bölüm etiketi `<div>`di → **`orders/[id]` ve `quotes/[id]`nin h1/h2/h3 sayısı SIFIRDI**. Dört rakip kanon, ikisi AYNI DOSYADA (`settings/page.tsx`). Üç rol/üç ölçek (`label` 11px BÜYÜK HARF / `title` 13px / `dialog` 16px); `Input.labelStyle()`ından TÜRETİLEMEZ (o `textTransform` taşımamaya kilitli). Tipografi imzası 42→4.
+
+**`Stat`: kapının kanıtladığı kusur, kapının BAKMADIĞI yerde.** Beş yüzey kutu zemini olarak `--bg-secondary` kullanıyordu = görünmez kutu; kural 2026-08-31'de yazılmıştı ama beş sayfalık allowlist üzerinde. Ton haritası 4 KOPYA → 1 (`Badge.TONE_TOKENS` export). Değer tipografisi 20→1 (`21px/650/tabular-nums`). **Uyarı gerçekleşti:** `gate/surface-consistency`nin ≥7/≥3 sayacı kırıldı (Öneriler 3→0, üçü de stat kutusuydu) → yapı iddiasına çevrildi + eksik `stripComments` eklendi.
+
+**DERSLER:** görünmek ≠ olmak · **bir kapı yalnız BAKTIĞI yerde koruma sağlar** (kanıtlı kuralın KAPSAMI da kanıtlanmalı) · bir kural iddia ettiğinden fazlasını söylememeli (negatif stat kuralı ilk yazımda sekme şeridini de yakaladı, stat imzasına daraltıldı) · ön tarama envanter değildir.
+
+**Kapı:** `surface-consistency` +7 · `form-consistency` +4 (**`<h2>` için bugüne kadar HİÇ kapı yoktu**) · `console-consistency` ada değil tipografiye bağlandı · üç yeni davranış testi (47 test). 18/18 kırmızı-kanıtlı. 501 dosya / 7006 test · E2E 94/94 · tüketici tarafında net −187 satır.
+
+**KAPSAM DIŞI, kayıtlı:** `orders/[id]`+`quotes/[id]`ye `PageHeader` (kullanıcı kararı — h1'siz kalıyorlar, **bilinen boşluk**) · `KpiCard` (uçtan uca test kilidi) · `Fact` ×2 · `StatsCards` (ölü ama silinmesi yasak) · baskı belgeleri · landing. Kalan 4 DOM-mutasyonlu hover dosyası artık kapı allowlist'inde gerekçeli.
 
 ---
 
@@ -35,7 +49,7 @@ metadata:
 | Faz | Konu | Açıklama |
 |-----|------|----------|
 | A | Design Token Genişletme | `globals.css`'e typography scale, spacing (4pt grid), z-index, hover tokens, skip-link, ~~reduced-motion~~ ✅ + tema token'ları (`--highlight-inset` vb. ✅) |
-| B | Component Kütüphanesi | DataTable(+onRowClick[klavye dahil]+rowAriaLabel+minWidth+rowStyle+`.row-reveal`), Card, Badge VAR; **liste tarafı 7/7 BİTTİ**: Vendors+PO+Customers+Orders+Quotes+3 settings tablosu+products (`c6f46fc`/`931c62d`/`64af65d`/`024c2d8`/`cdb5be3`/`dceb9a8`/`2095ae2`). Premium light theme entegre (`f550e83`). **Drawer tarafı 2026-09-05'te KAPANDI** (`ui/Drawer`+`dialog-a11y`, 7 çekmece). AÇIK: SectionHeader/NavLink/Stat |
+| B | Component Kütüphanesi | **KAPANDI 2026-09-05.** DataTable(+onRowClick[klavye dahil]+rowAriaLabel+minWidth+rowStyle+`.row-reveal`), Card, Badge VAR; **liste tarafı 7/7 BİTTİ**: Vendors+PO+Customers+Orders+Quotes+3 settings tablosu+products (`c6f46fc`/`931c62d`/`64af65d`/`024c2d8`/`cdb5be3`/`dceb9a8`/`2095ae2`). Premium light theme entegre (`f550e83`). **Drawer tarafı 2026-09-05'te KAPANDI** (`ui/Drawer`+`dialog-a11y`, 7 çekmece). **Son üç bileşen de 2026-09-05'te KAPANDI** (`ui/NavLink`+`SectionHeader`+`Stat`; `4745cae`/`b05f23d`/`497d717`). AÇIK MADDE YOK. |
 | C | DOM Mutation Fix | `onMouseEnter` style mutation → `useState(hovered)` — **ÇOĞU YAPILDI** (orders/quotes/products/customers/PO/production) |
 | D | Accessibility | Skip link, aria-label ✅(çoğu), focus trap (Sidebar mobile), form label-input bağlantısı — kısmen |
 | E | Görsel Yenileme | Landing, Login split-screen, Sidebar, ~~Topbar breadcrumb~~ → **Topbar "Sakin düz" yapıldı** (`bf28fb0`, sola-başlık), Dashboard, Orders |

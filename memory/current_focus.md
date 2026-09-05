@@ -45,10 +45,41 @@ ayırt edilemez → SHA kontrolü eklendi. (3) Gerekçe yorumu kuralı tetikledi
 **kayma animasyonu sürerken** yakalanmıştı.
 
 **498 dosya / 6947 test · E2E 94/94 · 10/10 kırmızı kanıtlı · net −68 satır.**
-AÇIK (ayrı tur, kullanıcı kararı): `SectionHeader` (~45 çağırı/6 varyant) ·
-`NavLink` (3 yüzey, 2'si birleştirilebilir) · `Stat` (2 hazır + ~28 elle/9
-varyant; **uyarı:** `surface-consistency`'nin `--surface-raised` ≥7/≥3 sayaçları
-`Stat` çıkarımında kırılacak).
+
+---
+
+**2026-09-05 (devam) — Faz B'nin son üç bileşeni KAPANDI, FAZ B BİTTİ.**
+Kullanıcı "üç bileşeni de yapalım" dedi. Üç dilim/üç commit: `NavLink`
+(`4745cae`) · `SectionHeader` (`b05f23d`) · `Stat` (`497d717`). Rapor
+`docs/audit/2026-09-05-uc-bilesen.md`.
+
+**ÜÇ KAYITLI SAYININ ÜÇÜ DE DÜŞÜKTÜ** — hepsi önceki turun ön taramasından
+geliyordu: SectionHeader 85 çağrı/42 varyant · Stat 3+7 bileşen + 26 blok/20
+değer tipografisi · NavLink'in eksenleri ÇAPRAZ (görsel ikili Sidebar+Ayarlar,
+mantık ikilisi Sidebar+Developer).
+
+**Üç kök bulgu:** (1) **Sidebar'ın 16-18 bağlantısında `aria-current` YOKTU** —
+altı görsel işaret vardı, hiçbiri semantik değildi; hover'ı 6 satır DOM
+mutasyonuydu. (2) **GÖRÜNMEK ≠ OLMAK**: 44 bölüm etiketi `<div>`di ve
+`orders/[id]` + `quotes/[id]` sayfalarının h1/h2/h3 sayısı SIFIRDI. (3) **Kapının
+kanıtladığı kusur, kapının BAKMADIĞI yerde**: beş stat yüzeyi `--bg-secondary`
+zeminliydi (görünmez kutu) ve kural 2026-08-31'de yazılmıştı ama yalnız beş
+sayfalık bir allowlist üzerinde.
+
+**Öngörülen kırılma geldi:** `gate/surface-consistency`nin ≥7/≥3 sayacı — Öneriler'in
+üç literalinin ÜÇÜ DE stat kutusuydu (3→0). Kural düzeltmeyi kusur sandı; yapı
+iddiasına çevrildi + eksik `stripComments` eklendi.
+
+**Doğrulama:** 8 nav + 20 başlık + 12 stat = 40 tarayıcı ölçümü, hepsi temiz.
+Seviye atlaması 0 · taşma 0 · tipografi imzası 42→4 (başlık), 20→1 (stat) ·
+görünür metin kaybı yok. 501 dosya / 7006 test · E2E 94/94 · 18/18
+kırmızı-kanıtlı · React Doctor 260→262 (ikisi de birleştirmenin mekanizması).
+
+**Dersler:** görünmek ≠ olmak · bir kapı yalnız BAKTIĞI yerde korur · bir kural
+iddia ettiğinden fazlasını söylememeli · ön tarama envanter değildir.
+
+**Bilinen boşluk (kullanıcı kararı):** `orders/[id]` ve `quotes/[id]` h1'siz,
+h2'den başlıyor.
 
 ## 2026-08-31 (6) — 20 maddelik "vibe-coded" listesi denetimi
 
