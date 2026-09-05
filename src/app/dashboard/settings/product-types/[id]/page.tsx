@@ -24,6 +24,7 @@ import type { ProductTypeStatsRow } from "@/lib/supabase/product-types";
 import { fieldStyle, labelStyle as sharedLabelStyle } from "@/components/ui/Input";
 import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 import SectionHeader from "@/components/ui/SectionHeader";
+import Stat from "@/components/ui/Stat";
 
 const FIELD_TYPE_LABELS: Record<ProductFieldType, string> = {
     text: "Metin",
@@ -124,14 +125,10 @@ function FieldStatus({ field }: { field: ProductTypeFieldRow }) {
     return <span style={{ color: "var(--success-text)", background: "var(--success-bg)", border: "0.5px solid var(--success-border)", borderRadius: "999px", padding: "2px 7px", fontSize: "11px" }}>Aktif</span>;
 }
 
+/** 2026-09-05: gövde ortak `ui/Stat`e taşındı — kardeş sayfadaki `Metric`in
+ *  ikizi ama ağırlığı 750, yüzeyi `--bg-primary`ydi; ikisi de kanona indi. */
 function Metric({ label, value, sub }: { label: string; value: string | number; sub: string }) {
-    return (
-        <div style={{ border: "0.5px solid var(--border-tertiary)", borderRadius: "8px", padding: "12px", background: "var(--bg-primary)" }}>
-            <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</div>
-            <div style={{ fontSize: "22px", fontWeight: 750, color: "var(--text-primary)", lineHeight: 1.1, marginTop: "7px" }}>{value}</div>
-            <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "5px" }}>{sub}</div>
-        </div>
-    );
+    return <Stat label={label} value={value} sub={sub} surfaceStyle={{ padding: "12px" }} />;
 }
 
 /** Mutasyon uçlarının izin listesiyle BİREBİR (api/product-types/**: requirePermission). */

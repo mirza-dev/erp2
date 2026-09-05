@@ -8,6 +8,7 @@ import Drawer from "@/components/ui/Drawer";
 import { formatCurrency, formatDate } from "@/lib/utils";
 import type { VendorSuppliedProduct, VendorPurchaseSummary } from "@/lib/vendor-detail";
 import type { VendorRow } from "@/lib/database.types";
+import Stat from "@/components/ui/Stat";
 
 /**
  * A3 (2026-08-24): Tedarikçiler sayfası yalnız bir iletişim listesiydi — satırın
@@ -34,13 +35,13 @@ const labelStyle: React.CSSProperties = {
     color: "var(--text-tertiary)",
 };
 
+/**
+ * 2026-09-05: gövde ortak `ui/Stat`e taşındı. Yerel sarmalayıcı yalnız
+ * `children` API'sini koruyor — iki çağrı yeri de değer olarak JSX geçiriyor.
+ * Eski zemin `--bg-secondary`ydi, yani sayfa zeminiyle aynı renk: görünmez kutu.
+ */
 function StatBox({ label, children }: { label: string; children: React.ReactNode }) {
-    return (
-        <div style={{ background: "var(--bg-secondary)", borderRadius: "6px", padding: "10px 12px" }}>
-            <div style={{ ...labelStyle, marginBottom: "2px" }}>{label}</div>
-            <div style={{ fontSize: "16px", fontWeight: 500, color: "var(--text-primary)" }}>{children}</div>
-        </div>
-    );
+    return <Stat label={label} value={children} />;
 }
 
 export default function VendorDetailPanel({ vendor, onClose }: VendorDetailPanelProps) {

@@ -18,6 +18,7 @@ import type { LinkedPO } from "@/lib/supabase/purchase-orders";
 import Button from "@/components/ui/Button";
 import { Check, CircleOff, ClipboardList, Pencil } from "lucide-react";
 import SectionHeader from "@/components/ui/SectionHeader";
+import Stat, { StatGrid } from "@/components/ui/Stat";
 
 interface AiEnrichmentItem {
     productId: string;
@@ -1347,119 +1348,77 @@ export default function PurchaseSuggestedPage() {
                 />
             )}
 
-            {/* Summary cards */}
+            {/* Summary cards. 2026-09-05: üçünün de yüzeyi ortak `ui/Stat`e
+                taşındı. Renkli KENARLIK korunuyor — kartın tonunu o anlatıyor
+                ve `Stat`in `tone`u yalnız DEĞERİ renklendirir. */}
             {reorderSuggestions.length > 0 && (
-                <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: "12px", marginTop: "20px" }}>
-                    <div style={{
-                        // 2026-08-31: `--bg-secondary` HER İKİ TEMADA sayfa
-                        // zeminiyle birebir aynı renk — bu kartların yüzeyi hiç
-                        // yoktu, yalnız renkli kenarlıkları görünüyordu (tarayıcı
-                        // ölçümü: backgroundColor #e8eef5 = --app-bg).
-                        background: "var(--surface-raised)",
-                        boxShadow: "var(--surface-shadow-sm)",
-                        border: "1px solid var(--danger-border)",
-                        borderRadius: "8px",
-                        padding: "14px 16px",
-                    }}>
-                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                            Toplam Kritik
-                        </div>
-                        <div style={{ fontSize: "28px", fontWeight: 700, color: "var(--danger-text)", marginTop: "4px", lineHeight: 1 }}>
-                            {reorderSuggestions.length}
-                        </div>
-                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
-                            {inScopeManufacturedCount} imalat · {inScopeCommercialCount} ticari
-                        </div>
-                    </div>
-
-                    <div style={{
-                        // 2026-08-31: `--bg-secondary` HER İKİ TEMADA sayfa
-                        // zeminiyle birebir aynı renk — bu kartların yüzeyi hiç
-                        // yoktu, yalnız renkli kenarlıkları görünüyordu (tarayıcı
-                        // ölçümü: backgroundColor #e8eef5 = --app-bg).
-                        background: "var(--surface-raised)",
-                        boxShadow: "var(--surface-shadow-sm)",
-                        border: "1px solid var(--warning-border)",
-                        borderRadius: "8px",
-                        padding: "14px 16px",
-                    }}>
-                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                            En Acil
-                        </div>
-                        {mostUrgent ? (
-                            <>
-                                <div style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)", marginTop: "4px" }}>
+                <StatGrid min="0" style={{ gridTemplateColumns: isMobile ? "1fr" : "repeat(3, 1fr)", gap: "12px", marginTop: "20px" }}>
+                    <Stat
+                        label="Toplam Kritik"
+                        value={reorderSuggestions.length}
+                        tone="danger"
+                        sub={`${inScopeManufacturedCount} imalat · ${inScopeCommercialCount} ticari`}
+                        surfaceStyle={{ padding: "14px 16px", border: "1px solid var(--danger-border)" }}
+                    />
+                    <Stat
+                        label="En Acil"
+                        value={mostUrgent ? (
+                            <span style={{ display: "flex", flexDirection: "column", gap: "4px", alignItems: "flex-start" }}>
+                                <span style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)" }}>
                                     {mostUrgent.name}
-                                </div>
-                                <div style={{ marginTop: "4px" }}>
-                                    <span style={{
-                                        fontSize: "12px",
-                                        fontWeight: 700,
-                                        background: daysBg(mostUrgentDays),
-                                        color: daysColor(mostUrgentDays),
-                                        padding: "2px 8px",
-                                        borderRadius: "4px",
-                                    }}>
-                                        {mostUrgentDays !== null ? `${mostUrgentDays} gün kaldı` : "—"}
-                                    </span>
-                                </div>
-                            </>
-                        ) : (
-                            <div style={{ fontSize: "13px", color: "var(--text-secondary)", marginTop: "4px" }}>—</div>
-                        )}
-                    </div>
-
-                    <div style={{
-                        // 2026-08-31: `--bg-secondary` HER İKİ TEMADA sayfa
-                        // zeminiyle birebir aynı renk — bu kartların yüzeyi hiç
-                        // yoktu, yalnız renkli kenarlıkları görünüyordu (tarayıcı
-                        // ölçümü: backgroundColor #e8eef5 = --app-bg).
-                        background: "var(--surface-raised)",
-                        boxShadow: "var(--surface-shadow-sm)",
-                        border: "1px solid var(--border-secondary)",
-                        borderRadius: "8px",
-                        padding: "14px 16px",
-                    }}>
-                        <div
-                            style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}
-                            title="Önerilen satın alma sipariş tutarlarının para birimi başına toplamı"
-                        >
-                            Önerilen Satın Alma Tutarı
-                        </div>
-                        <div style={{ fontSize: "28px", fontWeight: 700, color: "var(--accent-text)", marginTop: "4px", lineHeight: 1 }}>
+                                </span>
+                                <span style={{
+                                    fontSize: "12px",
+                                    fontWeight: 700,
+                                    background: daysBg(mostUrgentDays),
+                                    color: daysColor(mostUrgentDays),
+                                    padding: "2px 8px",
+                                    borderRadius: "4px",
+                                }}>
+                                    {mostUrgentDays !== null ? `${mostUrgentDays} gün kaldı` : "—"}
+                                </span>
+                            </span>
+                        ) : null}
+                        surfaceStyle={{ padding: "14px 16px", border: "1px solid var(--warning-border)" }}
+                    />
+                    <Stat
+                        label={
+                            <span title="Önerilen satın alma sipariş tutarlarının para birimi başına toplamı">
+                                Önerilen Satın Alma Tutarı
+                            </span>
+                        }
+                        tone="accent"
+                        value={<>
                             {formatCurrency(primaryTotal, primaryCurrency)}
                             <span style={{ fontSize: "12px", fontWeight: 500, color: "var(--text-tertiary)", marginLeft: "6px" }}>
                                 {primaryCurrency}
                             </span>
-                        </div>
-                        {!isSingleCurrency && (
-                            <div style={{ display: "flex", flexDirection: "column", gap: "2px", marginTop: "6px" }}>
-                                {currencyEntries.slice(1).map(([cur, val]) => (
-                                    <div key={cur} style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)" }}>
-                                        {formatCurrency(val.total, cur)}
-                                        <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--text-tertiary)", marginLeft: "6px" }}>
-                                            {cur}
-                                        </span>
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "6px", display: "flex", flexDirection: "column", gap: "2px" }}>
+                        </>}
+                        sub={<span style={{ display: "flex", flexDirection: "column", gap: "2px" }}>
+                            {!isSingleCurrency && currencyEntries.slice(1).map(([cur, val]) => (
+                                <span key={cur} style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-secondary)" }}>
+                                    {formatCurrency(val.total, cur)}
+                                    <span style={{ fontSize: "11px", fontWeight: 400, color: "var(--text-tertiary)", marginLeft: "6px" }}>
+                                        {cur}
+                                    </span>
+                                </span>
+                            ))}
                             <span>{reorderSuggestions.length} ürün · {formatCurrency(primaryAccepted, primaryCurrency)} kabul edildi</span>
                             {!isSingleCurrency && currencyEntries.slice(1).filter(([, v]) => v.accepted > 0).map(([cur, val]) => (
                                 <span key={cur}>{formatCurrency(val.accepted, cur)} kabul edildi</span>
                             ))}
-                        </div>
-                        {missingPriceCount > 0 && (
-                            <div
-                                style={{ fontSize: "11px", color: "var(--warning-text)", marginTop: "4px" }}
-                                title="Maliyet veya satış fiyatı tanımlı olmayan ürünler"
-                            >
-                                {missingPriceCount} üründe fiyat eksik — toplam tutar bu ürünleri içermez.
-                            </div>
-                        )}
-                    </div>
-                </div>
+                            {missingPriceCount > 0 && (
+                                <span
+                                    style={{ color: "var(--warning-text)" }}
+                                    title="Maliyet veya satış fiyatı tanımlı olmayan ürünler"
+                                >
+                                    {missingPriceCount} üründe fiyat eksik — toplam tutar bu ürünleri içermez.
+                                </span>
+                            )}
+                        </span>}
+                        surfaceStyle={{ padding: "14px 16px", border: "1px solid var(--border-secondary)" }}
+                    />
+                </StatGrid>
             )}
 
             {/* Decision summary — clickable filters */}

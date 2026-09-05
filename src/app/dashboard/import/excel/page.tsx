@@ -36,6 +36,8 @@ import {
     type ExcelImportTemplateKind,
     type ImportFieldApproval,
 } from "@/lib/import-center";
+import Stat, { StatGrid } from "@/components/ui/Stat";
+import Card from "@/components/ui/Card";
 
 // Excel/CSV toplu aktarım sihirbazı — kendi sayfası (2026-06-10 sadeleştirme).
 // Önceden /dashboard/import içinde <details> accordion'daydı; hub artık
@@ -1421,40 +1423,24 @@ export default function ImportExcelWizardPage() {
                             <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "2px" }}>{fileName}</div>
                         </div>
                     </div>
-                    <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(110px, 1fr))", gap: "10px", marginBottom: "16px" }}>
+                    <StatGrid min="110px" style={{ marginBottom: "16px" }}>
                         {confirmResult ? (
                             <>
-                                <div style={{ background: "var(--bg-secondary)", borderRadius: "6px", padding: "12px 14px" }}>
-                                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "2px" }}>Eklendi</div>
-                                    <div style={{ fontSize: "18px", fontWeight: 600, color: "var(--success-text)", marginBottom: "2px" }}>{confirmResult.added}</div>
-                                    <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>yeni kayıt</div>
-                                </div>
-                                <div style={{ background: "var(--bg-secondary)", borderRadius: "6px", padding: "12px 14px" }}>
-                                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "2px" }}>Güncellendi</div>
-                                    <div style={{ fontSize: "18px", fontWeight: 600, color: "var(--accent-text)", marginBottom: "2px" }}>{confirmResult.updated}</div>
-                                    <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>mevcut kayıt</div>
-                                </div>
+                                <Stat label="Eklendi" value={confirmResult.added} tone="success" sub="yeni kayıt" />
+                                <Stat label="Güncellendi" value={confirmResult.updated} tone="accent" sub="mevcut kayıt" />
                                 {confirmResult.skipped > 0 && (
-                                    <div style={{ background: "var(--bg-secondary)", borderRadius: "6px", padding: "12px 14px" }}>
-                                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "2px" }}>Atlanan</div>
-                                        <div style={{ fontSize: "18px", fontWeight: 600, color: "var(--warning-text)", marginBottom: "2px" }}>{confirmResult.skipped}</div>
-                                        <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>kayıt atlandı</div>
-                                    </div>
+                                    <Stat label="Atlanan" value={confirmResult.skipped} tone="warning" sub="kayıt atlandı" />
                                 )}
                                 {confirmResult.errors.length > 0 && (
-                                    <div style={{ background: "var(--bg-secondary)", borderRadius: "6px", padding: "12px 14px" }}>
-                                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "2px" }}>Hatalar</div>
-                                        <div style={{ fontSize: "18px", fontWeight: 600, color: "var(--danger-text)", marginBottom: "2px" }}>{confirmResult.errors.length}</div>
-                                        <div style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>satırda sorun</div>
-                                    </div>
+                                    <Stat label="Hatalar" value={confirmResult.errors.length} tone="danger" sub="satırda sorun" />
                                 )}
                             </>
                         ) : (
-                            <div style={{ background: "var(--bg-secondary)", borderRadius: "6px", padding: "12px 14px", gridColumn: "1 / -1" }}>
+                            <Card style={{ padding: "12px 14px", gridColumn: "1 / -1" }}>
                                 <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>İçe aktarım tamamlandı</div>
-                            </div>
+                            </Card>
                         )}
-                    </div>
+                    </StatGrid>
                     {/* Sprint B G6: Entity-bazlı kırılım — neyin ne kadar aktarıldığı */}
                     {confirmResult?.byEntity && (() => {
                         const ENTITY_LABELS: Record<string, string> = {

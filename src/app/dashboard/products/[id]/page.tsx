@@ -18,6 +18,7 @@ import ProductVendorsPanel from "@/components/products/ProductVendorsPanel";
 import { missingRequiredTechnicalFields } from "@/lib/technical-templates";
 import { fieldStyle, labelStyle as sharedLabelStyle } from "@/components/ui/Input";
 import SectionHeader from "@/components/ui/SectionHeader";
+import Stat, { StatGrid } from "@/components/ui/Stat";
 
 // Mirror of server-side ALLOWED_MIME — client-safe (no server module imports).
 // Source of truth: src/lib/supabase/product-attachments.ts ALLOWED_MIME.
@@ -1225,44 +1226,20 @@ export default function ProductDetailPage() {
                 {activeTab === "stok" && (
                     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                         {/* Operational cards */}
-                        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: "10px" }}>
-                            <div style={cardStyle}>
-                                <div style={labelStyle}>Stokta</div>
-                                <div style={{ fontSize: "20px", fontWeight: 700, color: "var(--text-primary)", marginTop: "4px" }}>
-                                    {formatNumber(product.on_hand)}
-                                </div>
-                            </div>
-                            <div style={cardStyle}>
-                                <div style={labelStyle}>Satılabilir</div>
-                                <div style={{ fontSize: "20px", fontWeight: 700, color: product.promisable <= product.minStockLevel ? "var(--danger-text)" : "var(--success-text)", marginTop: "4px" }}>
-                                    {formatNumber(product.promisable)}
-                                </div>
-                            </div>
-                            <div style={cardStyle}>
-                                <div style={labelStyle}>Rezerve</div>
-                                <div style={{ fontSize: "20px", fontWeight: 700, color: "var(--text-primary)", marginTop: "4px" }}>
-                                    {formatNumber(product.reserved)}
-                                </div>
-                            </div>
-                            <div style={cardStyle}>
-                                <div style={labelStyle}>Min Stok</div>
-                                <div style={{ fontSize: "20px", fontWeight: 700, color: "var(--text-primary)", marginTop: "4px" }}>
-                                    {formatNumber(product.minStockLevel)}
-                                </div>
-                            </div>
-                            <div style={cardStyle}>
-                                <div style={labelStyle}>Teklifte</div>
-                                <div style={{ fontSize: "20px", fontWeight: 700, color: "var(--text-primary)", marginTop: "4px" }}>
-                                    {formatNumber(product.quoted)}
-                                </div>
-                            </div>
-                            <div style={cardStyle}>
-                                <div style={labelStyle}>Bekleniyor</div>
-                                <div style={{ fontSize: "20px", fontWeight: 700, color: "var(--success-text)", marginTop: "4px" }}>
-                                    {formatNumber(product.incoming)}
-                                </div>
-                            </div>
-                        </div>
+                        {/* 2026-09-05: altı kutu `--bg-secondary` zeminliydi — gate'in
+                            kanıtladığı gibi sayfa zeminiyle aynı renk, yani görünmez. */}
+                        <StatGrid min="150px">
+                            <Stat label="Stokta" value={formatNumber(product.on_hand)} />
+                            <Stat
+                                label="Satılabilir"
+                                value={formatNumber(product.promisable)}
+                                tone={product.promisable <= product.minStockLevel ? "danger" : "success"}
+                            />
+                            <Stat label="Rezerve" value={formatNumber(product.reserved)} />
+                            <Stat label="Min Stok" value={formatNumber(product.minStockLevel)} />
+                            <Stat label="Teklifte" value={formatNumber(product.quoted)} />
+                            <Stat label="Bekleniyor" value={formatNumber(product.incoming)} tone="success" />
+                        </StatGrid>
 
                         {/* Stock edit fields */}
                         <div style={cardStyle}>

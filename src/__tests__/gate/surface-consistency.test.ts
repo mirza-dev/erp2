@@ -99,13 +99,106 @@ describe("GATE: yüzey + buton/kategori tutarlılığı", () => {
         }
     });
 
-    it("üst seviye kartların sayısı korunur — sessizce oyuk rengine dönmesin", () => {
-        // Ölçülen kusurun tam sayısı: Paraşüt'te 7, Öneriler'de 3 kart.
-        expect((read(CONVERTED["Paraşüt"]).match(/var\(--surface-raised\)/g) ?? []).length)
-            .toBeGreaterThanOrEqual(7);
-        expect((read(CONVERTED["Öneriler"]).match(/var\(--surface-raised\)/g) ?? []).length)
-            .toBeGreaterThanOrEqual(3);
-        expect(stripComments(read(CONVERTED["Uyarılar"]))).toContain('background: "var(--surface-raised)"');
+    it("üst seviye kartlar oyuk rengine dönemez — YAPI iddiası, sayı değil", () => {
+        // 2026-09-05'te YENİDEN YAZILDI. Eski hâli sayaçtı (`Paraşüt >= 7`,
+        // `Öneriler >= 3`) ve yorumu bile "Ölçülen kusurun tam sayısı" diyordu —
+        // yani deponun kendi dersinin ("`>= N` o günün sayısını kilitler,
+        // DEĞİŞMEZİ değil") karşı örneğiydi. `Stat` çıkarımı Öneriler'in ÜÇ
+        // literalinin ÜÇÜNÜ DE sildi (hepsi stat kutusuydu) ve Paraşüt'ü 7'den
+        // 6'ya indirdi — kural, düzeltmeyi kusur sandı.
+        //
+        // Ayrıca eski hâli `read()` çağırıyordu, `stripComments` YOKTU: bir
+        // yorumdaki `var(--surface-raised)` metni iddiayı yeşil tutabilirdi.
+        //
+        // Yerine geçen iddia: bu sayfaların yükseltilmiş yüzeyi KANONİK
+        // kaynaktan gelir (`Card` · `Stat` · `--surface-raised`) ve hiçbiri
+        // oyuk rengini (`--bg-secondary`) kutu zemini olarak yazmaz.
+        for (const [name, file] of Object.entries(CONVERTED)) {
+            const src = stripComments(read(file));
+            const canonical = /<Card[\s>]/.test(src) || /<Stat[\s>]/.test(src)
+                || src.includes("var(--surface-raised)");
+            expect(canonical, `${name}: yükseltilmiş yüzey kanonik kaynaktan gelmiyor`).toBe(true);
+            // Negatif iddia STAT İMZASINA bağlı: oyuk zemin + YAKININDA büyük
+            // bir sayı. Salt "oyuk zeminli yuvarlak kutu" araması sekme
+            // şeridini, tablo sarmalayıcısını ve çekmece içi bölüm kutusunu da
+            // yakalıyordu — onlar bu turun konusu değil ve kural iddia
+            // ettiğinden fazlasını söylememeli.
+            expect(src, `${name}: görünmez stat kutusu geri geldi`)
+                .not.toMatch(/background: "var\(--bg-secondary\)"[\s\S]{0,400}?fontSize: "(1[89]|2\d)px"/);
+        }
+    });
+
+    it("sayı kutusu yüzeyleri oyuk rengini kutu zemini yapamaz", () => {
+        // Ölçülen kusur: BEŞ stat yüzeyi (`aging` · `products/[id]` ·
+        // `import/excel` · `CustomerDetailPanel` · `VendorDetailPanel`) kutu
+        // zemini olarak `--bg-secondary` kullanıyordu — yukarıdaki "kuralın
+        // DAYANAĞI" testinin kanıtladığı gibi iki temada da sayfa zeminiyle
+        // BİREBİR aynı renk, yani GÖRÜNMEZ KUTU. Kapı bu kusuru 2026-08-31'de
+        // bulmuştu ama yalnız beş sayfalık bir allowlist üzerinde; bu beşi
+        // listenin dışında kaldığı için o günden beri kusurluydular.
+        const STAT_SURFACES = [
+            "src/app/dashboard/products/aging/page.tsx",
+            "src/app/dashboard/products/[id]/page.tsx",
+            "src/app/dashboard/import/excel/page.tsx",
+            "src/components/customers/CustomerDetailPanel.tsx",
+            "src/components/vendors/VendorDetailPanel.tsx",
+            "src/app/dashboard/parasut/page.tsx",
+            "src/app/dashboard/production/page.tsx",
+            "src/app/dashboard/purchase/suggested/page.tsx",
+            "src/app/dashboard/purchase/orders/[id]/page.tsx",
+            "src/app/dashboard/settings/email-deliveries/page.tsx",
+            "src/app/dashboard/settings/product-types/page.tsx",
+            "src/app/dashboard/settings/product-types/[id]/page.tsx",
+            "src/components/alerts/AlertCalendarDrawer.tsx",
+            "src/components/developer/ConsoleWidgets.tsx",
+        ];
+        for (const rel of STAT_SURFACES) {
+            const src = stripComments(read(rel));
+            expect(src, `${rel}: ortak Stat'tan beslenmiyor`).toMatch(/from "@\/components\/ui\/Stat"/);
+            // Kendi kutu yüzeyini geri yazamaz — imza: oyuk zemin + büyük sayı.
+            expect(src, `${rel}: görünmez stat kutusu geri geldi`)
+                .not.toMatch(/background: "var\(--bg-secondary\)"[\s\S]{0,400}?fontSize: "(1[89]|2\d)px"/);
+        }
+    });
+
+    it("değer tipografisi ve ton haritası TEK kaynakta", () => {
+        const stat = stripComments(read("src/components/ui/Stat.tsx"));
+        // Kanonik değer ölçeği — ölçümde 20 ayrı tipografi vardı.
+        expect(stat).toMatch(/fontSize: "21px"/);
+        expect(stat).toMatch(/var\(--font-heading-weight\)/);
+        // Izgarada alt alta duran sayılar hizalanmalı; yüzeylerin çoğunda yoktu.
+        expect(stat).toMatch(/fontVariantNumeric: "tabular-nums"/);
+        // Yüzey `Card`tan gelir — üçlüyü ikinci kez yazmaz.
+        expect(stat).toMatch(/from "@\/components\/ui\/Card"/);
+        expect(stat).not.toMatch(/var\(--surface-raised\)|var\(--surface-shadow-sm\)/);
+        // BÜYÜK HARF YOK: `form-consistency` kanonik etiketi böyle kilitliyor.
+        expect(stat).not.toMatch(/textTransform/);
+
+        // Ton→token eşlemesi DÖRT kopyadaydı (`Badge` · `ConsoleWidgets` ·
+        // `StatsCards` · `KpiCard`); üçü ortak kaynağa bağlandı.
+        expect(stat).toMatch(/TONE_TOKENS/);
+        // Üçü de ortak kaynağa bağlı: ikisi doğrudan, `ConsoleWidgets` ise
+        // `Stat` üzerinden (kendi `VALUE_COLOR` kopyası silindi).
+        for (const rel of [
+            "src/components/dashboard/StatsCards.tsx",
+            "src/components/dashboard/overview/KpiCard.tsx",
+        ]) {
+            expect(stripComments(read(rel)), `${rel}: ortak ton haritasına bağlı değil`)
+                .toMatch(/TONE_TOKENS/);
+        }
+        const widgets = stripComments(read("src/components/developer/ConsoleWidgets.tsx"));
+        expect(widgets).toMatch(/from "@\/components\/ui\/Stat"/);
+        expect(widgets, "VALUE_COLOR kopyası geri geldi").not.toMatch(/VALUE_COLOR/);
+        // Kopyanın imzası: AYNI sözlükte success + warning + danger üçlüsü bir
+        // arada. Koşullu tek renk (`danger ? x : y`) kopya değildir; alan
+        // anlamı taşıyan `HEALTH_COLOR` da değil (dördüncü anahtarı `unknown`
+        // ve ton değil SERVİS DURUMU eşliyor).
+        const copyPattern = /\{[^{}]*"var\(--success-text\)"[^{}]*"var\(--warning-text\)"[^{}]*"var\(--danger-text\)"[^{}]*\}/;
+        for (const f of walkSrc()) {
+            const rel = relative(root, f);
+            if (rel.endsWith("Badge.tsx") || rel.endsWith("ConsoleWidgets.tsx")) continue;
+            expect(copyPattern.test(stripComments(readFileSync(f, "utf8"))), `${rel}: ton haritası kopyası`).toBe(false);
+        }
     });
 
     it("başlıksız sayfa kalmaz — Uyarılar ve Veri Aktarım kanonik PageHeader kullanır", () => {

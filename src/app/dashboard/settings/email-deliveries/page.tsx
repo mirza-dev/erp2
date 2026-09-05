@@ -10,6 +10,8 @@ import { useToast } from "@/components/ui/Toast";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import type { EmailDeliveryStatus, EmailLogRow, EmailSuppressionRow, MaintenanceIncidentRow } from "@/lib/database.types";
 import SectionHeader from "@/components/ui/SectionHeader";
+import Stat, { StatGrid } from "@/components/ui/Stat";
+import { TONE_TOKENS } from "@/components/ui/Badge";
 
 type SafeDelivery = Omit<EmailLogRow, "html_body" | "text_body" | "metadata">;
 
@@ -158,20 +160,22 @@ export default function EmailDeliveriesPage() {
                 actions={<Button variant="secondary" size="sm" leftIcon={<RefreshCw size={14} />} onClick={() => void load()} loading={loading}>Yenile</Button>}
             />
 
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(170px, 1fr))", gap: 10 }}>
-                {[
-                    { label: "Görüntülenen", value: metrics.total, icon: MailCheck, tone: "var(--accent-text)" },
-                    { label: "Teslim Edilen", value: metrics.delivered, icon: CheckCircle2, tone: "var(--success-text)" },
-                    { label: "Sorunlu", value: metrics.problem, icon: AlertTriangle, tone: "var(--danger-text)" },
-                    { label: "Açık Bakım Kaydı", value: incidents.length, icon: Wrench, tone: "var(--warning-text)" },
-                ].map(item => (
-                    <div key={item.label} style={{ border: "var(--line-width) solid var(--surface-border)", borderRadius: 8, padding: 14, background: "var(--surface-raised)", boxShadow: "var(--surface-shadow-sm)" }}>
-                        <item.icon size={16} color={item.tone} aria-hidden="true" />
-                        <div style={{ fontSize: 22, fontWeight: 700, marginTop: 8, color: "var(--text-primary)" }}>{item.value}</div>
-                        <div style={{ fontSize: 11, color: "var(--text-secondary)", marginTop: 2 }}>{item.label}</div>
-                    </div>
+            <StatGrid>
+                {([
+                    { label: "Görüntülenen", value: metrics.total, icon: MailCheck, tone: "accent" },
+                    { label: "Teslim Edilen", value: metrics.delivered, icon: CheckCircle2, tone: "success" },
+                    { label: "Sorunlu", value: metrics.problem, icon: AlertTriangle, tone: "danger" },
+                    { label: "Açık Bakım Kaydı", value: incidents.length, icon: Wrench, tone: "warning" },
+                ] as const).map(item => (
+                    <Stat
+                        key={item.label}
+                        label={item.label}
+                        value={item.value}
+                        icon={<item.icon size={16} color={TONE_TOKENS[item.tone].text} aria-hidden="true" />}
+                        surfaceStyle={{ padding: 14 }}
+                    />
                 ))}
-            </div>
+            </StatGrid>
 
             <section style={{ border: "var(--line-width) solid var(--surface-border)", borderRadius: 8, background: "var(--surface-raised)", overflow: "hidden", boxShadow: "var(--surface-shadow-sm)" }}>
                 <div style={{ padding: 14, display: "grid", gridTemplateColumns: compactFilters ? "1fr" : "repeat(auto-fit, minmax(125px, 1fr))", gap: 8, alignItems: "center", borderBottom: "var(--line-width) solid var(--border-tertiary)" }}>

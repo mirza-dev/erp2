@@ -10,6 +10,7 @@ import {
 import { ALERT_TYPE_LABEL } from "@/lib/alert-labels";
 import type { AlertType } from "@/lib/database.types";
 import SectionHeader from "@/components/ui/SectionHeader";
+import StatBox from "@/components/ui/Stat";
 
 /** Tip-bazlı yönlendirme linkleri (Faz 1: nav-only; inline formlar Faz 2'de). */
 type DrawerLink = { label: string; href: string; variant: "primary" | "secondary" | "ghost" };
@@ -553,12 +554,21 @@ function Section({ label, children }: { label: string; children: React.ReactNode
     );
 }
 
+/**
+ * 2026-09-05: gövde ortak `ui/Stat`e taşındı (ad çakışmasını önlemek için
+ * `StatBox` olarak içe aktarıldı). Etiket DEĞERİN ALTINDAYDI ve BÜYÜK HARFTİ;
+ * ikisi de kanona döndü — 26 yüzeyin çoğunluğu etiketi üste koyuyor.
+ *
+ * Izgara `gap: 1px` + `overflow: hidden` hilesiyle kutular arasında çizgi
+ * çiziyor; `Card`ın kendi kenarlığı o hileyi bozacağı için burada kapatıldı.
+ */
 function Stat({ value, label }: { value: number; label: string }) {
     return (
-        <div style={{ padding: "14px", background: "var(--surface-subtle)", display: "flex", flexDirection: "column", gap: "4px" }}>
-            <span style={{ fontSize: "18px", fontWeight: 700, color: "var(--text-primary)" }}>{value}</span>
-            <span style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.03em" }}>{label}</span>
-        </div>
+        <StatBox
+            label={label}
+            value={value}
+            surfaceStyle={{ padding: "14px", background: "var(--surface-subtle)", border: "none", borderRadius: 0, boxShadow: "none" }}
+        />
     );
 }
 

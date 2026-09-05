@@ -7,14 +7,18 @@ import {
 } from "lucide-react";
 import type { DashboardKpi } from "@/lib/dashboard-view-model";
 import Sparkline from "./charts/Sparkline";
+import { TONE_TOKENS } from "@/components/ui/Badge";
 
 /** Kompakt executive KPI kartı. */
 export default function KpiCard({ kpi }: { kpi: DashboardKpi }) {
     const danger = kpi.tone === "danger";
     const sparkTone = kpi.tone === "danger" ? "danger" : kpi.tone === "warning" ? "warning" : kpi.tone === "success" ? "success" : "accent";
-    const subColor = kpi.subTone === "warning"
-        ? "var(--warning-text)"
-        : kpi.subTone === "danger" ? "var(--danger-text)" : "var(--text-tertiary)";
+    // Ton→token eşlemesi ortak kaynakta (`Badge.TONE_TOKENS`) — dört kopyanın
+    // sonuncusu. KpiCard'ın kendisi kapsam dışı (sparkline + delta + kilitli
+    // davranış sözleşmesi), yalnız bu eşleme paylaşıldı.
+    const subColor = kpi.subTone === "warning" || kpi.subTone === "danger"
+        ? TONE_TOKENS[kpi.subTone].text
+        : "var(--text-tertiary)";
     const body = (
         <>
             <div className="kpi-card-head">

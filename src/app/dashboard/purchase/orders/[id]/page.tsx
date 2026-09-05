@@ -13,6 +13,7 @@ import type { PurchaseOrderRow, PurchaseOrderLineRow, PurchaseOrderStatus, Vendo
 import type { AuditEntry } from "@/lib/supabase/audit-log";
 import { poActionLabel, poActorLabel } from "@/lib/purchase-order-ui";
 import SectionHeader from "@/components/ui/SectionHeader";
+import Stat from "@/components/ui/Stat";
 
 const thStyle: React.CSSProperties = {
     textAlign: "left", padding: "10px 14px", fontSize: "12px", fontWeight: 500,
@@ -715,19 +716,18 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
     );
 }
 
+/**
+ * 2026-09-05: gövde ortak `ui/Stat`e taşındı. Değer 14px'ten kanonik 21px'e
+ * çıktı — bu kutular sayfanın özet şeridi ve tam olarak o ölçekte olmalıydı;
+ * ölçümde 20 değer tipografisinin en küçüğüydüler. Vurgu KENARLIĞI korunuyor.
+ */
 function SummaryCard({ label, value, highlight }: { label: string; value: string; highlight?: boolean }) {
     return (
-        <div style={{
-            background: "var(--bg-primary)",
-            border: `0.5px solid ${highlight ? "var(--accent-border)" : "var(--border-tertiary)"}`,
-            borderRadius: "8px", padding: "12px 14px",
-        }}>
-            <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "4px" }}>{label}</div>
-            <div style={{
-                fontSize: "14px", fontWeight: 500,
-                color: highlight ? "var(--accent-text)" : "var(--text-primary)",
-                fontVariantNumeric: "tabular-nums",
-            }}>{value}</div>
-        </div>
+        <Stat
+            label={label}
+            value={value}
+            tone={highlight ? "accent" : undefined}
+            surfaceStyle={highlight ? { borderColor: "var(--accent-border)" } : undefined}
+        />
     );
 }

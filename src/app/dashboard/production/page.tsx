@@ -15,6 +15,7 @@ import type { VoiceProductionEntry } from "@/lib/services/voice-service";
 import { mergeFireIntoNote } from "@/lib/voice-note-helpers";
 import { CalendarDays, Mic, RotateCcw, Square, Trash2, X } from "lucide-react";
 import { useIsMobile } from "@/hooks/useIsMobile";
+import Stat, { StatGrid } from "@/components/ui/Stat";
 
 interface FormLine {
     id: string;
@@ -855,8 +856,7 @@ function ProductionPageInner() {
                 Ekran yalnız gün ekseninde çalışıyordu; vardiya sorumlusu dört
                 ayrı denemede haftalık/aylık toplamı çıkaramadı. Veri zaten 120
                 günlük pencerede geliyordu, eksik olan toplayan görünümdü. */}
-            <div style={{
-                display: "grid",
+            <StatGrid min="0" style={{
                 gridTemplateColumns: isMobile ? "1fr 1fr" : "repeat(4, minmax(0, 1fr))",
                 gap: "8px",
             }}>
@@ -864,37 +864,23 @@ function ProductionPageInner() {
                     ["Bu hafta", haftaOzet],
                     ["Bu ay", ayOzet],
                 ] as const).flatMap(([etiket, ozet]) => [
-                    <div key={`${etiket}-adet`} style={{
-                        background: "var(--surface-raised)",
-                        border: "var(--line-width) solid var(--surface-border)",
-                        borderRadius: "6px", padding: "10px 12px",
-                        boxShadow: "var(--surface-shadow-sm)",
-                    }}>
-                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>{etiket} üretim</div>
-                        <div style={{ fontSize: "17px", fontWeight: 600, color: "var(--text-primary)", fontVariantNumeric: "tabular-nums" }}>
-                            {formatNumber(ozet.adet)}
-                        </div>
-                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>{ozet.kalem} kalem</div>
-                    </div>,
-                    <div key={`${etiket}-hurda`} style={{
-                        background: "var(--surface-raised)",
-                        border: "var(--line-width) solid var(--surface-border)",
-                        borderRadius: "6px", padding: "10px 12px",
-                        boxShadow: "var(--surface-shadow-sm)",
-                    }}>
-                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>{etiket} hurda</div>
-                        <div style={{
-                            fontSize: "17px", fontWeight: 600, fontVariantNumeric: "tabular-nums",
-                            color: ozet.hurda > 0 ? "var(--danger-text)" : "var(--text-secondary)",
-                        }}>
-                            {formatNumber(ozet.hurda)}
-                        </div>
-                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
-                            {ozet.adet > 0 ? `%${((ozet.hurda / ozet.adet) * 100).toFixed(1)} fire` : "—"}
-                        </div>
-                    </div>,
+                    <Stat
+                        key={`${etiket}-adet`}
+                        label={`${etiket} üretim`}
+                        value={formatNumber(ozet.adet)}
+                        sub={`${ozet.kalem} kalem`}
+                        surfaceStyle={{ padding: "10px 12px" }}
+                    />,
+                    <Stat
+                        key={`${etiket}-hurda`}
+                        label={`${etiket} hurda`}
+                        value={formatNumber(ozet.hurda)}
+                        tone={ozet.hurda > 0 ? "danger" : undefined}
+                        sub={ozet.adet > 0 ? `%${((ozet.hurda / ozet.adet) * 100).toFixed(1)} fire` : "—"}
+                        surfaceStyle={{ padding: "10px 12px" }}
+                    />,
                 ])}
-            </div>
+            </StatGrid>
 
             {/* Selected date log */}
             <div style={{

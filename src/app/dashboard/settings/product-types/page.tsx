@@ -24,6 +24,7 @@ import { usePermissions } from "@/lib/auth/use-permissions";
 import type { ProductTypeStatsRow } from "@/lib/supabase/product-types";
 import { fieldStyle } from "@/components/ui/Input";
 import SectionHeader from "@/components/ui/SectionHeader";
+import Stat from "@/components/ui/Stat";
 
 const pageStyle: React.CSSProperties = {
     padding: "24px",
@@ -51,26 +52,22 @@ const metricPadStyle: React.CSSProperties = { padding: "12px 14px", minHeight: "
 // farklı duruyordu (2026-08-24 tespiti).
 const inputStyle: React.CSSProperties = fieldStyle("lg");
 
-function Metric({
-    label,
-    value,
-    sub,
-    icon,
-}: {
-    label: string;
-    value: string | number;
-    sub: string;
-    icon: React.ReactNode;
+/**
+ * 2026-09-05: gövde ortak `ui/Stat`e taşındı. İkon etiketin sağından SOLUNA
+ * geçti (çerçevenin `icon` yuvası baştadır) ve BÜYÜK HARF düştü — 26 stat
+ * yüzeyinin yalnız 6'sı kullanıyordu.
+ */
+function Metric({ label, value, sub, icon }: {
+    label: string; value: string | number; sub: string; icon: React.ReactNode;
 }) {
     return (
-        <Card style={metricPadStyle}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "8px" }}>
-                <span style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em" }}>{label}</span>
-                <span style={{ color: "var(--text-tertiary)" }}>{icon}</span>
-            </div>
-            <div style={{ fontSize: "22px", fontWeight: 700, color: "var(--text-primary)", lineHeight: 1 }}>{value}</div>
-            <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "6px" }}>{sub}</div>
-        </Card>
+        <Stat
+            label={label}
+            value={value}
+            sub={sub}
+            icon={<span style={{ color: "var(--text-tertiary)", display: "inline-flex" }}>{icon}</span>}
+            surfaceStyle={metricPadStyle}
+        />
     );
 }
 

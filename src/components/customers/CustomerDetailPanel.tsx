@@ -15,6 +15,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { fieldStyle } from "@/components/ui/Input";
 import SectionHeader from "@/components/ui/SectionHeader";
+import Stat from "@/components/ui/Stat";
 
 interface CustomerDetailPanelProps {
     customer: Customer | null;
@@ -279,23 +280,17 @@ export default function CustomerDetailPanel({
                                 borderBottom: "0.5px solid var(--border-tertiary)",
                             }}
                         >
-                            <div style={{ background: "var(--bg-secondary)", borderRadius: "6px", padding: "10px 12px" }}>
-                                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "2px" }}>Toplam Sipariş</div>
-                                <div style={{ fontSize: "18px", fontWeight: 500, color: "var(--text-primary)" }}>{totalOrders}</div>
-                            </div>
-                            <div style={{ background: "var(--bg-secondary)", borderRadius: "6px", padding: "10px 12px" }}>
-                                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "2px" }}>Toplam Ciro</div>
-                                <div style={{ fontSize: "16px", fontWeight: 500, color: "var(--success-text)" }}>
-                                    {canViewFinancialSummary && (revenue.amount > 0 || revenue.others.length > 0)
-                                        ? maskCurrency(revenue.amount, revenue.currency, true)
-                                        : "—"}
-                                </div>
-                                {canViewFinancialSummary && revenue.others.map(o => (
-                                    <div key={o.currency} style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>
-                                        {maskCurrency(o.amount, o.currency, true)}
-                                    </div>
-                                ))}
-                            </div>
+                            <Stat label="Toplam Sipariş" value={totalOrders} />
+                            <Stat
+                                label="Toplam Ciro"
+                                tone="success"
+                                value={canViewFinancialSummary && (revenue.amount > 0 || revenue.others.length > 0)
+                                    ? maskCurrency(revenue.amount, revenue.currency, true)
+                                    : null}
+                                sub={canViewFinancialSummary && revenue.others.length > 0
+                                    ? revenue.others.map(o => maskCurrency(o.amount, o.currency, true)).join(" · ")
+                                    : undefined}
+                            />
                         </div>
 
                         {/* Contact details */}

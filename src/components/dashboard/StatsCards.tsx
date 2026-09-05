@@ -5,11 +5,15 @@ import { useRouter } from "next/navigation";
 import { useData } from "@/lib/data-context";
 import { formatNumber } from "@/lib/utils";
 import { dateDaysFromToday } from "@/lib/stock-utils";
+import { TONE_TOKENS } from "@/components/ui/Badge";
 
+// 2026-09-05: ton→token eşlemesi ortak kaynağa bağlandı (`Badge.TONE_TOKENS`).
+// Bu dosya ÖLÜ KODdur (0 üretim importu) ama `dashboard-overview-preservation`
+// silinmesini yasaklıyor — kopyayı bırakmak dördüncü bir ayrışma noktası olurdu.
 const subtitleColors = {
-    ok: "var(--success-text)",
-    warn: "var(--warning-text)",
-    danger: "var(--danger-text)",
+    ok: TONE_TOKENS.success.text,
+    warn: TONE_TOKENS.warning.text,
+    danger: TONE_TOKENS.danger.text,
 };
 
 const StatsCards = memo(function StatsCards() {

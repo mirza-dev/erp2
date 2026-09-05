@@ -2,13 +2,21 @@ import type { CSSProperties, ReactNode } from "react";
 
 export type BadgeTone = "success" | "neutral" | "danger" | "accent" | "warning";
 
-interface ToneTokens {
+export interface ToneTokens {
     bg: string;
     text: string;
 }
 
-// Tema token çiftleri — renkte CSS var → data-theme ile otomatik temalanır.
-const TONE_TOKENS: Record<BadgeTone, ToneTokens> = {
+/**
+ * Tema token çiftleri — renkte CSS var → data-theme ile otomatik temalanır.
+ *
+ * 2026-09-05'te EXPORT edildi. Sebep ölçüldü: aynı ton→token eşlemesi DÖRT
+ * kopyada yaşıyordu (`Badge` · `ConsoleWidgets.VALUE_COLOR` ·
+ * `StatsCards.subtitleColors` · `KpiCard.subColor`). Kopyalanmış kuralın
+ * tehlikesi ayrışmadır — parola politikasının dört kopyaya dağılıp dördünün de
+ * `length >= 8`de kalması bu depoda zaten yaşandı.
+ */
+export const TONE_TOKENS: Record<BadgeTone, ToneTokens> = {
     success: { bg: "var(--success-bg)", text: "var(--success-text)" },
     danger: { bg: "var(--danger-bg)", text: "var(--danger-text)" },
     warning: { bg: "var(--warning-bg)", text: "var(--warning-text)" },

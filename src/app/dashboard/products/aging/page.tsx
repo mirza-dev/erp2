@@ -8,6 +8,7 @@ import { maskCurrency } from "@/lib/utils";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import type { AgingCategory, AgingRow } from "@/lib/supabase/aging";
 import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
+import Stat, { StatGrid } from "@/components/ui/Stat";
 
 // ── Badge config ──────────────────────────────────────────────
 
@@ -261,71 +262,30 @@ export default function AgingPage() {
                 })}
             </div>
 
-            {/* Özet Kartları */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: "8px" }}>
-
-                {/* Bağlanan Sermaye */}
-                <div style={{
-                    padding: "12px 14px",
-                    background: "var(--bg-secondary)",
-                    border: "0.5px solid var(--border-secondary)",
-                    borderRadius: "8px",
-                }}>
-                    <div style={{ fontSize: "18px", fontWeight: 700, color: "var(--text-primary)", lineHeight: 1.2 }}>
-                        {loading || !canViewPurchaseCosts ? "—" : capitalEntries.length === 0
-                            ? "—"
-                            : capitalEntries.map(([cur, total]) => maskCurrency(total, cur, true)).join(" · ")}
-                    </div>
-                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
-                        Bağlanan Sermaye
-                    </div>
-                </div>
-
-                {/* Durgun + Ölü */}
-                <div style={{
-                    padding: "12px 14px",
-                    background: atRisk > 0 ? "var(--danger-bg)" : "var(--bg-secondary)",
-                    border: `0.5px solid ${atRisk > 0 ? "var(--danger-border)" : "var(--border-secondary)"}`,
-                    borderRadius: "8px",
-                }}>
-                    <div style={{ fontSize: "18px", fontWeight: 700, color: atRisk > 0 ? "var(--danger-text)" : "var(--text-primary)" }}>
-                        {loading ? "—" : atRisk}
-                    </div>
-                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
-                        Durgun + Ölü SKU
-                    </div>
-                </div>
-
-                {/* Ortalama Bekleme */}
-                <div style={{
-                    padding: "12px 14px",
-                    background: "var(--bg-secondary)",
-                    border: "0.5px solid var(--border-secondary)",
-                    borderRadius: "8px",
-                }}>
-                    <div style={{ fontSize: "18px", fontWeight: 700, color: "var(--text-primary)" }}>
-                        {loading ? "—" : avgWaiting !== null ? `${avgWaiting} gün` : "—"}
-                    </div>
-                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
-                        Ort. Bekleme Süresi
-                    </div>
-                </div>
-
-                {/* Toplam SKU */}
-                <div style={{
-                    padding: "12px 14px",
-                    background: "var(--bg-secondary)",
-                    border: "0.5px solid var(--border-secondary)",
-                    borderRadius: "8px",
-                }}>
-                    <div style={{ fontSize: "18px", fontWeight: 700, color: "var(--text-primary)" }}>
-                        {loading ? "—" : rows.length}
-                    </div>
-                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginTop: "4px" }}>
-                        Toplam SKU
-                    </div>
-                </div>
-            </div>
+            {/* Özet Kartları — 2026-09-05: dördü de `--bg-secondary` zeminliydi,
+                yani gate'in kendi "kuralın DAYANAĞI" testinin kanıtladığı gibi
+                sayfa zeminiyle BİREBİR aynı renk: görünmez kutu. */}
+            <StatGrid min="0" style={{ gridTemplateColumns: "repeat(4, 1fr)", gap: "8px" }}>
+                <Stat
+                    label="Bağlanan Sermaye"
+                    value={loading || !canViewPurchaseCosts || capitalEntries.length === 0
+                        ? null
+                        : capitalEntries.map(([cur, total]) => maskCurrency(total, cur, true)).join(" · ")}
+                />
+                <Stat
+                    label="Durgun + Ölü SKU"
+                    value={loading ? null : atRisk}
+                    tone={atRisk > 0 ? "danger" : undefined}
+                    surfaceStyle={atRisk > 0
+                        ? { background: "var(--danger-bg)", borderColor: "var(--danger-border)" }
+                        : undefined}
+                />
+                <Stat
+                    label="Ort. Bekleme Süresi"
+                    value={loading || avgWaiting === null ? null : `${avgWaiting} gün`}
+                />
+                <Stat label="Toplam SKU" value={loading ? null : rows.length} />
+            </StatGrid>
 
             {/* Filtre Satırı */}
             <div style={{ display: "flex", alignItems: "center", gap: "10px", flexWrap: "wrap" }}>

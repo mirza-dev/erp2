@@ -8,6 +8,7 @@ import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-u
 import type { IntegrationSyncLogRow, SalesOrderRow } from "@/lib/database.types";
 import { LoadingState } from "@/components/ui/StateViews";
 import SectionHeader from "@/components/ui/SectionHeader";
+import Stat, { StatGrid } from "@/components/ui/Stat";
 
 type SyncStatus = "idle" | "syncing" | "done";
 type ConnectionStatus = "connected" | "disconnected";
@@ -465,26 +466,22 @@ export default function ParasutPage() {
                     </div>
                 )}
 
-                {/* B -- Scope Cards */}
-                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
+                {/* B -- Scope Cards. 2026-09-05: yüzey ortak `ui/Stat`e taşındı;
+                    `--surface-raised` üçlüsü artık `Card`tan geliyor. */}
+                <StatGrid min="0" style={{ gridTemplateColumns: "1fr 1fr 1fr", gap: "12px" }}>
                     {scopeCards.map((card) => (
-                        <div
+                        <Stat
                             key={card.label}
-                            style={{
-                                background: "var(--surface-raised)",
-                        boxShadow: "var(--surface-shadow-sm)",
-                                border: "0.5px solid var(--border-tertiary)",
-                                borderRadius: "8px",
-                                padding: "14px 16px",
-                                display: "flex",
-                                flexDirection: "column",
-                                gap: "6px",
-                            }}
-                        >
-                            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                                <div style={{ fontSize: "12px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                                    {card.label}
-                                </div>
+                            label={card.label}
+                            value={<>
+                                {card.count}
+                                <span style={{ fontSize: "12px", fontWeight: 400, color: "var(--text-tertiary)", marginLeft: "4px" }}>
+                                    {card.unit}
+                                </span>
+                            </>}
+                            sub={`Son sync: ${lastSyncTime}`}
+                            surfaceStyle={{ padding: "14px 16px", gap: "6px" }}
+                            action={
                                 <Button
                                     variant="secondary"
                                     size="xs"
@@ -494,19 +491,10 @@ export default function ParasutPage() {
                                 >
                                     Sync Et
                                 </Button>
-                            </div>
-                            <div style={{ fontSize: "22px", fontWeight: 600, color: "var(--text-primary)" }}>
-                                {card.count}
-                                <span style={{ fontSize: "12px", fontWeight: 400, color: "var(--text-tertiary)", marginLeft: "4px" }}>
-                                    {card.unit}
-                                </span>
-                            </div>
-                            <div style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
-                                Son sync: {lastSyncTime}
-                            </div>
-                        </div>
+                            }
+                        />
                     ))}
-                </div>
+                </StatGrid>
 
                 {/* Faz 11.4 — Step + Error Kind Dağılımı */}
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>

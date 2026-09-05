@@ -14,6 +14,7 @@ import {
 } from "@/lib/telemetry/health";
 import type { TelemetrySeverity } from "@/lib/database.types";
 import { HEALTH_LABELS, SEVERITY_LABELS } from "./console-format";
+import Stat, { StatGrid } from "@/components/ui/Stat";
 
 /**
  * Developer Console ortak parçaları.
@@ -94,6 +95,17 @@ export function HealthPill({ status, children }: { status: HealthStatus; childre
 
 // ── Metrik kartı ─────────────────────────────────────────────────────────
 
+/**
+ * Konsolun metrik kartı — 2026-09-05'ten beri ortak `ui/Stat`in İNCE
+ * SARMALAYICISI.
+ *
+ * Props ve 17 çağrı yeri DEĞİŞMEDİ; altındaki yüzey birleşti. İki görünür
+ * yakınsama var ve gizlenmiyor: yarıçap `9px` → `Card`ın kanonik `8px`i,
+ * kenarlık `0.5px --border-secondary` → `--line-width --surface-border`.
+ *
+ * `tone` haritası artık kendi kopyası değil `Badge`in `TONE_TOKENS`ı: aynı
+ * eşleme DÖRT kopyada yaşıyordu.
+ */
 export interface MetricCardProps {
     label: string;
     /** null → "Ölçülmüyor" yazılır (§28 — uydurma değer yok). */
@@ -102,63 +114,20 @@ export interface MetricCardProps {
     tone?: "default" | "danger" | "warning" | "success";
 }
 
-const VALUE_COLOR: Record<NonNullable<MetricCardProps["tone"]>, string> = {
-    default: "var(--text-primary)",
-    danger: "var(--danger-text)",
-    warning: "var(--warning-text)",
-    success: "var(--success-text)",
-};
-
 export function MetricCard({ label, value, hint, tone = "default" }: MetricCardProps) {
-    const measured = value !== null && value !== undefined;
     return (
-        <div
-            style={{
-                background: "var(--surface-raised)",
-                border: "0.5px solid var(--border-secondary)",
-                borderRadius: "9px",
-                padding: "12px 14px",
-                display: "flex",
-                flexDirection: "column",
-                gap: "3px",
-                minWidth: 0,
-            }}
-        >
-            <span style={{ fontSize: "11px", color: "var(--text-tertiary)", fontWeight: 500 }}>
-                {label}
-            </span>
-            <span
-                style={{
-                    fontSize: measured ? "21px" : "13px",
-                    fontWeight: measured ? 650 : 500,
-                    color: measured ? VALUE_COLOR[tone] : "var(--text-tertiary)",
-                    fontVariantNumeric: "tabular-nums",
-                    fontStyle: measured ? "normal" : "italic",
-                }}
-            >
-                {measured ? value : "Ölçülmüyor"}
-            </span>
-            {hint && (
-                <span style={{ fontSize: "11px", color: "var(--text-tertiary)", lineHeight: 1.4 }}>
-                    {hint}
-                </span>
-            )}
-        </div>
+        <Stat
+            label={label}
+            value={value}
+            tone={tone === "default" ? undefined : tone}
+            sub={hint}
+            emptyText="Ölçülmüyor"
+        />
     );
 }
 
 export function MetricGrid({ children }: { children: ReactNode }) {
-    return (
-        <div
-            style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(168px, 1fr))",
-                gap: "10px",
-            }}
-        >
-            {children}
-        </div>
-    );
+    return <StatGrid min="168px">{children}</StatGrid>;
 }
 
 // ── Zaman aralığı ────────────────────────────────────────────────────────
