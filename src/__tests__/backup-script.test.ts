@@ -72,4 +72,52 @@ describe("GATE — yedekleme aracı", () => {
         expect(runbook).toMatch(/Parolalar geri gelmez/);
         expect(runbook).toMatch(/restoreOrder/);
     });
+
+    // ── 2026-09-05 PROVASININ AÇTIĞI KURALLAR ───────────────────────────────
+    //
+    // Yordam 2026-08-30'dan beri yazılıydı ama HİÇ KOŞULMAMIŞTI. İlk prova dört
+    // gerçek kusur çıkardı; aşağıdakiler o kusurların geri gelmesini engelliyor.
+
+    it("geri yükleme sırası FK GRAFİĞİNDEN gelir, yaratma sırasından DEĞİL", () => {
+        // Eski gerekçe — "bir tabloya FK verebilmek için hedef önce yaratılmalı"
+        // — YANLIŞ: FK sonradan ALTER TABLE ile de eklenebilir. Somut vaka:
+        // purchase_commitments mig.020'de, purchase_order_lines mig.049'da
+        // yaratılıyor, aradaki FK mig.050'de ekleniyor → yaratma sırası ters
+        // ve geri yükleme 23503 ile düşüyordu.
+        expect(script).toMatch(/function topologicalOrder/);
+        expect(script, "manifest sırası topolojik sıralayıcıdan beslenmeli")
+            .toMatch(/restoreOrder:\s*order/);
+        // Yaratma sırası yalnız eşitlik bozucu olarak kalabilir.
+        expect(script).not.toMatch(/restoreOrder:\s*creationOrder\(/);
+        // Döngü sessizce yutulmamalı.
+        expect(script).toMatch(/restoreOrderCycles/);
+    });
+
+    it("obje içerik türü LİSTEDEN okunur (indirme başlığı saklanan türü söylemez)", () => {
+        // Supabase Storage, HTML'i stored-XSS'e karşı `text/plain` olarak SERVİS
+        // eder; indirme yanıtının başlığı saklanan tür DEĞİLDİR. Prova: manifest
+        // `text/plain` kaydedince `quote-pdfs` kovasının yalnız `text/html`
+        // kabul eden allowlist'i teklif arşivlerini HTTP 400 ile reddetti.
+        expect(script).toMatch(/o\.metadata\?\.mimetype/);
+        expect(script, "tür manifest'e yazılmalı").toMatch(/types\[full\]\s*=/);
+    });
+
+    it("geri yükleme aracı: kuru çalışma varsayılan, canlı hedef ayrıca izin ister", () => {
+        const restore = readFileSync(join(process.cwd(), "scripts/restore.ts"), "utf8");
+        // Yazmak açık niyet ister (repair-* scriptlerinin deseni).
+        expect(restore).toMatch(/const APPLY = argv\.includes\("--apply"\)/);
+        // Canlıya geri yükleme MEŞRU bir kurtarma senaryosu — ama kazara olmamalı.
+        expect(restore).toMatch(/isProdTarget\(url\)\s*&&\s*APPLY\s*&&\s*process\.env\.ALLOW_PROD_TARGET/);
+        // EKSİK bir yedek geri yüklenemez: yarım veri, veri yokluğundan kötüdür.
+        expect(restore).toMatch(/manifest\.errors\?\.length/);
+        // Sıra manifest'ten okunur; script kendi sırasını uydurmaz.
+        expect(restore).toMatch(/manifest\.restoreOrder/);
+    });
+
+    it("`npm run restore` kayıtlı", () => {
+        const pkg = JSON.parse(readFileSync(join(process.cwd(), "package.json"), "utf8")) as {
+            scripts: Record<string, string>;
+        };
+        expect(pkg.scripts.restore).toBe("tsx scripts/restore.ts");
+    });
 });

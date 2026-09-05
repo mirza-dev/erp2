@@ -37,7 +37,8 @@
     "sim": "node scripts/sim/simctl.mjs",
     "sim:provision": "tsx scripts/sim/provision.ts",
     "sim:snapshot": "tsx scripts/sim/snapshot.ts",
-    "sim:cleanup": "tsx scripts/sim/cleanup.ts"
+    "sim:cleanup": "tsx scripts/sim/cleanup.ts",
+    "restore": "tsx scripts/restore.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

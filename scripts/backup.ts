@@ -65,9 +65,21 @@ function sha256(body: string | Uint8Array): string {
     return createHash("sha256").update(body as never).digest("hex");
 }
 
-/** Migration'ların tablo yaratma SIRASI, geçerli bir geri-yükleme sırasıdır:
- *  bir tabloya FK verebilmek için hedefin ÖNCE var olması gerekir. */
-function restoreOrder(): string[] {
+/**
+ * Migration'ların tablo YARATMA sırası.
+ *
+ * 2026-09-05'e kadar bunun tek başına geçerli bir geri-yükleme sırası olduğu
+ * VARSAYILIYORDU — gerekçe "bir tabloya FK verebilmek için hedefin önce var
+ * olması gerekir" idi. **Bu gerekçe YANLIŞ**: FK sonradan `ALTER TABLE` ile de
+ * eklenebiliyor. Prova bunu somut olarak yakaladı — `purchase_commitments`
+ * mig.020'de yaratılıyor, `purchase_order_lines` mig.049'da, ve aralarındaki FK
+ * mig.050'de ekleniyor; yaratma sırası ikisini TERS koyuyor ve geri yükleme
+ * 23503 ile düşüyor.
+ *
+ * Artık yalnız DETERMİNİSTİK EŞİTLİK BOZUCU olarak kullanılıyor; asıl sıra
+ * `topologicalOrder()`den, yani canlı FK grafiğinden geliyor.
+ */
+function creationOrder(): string[] {
     const migDir = join(process.cwd(), "supabase", "migrations");
     if (!existsSync(migDir)) return [];
     const seen: string[] = [];
@@ -83,8 +95,61 @@ function restoreOrder(): string[] {
     return seen;
 }
 
+/**
+ * Geri yükleme sırasını CANLI FK grafiğinden üretir (Kahn).
+ *
+ * Kaynak, PostgREST'in OpenAPI çıktısı: her kolonun `description`ı FK'yi
+ * `<fk table='X' column='Y'/>` biçiminde taşıyor. Yani sıra, migration
+ * metinlerinden çıkarılan bir TAHMİN değil, veritabanının o anki gerçeği.
+ *
+ * Kendine referanslar (ör. bir tablonun kendi `parent_id`si) kenar sayılmaz:
+ * tablolar arası sıra onları çözemez; aynı tablo içindeki satır sırası ayrı
+ * bir sorundur ve `orderedBy` (PK) ile deterministik yazılır.
+ *
+ * Döngü kalırsa (A→B→A) o tablolar `creationOrder` sırasıyla sona eklenir ve
+ * manifest'e `restoreOrderCycles` olarak YAZILIR — sessizce yanlış sıra
+ * üretmektense görünür bir uyarı bırakmak doğrudur.
+ */
+function topologicalOrder(
+    tables: string[],
+    defs: Record<string, { properties?: Record<string, { description?: string }> }>,
+): { order: string[]; cycles: string[] } {
+    const tie = creationOrder();
+    const rank = (t: string) => { const i = tie.indexOf(t); return i < 0 ? Number.MAX_SAFE_INTEGER : i; };
+
+    const deps = new Map<string, Set<string>>();
+    for (const t of tables) deps.set(t, new Set());
+    for (const t of tables) {
+        for (const col of Object.values(defs[t]?.properties ?? {})) {
+            for (const m of (col.description ?? "").matchAll(/<fk table='([^']+)'/g)) {
+                const target = m[1];
+                if (target !== t && tables.includes(target)) deps.get(t)!.add(target);
+            }
+        }
+    }
+
+    const order: string[] = [];
+    const remaining = new Set(tables);
+    while (remaining.size > 0) {
+        const ready = [...remaining]
+            .filter((t) => [...deps.get(t)!].every((d) => !remaining.has(d)))
+            .sort((a, b) => rank(a) - rank(b));
+        if (ready.length === 0) break;      // döngü
+        for (const t of ready) { order.push(t); remaining.delete(t); }
+    }
+    const cycles = [...remaining].sort((a, b) => rank(a) - rank(b));
+    order.push(...cycles);
+    return { order, cycles };
+}
+
 type TableStat = { rows: number; bytes: number; sha256: string; orderedBy: string | null };
-type BucketStat = { objects: number; bytes: number; public: boolean };
+/**
+ * `types`: yol → içerik türü. 2026-09-05 provasında eksikliği yakalandı — yedek
+ * yalnız BAYTLARI saklıyordu, geri yüklemede tür uzantıdan tahmin ediliyordu ve
+ * `quote-pdfs` kovasındaki arşiv `.html`leri `application/octet-stream` olarak
+ * reddedildi (kovanın MIME allowlist'i var). Tür, verinin kendisi kadar veridir.
+ */
+type BucketStat = { objects: number; bytes: number; public: boolean; types: Record<string, string> };
 
 async function main() {
     const errors: string[] = [];
@@ -183,6 +248,7 @@ async function main() {
         for (const b of buckets) {
             let objects = 0;
             let bytes = 0;
+            const types: Record<string, string> = {};
             const walk = async (prefix: string, depth: number): Promise<void> => {
                 if (depth > 8) {
                     errors.push(`storage/${b.id}: 8 seviyeden derin klasör atlandı (${prefix})`);
@@ -203,7 +269,7 @@ async function main() {
                         errors.push(`storage/${b.id}: liste okunamadı (HTTP ${res.status})`);
                         return;
                     }
-                    const page = (await res.json()) as { id: string | null; name: string }[];
+                    const page = (await res.json()) as { id: string | null; name: string; metadata?: { mimetype?: string } }[];
                     if (!Array.isArray(page) || page.length === 0) return;
                     for (const o of page) {
                         const full = prefix ? `${prefix}/${o.name}` : o.name;
@@ -219,6 +285,16 @@ async function main() {
                             errors.push(`storage/${b.id}/${full}: indirilemedi (HTTP ${dl.status})`);
                             continue;
                         }
+                        // Tür LİSTEDEN okunur, indirme yanıtından DEĞİL.
+                        // Supabase Storage HTML'i stored-XSS'e karşı `text/plain`
+                        // olarak SERVİS EDER; yani yanıt başlığı saklanan türü
+                        // söylemez. 2026-09-05 provası bunu somut yakaladı:
+                        // başlıktan alınan `text/plain`, `quote-pdfs` kovasının
+                        // yalnız `text/html` kabul eden allowlist'ine takılıp
+                        // teklif arşivlerinin geri yüklenmesini engelledi.
+                        // `metadata.mimetype` saklanan gerçektir.
+                        const ctype = o.metadata?.mimetype ?? dl.headers.get("content-type");
+                        if (ctype) types[full] = ctype.split(";")[0].trim();
                         const buf = new Uint8Array(await dl.arrayBuffer());
                         bytes += write(`storage/${b.id}/${full}`, buf);
                         objects++;
@@ -227,11 +303,20 @@ async function main() {
                 }
             };
             await walk("", 0);
-            bucketStats[b.id] = { objects, bytes, public: b.public };
+            bucketStats[b.id] = { objects, bytes, public: b.public, types };
             totalObjects += objects;
             totalBytes += bytes;
             console.log(`[backup] storage/${b.id}: ${objects} obje · ${(bytes / 1048576).toFixed(2)} MB`);
         }
+    }
+
+    // ---- 3.5) Geri yükleme sırası — canlı FK grafiğinden -------------------
+    const { order, cycles } = topologicalOrder(Object.keys(tableStats), defs);
+    if (cycles.length) {
+        warnings.push(
+            `FK grafiğinde döngü: ${cycles.join(", ")} — bu tablolar yaratma sırasıyla sona eklendi, ` +
+            "geri yüklemede el ile kontrol gerekir.",
+        );
     }
 
     // ---- 4) Manifest --------------------------------------------------------
@@ -248,8 +333,10 @@ async function main() {
         },
         tables: tableStats,
         storage: bucketStats,
-        /** FK'leri bozmadan geri yükleme sırası — migration'ların tablo yaratma sırası. */
-        restoreOrder: restoreOrder().filter((t) => t in tableStats),
+        /** FK'leri bozmadan geri yükleme sırası — CANLI FK grafiğinin topolojik sırası. */
+        restoreOrder: order,
+        /** Grafikte döngü varsa hangi tablolar sırasız kaldı (boş olmalı). */
+        restoreOrderCycles: cycles,
         warnings,
         errors,
     };

@@ -63,14 +63,37 @@ yedek pazarlık konusu değil.
 - `restoreOrder` — FK'leri bozmayan geri yükleme sırası
 - `errors` — **boş olmalı.** Doluysa yedek eksiktir, tekrar koşun
 
-`restoreOrder` migration'ların tablo yaratma sırasından türetilir: bir tabloya FK
-verebilmek için hedefin önce var olması gerekir, dolayısıyla yaratma sırası
-geçerli bir topolojik sıradır.
+`restoreOrder` **canlı FK grafiğinin topolojik sırasıdır** (PostgREST'in OpenAPI
+çıktısındaki `<fk table='…'/>` bilgisinden üretilir). `restoreOrderCycles` boş
+olmalı; doluysa o tablolar sırasız kalmıştır ve el ile kontrol gerekir.
+
+> **Düzeltme (2026-09-05).** Bu belge 2026-08-30'dan 2026-09-05'e kadar sırayı
+> "migration'ların tablo YARATMA sırası" diye tanımlıyordu ve gerekçesi şuydu:
+> *"bir tabloya FK verebilmek için hedefin önce var olması gerekir."* **Bu gerekçe
+> yanlıştı** — FK sonradan `ALTER TABLE` ile de eklenebiliyor. İlk gerçek prova
+> bunu ilk denemede yakaladı: `purchase_commitments` mig.020'de yaratılıyor,
+> `purchase_order_lines` mig.049'da, aradaki FK ise mig.050'de ekleniyor. Yaratma
+> sırası ikisini ters koyuyor ve geri yükleme `23503` ile düşüyordu.
 
 ## Geri yükleme
 
-> Bu yordam **canlıya yazar.** Önce boş bir Supabase projesinde prova edin.
+```bash
+npm run restore -- --from backups/<damga>            # KURU ÇALIŞMA (varsayılan)
+npm run restore -- --from backups/<damga> --apply    # yazar
+```
+
+Script aşağıdaki §1→§3 yordamının ta kendisidir: hesapları tablolardan önce
+yazar, tabloları `restoreOrder` sırasıyla 500'lük gruplar hâlinde
+`merge-duplicates` ile yükler (yarıda kalırsa yeniden koşulabilir), kovaları
+manifest'teki `public` bayrağıyla yaratır ve sonunda satır sayılarını manifest
+ile karşılaştırır. **`manifest.errors` doluysa çalışmayı reddeder** — yarım veri,
+veri yokluğundan kötüdür (eksik satırlar "silinmiş" gibi görünür).
+
+Canlı hedefte `--apply` ayrıca `ALLOW_PROD_TARGET=1` ister.
+
+> Bu yordam **canlıya yazar.** Önce boş bir projede prova edin.
 > Bir kere prova edilmemiş yedek, yedek değil hipotezdir.
+> **2026-09-05'te prova edildi** — sonuçlar aşağıda "Prova" bölümünde.
 
 ### 0. Şema
 
@@ -147,9 +170,56 @@ npm run backup -- --out /tmp/dogrulama --no-storage
 Yeni manifest'in `totals.rows` ve tablo bazlı satır sayıları, geri yüklediğiniz
 yedeğinkiyle **birebir** olmalı. Ardından `npm run smoke`.
 
+## Prova — 2026-09-05 (yerel dev veritabanı)
+
+Yordam ilk kez uçtan uca koşuldu: yerel dev DB yedeklendi → `supabase db reset
+--local` ile boş şemaya dönüldü (111 migration sıfırdan uygulandı) → tek geçişte
+geri yüklendi.
+
+**Sonuç: 64/64 tablo · 952 satır · 1 hesap · 13/13 obje · 0 hata.** Ardından
+`preflight:auth` ✅ (kalıcı admin korundu), `check:chains` ✅ (tek kopukluk
+yedekte de vardı — veri, prova değil), ve **94/94 E2E** geri yüklenmiş
+veritabanına karşı yeşil.
+
+**Dört gerçek kusur çıktı ve düzeltildi:**
+
+| # | Kusur | Etki |
+|---|---|---|
+| 1 | `restoreOrder` yaratma sırasından üretiliyordu | `purchase_commitments` hiç yüklenmiyordu (23503) |
+| 2 | `company_settings` tekil satırı migration'da tohumlanıyor | 23505 → **firma profili hiç geri gelmiyordu** |
+| 3 | `product_type_fields` ikincil unique kısıtta çakışıyor | 23505 → 68 satır yüklenmiyordu |
+| 4 | Yedek obje içerik TÜRÜNÜ saklamıyordu | teklif arşivi `.html`leri HTTP 400 ile reddediliyordu |
+
+4'ün inceliği kayda değer: tür ilk düzeltmede indirme yanıtının başlığından
+alındı ve **yine olmadı** — Supabase Storage HTML'i stored-XSS'e karşı
+`text/plain` olarak *servis eder*, yani başlık saklanan türü söylemez. Doğru
+kaynak obje **listesindeki** `metadata.mimetype`.
+
+### Geri yüklemenin DEĞİŞTİRDİĞİ tek şey: `updated_at`
+
+Kaynak ile geri yükleme sonrası yedek SHA-256 ile karşılaştırıldı:
+**60/64 tablo birebir aynı.** Farklı çıkan dördünde (`note_templates`,
+`product_types`, `product_type_fields`, `purchase_orders`) değişen **tek kolon
+`updated_at`**; satır sayıları ve tüm iş verisi aynı.
+
+Sebep: bu tablolarda geri yükleme INSERT değil **UPDATE** yapıyor — ilk üçü
+migration'ların tohumladığı referans satırları, `purchase_orders` ise
+`trg_pol_after_change`in satır yüklemesinde başlık toplamlarını yeniden
+yazması. `updated_at` trigger'ları BEFORE **UPDATE** olduğu için tam bu yollarda
+ateşleniyor. Zararsız ama bilinmeli: geri yükleme sonrası bu dört tabloda
+"değiştirilme zamanı" geri yükleme anıdır, orijinal değil.
+
 ## Bilinen sınırlar
 
 - **Parola hash'leri yedekte yok** (Admin API döndürmüyor) → sıfırlama gerekir.
+  Provada doğrulandı: `PUT /auth/v1/admin/users/<id>` ile parola kurulunca giriş
+  ve tüm E2E akışı çalışıyor. `app_metadata.roles` korunduğu için RBAC kaybolmuyor.
+- **`updated_at` dört tabloda geri yükleme anına kayar** (yukarı bak) — iş verisi
+  değişmez.
+- **Migration'lar referans verisi TOHUMLUYOR** (`company_settings` tekil satırı,
+  ürün tipleri/alanları, not şablonları). Hedef "boş" değildir; geri yükleme bu
+  satırların üstüne yazmak zorunda. `scripts/restore.ts` bunu iki mekanizmayla
+  yapıyor: `on_conflict` (ikincil unique kısıt) ve tekil tabloda önce-sil.
 - **Ortam değişkenleri yedekte yok** — bilinçli; sır içeriyorlar.
 - Yedek **anlık tutarlı değil**: tablolar sırayla okunur, arada yazma olursa satır
   sayısı kontrolü bunu hata olarak bildirir (tekrar koşun). Sistem kullanımdayken

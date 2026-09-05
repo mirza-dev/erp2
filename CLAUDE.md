@@ -5,6 +5,22 @@ _Son güncelleme: 2026-08-31_
 
 > Bu bölüm yalnız **güncel durumu + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda ve `memory/current_focus.md`'de. Aşağıdaki indeks son dönem oturumlarına (commit + konu) hızlı bakış içindir; daha eski dönemler (Faz 2–3d AI Import, Sprint A–C, M-3 Rate Limiting, React Doctor, Teklif V2–V7 plan turları, Paraşüt Faz 1–11) git geçmişinde.
 
+**Son tamamlanan iş:** **Yedek geri-yükleme PROVA EDİLDİ — yordam dört yerinden kırıkmış** (2026-09-05; GREEN; **migration YOK**). Lansman olgunluk listesinin **#11**'i kapandı. Kullanıcı "ikincisini hallet" dedi; kapsam kararı: **yerel DB sıfırlanıp geri yüklensin** (tam sadık prova). Rapor: `docs/backup-restore.md` §Prova.
+
+**Akış:** yerel dev DB yedeklendi → `supabase db reset --local` (111 migration sıfırdan uygulandı; runbook §0 böylece de doğrulandı) → **TEK GEÇİŞTE** geri yüklendi → **64/64 tablo · 952 satır · 1 hesap · 13/13 obje · 0 hata**. Ardından `preflight:auth` ✅ (kalıcı admin korundu → brick değil), `check:chains` ✅ (tek kopukluk **yedekte de vardı** — veri kusuru, prova kusuru değil), ve **94/94 E2E** geri yüklenmiş veritabanına karşı yeşil.
+
+**YENİ `scripts/restore.ts` (`npm run restore`)** — yordam 2026-08-30'dan beri yalnız YAZILIYDI, artık çalıştırılabilir: kuru çalışma varsayılan (yazmak açık niyet ister), canlı hedefte ayrıca `ALLOW_PROD_TARGET=1`, ve **`manifest.errors` doluysa REDDEDER** (yarım veri, veri yokluğundan kötüdür — eksik satırlar "silinmiş" gibi görünür).
+
+**PROVA DÖRT GERÇEK KUSUR ÇIKARDI. Dördü de belgede makul gerekçelerle yazılıydı; hiçbiri okumakla görülmezdi:**
+1. **`restoreOrder` YANLIŞ ÜRETİLİYORDU.** Belgedeki gerekçe — *"yaratma sırası geçerli bir topolojik sıradır, çünkü FK verebilmek için hedef önce var olmalı"* — **yanlış**: FK sonradan `ALTER TABLE` ile de eklenebiliyor. Somut vaka: `purchase_commitments` mig.**020**'de, `purchase_order_lines` mig.**049**'da yaratılıyor, aradaki FK mig.**050**'de ekleniyor → yaratma sırası ikisini TERS koyuyor, geri yükleme `23503` ile düşüyordu. Sıra artık **canlı FK grafiğinden** üretiliyor (PostgREST OpenAPI `<fk table='…'/>`, Kahn) + `restoreOrderCycles` manifest'e yazılıyor.
+2. **`company_settings` tekil satırı migration'da TOHUMLANIYOR** → `23505` (ifade indeksi `((true))`) → **firma profili hiç geri gelmiyordu** (antet, teklif öneki, geçerlilik günü).
+3. **`product_type_fields`** ikincil unique kısıtta çakışıyor — `merge-duplicates` çakışmayı yalnız **birincil anahtardan** çözer → 68 satır yüklenmiyordu. Çözüm `?on_conflict=`; tekil tabloda önce-sil.
+4. **Yedek obje içerik TÜRÜNÜ saklamıyordu** → `quote-pdfs` kovasının allowlist'i yalnız `text/html` kabul ettiği için teklif arşivleri **HTTP 400** ile reddediliyordu. **İnceliği kayda değer:** tür ilk düzeltmede indirme yanıtının BAŞLIĞINDAN alındı ve **yine olmadı** — Supabase Storage HTML'i stored-XSS'e karşı `text/plain` olarak **SERVİS EDER**, yani başlık saklanan türü söylemez. Doğru kaynak obje **listesindeki** `metadata.mimetype`.
+
+**GERİ YÜKLEMENİN DEĞİŞTİRDİĞİ TEK ŞEY `updated_at`.** Kaynak ile sonuç **SHA-256** ile karşılaştırıldı: **60/64 tablo birebir aynı**; satır/obje/hesap toplamları tam. Farklı çıkan dördünde (`note_templates`, `product_types`, `product_type_fields`, `purchase_orders`) değişen **tek kolon `updated_at`** — çünkü o yollarda INSERT değil **UPDATE** yapılıyor (migration tohumlu satırlar + `trg_pol_after_change`in başlık toplamlarını yeniden yazması) ve `updated_at` trigger'ları BEFORE **UPDATE**. Runbook'un "INSERT'te ateşlenmez, zaman damgaları korunur ✅" notu saf INSERT için doğru, tohumlu tablolar için değil.
+
+**DERS: prova edilmemiş bir yordam, doğru GÖRÜNEN bir hipotezdir.** Kapı: `backup-script.test.ts` 6 → 10 test, **5/5 kırmızı kanıtlı**. tsc 0 · lint 0 · **497 dosya / 6925 test** · build 0 · migration YOK.
+
 **Son tamamlanan iş:** **E2E suite yeşillendirme — "yeşil" görünen suite aslında yeşil değildi** (2026-09-05; GREEN; **migration YOK**; **ürün kodu DEĞİŞMEDİ** — yalnız test altyapısı + 2 spec). Kullanıcı "sırada ne var" dedi, seçim E2E oldu. Lansman olgunluk listesinin son kod maddesi (**#19 Kullanıcı akışları**) kapandı. Rapor: `docs/audit/2026-09-05-e2e-suite-yesillendirme.md`.
 
 **BASELINE: 85 passed · 8 flaky · 1 failed · 32,8 dakika.** Suite `pretest:e2e` kapısı yüzünden aylarca kilitliydi; kilit 2026-08-31'de açıldı ama **o günden beri bir kez bile koşmamıştı**. "Flaky" burada bir tür değil **ÖRTÜYDÜ**: o testler ilk denemede düşüp retry'da 1 sn'de geçiyordu ve `retries: 1` yüzünden özet satırı hep "passed" gibi okunuyordu. Uç durum: bir test **15,0 dk**, biri **8,2 dk** (test timeout'u 60 sn — fark teardown'da: `Tearing down "context" exceeded`).
@@ -670,6 +686,7 @@ Teklif "Gönder"e basınca müşteriye teklif belgesi `.html` ekli e-posta. Kara
 - **Paraşüt Faz 12 — Sandbox GATE:** gerçek Paraşüt API ile OAuth + list filtreleri + e-doc trackable_job + stok invariant doğrulamaları (`PARASUT_PLAN.md` §Faz 12).
 
 ### Son dönem oturum indeksi (en yeniden eskiye — detay git log'unda)
+- Yedek geri-yükleme provası — tek geçişte 64/64 · 4 gerçek kusur (restoreOrder/tohum satırları/obje türü) · npm run restore
 - E2E suite yeşillendirme — 85/8flaky/1fail·32,8dk → 94/94 retries=0·2,3dk (hidrasyon + soğuk derleme + taşınmış rol)
 - Kalan üç madde — §A7 taşma (teşhis düzeltildi: ızgara min-content) · Button.ghostDanger · A4 konsol URL filtreleri
 - Buton dili Dilim 2·3·4 — 101→60 buton, btn()+iconButtonStyle+.tap-row-gap silindi, panel sekmeleri beyaz/mavi dile
