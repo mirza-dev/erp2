@@ -69,9 +69,14 @@ describe("Ayarlar — gruplu sekme nav a11y", () => {
 
     it("her sekme butonu id + aria-current + dirty durum erişilebilir adda", () => {
         expect(PAGE_SRC).toMatch(/id=\{`settings-tab-\$\{tab\.key\}`\}/);
-        expect(PAGE_SRC).toMatch(/aria-current=\{active \? "page" : undefined\}/);
+        // 2026-09-05: `aria-current` artık burada YAZILMIYOR — sekme şeridi ortak
+        // `ui/NavLink`in `NavButton`una taşındı ve nitelik ORADA basılıyor.
+        // İddia da oraya taşındı (`ui/nav-link.test.tsx`, gerçek render ile).
+        // Bu satır yalnız BAĞIN durduğunu doğrular: sayfa `active` propunu
+        // geçirmezse aktif durum sessizce kaybolurdu.
+        expect(PAGE_SRC).toMatch(/<NavButton[\s\S]{0,400}?active=\{active\}/);
         // Dirty durum yalnız görsel nokta değil — buton erişilebilir adında
-        expect(PAGE_SRC).toMatch(/aria-label=\{dirty \? `\$\{tab\.label\} \(kaydedilmemiş değişiklikler\)` : undefined\}/);
+        expect(PAGE_SRC).toMatch(/ariaLabel=\{dirty \? `\$\{tab\.label\} \(kaydedilmemiş değişiklikler\)` : undefined\}/);
     });
 
     it("içerik alanı role=region + aria-labelledby aktif sekme id'sine bağlı", () => {

@@ -62,6 +62,10 @@ describe("Sidebar — premium domain navigation", () => {
 
     it("Ayarlar exact active; alt ayar sayfaları kendi item'ını aktif eder", () => {
         expect(SOURCE).toMatch(/label:\s*"Ayarlar",\s*href:\s*"\/dashboard\/settings",\s*icon:\s*Settings,\s*exact:\s*true/);
-        expect(SOURCE).toMatch(/item\.exact\s*\?\s*pathname === item\.href/);
+        // 2026-09-05: ifade `ui/NavLink`in `isActiveHref`ine taşındı — aynı üç
+        // satır Developer konsolunda da BİREBİR yazılıydı. Sidebar'ın hâlâ o
+        // yardımcıyı `item.exact` ile sürdüğünü burada, yardımcının kendi
+        // davranışını `ui/nav-link.test.tsx`te doğruluyoruz.
+        expect(SOURCE).toMatch(/isActiveHref\(pathname, item\.href, item\.exact\)/);
     });
 });

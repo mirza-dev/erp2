@@ -188,7 +188,11 @@ describe("Tema — ThemeToggle UI", () => {
     it("dashboard shell light surface tokenlarını kullanır", () => {
         expect(DASH_LAYOUT_SRC).toContain("var(--app-bg)");
         expect(SIDEBAR_SRC).toContain("var(--shell-bg)");
-        expect(SIDEBAR_SRC).toContain("var(--nav-active-bg)");
+        // 2026-09-05: aktif nav zemini artık Sidebar'ın satır içi stilinde DEĞİL
+        // ortak `.nav-rail-item` sınıfında (Ayarlar şeridiyle paylaşılıyor).
+        // Token iddiası garantinin yeni evine taşındı; Sidebar'ın o token'ı
+        // kullandığını `.is-active` kuralı üzerinden doğruluyoruz.
+        expect(GLOBALS_SRC).toMatch(/\.nav-rail-item\.is-active \{[^}]*var\(--nav-active-bg\)/);
         expect(GLOBALS_SRC).toMatch(/\.topbar-shell[\s\S]*var\(--shell-bg\)/);
     });
 

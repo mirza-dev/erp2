@@ -1126,14 +1126,36 @@ body {
   text-transform: uppercase;
 }
 
-.settings-tab-button {
+/* ── Gezinme rayı — Sidebar ve Ayarlar şeridinin ORTAK dili ────────────────
+   Bileşen tarafı: `src/components/ui/NavLink.tsx`.
+
+   2026-09-05 ölçümü aynı tasarımın iki uygulamasını buldu: Ayarlar burada,
+   CSS'te; Sidebar ise satır içi stil + `onMouseEnter` DOM MUTASYONU ile.
+   Altı ölçü kaymıştı ve her birinde bir kazanan seçildi:
+
+     · min-height 36px (Sidebar'ınki) — Ayarlar 38px kullanıyordu. ÖLÇÜLDÜ:
+       16 öğelik ray 38px'te 900px yüksekliğe sığmıyor, kaymaya başlıyor.
+       Ayarlar'ın 7 öğesi için küçülme bedava.
+     · şerit içeriden 7px (Sidebar'ınki) — 36px'te 7px, 38px'te 8px ile AYNI
+       22px şeridi veriyor, yani şeridin boyu değişmedi.
+     · padding `0 10px 0 12px` (Ayarlar'ınki) — sol 12px, `left: 0`daki 2px
+       şeride 10px nefes bırakıyor; Sidebar'ın 10px'i 8px bırakıyordu.
+     · gap 9px (Ayarlar'ınki).
+     · ikon opaklığı 0.92 (Ayarlar'ınki) — 0.72 pasif ikonu `--text-secondary`
+       üzerine İKİNCİ kez soluklaştırıyordu.
+     · hover kenarlığı YOK (Ayarlar'ınki) — kenarlık AKTİF durumun işareti
+       olmalı; hover'ı zemin + metin rengi zaten anlatıyor.
+
+   Izgara değil FLEX: Ayarlar `18px minmax(0,1fr) 8px` ızgarası kullanıyordu ama
+   Sidebar'ın sondaki yuvası değişken genişlikte bir sayaç rozeti — sabit 8px
+   kolon onu taşıyamaz. */
+.nav-rail-item {
   position: relative;
-  display: grid;
-  grid-template-columns: 18px minmax(0, 1fr) 8px;
+  display: flex;
   align-items: center;
   gap: 9px;
   width: 100%;
-  min-height: 38px;
+  min-height: 36px;
   padding: 0 10px 0 12px;
   border: var(--line-width) solid transparent;
   border-radius: 7px;
@@ -1144,15 +1166,17 @@ body {
   font-weight: var(--font-ui-weight);
   line-height: 1.2;
   text-align: left;
+  text-decoration: none;
+  box-sizing: border-box;
   transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
 }
 
-.settings-tab-button::before {
+.nav-rail-item::before {
   content: "";
   position: absolute;
   left: 0;
-  top: 8px;
-  bottom: 8px;
+  top: 7px;
+  bottom: 7px;
   width: 2px;
   border-radius: 999px;
   background: var(--accent);
@@ -1160,38 +1184,45 @@ body {
   transition: opacity 0.14s ease;
 }
 
-.settings-tab-button:hover {
+.nav-rail-item:hover {
   background: var(--nav-hover-bg);
   color: var(--text-primary);
 }
 
-.settings-tab-button.is-active {
+.nav-rail-item.is-active {
   border-color: var(--nav-active-border);
   background: var(--nav-active-bg);
   color: var(--accent-text);
   font-weight: var(--font-heading-weight);
 }
 
-.settings-tab-button.is-active::before {
+.nav-rail-item.is-active::before {
   opacity: 1;
 }
 
-.settings-tab-icon {
+.nav-rail-icon {
   color: currentColor;
   opacity: 0.92;
+  flex-shrink: 0;
 }
 
-.settings-tab-label {
+/* Kısaltma YALNIZ metne uygulanır — ikon ve sondaki rozet kısalmaz. */
+.nav-rail-label {
+  flex: 1 1 auto;
   min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
 }
 
+.nav-rail-item.is-active .nav-rail-icon {
+  opacity: 1;
+}
+
 .settings-tab-dirty-dot {
   width: 6px;
   height: 6px;
-  justify-self: end;
+  flex-shrink: 0;
   border-radius: 999px;
   background: var(--warning);
   box-shadow: 0 0 0 3px var(--warning-bg);
@@ -1300,8 +1331,10 @@ body {
     display: none;
   }
 
-  .settings-tab-button {
-    grid-template-columns: 17px minmax(0, auto) 8px;
+  /* Ayarlar şeridi mobilde YATAY çip şeridine döner — bu ezmeler ona ÖZGÜ,
+     o yüzden `.settings-tab-nav` altına kapsandı. Sidebar mobilde çekmece
+     olur ve dikey ray dilini aynen korur. */
+  .settings-tab-nav .nav-rail-item {
     flex: 0 0 auto;
     width: max-content;
     min-width: max-content;
@@ -1312,11 +1345,11 @@ body {
     background: var(--surface-subtle);
   }
 
-  .settings-tab-button::before {
+  .settings-tab-nav .nav-rail-item::before {
     display: none;
   }
 
-  .settings-tab-label {
+  .settings-tab-nav .nav-rail-label {
     max-width: 160px;
   }
 

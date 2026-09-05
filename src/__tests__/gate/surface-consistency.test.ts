@@ -253,4 +253,89 @@ describe("GATE: yüzey + buton/kategori tutarlılığı", () => {
         expect(core).toMatch(/event\.key !== "Tab"/);
         expect(core).toMatch(/previouslyFocused\?\.focus\?\.\(\)/);
     });
+
+    // ── 2026-09-05: gezinme rayı ──────────────────────────────────
+    //
+    // Ölçüm üç gezinme yüzeyi buldu ve eksenlerin ÇAPRAZLANDIĞINI gösterdi:
+    // görsel ikili Sidebar+Ayarlar (aynı üç nav token'ı, aynı 2px sol accent
+    // şeridi — iki ayrı uygulama, altı ölçülebilir kayma), mantık ikilisi
+    // Sidebar+Developer (aynı `isActive` ifadesi birebir iki kez yazılmış).
+    // Sidebar'ın hover'ı ALTI satır DOM mutasyonuydu ve 16-18 bağlantısının
+    // hiçbirinde `aria-current` yoktu.
+
+    it("üç gezinme yüzeyi de aktif durumu ekran okuyucuya BİLDİRİR", () => {
+        // İşaretlemenin varlığı davranışın varlığı değildir — ama yokluğu
+        // kesinlikle yokluğudur. Sidebar'da altı GÖRSEL işaret vardı ve
+        // hiçbiri semantik değildi.
+        const surfaces: Record<string, RegExp> = {
+            // Ray yüzeyleri niteliği ORTAK çerçeveden alır: `active` propunu
+            // geçirmezlerse aktiflik sessizce kaybolur.
+            "src/components/layout/Sidebar.tsx": /<NavLink[\s\S]{0,300}?active=\{active\}/,
+            "src/app/dashboard/settings/page.tsx": /<NavButton[\s\S]{0,400}?active=\{active\}/,
+            // Developer sekmeleri KASTEN ayrı görsel dilde (yatay alt çizgi),
+            // bu yüzden niteliği kendi basar.
+            "src/app/dashboard/developer/layout.tsx": /aria-current=\{active \? "page" : undefined\}/,
+        };
+        for (const [rel, pattern] of Object.entries(surfaces)) {
+            expect(stripComments(read(rel)), rel).toMatch(pattern);
+        }
+        // Çerçevenin kendisi niteliği iki elemanda da basıyor.
+        const nav = stripComments(read("src/components/ui/NavLink.tsx"));
+        expect((nav.match(/aria-current=\{active \? "page" : undefined\}/g) ?? []).length).toBe(2);
+    });
+
+    it("aktif rota hesabı TEK kaynakta — ifade ikinci kez yazılamaz", () => {
+        const core = stripComments(read("src/components/ui/NavLink.tsx"));
+        expect(core).toMatch(/export function isActiveHref/);
+        expect(core).toMatch(/startsWith\(href \+ "\/"\)/);
+
+        // Kopyanın geri gelmesi = kuralın ihlali. Desen `pathname.startsWith`
+        // ile `+ "/"` birleşimini arıyor; `isActiveHref`in kendi gövdesi
+        // `href.startsWith` yazdığı için burada eşleşmiyor.
+        const offenders = walkSrc()
+            .filter(f => !f.endsWith("NavLink.tsx"))
+            .filter(f => /pathname\.startsWith\([^)]*\+\s*"\/"\)/.test(stripComments(readFileSync(f, "utf8"))))
+            .map(f => relative(root, f));
+        expect(offenders, `aktif-rota ifadesinin kopyası: ${offenders.join(", ")}`).toEqual([]);
+    });
+
+    it("ray görünümü CSS'te — iki yüzey de kendi stilini YAZMAZ", () => {
+        // `.nav-rail-item` ailesi Sidebar ve Ayarlar'ın ortak dili.
+        expect(GLOBALS).toMatch(/\.nav-rail-item \{[^}]*min-height: 36px/);
+        expect(GLOBALS).toMatch(/\.nav-rail-item:hover \{[^}]*var\(--nav-hover-bg\)/);
+        expect(GLOBALS).toMatch(/\.nav-rail-item\.is-active \{[^}]*var\(--nav-active-bg\)/);
+        expect(GLOBALS).toMatch(/\.nav-rail-item\.is-active \{[^}]*var\(--nav-active-border\)/);
+
+        // Nav token'ları yüzeylerin SATIR İÇİNDE geri yazılamaz.
+        for (const rel of ["src/components/layout/Sidebar.tsx", "src/app/dashboard/settings/page.tsx"]) {
+            const src = stripComments(read(rel));
+            expect(src, rel).not.toMatch(/var\(--nav-(hover-bg|active-bg|active-border)\)/);
+        }
+    });
+
+    it("DOM mutasyonlu hover taşıyan dosya KÜMESİ tam olarak bu", () => {
+        // Bugüne kadar bu kalıbı yasaklayan HİÇBİR kapı kuralı yoktu; iki
+        // dosya-özel iddia vardı (`purchase-orders-ui`, `datatable-rollout`) ve
+        // Sidebar ikisinin de dışındaydı. Küme iddiası listenin sessizce
+        // BÜYÜMESİNİ engeller — küçülmesi serbest, ama her yeni satır bilinçli
+        // bir karar olmalı.
+        const ALLOWED: Record<string, string> = {
+            "src/components/ui/Button.tsx":
+                "merkezî stil motoru: varyantlar JS nesnesi, hover'ı applyHover TEK yerden sürer",
+            "src/app/dashboard/products/page.tsx":
+                "ürün listesi satır vurgusu — bu turun kapsamı dışında, ayrı tur",
+            "src/app/dashboard/orders/OrderForm.tsx":
+                "sipariş formu satır vurgusu — bu turun kapsamı dışında, ayrı tur",
+            "src/components/dashboard/StatsCards.tsx":
+                "ÖLÜ KOD (0 üretim importu) ama dashboard-overview-preservation silinmesini yasaklıyor",
+        };
+        const found = walkSrc()
+            .filter(f => /\.currentTarget\.style\.|\bel\.style\./.test(stripComments(readFileSync(f, "utf8"))))
+            .map(f => relative(root, f))
+            .sort();
+        expect(found).toEqual(Object.keys(ALLOWED).sort());
+        for (const [file, reason] of Object.entries(ALLOWED)) {
+            expect(reason.length, `${file} için gerekçe çok kısa`).toBeGreaterThan(25);
+        }
+    });
 });

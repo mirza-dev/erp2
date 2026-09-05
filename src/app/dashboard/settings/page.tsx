@@ -19,6 +19,7 @@ import {
     type LucideIcon,
 } from "lucide-react";
 import Button from "@/components/ui/Button";
+import { NavButton } from "@/components/ui/NavLink";
 import { useToast } from "@/components/ui/Toast";
 import DemoBanner from "@/components/ui/DemoBanner";
 import DosyalarTab from "@/components/settings/DosyalarTab";
@@ -1571,22 +1572,20 @@ function SettingsPageInner() {
                                 const active = activeTab === tab.key;
                                 const dirty = dirtyTabs.has(tab.key);
                                 return (
-                                    <button
+                                    <NavButton
                                         key={tab.key}
-                                        type="button"
                                         id={`settings-tab-${tab.key}`}
+                                        active={active}
                                         onClick={() => handleTabSwitch(tab.key)}
-                                        aria-current={active ? "page" : undefined}
-                                        aria-label={dirty ? `${tab.label} (kaydedilmemiş değişiklikler)` : undefined}
+                                        ariaLabel={dirty ? `${tab.label} (kaydedilmemiş değişiklikler)` : undefined}
                                         ref={(node) => {
                                             if (active && node) activeTabButtonRef.current = node;
                                         }}
-                                        className={`settings-tab-button${active ? " is-active" : ""}`}
+                                        icon={<Icon className="nav-rail-icon" size={17} aria-hidden="true" />}
+                                        trailing={dirty ? <span className="settings-tab-dirty-dot" aria-hidden="true" /> : undefined}
                                     >
-                                        <Icon className="settings-tab-icon" size={17} aria-hidden="true" />
-                                        <span className="settings-tab-label">{tab.label}</span>
-                                        {dirty && <span className="settings-tab-dirty-dot" aria-hidden="true" />}
-                                    </button>
+                                        {tab.label}
+                                    </NavButton>
                                 );
                             })}
                         </div>

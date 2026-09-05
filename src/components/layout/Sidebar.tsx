@@ -28,6 +28,7 @@ import { useDashboardCounters } from "@/lib/data-context";
 import { isDemoMode, clearDemoMode } from "@/lib/demo-utils";
 import { requiredPermissionForPath } from "@/lib/auth/page-access";
 import { usePermissions } from "@/lib/auth/use-permissions";
+import { NavLink, isActiveHref } from "@/components/ui/NavLink";
 
 interface NavItem {
     label: string;
@@ -160,10 +161,8 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
         }, []);
     }, [navGroups, perms]);
 
-    const isActive = (item: NavItem) =>
-        item.exact
-            ? pathname === item.href
-            : pathname === item.href || pathname.startsWith(item.href + "/");
+    // Aktif hesabı `ui/NavLink`te — aynı ifade Developer konsolunda da yazılıydı.
+    const isActive = (item: NavItem) => isActiveHref(pathname, item.href, item.exact);
 
     const badgeColors = (tone: NavItem["countTone"] = "danger") => {
         if (tone === "info") {
@@ -211,81 +210,18 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
                         const Icon = item.icon;
                         const badge = badgeColors(item.countTone);
                         return (
-                            <Link
+                            <NavLink
                                 key={item.href}
                                 href={item.href}
+                                active={active}
                                 onClick={onNavigate}
-                                style={{
-                                    display: "flex",
-                                    alignItems: "center",
-                                    gap: "10px",
-                                    minHeight: "36px",
-                                    padding: "0 9px 0 10px",
-                                    fontSize: "13px",
-                                    fontWeight: active ? "var(--font-heading-weight)" : "var(--font-ui-weight)",
-                                    color: active ? "var(--accent-text)" : "var(--text-secondary)",
-                                    background: active ? "var(--nav-active-bg)" : "transparent",
-                                    textDecoration: "none",
-                                    cursor: "pointer",
-                                    transition: "background 0.14s ease, color 0.14s ease, border-color 0.14s ease",
-                                    borderRadius: "7px",
-                                    position: "relative",
-                                    border: `var(--line-width) solid ${active ? "var(--nav-active-border)" : "transparent"}`,
-                                    boxSizing: "border-box",
-                                }}
-                                onMouseEnter={(e) => {
-                                    if (!active) {
-                                        e.currentTarget.style.background = "var(--nav-hover-bg)";
-                                        e.currentTarget.style.color = "var(--text-primary)";
-                                        e.currentTarget.style.borderColor = "var(--shell-border)";
-                                    }
-                                }}
-                                onMouseLeave={(e) => {
-                                    if (!active) {
-                                        e.currentTarget.style.background = "transparent";
-                                        e.currentTarget.style.color = "var(--text-secondary)";
-                                        e.currentTarget.style.borderColor = "transparent";
-                                    }
-                                }}
-                            >
-                                <span
-                                    aria-hidden
-                                    style={{
-                                        position: "absolute",
-                                        left: 0,
-                                        top: "7px",
-                                        bottom: "7px",
-                                        width: "2px",
-                                        borderRadius: "999px",
-                                        background: active ? "var(--accent)" : "transparent",
-                                    }}
-                                />
-                                <Icon
-                                    size={17}
-                                    strokeWidth={1.75}
-                                    aria-hidden
-                                    style={{
-                                        flexShrink: 0,
-                                        color: "currentColor",
-                                        opacity: active ? 1 : 0.72,
-                                    }}
-                                />
-                                <span
-                                    style={{
-                                        flex: 1,
-                                        minWidth: 0,
-                                        overflow: "hidden",
-                                        textOverflow: "ellipsis",
-                                        whiteSpace: "nowrap",
-                                    }}
-                                    title={item.label}
-                                >
-                                    {item.label}
-                                </span>
-                                {item.count && item.count > 0 && (
+                                title={item.label}
+                                icon={
+                                    <Icon size={17} strokeWidth={1.75} aria-hidden className="nav-rail-icon" />
+                                }
+                                trailing={item.count && item.count > 0 ? (
                                     <span
                                         style={{
-                                            marginLeft: "auto",
                                             minWidth: "22px",
                                             height: "22px",
                                             display: "inline-flex",
@@ -305,8 +241,10 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
                                     >
                                         {item.count}
                                     </span>
-                                )}
-                            </Link>
+                                ) : undefined}
+                            >
+                                {item.label}
+                            </NavLink>
                         );
                     })}
                 </div>

@@ -5,6 +5,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import { LoadingState } from "@/components/ui/StateViews";
+import { isActiveHref } from "@/components/ui/NavLink";
 
 /**
  * Developer Console kabuğu.
@@ -68,9 +69,12 @@ export default function DeveloperLayout({ children }: { children: React.ReactNod
                 }}
             >
                 {NAV.map(item => {
-                    const active = item.exact
-                        ? pathname === item.href
-                        : pathname === item.href || pathname.startsWith(item.href + "/");
+                    // Aktif hesabı Sidebar ile ORTAK (`ui/NavLink`) — bu ifade
+                    // 2026-09-05'e kadar iki dosyada birebir yazılıydı. Ama
+                    // GÖRSEL dil kasten ayrı kalıyor: bu YATAY bir sekme
+                    // şeridi, dikey rayın 2px sol accent şeridi burada yanlış
+                    // olurdu. Alt çizgi bu yüzeyin kendi dili.
+                    const active = isActiveHref(pathname, item.href, item.exact);
                     return (
                         <Link
                             key={item.href}
