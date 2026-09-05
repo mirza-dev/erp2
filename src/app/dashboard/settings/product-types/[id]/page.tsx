@@ -23,6 +23,7 @@ import type { ProductFieldType, ProductTypeFieldRow, ProductTypeRow } from "@/li
 import type { ProductTypeStatsRow } from "@/lib/supabase/product-types";
 import { fieldStyle, labelStyle as sharedLabelStyle } from "@/components/ui/Input";
 import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 const FIELD_TYPE_LABELS: Record<ProductFieldType, string> = {
     text: "Metin",
@@ -591,7 +592,7 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
                 <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
                     <div style={cardStyle}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
-                            <h2 style={{ fontSize: "15px", fontWeight: 700, margin: 0 }}>Şablon Bilgileri</h2>
+                            <SectionHeader variant="title">Şablon Bilgileri</SectionHeader>
                             <Button onClick={saveHeader} loading={savingHeader} disabled={blocked} title={blockedTitle}>Kaydet</Button>
                         </div>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 84px", gap: "10px" }}>
@@ -613,7 +614,7 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
                     <div style={cardStyle}>
                         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "12px", marginBottom: "12px" }}>
                             <div>
-                                <h2 style={{ fontSize: "15px", fontWeight: 700, margin: "0 0 3px" }}>Teknik Alanlar</h2>
+                                <SectionHeader variant="title" style={{ marginBottom: "3px" }}>Teknik Alanlar</SectionHeader>
                                 <div style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
                                     Teknik anahtarlar ürün bilgilerindeki attribute kayıtlarıyla birebir eşleşir.
                                 </div>
@@ -639,7 +640,7 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
 
                 <aside style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
                     <div style={cardStyle}>
-                        <h2 style={{ fontSize: "15px", fontWeight: 700, margin: "0 0 12px" }}>Kullanım Özeti</h2>
+                        <SectionHeader variant="title" style={{ marginBottom: "12px" }}>Kullanım Özeti</SectionHeader>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                             <Metric label="Ürün" value={stats?.product_count ?? "—"} sub="Bu şablona bağlı" />
                             <Metric label="Alan" value={stats?.field_count ?? activeFields.length} sub="Aktif teknik alan" />
@@ -652,7 +653,7 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
                     </div>
 
                     <div style={cardStyle}>
-                        <h2 style={{ fontSize: "15px", fontWeight: 700, margin: "0 0 10px" }}>Ürün Formu Önizlemesi</h2>
+                        <SectionHeader variant="title" style={{ marginBottom: "10px" }}>Ürün Formu Önizlemesi</SectionHeader>
                         {activeFields.length === 0 ? (
                             <div style={{ color: "var(--text-tertiary)", fontSize: "12px" }}>Aktif alan ekleyince ürün detayında burada tanımlanan teknik bilgiler görünür.</div>
                         ) : (
@@ -673,7 +674,7 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
 
                     {inactiveFields.length > 0 && (
                         <div style={cardStyle}>
-                            <h2 style={{ fontSize: "15px", fontWeight: 700, margin: "0 0 10px" }}>Pasif Alanlar</h2>
+                            <SectionHeader variant="title" style={{ marginBottom: "10px" }}>Pasif Alanlar</SectionHeader>
                             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                                 {inactiveFields.map(field => (
                                     <div key={field.id} style={{ display: "flex", justifyContent: "space-between", gap: "8px", alignItems: "center", fontSize: "12px" }}>
@@ -694,9 +695,9 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
                     width="min(560px, calc(100vw - 28px))"
                     dismissible={!fieldSaving}
                 >
-                        <h2 style={{ fontSize: "16px", fontWeight: 720, margin: "0 0 14px" }}>
+                        <SectionHeader variant="dialog" style={{ marginBottom: "14px" }}>
                             {fieldModal === "new" ? "Yeni Teknik Alan" : "Teknik Alanı Düzenle"}
-                        </h2>
+                        </SectionHeader>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                             <label>
                                 <span style={labelStyle}>Türkçe Etiket</span>

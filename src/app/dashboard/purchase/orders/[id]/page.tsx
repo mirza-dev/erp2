@@ -12,6 +12,7 @@ import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-u
 import type { PurchaseOrderRow, PurchaseOrderLineRow, PurchaseOrderStatus, VendorRow, ProductRow } from "@/lib/database.types";
 import type { AuditEntry } from "@/lib/supabase/audit-log";
 import { poActionLabel, poActorLabel } from "@/lib/purchase-order-ui";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 const thStyle: React.CSSProperties = {
     textAlign: "left", padding: "10px 14px", fontSize: "12px", fontWeight: 500,
@@ -680,9 +681,9 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
                     width="min(440px, calc(100vw - 32px))"
                     surfaceStyle={{ background: "var(--bg-primary)", padding: "24px", borderRadius: "10px", gap: "12px" }}
                 >
-                        <h2 id="po-cancel-title" style={{ fontSize: "16px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
+                        <SectionHeader variant="dialog" id="po-cancel-title">
                             Siparişi İptal Et
-                        </h2>
+                        </SectionHeader>
                         <p style={{ fontSize: "13px", color: "var(--text-secondary)", margin: 0 }}>
                             <strong>{po.po_number}</strong> iptal edilecek. Bekleyen commitment&apos;lar otomatik iptal olur.
                             Sadece admin yetkili kullanıcılar bu işlemi yapabilir.

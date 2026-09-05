@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from "react";
 import Button from "@/components/ui/Button";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 interface OpsMetrics {
     criticalStockCount: number;
@@ -373,16 +374,9 @@ export default function AISummaryCard() {
                     padding: "10px 14px",
                     marginBottom: "10px",
                 }}>
-                    <div style={{
-                        fontSize: "10px",
-                        fontWeight: 700,
-                        textTransform: "uppercase",
-                        letterSpacing: "0.05em",
-                        color: "var(--danger-text)",
-                        marginBottom: "6px",
-                    }}>
+                    <SectionHeader level={3} style={{ color: "var(--danger-text)", marginBottom: "6px" }}>
                         Anomali Tespiti
-                    </div>
+                    </SectionHeader>
                     {data.anomalies.map((a, i) => (
                         <div key={i} style={{
                             fontSize: "12px",

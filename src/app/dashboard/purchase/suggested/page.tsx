@@ -17,6 +17,7 @@ import PurchaseOrderModal, { type ModalItem, type VendorOption, type PoModalMode
 import type { LinkedPO } from "@/lib/supabase/purchase-orders";
 import Button from "@/components/ui/Button";
 import { Check, CircleOff, ClipboardList, Pencil } from "lucide-react";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 interface AiEnrichmentItem {
     productId: string;
@@ -1908,9 +1909,9 @@ export default function PurchaseSuggestedPage() {
 
                         {/* Stok Durumu */}
                         <div style={{ background: "var(--bg-secondary)", border: "0.5px solid var(--border-secondary)", borderRadius: "8px", padding: "12px 14px" }}>
-                            <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "10px" }}>
+                            <SectionHeader level={3}>
                                 Stok Durumu
-                            </div>
+                            </SectionHeader>
                             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "8px", marginBottom: "10px" }}>
                                 {(() => {
                                     // Audit 6. tur Fix 3: drawer Stok Durumu da promisable bazlı
@@ -1952,9 +1953,9 @@ export default function PurchaseSuggestedPage() {
                         {/* Sipariş Planı */}
                         {aiDrawerSuggestion && (
                             <div style={{ background: "var(--bg-secondary)", border: "0.5px solid var(--border-secondary)", borderRadius: "8px", padding: "12px 14px" }}>
-                                <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "10px" }}>
+                                <SectionHeader level={3}>
                                     Sipariş Planı
-                                </div>
+                                </SectionHeader>
                                 <div style={{ display: "flex", flexDirection: "column", gap: "7px" }}>
                                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
                                         <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>Önerilen miktar</span>
@@ -1995,10 +1996,13 @@ export default function PurchaseSuggestedPage() {
                         {/* AI Değerlendirmesi */}
                         {aiDrawerEnrichment ? (
                             <div>
-                                <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px", display: "flex", alignItems: "center", gap: "6px" }}>
-                                    <span style={{ background: "var(--accent-bg)", color: "var(--accent-text)", padding: "1px 5px", borderRadius: "3px", fontSize: "9px" }}>✦ AI</span>
+                                <SectionHeader
+                                    level={3}
+                                    style={{ marginBottom: "8px" }}
+                                    icon={<span style={{ background: "var(--accent-bg)", color: "var(--accent-text)", padding: "1px 5px", borderRadius: "3px", fontSize: "9px" }}>✦ AI</span>}
+                                >
                                     Değerlendirme
-                                </div>
+                                </SectionHeader>
                                 {(() => {
                                     const urgency = aiDrawerEnrichment.aiUrgencyLevel ?? "moderate";
                                     const urgencyLabel = urgency === "critical" ? "Kritik" : urgency === "high" ? "Yüksek" : "Orta";
@@ -2041,9 +2045,9 @@ export default function PurchaseSuggestedPage() {
                         {/* Karar bölümü */}
                         {aiDrawerRecEntry && (
                             <div style={{ borderTop: "0.5px solid var(--border-tertiary)", paddingTop: "16px" }}>
-                                <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "10px" }}>
+                                <SectionHeader level={3}>
                                     Karar
-                                </div>
+                                </SectionHeader>
                                 <RecActionCell
                                     productId={aiDrawerProduct.id}
                                     recEntry={aiDrawerRecEntry}

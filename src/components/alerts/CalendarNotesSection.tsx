@@ -4,6 +4,7 @@ import { Building2, Clock3, LockKeyhole, NotebookText, Plus } from "lucide-react
 import Button from "@/components/ui/Button";
 import type { CalendarNote } from "@/lib/calendar-notes";
 import { sortCalendarNotes } from "@/lib/calendar-notes";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 interface Props {
     notes: CalendarNote[];
@@ -15,14 +16,14 @@ export function CalendarNotesSection({ notes, onAdd, onDetail }: Props) {
     const sorted = sortCalendarNotes(notes);
     return (
         <section aria-label="Takvim notları" style={{ padding: "14px 20px 15px", borderBottom: "1px solid var(--border-tertiary)" }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "10px", marginBottom: sorted.length ? "10px" : 0 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "7px", minWidth: 0 }}>
-                    <NotebookText size={14} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />
-                    <span style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-secondary)", letterSpacing: "0.04em", textTransform: "uppercase" }}>Notlar</span>
-                    <span style={{ fontSize: "10px", color: "var(--text-tertiary)" }}>{sorted.length}</span>
-                </div>
-                <Button variant="ghost" size="xs" onClick={onAdd} leftIcon={<Plus size={13} />}>Not Ekle</Button>
-            </div>
+            <SectionHeader
+                level={3}
+                style={{ marginBottom: sorted.length ? "10px" : 0 }}
+                icon={<NotebookText size={14} style={{ color: "var(--text-tertiary)", flexShrink: 0 }} />}
+                action={<Button variant="ghost" size="xs" onClick={onAdd} leftIcon={<Plus size={13} />}>Not Ekle</Button>}
+            >
+                Notlar <span style={{ fontSize: "10px", fontWeight: 400, color: "var(--text-tertiary)" }}>{sorted.length}</span>
+            </SectionHeader>
 
             {sorted.length > 0 && (
                 <div style={{ display: "flex", flexDirection: "column", gap: "6px" }}>

@@ -108,6 +108,90 @@ describe("GATE — form ve başlık tipografisi", () => {
         }
     });
 
+    // ── 2026-09-05: bölüm başlıkları ──────────────────────────────
+    //
+    // `<h1>`in kapısı 2026-08-31'de kuruldu, `<h2>`nin HİÇ olmadı. Ölçüm bedeli
+    // gösterdi: 41 `<h2>` × 13 tipografi varyantı + 44 BÜYÜK HARF bölüm etiketi
+    // × 29 varyantı = 85 çağrı, 42 varyant. Etiketlerin hepsi `<div>`di — başlık
+    // gibi GÖRÜNÜP başlık OLMAYAN yüzeyler. `orders/[id]` ve `quotes/[id]`
+    // sayfalarının h1/h2/h3 sayısı SIFIRDI.
+
+    const H2_EXCEPTIONS: Record<string, string> = {
+        "src/app/gizlilik/page.tsx":
+            "bağımsız hukuki belge sayfası, uygulama kabuğu dışında (h1 istisnasıyla aynı gerekçe)",
+        "src/components/dashboard/overview/DashboardReport.tsx":
+            "yalnız BASKIDA görünen rapor (@media print); ekranda display:none, uygulama kabuğu değil",
+        "src/app/error.tsx":
+            "kök hata sınırı — bölüm başlığı değil, sayfanın yerine geçen hata mesajı",
+        "src/app/dashboard/error.tsx":
+            "panel hata sınırı — bölüm başlığı değil, sayfanın yerine geçen hata mesajı",
+    };
+
+    it("elle yazılmış bölüm başlığı YALNIZ belgelenmiş istisnalarda olabilir", () => {
+        // Kaynak `src/app` değil TÜM `src`: bölüm başlıklarının yarısı
+        // `src/components` altında yaşıyor ve bu kapının eski taraması onları
+        // hiç görmüyordu.
+        const found = walk(join(root, "src"))
+            .filter(f => !f.includes("__tests__"))
+            .filter(f => /<h[23]\s+style=\{/.test(stripComments(readFileSync(f, "utf8"))))
+            .map(f => relative(root, f))
+            .sort();
+        expect(found).toEqual(Object.keys(H2_EXCEPTIONS).sort());
+        for (const [file, reason] of Object.entries(H2_EXCEPTIONS)) {
+            expect(reason.length, `${file} için gerekçe çok kısa`).toBeGreaterThan(25);
+        }
+    });
+
+    it("dönüşen yüzeyler BÜYÜK HARF bölüm etiketini geri YAZAMAZ", () => {
+        // Repo genelinde "uppercase div" araması bölüm etiketini rozetten,
+        // tablo başlığından ve stat etiketinden AYIRAMIYOR — desen üçünü de
+        // yakalıyor. O yüzden iddia bu turda GERÇEKTEN dönüşen yüzeylere
+        // kilitlendi; repo geneli küme iddiası stat turuna bırakıldı (stat
+        // etiketleri o turda ortak kaynağa gidince kalan küme küçülür).
+        const CONVERTED = [
+            "src/app/dashboard/orders/[id]/page.tsx",
+            "src/app/dashboard/orders/OrderForm.tsx",
+            "src/app/dashboard/settings/page.tsx",
+            "src/app/dashboard/products/[id]/page.tsx",
+            "src/components/customers/CustomerDetailPanel.tsx",
+            "src/components/import/ExtractionReview.tsx",
+            "src/components/settings/ResetDemoSection.tsx",
+            "src/components/dashboard/AISummaryCard.tsx",
+            "src/components/alerts/CalendarNotesSection.tsx",
+            "src/components/alerts/DayDetailPanel.tsx",
+        ];
+        for (const rel of CONVERTED) {
+            const code = stripComments(readFileSync(join(root, rel), "utf8"));
+            expect(code, rel).toMatch(/<SectionHeader\b/);
+            // Bölüm etiketinin imzası: uppercase + letterSpacing + marginBottom
+            // bir arada. Rozet (`background`+`padding`) ve tablo başlığı bu
+            // üçlüyü taşımaz.
+            const offenders = code.match(/<(?:div|span)[^>]*textTransform: "uppercase"[^>]*marginBottom/g) ?? [];
+            expect(offenders, `${rel}: elle yazılmış bölüm etiketi geri geldi`).toEqual([]);
+        }
+    });
+
+    it("`SectionHeader` gerçekten benimsendi (anti-vacuous)", () => {
+        const users = walk(join(root, "src"))
+            .filter(f => !f.includes("__tests__"))
+            .filter(f => /<SectionHeader\b/.test(readFileSync(f, "utf8")));
+        expect(users.length, "SectionHeader kullanan dosya").toBeGreaterThanOrEqual(20);
+    });
+
+    it("üç varyantın tipografisi TEK dosyada ve BÜYÜK HARF form etiketine sızmaz", () => {
+        const src = readFileSync(join(root, "src/components/ui/SectionHeader.tsx"), "utf8");
+        // Üç rol, üç ölçek — her biri ölçülen dağılımın tepesinden.
+        expect(src).toMatch(/label:\s*\{[\s\S]*?fontSize: "11px"[\s\S]*?textTransform: "uppercase"/);
+        expect(src).toMatch(/title:\s*\{[\s\S]*?fontSize: "13px"/);
+        expect(src).toMatch(/dialog:\s*\{[\s\S]*?fontSize: "16px"/);
+        // Ağırlıklar SAYI değil TOKEN.
+        expect(src).toMatch(/var\(--font-label-weight\)/);
+        expect(src).toMatch(/var\(--font-heading-weight\)/);
+        // KRİTİK: kanonik form etiketinden TÜRETİLEMEZ — `labelStyle()` bilerek
+        // `textTransform` taşımıyor (kullanıcı kararı) ve buradan bulaşmamalı.
+        expect(src).not.toMatch(/sharedLabelStyle|from "@\/components\/ui\/Input"/);
+    });
+
     it("`PageHeader` gerçekten benimsendi (anti-vacuous)", () => {
         const users = FILES.filter(f => /<PageHeader\b/.test(f.code)).length;
         // Göç öncesi 15'ti; bu sayı düşerse biri geri almış demektir.

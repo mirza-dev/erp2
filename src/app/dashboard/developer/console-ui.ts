@@ -15,15 +15,15 @@ import { labelStyle as sharedLabelStyle } from "@/components/ui/Input";
 export const CONSOLE_GUTTER = "14px";
 
 /**
- * Kart içi bölüm başlığı. Üç dosyada ayrı ayrı tanımlanmıştı ve ayrışmıştı
- * (`margin` 6px'e karşı 8px), ağırlık da token yerine sabit 650'ydi.
- * `--font-heading-weight` zaten 650 — token'a geçiş görsel olarak nötrdür.
+ * Kart içi bölüm başlığının OLUĞU — tipografi değil, yalnız boşluk.
+ *
+ * 2026-09-05: tipografi ortak `ui/SectionHeader`in `title` varyantına taşındı.
+ * Bu dosyada üç kez ayrı tanımlanıp ayrışmıştı; repo genelinde ise DÖRDÜNCÜ
+ * rakip tanımdı (`settings/page.tsx` ikisini birden taşıyordu). Geriye kalan
+ * tek şey konsola özgü: `Card` kasten dolgusuzdur, o yüzden başlık kendi yatay
+ * oluğunu taşır ve `DataTable` hücresiyle (10px 14px) hizalı durur.
  */
-export const sectionTitle: CSSProperties = {
-    fontSize: "13px",
-    fontWeight: "var(--font-heading-weight)",
-    color: "var(--text-primary)",
-    margin: 0,
+export const sectionTitlePad: CSSProperties = {
     padding: `12px ${CONSOLE_GUTTER} 8px`,
 };
 

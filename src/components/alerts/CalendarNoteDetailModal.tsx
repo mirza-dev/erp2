@@ -5,6 +5,7 @@ import { Building2, CalendarClock, CalendarDays, Clock3, LockKeyhole, Pencil, Tr
 import Button from "@/components/ui/Button";
 import type { CalendarNote } from "@/lib/calendar-notes";
 import Modal from "@/components/ui/Modal";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 interface Props {
     note: CalendarNote;
@@ -40,7 +41,7 @@ export function CalendarNoteDetailModal({ note, onClose, onEdit, onDeleted, isDe
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px" }}>
                 <div style={{ minWidth: 0 }}>
                     <VisibilityBadge visibility={note.visibility} />
-                    <h2 style={{ margin: "10px 0 0", fontSize: "17px", lineHeight: 1.35, color: "var(--text-primary)", fontWeight: 650 }}>{note.title}</h2>
+                    <SectionHeader variant="dialog" style={{ marginTop: "10px", lineHeight: 1.35 }}>{note.title}</SectionHeader>
                 </div>
                 <Button variant="icon" size="md" iconOnly aria-label="Kapat" onClick={onClose}><X size={15} /></Button>
             </div>

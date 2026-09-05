@@ -10,6 +10,7 @@ import {
 import { ALERT_TYPE_LABEL } from "@/lib/alert-labels";
 import type { CalendarNote } from "@/lib/calendar-notes";
 import { CalendarNotesSection } from "@/components/alerts/CalendarNotesSection";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 interface Props {
     selectedDate: Date | null;
@@ -77,9 +78,9 @@ export function DayDetailPanel({
                 >
                     <CalendarNotesSection notes={notes} onAdd={onAddNote} onDetail={onNoteDetail} />
                     <section data-testid="hourly-alert-timeline" aria-label="Saat bazlı uyarılar" style={{ padding: "14px 20px 18px" }}>
-                        <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--text-secondary)", letterSpacing: "0.04em", textTransform: "uppercase", marginBottom: sorted.length ? "12px" : 0 }}>
+                        <SectionHeader level={3} style={{ marginBottom: sorted.length ? "12px" : 0 }}>
                             Saat Bazlı Uyarılar
-                        </div>
+                        </SectionHeader>
                         {sorted.length === 0 ? (
                             <div style={{ padding: "16px 0 4px", fontSize: "11.5px", color: "var(--text-tertiary)" }}>Bu gün için uyarı yok</div>
                         ) : sorted.map((occ, idx) => (

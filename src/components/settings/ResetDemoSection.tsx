@@ -6,6 +6,7 @@ import Modal from "@/components/ui/Modal";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { RotateCcw } from "lucide-react";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 /**
  * Tehlikeli Bölge — tüm iş verisini siler, yerine demo seed yükler.
@@ -115,18 +116,9 @@ export default function ResetDemoSection() {
                 borderRadius: "8px",
             }}
         >
-            <div
-                style={{
-                    fontSize: "11px",
-                    color: "var(--danger-text)",
-                    letterSpacing: "0.06em",
-                    textTransform: "uppercase",
-                    marginBottom: "10px",
-                    fontWeight: 600,
-                }}
-            >
+            <SectionHeader style={{ color: "var(--danger-text)" }}>
                 Tehlikeli Bölge
-            </div>
+            </SectionHeader>
             <div
                 style={{
                     fontSize: "14px",

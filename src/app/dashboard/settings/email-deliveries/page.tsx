@@ -9,6 +9,7 @@ import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 import { useToast } from "@/components/ui/Toast";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import type { EmailDeliveryStatus, EmailLogRow, EmailSuppressionRow, MaintenanceIncidentRow } from "@/lib/database.types";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 type SafeDelivery = Omit<EmailLogRow, "html_body" | "text_body" | "metadata">;
 
@@ -203,14 +204,14 @@ export default function EmailDeliveriesPage() {
 
             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(320px, 1fr))", gap: 14 }}>
                 <section style={{ border: "var(--line-width) solid var(--surface-border)", borderRadius: 8, background: "var(--surface-raised)", padding: 14 }}>
-                    <h2 style={{ margin: 0, fontSize: 14, color: "var(--text-primary)", display: "flex", gap: 7, alignItems: "center" }}><ShieldOff size={15} aria-hidden="true" />Aktif Suppression</h2>
+                    <SectionHeader variant="title" icon={<ShieldOff size={15} aria-hidden="true" />}>Aktif Suppression</SectionHeader>
                     {suppressions.length === 0 ? <p style={{ color: "var(--text-tertiary)", fontSize: 12 }}>Aktif suppression yok.</p> : suppressions.map(row => <div key={row.id} style={{ padding: "10px 0", borderBottom: "var(--line-width) solid var(--border-tertiary)", display: "flex", justifyContent: "space-between", gap: 10 }}>
                         <div><div style={{ color: "var(--text-primary)", fontSize: 12 }}>{row.recipient_email}</div><div style={{ color: "var(--text-tertiary)", fontSize: 11 }}>{row.reason} · {row.scope_key}</div></div>
                         <Button variant="dangerSoft" size="xs" loading={workingId === row.id} onClick={() => void action(row.id, `/api/maintenance/email-suppressions/${row.id}`, "PATCH")}>Kaldır</Button>
                     </div>)}
                 </section>
                 <section style={{ border: "var(--line-width) solid var(--surface-border)", borderRadius: 8, background: "var(--surface-raised)", padding: 14 }}>
-                    <h2 style={{ margin: 0, fontSize: 14, color: "var(--text-primary)", display: "flex", gap: 7, alignItems: "center" }}><Wrench size={15} aria-hidden="true" />Açık Bakım Kayıtları</h2>
+                    <SectionHeader variant="title" icon={<Wrench size={15} aria-hidden="true" />}>Açık Bakım Kayıtları</SectionHeader>
                     {incidents.length === 0 ? <p style={{ color: "var(--text-tertiary)", fontSize: 12 }}>Açık bakım kaydı yok.</p> : incidents.map(row => <div key={row.id} style={{ padding: "10px 0", borderBottom: "var(--line-width) solid var(--border-tertiary)", display: "flex", justifyContent: "space-between", gap: 10 }}>
                         <div><div style={{ color: "var(--text-primary)", fontSize: 12 }}>{row.title}</div><div style={{ color: "var(--text-tertiary)", fontSize: 11 }}>{row.description}</div></div>
                         <Button variant="secondary" size="xs" loading={workingId === row.id} onClick={() => void action(row.id, `/api/maintenance/incidents/${row.id}`, "PATCH")}>Çözüldü</Button>
@@ -239,7 +240,7 @@ export default function EmailDeliveriesPage() {
                                 `aria-label` ise konuyu hiç söylemiyordu. */}
                             <div id="email-delivery-detail-title">
                                 <div style={{ color: "var(--text-tertiary)", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0 }}>Teslimat Detayı</div>
-                                <h2 style={{ margin: "5px 0 0", color: "var(--text-primary)", fontSize: 16, lineHeight: 1.35 }}>{selectedDelivery.subject}</h2>
+                                <SectionHeader variant="dialog" style={{ marginTop: "5px", lineHeight: 1.35 }}>{selectedDelivery.subject}</SectionHeader>
                             </div>
                             <Button variant="icon" size="sm" iconOnly aria-label="Teslimat detayını kapat" leftIcon={<X size={15} />} onClick={() => setSelectedDelivery(null)} />
                         </div>

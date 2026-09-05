@@ -13,6 +13,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { dateDaysFromToday, localISODate } from "@/lib/stock-utils";
 import { fieldStyle } from "@/components/ui/Input";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 // ── Shared types ───────────────────────────────────────────────
 
@@ -767,9 +768,9 @@ export default function OrderForm({ mode, orderId, initial }: OrderFormProps) {
 
                         {/* Notes */}
                         <div style={{ marginTop: "14px" }}>
-                            <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                            <SectionHeader style={{ marginBottom: "6px" }}>
                                 Sipariş Notu
-                            </div>
+                            </SectionHeader>
                             <textarea
                                 value={notes}
                                 onChange={e => setNotes(e.target.value)}
@@ -788,9 +789,9 @@ export default function OrderForm({ mode, orderId, initial }: OrderFormProps) {
 
                         {/* Teklif Geçerliliği */}
                         <div style={{ marginTop: "14px" }}>
-                            <div style={{ fontSize: "11px", color: "var(--text-tertiary)", marginBottom: "6px", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                            <SectionHeader style={{ marginBottom: "6px" }}>
                                 Teklif Geçerliliği
-                            </div>
+                            </SectionHeader>
                             <input
                                 type="date"
                                 value={quoteValidUntil}

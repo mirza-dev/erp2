@@ -20,6 +20,7 @@ import VendorDetailPanel from "@/components/vendors/VendorDetailPanel";
 import Drawer from "@/components/ui/Drawer";
 import { CircleOff, Pencil, Plus, RotateCcw } from "lucide-react";
 import PageHeader from "@/components/ui/PageHeader";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 // ── Styles ────────────────────────────────────────────────────
 
@@ -556,9 +557,9 @@ export default function VendorsClient(props: VendorsClientProps) {
                         surfaceStyle={{ padding: "24px", gap: "16px" }}
                     >
                         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                            <h2 id="vendor-form-title" style={{ fontSize: "16px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
+                            <SectionHeader variant="dialog" id="vendor-form-title">
                                 {drawerMode === "create" ? "Yeni Tedarikçi" : "Tedarikçi Düzenle"}
-                            </h2>
+                            </SectionHeader>
                             <button
                                 type="button"
                                 onClick={closeDrawer}

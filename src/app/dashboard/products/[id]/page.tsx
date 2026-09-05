@@ -17,6 +17,7 @@ import SupplierPricesPanel from "@/components/products/SupplierPricesPanel";
 import ProductVendorsPanel from "@/components/products/ProductVendorsPanel";
 import { missingRequiredTechnicalFields } from "@/lib/technical-templates";
 import { fieldStyle, labelStyle as sharedLabelStyle } from "@/components/ui/Input";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 // Mirror of server-side ALLOWED_MIME — client-safe (no server module imports).
 // Source of truth: src/lib/supabase/product-attachments.ts ALLOWED_MIME.
@@ -155,17 +156,6 @@ const fieldRowStyle: React.CSSProperties = {
 };
 
 const labelStyle: React.CSSProperties = { ...sharedLabelStyle() };
-
-const sectionTitleStyle: React.CSSProperties = {
-    fontSize: "11px",
-    fontWeight: 700,
-    color: "var(--text-tertiary)",
-    textTransform: "uppercase",
-    letterSpacing: "0.06em",
-    marginBottom: "10px",
-    paddingBottom: "6px",
-    borderBottom: "0.5px solid var(--border-tertiary)",
-};
 
 const cardStyle: React.CSSProperties = {
     background: "var(--bg-secondary)",
@@ -1040,9 +1030,9 @@ export default function ProductDetailPage() {
                         borderRadius: "6px",
                     }}
                 >
-                    <div style={{ fontSize: "11px", fontWeight: 700, color: "var(--warning-text)", textTransform: "uppercase", letterSpacing: "0.04em" }}>
+                    <SectionHeader style={{ color: "var(--warning-text)", marginBottom: 0 }}>
                         Aktif Uyarılar ({alerts.length})
-                    </div>
+                    </SectionHeader>
                     {alerts.slice(0, 3).map(a => (
                         <div key={a.id} style={{ fontSize: "12px", color: "var(--text-primary)" }}>
                             <strong>{a.title}</strong>{a.description ? ` — ${a.description}` : null}
@@ -1088,7 +1078,7 @@ export default function ProductDetailPage() {
             >
                 {activeTab === "genel" && (
                     <div style={cardStyle}>
-                        <div style={sectionTitleStyle}>Genel Bilgiler</div>
+                        <SectionHeader rule>Genel Bilgiler</SectionHeader>
                         <FieldView label="SKU" value={product.sku} />
                         {editMode && form ? (
                             <>
@@ -1181,7 +1171,7 @@ export default function ProductDetailPage() {
 
                 {activeTab === "teknik" && (
                     <div style={cardStyle}>
-                        <div style={sectionTitleStyle}>Teknik Özellikler</div>
+                        <SectionHeader rule>Teknik Özellikler</SectionHeader>
                         {!activeTypeId ? (
                             <div style={{ padding: "24px 0", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
                                 Bu ürün için teknik şablon seçilmemiş. Genel sekmesinden bir teknik şablon seçince alanlar burada görünür.
@@ -1276,7 +1266,7 @@ export default function ProductDetailPage() {
 
                         {/* Stock edit fields */}
                         <div style={cardStyle}>
-                            <div style={sectionTitleStyle}>Stok Yönetimi</div>
+                            <SectionHeader rule>Stok Yönetimi</SectionHeader>
                             {editMode && form ? (
                                 <>
                                     <FieldEdit label="Min Stok Seviyesi">
@@ -1307,7 +1297,7 @@ export default function ProductDetailPage() {
                             girmenin TEK yolu Excel hazırlayıp import sihirbazından
                             geçmekti (pratikte yapılmaz → stok kayması kalıcılaşır). */}
                         <div style={cardStyle}>
-                            <div style={sectionTitleStyle}>Sayım / Stok Düzelt</div>
+                            <SectionHeader rule>Sayım / Stok Düzelt</SectionHeader>
                             {!countOpen ? (
                                 <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "12px", flexWrap: "wrap" }}>
                                     <div style={{ fontSize: "12px", color: "var(--text-tertiary)", lineHeight: 1.5 }}>
@@ -1393,7 +1383,7 @@ export default function ProductDetailPage() {
 
                         {/* Pending commitments */}
                         <div style={cardStyle}>
-                            <div style={sectionTitleStyle}>Bekleyen Teslimatlar ({commitments.length})</div>
+                            <SectionHeader rule>Bekleyen Teslimatlar ({commitments.length})</SectionHeader>
                             {commitments.length === 0 ? (
                                 <div style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>Bekleyen teslimat yok.</div>
                             ) : (
@@ -1424,7 +1414,7 @@ export default function ProductDetailPage() {
 
                 {activeTab === "tedarik" && (
                     <div style={cardStyle}>
-                        <div style={sectionTitleStyle}>Tedarik Bilgileri</div>
+                        <SectionHeader rule>Tedarik Bilgileri</SectionHeader>
                         {editMode && form ? (
                             <>
                                 <FieldEdit label="Tercihli Tedarikçi">
@@ -1461,7 +1451,7 @@ export default function ProductDetailPage() {
                 {activeTab === "ticari" && (
                     <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
                         <div style={cardStyle}>
-                            <div style={sectionTitleStyle}>Ticari Bilgiler</div>
+                            <SectionHeader rule>Ticari Bilgiler</SectionHeader>
                             {editMode && form ? (
                                 <>
                                     <FieldEdit label="Satış Fiyatı">
@@ -1489,7 +1479,7 @@ export default function ProductDetailPage() {
 
                         {/* Active quotes */}
                         <div style={cardStyle}>
-                            <div style={sectionTitleStyle}>Aktif Teklifler ({quotes.length})</div>
+                            <SectionHeader rule>Aktif Teklifler ({quotes.length})</SectionHeader>
                             {quotes.length === 0 ? (
                                 <div style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>Bu ürün için aktif teklif yok.</div>
                             ) : (
@@ -1526,7 +1516,7 @@ export default function ProductDetailPage() {
 
                 {activeTab === "ekler" && (
                     <div style={cardStyle}>
-                        <div style={sectionTitleStyle}>Ekler</div>
+                        <SectionHeader rule>Ekler</SectionHeader>
 
                         {/* Faz 2d Review P3-002: load error banner */}
                         {attachmentsError && (

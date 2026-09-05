@@ -38,6 +38,7 @@ import {
     getAiImportOperation,
 } from "@/lib/ai-import-operations";
 import { getTargetForOperation } from "@/lib/import-guide";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 // ── Props ────────────────────────────────────────────────────────────────────
 
@@ -900,9 +901,9 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                                                 <tr key={`${line.id}-tech`}>
                                                     <td colSpan={detailColSpan} style={{ padding: "0 10px 12px", borderBottom: "0.5px solid var(--border-tertiary)", background: "var(--bg-primary)" }}>
                                                         <div style={{ border: "0.5px solid var(--border-tertiary)", borderRadius: "6px", padding: "10px", background: "var(--bg-secondary)" }}>
-                                                            <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>
+                                                            <SectionHeader>
                                                                 Teknik bilgiler · {lineType?.name} · {approvedFieldCount} alan uygulanacak
-                                                            </div>
+                                                            </SectionHeader>
                                                             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: "8px" }}>
                                                                 {techFields.map(field => {
                                                                     const evidence = line.extraction_evidence?.[field.field_key];
@@ -970,9 +971,9 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                                                 <tr key={`${line.id}-core`}>
                                                     <td colSpan={detailColSpan} style={{ padding: "0 10px 12px", background: "var(--bg-primary)" }}>
                                                         <div style={{ border: "0.5px solid var(--border-tertiary)", borderRadius: "6px", padding: "10px", background: "var(--bg-secondary)" }}>
-                                                            <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>
+                                                            <SectionHeader>
                                                                 Genel bilgiler · ürün kartına yazılacak
-                                                            </div>
+                                                            </SectionHeader>
                                                             <div style={{ display: "flex", flexWrap: "wrap", gap: "6px" }}>
                                                                 {Object.entries(line.extracted_core_fields ?? {}).map(([key, value]) => (
                                                                     <span key={key} style={{

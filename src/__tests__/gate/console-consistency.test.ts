@@ -68,12 +68,33 @@ describe("GATE: Developer Console ortak stil kaynağı", () => {
         expect(factLabelBody.slice(0, 200)).not.toMatch(/fontSize\s*:/);
     });
 
-    it("hiçbir konsol sayfası kendi sectionTitle/factGrid'ini tanımlamaz", () => {
+    it("hiçbir konsol sayfası kendi bölüm başlığını/factGrid'ini tanımlamaz", () => {
+        // 2026-09-05: `sectionTitle` konsoldan TAMAMEN ayrıldı — tipografi ortak
+        // `ui/SectionHeader`in `title` varyantına taşındı, `console-ui`de yalnız
+        // konsola özgü OLUK kaldı (`sectionTitlePad`). Desen bu yüzden ada değil
+        // TİPOGRAFİYE bakıyor: konsol dosyaları başlık boyutu/rengi yazamaz.
         const offenders = consoleFiles
             .filter(f => !f.path.endsWith("console-ui.ts"))
-            .filter(f => /const\s+(sectionTitle|factGrid)\s*:/.test(f.src))
+            .filter(f => /const\s+(sectionTitle|factGrid)\s*:/.test(f.src)
+                || /<h[23]\s+style=\{/.test(f.src))
             .map(f => f.path);
-        expect(offenders).toEqual([]);
+        expect(offenders, `kendi bölüm başlığını yazan konsol dosyası: ${offenders.join(", ")}`).toEqual([]);
+    });
+
+    it("konsolun on iki bölüm başlığı ortak SectionHeader'dan besleniyor", () => {
+        // Anti-vacuous: yukarıdaki kural yasak, bu kural VARLIK iddia ediyor.
+        // İkisi olmadan "hiç başlık yok" da yeşil yanardı.
+        // Sayı değil KÜME: "en az N" o günün sayısını kilitler, değişmezi değil.
+        const users = consoleFiles.filter(f => /<SectionHeader\b/.test(f.src)).map(f => f.path).sort();
+        expect(users).toEqual([
+            "src/app/dashboard/developer/diagnostics/page.tsx",
+            "src/app/dashboard/developer/errors/[id]/page.tsx",
+            "src/app/dashboard/developer/page.tsx",
+            "src/app/dashboard/developer/performance/page.tsx",
+        ]);
+        // Oluk konsola özgü kalır ve `CONSOLE_GUTTER`e bağlıdır.
+        expect(consoleUiCode).toMatch(/export const sectionTitlePad[\s\S]*?CONSOLE_GUTTER/);
+        expect(consoleUiCode).not.toMatch(/sectionTitlePad[\s\S]{0,120}fontSize/);
     });
 
     it("konsolda satır içi <dt> tipografisi yazılmaz — factLabel() kullanılır", () => {

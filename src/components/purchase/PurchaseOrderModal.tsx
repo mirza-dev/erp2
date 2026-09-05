@@ -6,6 +6,7 @@ import { useToast } from "@/components/ui/Toast";
 import Button from "@/components/ui/Button";
 import Drawer from "@/components/ui/Drawer";
 import { X } from "lucide-react";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 export interface ModalItem {
     recommendationId: string;
@@ -232,9 +233,9 @@ export default function PurchaseOrderModal({
                     borderBottom: "0.5px solid var(--border-secondary)",
                     flexShrink: 0,
                 }}>
-                    <h2 style={{ margin: 0, fontSize: "15px", fontWeight: 600, color: "var(--text-primary)" }}>
+                    <SectionHeader variant="dialog">
                         {title}
-                    </h2>
+                    </SectionHeader>
                     <Button variant="ghost" size="sm" iconOnly onClick={onClose} aria-label="Kapat">
                         <X size={16} aria-hidden />
                     </Button>

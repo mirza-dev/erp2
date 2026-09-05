@@ -8,13 +8,14 @@ import { ArrowLeft } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Input, { Select, Textarea, labelStyle as sharedLabelStyle } from "@/components/ui/Input";
-import { cardBodyLast, consoleRow, factCell, factGrid, factLabel, factValue, factWide, sectionTitle } from "../../console-ui";
+import { cardBodyLast, consoleRow, factCell, factGrid, factLabel, factValue, factWide, sectionTitlePad } from "../../console-ui";
 import Modal from "@/components/ui/Modal";
 import { ErrorState, LoadingState } from "@/components/ui/StateViews";
 import { useToast } from "@/components/ui/Toast";
 import { jsonFetcher, SWR_DEFAULTS } from "@/lib/swr-config";
 import type { ErrorDetailPayload } from "@/lib/telemetry/console-types";
 import type { DeveloperBugPriority, ErrorGroupStatus } from "@/lib/database.types";
+import SectionHeader from "@/components/ui/SectionHeader";
 import {
     Mono,
     SeverityBadge,
@@ -140,7 +141,7 @@ export default function ErrorDetailPage({ params }: { params: Promise<{ id: stri
 
             {bugs.length > 0 && (
                 <Card>
-                    <h2 style={sectionTitle}>Bağlı Bug&apos;lar</h2>
+                    <SectionHeader variant="title" style={sectionTitlePad}>Bağlı Bug&apos;lar</SectionHeader>
                     <ul style={{ margin: 0, padding: "0 14px 14px 32px" }}>
                         {bugs.map(b => (
                             <li key={b.id} style={{ fontSize: "12.5px", color: "var(--text-secondary)", padding: "2px 0" }}>
@@ -156,7 +157,7 @@ export default function ErrorDetailPage({ params }: { params: Promise<{ id: stri
 
             {/* ── İstek bağlamı ───────────────────────────────────────────── */}
             <Card>
-                <h2 style={sectionTitle}>Son Oluşum — İstek</h2>
+                <SectionHeader variant="title" style={sectionTitlePad}>Son Oluşum — İstek</SectionHeader>
                 {latest ? (
                     <dl style={{ ...factGrid, ...cardBodyLast }}>
                         <Fact label="Zaman" value={formatDateTime(latest.occurred_at)} />
@@ -177,16 +178,16 @@ export default function ErrorDetailPage({ params }: { params: Promise<{ id: stri
 
             {/* ── Stack trace ─────────────────────────────────────────────── */}
             <Card>
-                <h2 style={sectionTitle}>Stack Trace</h2>
+                <SectionHeader variant="title" style={sectionTitlePad}>Stack Trace</SectionHeader>
                 <div style={cardBodyLast}><StackTrace stack={latest?.stack ?? null} /></div>
             </Card>
 
             {/* ── İlişkili olaylar ────────────────────────────────────────── */}
             <Card>
-                <h2 style={sectionTitle}>
+                <SectionHeader variant="title" style={sectionTitlePad}>
                     İlişkili Olaylar
                     {latestRequestId && <> · <Mono>{latestRequestId}</Mono></>}
-                </h2>
+                </SectionHeader>
                 {!latestRequestId ? (
                     <p style={{ ...mutedText, ...cardBodyLast }}>
                         Son oluşumda korelasyon kimliği yok — bu hata istek kapsamı dışında
@@ -218,7 +219,7 @@ export default function ErrorDetailPage({ params }: { params: Promise<{ id: stri
             {/* ── Oluşum geçmişi ──────────────────────────────────────────── */}
             {events.length > 1 && (
                 <Card>
-                    <h2 style={sectionTitle}>Son Oluşumlar ({events.length})</h2>
+                    <SectionHeader variant="title" style={sectionTitlePad}>Son Oluşumlar ({events.length})</SectionHeader>
                     <div style={{ display: "flex", flexDirection: "column" }}>
                         {events.map(e => (
                             <div key={e.id} style={relatedRow}>

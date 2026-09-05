@@ -13,6 +13,7 @@ import type { OrderDetail } from "@/lib/mock-data";
 import Button, { ButtonLink } from "@/components/ui/Button";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
+import SectionHeader from "@/components/ui/SectionHeader";
 type ParasutStepKey = "contact" | "product" | "shipment" | "invoice" | "edoc";
 
 interface ParasutStatusPayload {
@@ -693,7 +694,7 @@ export default function OrderDetailPage() {
                             }}
                         >
                             <div>
-                                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>Müşteri</div>
+                                <SectionHeader>Müşteri</SectionHeader>
                                 {/* KOBİ-sim Y6: bağlı cari artık tıklanabilir — muhasebe
                                     siparişten cari ekstresine geçebiliyor. */}
                                 {order.customerId ? (
@@ -778,7 +779,7 @@ export default function OrderDetailPage() {
                                 )}
                             </div>
                             <div>
-                                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>Sipariş Bilgisi</div>
+                                <SectionHeader>Sipariş Bilgisi</SectionHeader>
                                 <div style={{ display: "flex", flexDirection: "column", gap: "5px" }}>
                                     <InfoRow label="Sipariş No" value={order.orderNumber} />
                                     <InfoRow label="Oluşturulma" value={formatDate(order.createdAt)} />
@@ -945,9 +946,9 @@ export default function OrderDetailPage() {
 
                             {/* Commercial timeline */}
                             <div style={{ marginTop: "16px", paddingTop: "14px", borderTop: "0.5px solid var(--border-tertiary)" }}>
-                                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>
+                                <SectionHeader>
                                     Ticari Süreç
-                                </div>
+                                </SectionHeader>
                                 {commercialSteps.map((s, i) => {
                                     const stepIdx = commercialSteps.indexOf(s);
                                     const isDone = stepIdx <= currentCommercialIdx && commercialStatus !== "cancelled";
@@ -1026,9 +1027,9 @@ export default function OrderDetailPage() {
 
                             {/* Fulfillment timeline */}
                             <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "0.5px solid var(--border-tertiary)" }}>
-                                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>
+                                <SectionHeader>
                                     Lojistik
-                                </div>
+                                </SectionHeader>
                                 {(["unallocated", "allocated", "shipped"] as FulfillmentStatus[]).map((s, i) => {
                                     const steps = ["unallocated", "allocated", "shipped"];
                                     const currentIdx = steps.indexOf(fulfillmentStatus);
@@ -1088,9 +1089,9 @@ export default function OrderDetailPage() {
                             {/* Paraşüt Muhasebe Sync */}
                             {fulfillmentStatus === "shipped" && (
                                 <div style={{ marginTop: "12px", paddingTop: "12px", borderTop: "0.5px solid var(--border-tertiary)" }}>
-                                    <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.04em", marginBottom: "8px" }}>
+                                    <SectionHeader>
                                         Muhasebe Sync
-                                    </div>
+                                    </SectionHeader>
                                     <ParasutBadge
                                         status={parasutStatus}
                                         invoiceId={parasutInvoiceId}

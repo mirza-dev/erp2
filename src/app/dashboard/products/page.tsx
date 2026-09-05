@@ -21,6 +21,7 @@ import { missingRequiredTechnicalFields } from "@/lib/technical-templates";
 import { Plus, RefreshCw, RotateCcw, Trash2 } from "lucide-react";
 import FilterChips from "@/components/ui/FilterChips";
 import PageHeader from "@/components/ui/PageHeader";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 
 interface RiskItem {
@@ -1249,9 +1250,9 @@ export default function ProductsPage() {
                                 flexDirection: "column",
                                 gap: "10px",
                             }}>
-                                <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                                <SectionHeader level={3} style={{ marginBottom: 0 }}>
                                     Kimlik Bilgileri <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(isteğe bağlı)</span>
-                                </div>
+                                </SectionHeader>
 
                                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
                                     <FormField label="Malzeme Kalitesi">
@@ -1337,9 +1338,9 @@ export default function ProductsPage() {
                                 flexDirection: "column",
                                 gap: "10px",
                             }}>
-                                <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                                <SectionHeader level={3} style={{ marginBottom: 0 }}>
                                     Teknik Şablon <span style={{ fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(isteğe bağlı)</span>
-                                </div>
+                                </SectionHeader>
                                 <FormField label="Teknik Şablon">
                                     <select
                                         style={modalInputStyle}

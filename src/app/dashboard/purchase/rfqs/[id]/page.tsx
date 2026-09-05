@@ -12,6 +12,7 @@ import type { RfqDetail, RfqVendorWithPrices } from "@/lib/supabase/supplier-rfq
 import type { SupplierRfqStatus } from "@/lib/database.types";
 import { bestVendorPerLine, type RateMap, type ComparisonLine } from "@/lib/rfq-comparison";
 import { fieldStyle } from "@/components/ui/Input";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 const STATUS_LABEL: Record<SupplierRfqStatus, string> = {
     draft: "Taslak", sent: "Gönderildi", awarded: "Karara Bağlandı", cancelled: "İptal",
@@ -425,7 +426,7 @@ function VendorQuoteModal({ rfqId, vendor, lines, onClose, onSaved }: {
             width="min(720px, calc(100vw - 40px))"
             surfaceStyle={{ background: "var(--bg-primary)", borderRadius: "10px", padding: "20px", maxHeight: "85vh", border: "0.5px solid var(--border-tertiary)" }}
         >
-                <h2 id="rfq-price-entry-title" style={{ fontSize: "16px", fontWeight: 600, color: "var(--text-primary)", margin: "0 0 14px" }}>{vendor.vendor_name} — Fiyat Girişi</h2>
+                <SectionHeader variant="dialog" id="rfq-price-entry-title" style={{ marginBottom: "14px" }}>{vendor.vendor_name} — Fiyat Girişi</SectionHeader>
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px", marginBottom: "14px" }}>
                     <div>
                         <label style={{ fontSize: "11px", color: "var(--text-tertiary)", display: "block", marginBottom: "3px" }}>Para Birimi</label>

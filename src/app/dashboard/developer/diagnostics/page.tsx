@@ -11,7 +11,8 @@ import { useToast } from "@/components/ui/Toast";
 import { jsonFetcher, SWR_DEFAULTS } from "@/lib/swr-config";
 import type { DiagnosticsPayload } from "@/lib/telemetry/console-types";
 import { formatUptime } from "@/lib/telemetry/service-health";
-import { cardBody, cardBodyLast, factCell, factGrid, factLabel, factValue, sectionTitle } from "../console-ui";
+import { cardBody, cardBodyLast, factCell, factGrid, factLabel, factValue, sectionTitlePad } from "../console-ui";
+import SectionHeader from "@/components/ui/SectionHeader";
 import {
     HealthPill,
     Mono,
@@ -118,7 +119,7 @@ export default function DeveloperDiagnosticsPage() {
 
             {/* ── Telemetri sağlığı ───────────────────────────────────────── */}
             <Card>
-                <h2 style={sectionTitle}>Telemetri Boru Hattı</h2>
+                <SectionHeader variant="title" style={sectionTitlePad}>Telemetri Boru Hattı</SectionHeader>
                 <dl style={{ ...factGrid, ...cardBody }}>
                     <Fact
                         label="Durum"
@@ -145,7 +146,7 @@ export default function DeveloperDiagnosticsPage() {
 
             {/* ── Test ve bakım ───────────────────────────────────────────── */}
             <Card>
-                <h2 style={sectionTitle}>Boru Hattı Testi ve Bakım</h2>
+                <SectionHeader variant="title" style={sectionTitlePad}>Boru Hattı Testi ve Bakım</SectionHeader>
                 <p style={{ ...mutedText, ...cardBody }}>
                     &quot;Test hatası&quot; GERÇEK bir hata fırlatır ve merkezi yakalayıcıdan
                     (<Mono>handleApiError</Mono>) geçirir; yanıtın 500 olması beklenen
@@ -165,7 +166,7 @@ export default function DeveloperDiagnosticsPage() {
 
             {/* ── Tablo boyutları ─────────────────────────────────────────── */}
             <Card>
-                <h2 style={sectionTitle}>Telemetri Tabloları</h2>
+                <SectionHeader variant="title" style={sectionTitlePad}>Telemetri Tabloları</SectionHeader>
                 <dl style={{ ...factGrid, ...cardBody }}>
                     {Object.entries(data.tableSizes).map(([table, count]) => (
                         <Fact
@@ -183,7 +184,7 @@ export default function DeveloperDiagnosticsPage() {
 
             {/* ── Yapılandırma ────────────────────────────────────────────── */}
             <Card>
-                <h2 style={sectionTitle}>Yapılandırma</h2>
+                <SectionHeader variant="title" style={sectionTitlePad}>Yapılandırma</SectionHeader>
                 <p style={{ ...mutedText, ...cardBody }}>
                     Yalnız <strong>varlık</strong> gösterilir — hiçbir sır değeri okunmaz veya yazılmaz.
                 </p>
@@ -202,7 +203,7 @@ export default function DeveloperDiagnosticsPage() {
 
             {/* ── Çalışma zamanı ──────────────────────────────────────────── */}
             <Card>
-                <h2 style={sectionTitle}>Çalışma Zamanı</h2>
+                <SectionHeader variant="title" style={sectionTitlePad}>Çalışma Zamanı</SectionHeader>
                 <dl style={{ ...factGrid, ...cardBodyLast }}>
                     <Fact label="Çalışma süresi" value={formatUptime(data.uptimeSeconds)} />
                     <Fact label="Node sürümü" value={data.nodeVersion} />

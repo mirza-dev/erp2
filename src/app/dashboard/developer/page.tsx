@@ -10,7 +10,7 @@ import { jsonFetcher, SWR_DEFAULTS } from "@/lib/swr-config";
 import { DEFAULT_TIME_RANGE, type TimeRange } from "@/lib/telemetry/health";
 import type { OverviewPayload } from "@/lib/telemetry/console-types";
 import { FEED_SOURCE_LABELS } from "@/lib/telemetry/console-types";
-import { CONSOLE_GUTTER, consoleRow, sectionTitle } from "./console-ui";
+import { CONSOLE_GUTTER, consoleRow, sectionTitlePad } from "./console-ui";
 import {
     HealthDot,
     HealthPill,
@@ -28,6 +28,7 @@ import {
     formatTime,
 } from "@/components/developer/console-format";
 import { formatUptime } from "@/lib/telemetry/service-health";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 /** Panel 30 sn'de bir kendini tazeler (§17 — WebSocket/SSE kurulmadı). */
 const REFRESH_MS = 30_000;
@@ -176,7 +177,7 @@ export default function DeveloperOverviewPage() {
 
             {/* ── Servis sağlığı ──────────────────────────────────────────── */}
             <Card>
-                <h2 style={sectionTitle}>Servis Durumu</h2>
+                <SectionHeader variant="title" style={sectionTitlePad}>Servis Durumu</SectionHeader>
                 <div style={{ display: "flex", flexDirection: "column" }}>
                     {health.services.map(service => (
                         <div
@@ -212,7 +213,7 @@ export default function DeveloperOverviewPage() {
                     gap: "10px",
                     padding: `0 ${CONSOLE_GUTTER}`,
                 }}>
-                    <h2 style={{ ...sectionTitle, padding: "12px 0 8px" }}>Son Olaylar</h2>
+                    <SectionHeader variant="title" style={{ padding: "12px 0 8px" }}>Son Olaylar</SectionHeader>
                     <Link href="/dashboard/developer/logs" style={linkStyle}>Tümü →</Link>
                 </div>
                 {recentActivity.length === 0 ? (

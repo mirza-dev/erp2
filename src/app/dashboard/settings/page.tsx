@@ -41,6 +41,7 @@ import {
     type SettingsTab,
 } from "@/lib/settings-tabs";
 import { checkPasswordPolicy } from "@/lib/auth/password-policy";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 const settingsTabIcons: Record<SettingsTab, LucideIcon> = {
     firma: Building2,
@@ -63,14 +64,6 @@ const settingsGroupLabels: Record<SettingsTabDefinition["scope"], string> = {
 const inputStyle: React.CSSProperties = { ...fieldStyle("md"), fontWeight: "var(--font-ui-weight)" };
 
 const labelStyle: React.CSSProperties = { ...sharedLabelStyle(), display: "block", marginBottom: "4px" };
-
-const sectionTitle: React.CSSProperties = {
-    fontSize: "11px",
-    color: "var(--text-tertiary)",
-    letterSpacing: "0.06em",
-    textTransform: "uppercase",
-    marginBottom: "12px",
-};
 
 function FieldError({ msg }: { msg: string }) {
     return (
@@ -290,7 +283,7 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
         <div style={{ display: "flex", flexDirection: "column", gap: "20px" }}>
             {/* Logo */}
             <div>
-                <div style={sectionTitle}>Firma Logosu</div>
+                <SectionHeader>Firma Logosu</SectionHeader>
                 <input
                     ref={logoFileRef}
                     type="file"
@@ -393,7 +386,7 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
 
             {/* Fields grid */}
             <div>
-                <div style={sectionTitle}>Firma Bilgileri</div>
+                <SectionHeader>Firma Bilgileri</SectionHeader>
                 <div className="settings-form-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                     <div style={{ gridColumn: "1 / -1" }}>
                         <label style={labelStyle}>Firma Adı *</label>
@@ -745,7 +738,7 @@ function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void 
 
             {/* Profile fields */}
             <div>
-                <div style={sectionTitle}>Profil Bilgileri</div>
+                <SectionHeader>Profil Bilgileri</SectionHeader>
                 <div className="settings-form-grid" style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                     <div>
                         <label style={labelStyle}>Ad Soyad</label>
@@ -774,7 +767,7 @@ function KullaniciTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void 
 
             {/* Password */}
             <div>
-                <div style={sectionTitle}>Şifre Değiştir</div>
+                <SectionHeader>Şifre Değiştir</SectionHeader>
                 <div style={{ display: "flex", flexDirection: "column", gap: "10px", maxWidth: "400px" }}>
                     {(["current", "next", "confirm"] as const).map((key, i) => (
                         <div key={key}>
@@ -913,7 +906,7 @@ function BildirimlerTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => voi
 
     return (
         <div>
-            <div style={sectionTitle}>E-posta Bildirimleri</div>
+            <SectionHeader>E-posta Bildirimleri</SectionHeader>
             <div
                 style={{
                     background: "var(--surface-subtle)",
@@ -1171,7 +1164,7 @@ function ApiTab() {
 
     return (
         <div>
-            <div style={sectionTitle}>Entegrasyon Anahtarları</div>
+            <SectionHeader>Entegrasyon Anahtarları</SectionHeader>
             <div
                 style={{
                     background: "var(--surface-subtle)",
@@ -1244,7 +1237,7 @@ function ApiTab() {
             </div>
 
             {/* Faz 11.5 — Paraşüt OAuth bağlantısı */}
-            <div style={{ ...sectionTitle, marginTop: "24px" }}>Paraşüt OAuth</div>
+            <SectionHeader style={{ marginTop: "24px" }}>Paraşüt OAuth</SectionHeader>
             <div
                 style={{
                     background: "var(--surface-subtle)",
@@ -1360,14 +1353,6 @@ function MetricRow({ label, value, highlight }: { label: string; value: string |
     );
 }
 
-function SectionHeader({ children }: { children: React.ReactNode }) {
-    return (
-        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "6px", marginTop: "20px" }}>
-            {children}
-        </div>
-    );
-}
-
 
 const AI_FETCH_TIMEOUT_MS = 8000;
 
@@ -1431,14 +1416,14 @@ function AiTab() {
 
     return (
         <div style={{ paddingBottom: "32px" }}>
-            <SectionHeader>AI Çalıştırmaları — Son 7 Gün</SectionHeader>
+            <SectionHeader style={{ marginTop: "20px", marginBottom: "6px" }}>AI Çalıştırmaları — Son 7 Gün</SectionHeader>
             <MetricRow label="Toplam çalıştırma" value={runs.last7d} />
             <MetricRow label="Fallback (model yok)" value={`${runs.fallbackCount} (%${fallbackPct})`} highlight={fallbackPct > 30} />
             {Object.entries(runs.byFeature).map(([feature, count]) => (
                 <MetricRow key={feature} label={featureLabels[feature] ?? feature} value={count} />
             ))}
 
-            <SectionHeader>Öneri Yaşam Döngüsü</SectionHeader>
+            <SectionHeader style={{ marginTop: "20px", marginBottom: "6px" }}>Öneri Yaşam Döngüsü</SectionHeader>
             <MetricRow label="Aktif (suggested)" value={recommendations.byStatus.suggested ?? 0} />
             <MetricRow label="Kabul edildi" value={recommendations.byStatus.accepted ?? 0} />
             <MetricRow label="Düzenlendi" value={recommendations.byStatus.edited ?? 0} />
@@ -1446,7 +1431,7 @@ function AiTab() {
             <MetricRow label="Süresi doldu" value={recommendations.byStatus.expired ?? 0} />
             <MetricRow label="Karar oranı" value={`%${decidePct}`} />
 
-            <SectionHeader>Kullanıcı Kararları — Son 7 Gün</SectionHeader>
+            <SectionHeader style={{ marginTop: "20px", marginBottom: "6px" }}>Kullanıcı Kararları — Son 7 Gün</SectionHeader>
             <MetricRow label="Kabul" value={feedback.last7d.accepted ?? 0} />
             <MetricRow label="Düzenle" value={feedback.last7d.edited ?? 0} />
             <MetricRow label="Reddet" value={feedback.last7d.rejected ?? 0} />

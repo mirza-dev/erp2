@@ -9,6 +9,7 @@ import type { NoteTemplate, NoteTemplateKind } from "@/lib/mock-data";
 import { CircleOff, Eye, Pencil, Plus, RotateCcw } from "lucide-react";
 import FilterChips from "@/components/ui/FilterChips";
 import { fieldStyle } from "@/components/ui/Input";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 /**
  * Ayarlar → Not Şablonları.
@@ -281,9 +282,9 @@ export default function NoteTemplatesTab() {
 
             {showForm && (
                 <Modal onClose={() => setShowForm(false)} ariaLabel={editingId ? "Şablon düzenle" : "Yeni şablon ekle"} dismissible={!saving}>
-                        <h2 style={{ fontSize: "16px", fontWeight: 600, marginBottom: "16px" }}>
+                        <SectionHeader variant="dialog" style={{ marginBottom: "16px" }}>
                             {editingId ? "Şablonu Düzenle" : "Yeni Not Şablonu"}
-                        </h2>
+                        </SectionHeader>
 
                         <label style={labelStyle}>Kategori *</label>
                         <select

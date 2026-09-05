@@ -10,6 +10,7 @@ import { EmptyState, ErrorState, LoadingState } from "@/components/ui/StateViews
 import { jsonFetcher, SWR_DEFAULTS } from "@/lib/swr-config";
 import { DEFAULT_TIME_RANGE, type TimeRange } from "@/lib/telemetry/health";
 import type { EndpointPerformance, PageUsage, PerformanceResponse } from "@/lib/telemetry/console-types";
+import SectionHeader from "@/components/ui/SectionHeader";
 import {
     MetricCard,
     MetricGrid,
@@ -233,13 +234,13 @@ export default function DeveloperPerformancePage() {
                         kullanılıyor". PMT pilotunda hangi modülün karşılığı
                         olduğunu ölçmenin tek yolu bu. */}
                     <div style={{ marginTop: "20px" }}>
-                        <h2 style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)", margin: "0 0 4px" }}>
+                        <SectionHeader
+                            variant="title"
+                            style={{ marginBottom: "10px" }}
+                            description="Bu aralıkta hangi ekranın kaç kez açıldığı. Yalnız panel içi gezinme sayılır; giriş ve tanıtım sayfaları kapsam dışıdır."
+                        >
                             Modül kullanımı
-                        </h2>
-                        <p style={{ fontSize: "12px", color: "var(--text-tertiary)", margin: "0 0 10px", lineHeight: 1.5 }}>
-                            Bu aralıkta hangi ekranın kaç kez açıldığı. Yalnız panel içi gezinme
-                            sayılır; giriş ve tanıtım sayfaları kapsam dışıdır.
-                        </p>
+                        </SectionHeader>
                         {(data.pageUsage ?? []).length === 0 ? (
                             <Card>
                                 <EmptyState

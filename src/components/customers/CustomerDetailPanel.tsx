@@ -14,6 +14,7 @@ import { usePermissions } from "@/lib/auth/use-permissions";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import { fieldStyle } from "@/components/ui/Input";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 interface CustomerDetailPanelProps {
     customer: Customer | null;
@@ -184,9 +185,9 @@ export default function CustomerDetailPanel({
                 {editMode && editForm ? (
                     /* ── Edit Mode ── */
                     <div style={{ padding: "14px 16px", display: "flex", flexDirection: "column", gap: "10px", flex: 1 }}>
-                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.06em", marginBottom: "2px" }}>
+                        <SectionHeader style={{ marginBottom: "2px" }}>
                             Müşteri Düzenle
-                        </div>
+                        </SectionHeader>
 
                         <div>
                             <label style={labelStyle}>Firma Adı</label>
@@ -299,9 +300,9 @@ export default function CustomerDetailPanel({
 
                         {/* Contact details */}
                         <div style={{ padding: "14px 16px", borderBottom: "0.5px solid var(--border-tertiary)" }}>
-                            <div style={{ fontSize: "11px", color: "var(--text-tertiary)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "10px" }}>
+                            <SectionHeader>
                                 İletişim
-                            </div>
+                            </SectionHeader>
                             <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                                 <DetailRow label="E-posta" value={customer.email || "—"} />
                                 <DetailRow label="Telefon" value={customer.phone || "—"} />
@@ -316,9 +317,9 @@ export default function CustomerDetailPanel({
                         {/* Recent Orders */}
                         <div style={{ padding: "14px 16px", borderBottom: "0.5px solid var(--border-tertiary)" }}>
                             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "10px" }}>
-                                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", letterSpacing: "0.06em", textTransform: "uppercase" }}>
+                                <SectionHeader style={{ marginBottom: 0 }}>
                                     Son Siparişler
-                                </div>
+                                </SectionHeader>
                                 {totalOrders > 0 && (
                                     <Link
                                         href={`/dashboard/orders?customerId=${customer.id}`}
@@ -375,9 +376,9 @@ export default function CustomerDetailPanel({
                         {/* Notes */}
                         {customer.notes && (
                             <div style={{ padding: "14px 16px", borderBottom: "0.5px solid var(--border-tertiary)" }}>
-                                <div style={{ fontSize: "11px", color: "var(--text-tertiary)", letterSpacing: "0.06em", textTransform: "uppercase", marginBottom: "6px" }}>
+                                <SectionHeader style={{ marginBottom: "6px" }}>
                                     Notlar
-                                </div>
+                                </SectionHeader>
                                 <div style={{ fontSize: "12px", color: "var(--text-secondary)", lineHeight: 1.5, background: "var(--bg-secondary)", padding: "8px 10px", borderRadius: "6px" }}>
                                     {customer.notes}
                                 </div>

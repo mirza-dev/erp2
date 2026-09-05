@@ -7,6 +7,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import type { IntegrationSyncLogRow, SalesOrderRow } from "@/lib/database.types";
 import { LoadingState } from "@/components/ui/StateViews";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 type SyncStatus = "idle" | "syncing" | "done";
 type ConnectionStatus = "connected" | "disconnected";
@@ -519,9 +520,9 @@ export default function ParasutPage() {
                             padding: "14px 16px",
                         }}
                     >
-                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "10px" }}>
+                        <SectionHeader>
                             Step Dağılımı
-                        </div>
+                        </SectionHeader>
                         {(!stats.byStep || Object.keys(stats.byStep).length === 0) ? (
                             <div style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>Veri yok</div>
                         ) : (
@@ -568,9 +569,9 @@ export default function ParasutPage() {
                             padding: "14px 16px",
                         }}
                     >
-                        <div style={{ fontSize: "11px", color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.05em", marginBottom: "10px" }}>
+                        <SectionHeader>
                             Hata Tipi Dağılımı
-                        </div>
+                        </SectionHeader>
                         {(!stats.byErrorKind || Object.keys(stats.byErrorKind).length === 0) ? (
                             <div style={{ fontSize: "12px", color: "var(--text-tertiary)" }}>Hata yok</div>
                         ) : (

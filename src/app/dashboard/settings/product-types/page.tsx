@@ -23,6 +23,7 @@ import { DEMO_BLOCK_TOAST, DEMO_DISABLED_TOOLTIP, useIsDemo } from "@/lib/demo-u
 import { usePermissions } from "@/lib/auth/use-permissions";
 import type { ProductTypeStatsRow } from "@/lib/supabase/product-types";
 import { fieldStyle } from "@/components/ui/Input";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 const pageStyle: React.CSSProperties = {
     padding: "24px",
@@ -360,7 +361,7 @@ export default function TechnicalTemplatesPage() {
 
             {showCreate && (
                 <Modal onClose={() => setShowCreate(false)} ariaLabel="Yeni teknik şablon" dismissible={!creating}>
-                        <h2 style={{ fontSize: "16px", fontWeight: 700, margin: "0 0 14px" }}>Yeni Teknik Şablon</h2>
+                        <SectionHeader variant="dialog" style={{ marginBottom: "14px" }}>Yeni Teknik Şablon</SectionHeader>
                         <div style={{ display: "flex", flexDirection: "column", gap: "10px" }}>
                             <label style={{ fontSize: "12px", color: "var(--text-secondary)" }}>
                                 Şablon Adı

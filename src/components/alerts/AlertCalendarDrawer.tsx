@@ -9,6 +9,7 @@ import {
 } from "@/lib/alert-calendar";
 import { ALERT_TYPE_LABEL } from "@/lib/alert-labels";
 import type { AlertType } from "@/lib/database.types";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 /** Tip-bazlı yönlendirme linkleri (Faz 1: nav-only; inline formlar Faz 2'de). */
 type DrawerLink = { label: string; href: string; variant: "primary" | "secondary" | "ghost" };
@@ -537,10 +538,16 @@ export function AlertCalendarDrawer({
     );
 }
 
+/**
+ * Çekmece içi bölüm — YERLEŞİM sarmalayıcısı, tipografi değil.
+ *
+ * Tipografi ortak `ui/SectionHeader`ten gelir; burada kalan tek şey başlığın
+ * ve gövdesinin aynı kutuda durması. On çağrı yeri değişmeden çalışır.
+ */
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
     return (
         <div>
-            <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-tertiary)", letterSpacing: "0.07em", textTransform: "uppercase", marginBottom: "10px" }}>{label}</div>
+            <SectionHeader level={3}>{label}</SectionHeader>
             {children}
         </div>
     );

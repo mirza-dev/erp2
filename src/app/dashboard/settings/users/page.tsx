@@ -12,6 +12,7 @@ import { KeyRound, Pencil, Plus, Trash2 } from "lucide-react";
 import { fieldStyle, labelStyle as sharedLabelStyle } from "@/components/ui/Input";
 import { MIN_PASSWORD_LENGTH, checkPasswordPolicy } from "@/lib/auth/password-policy";
 import Modal from "@/components/ui/Modal";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 interface User {
     id: string;
@@ -488,9 +489,9 @@ export default function UsersPage() {
                     labelledBy="sifre-sifirla-baslik"
                     dismissible={!resetting}
                 >
-                    <h2 id="sifre-sifirla-baslik" style={{ fontSize: "15px", fontWeight: 600, color: "var(--text-primary)", margin: 0 }}>
+                    <SectionHeader variant="dialog" id="sifre-sifirla-baslik">
                         Şifre sıfırla
-                    </h2>
+                    </SectionHeader>
                     <p style={{ fontSize: "13px", color: "var(--text-tertiary)", lineHeight: 1.6, margin: 0 }}>
                         <strong style={{ color: "var(--text-primary)" }}>{resetUser.email}</strong> için yeni bir
                         şifre belirleyin. Kullanıcıya bu şifreyi güvenli bir yoldan iletin; ilk girişinden
