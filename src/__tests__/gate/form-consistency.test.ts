@@ -125,6 +125,8 @@ describe("GATE — form ve başlık tipografisi", () => {
             "kök hata sınırı — bölüm başlığı değil, sayfanın yerine geçen hata mesajı",
         "src/app/dashboard/error.tsx":
             "panel hata sınırı — bölüm başlığı değil, sayfanın yerine geçen hata mesajı",
+        "src/app/dashboard/quotes/_components/QuoteForm.tsx":
+            "bastığı PDF'in EKRAN İKİZİ: iki bölüm başlığı marka mavisini (#0072BC) QuoteDocument'in metaSectionHeadStyle'ı ile paylaşır; griye çevirmek ekran-belge aynasını kırardı",
     };
 
     it("elle yazılmış bölüm başlığı YALNIZ belgelenmiş istisnalarda olabilir", () => {
@@ -140,6 +142,47 @@ describe("GATE — form ve başlık tipografisi", () => {
         for (const [file, reason] of Object.entries(H2_EXCEPTIONS)) {
             expect(reason.length, `${file} için gerekçe çok kısa`).toBeGreaterThan(25);
         }
+    });
+
+    it("`QuoteForm`un h2 istisnası BLANKET değil — yalnız belge ikizinin marka mavisi", () => {
+        // Bir dosyayı `H2_EXCEPTIONS`a koymak, o dosyanın TAMAMINI kuralın
+        // dışına çıkarır. `QuoteForm` 2000 satır: istisna böyle bırakılırsa
+        // yarın oraya yazılacak herhangi bir elle başlık da sessizce geçerdi.
+        // İddia bu yüzden daraltıldı — SAYI değil imza kilitleniyor.
+        const rel = "src/app/dashboard/quotes/_components/QuoteForm.tsx";
+        const code = stripComments(readFileSync(join(root, rel), "utf8"));
+        const manual = code.match(/<h2\s+style=\{\{[^}]*\}\}/g) ?? [];
+        expect(manual.length, "elle yazılmış h2 kalmamış — istisna vacuous").toBeGreaterThan(0);
+        for (const tag of manual) {
+            expect(tag, `belge ikizi imzası taşımayan elle h2: ${tag.slice(0, 90)}`).toContain("#0072BC");
+        }
+        // Mavi OLMAYAN başlıklar gerçekten ortak bileşene gitti.
+        expect(code, `${rel}: SectionHeader kullanılmıyor`).toMatch(/<SectionHeader\b/);
+    });
+
+    it("form bileşenleri sayfanın h1'ini basar; taşıyıcının kendi başlığı varsa KAPATIR", () => {
+        // 2026-09-08 ölçümü: `/quotes/new`, `/orders/new` ve `/orders/[id]/edit`
+        // sayfalarının h1'i YOKTU — üçünde de sayfa başlığı 14px/12.5px bir
+        // `<div>`di. `quotes/[id]`de ise TERS kusur vardı: sayfa 2026-09-05'te
+        // `PageHeader` aldı ama formun kendi kırıntı çubuğu kalınca teklif
+        // numarası ve durum rozeti aynı ekranda İKİ KEZ basıldı.
+        const FORMS = [
+            "src/app/dashboard/quotes/_components/QuoteForm.tsx",
+            "src/app/dashboard/orders/OrderForm.tsx",
+        ];
+        for (const rel of FORMS) {
+            const code = stripComments(readFileSync(join(root, rel), "utf8"));
+            expect(code, `${rel}: PageHeader basmıyor`).toMatch(/<PageHeader[\s\n]/);
+            // `\s` ZORUNLU: `subtitle={` ve `titleAdornment={` dizeleri `title=`
+            // desenini içeriyor/andırıyor (sınır dersinin 5. tekrarı).
+            expect(code, `${rel}: PageHeader'a title verilmemiş`)
+                .toMatch(/<PageHeader[\s\S]{0,400}?\stitle=\{/);
+        }
+        // Taşıyıcı sayfanın kendi `PageHeader`ı varsa form kendininkini KAPATMALI.
+        const host = stripComments(readFileSync(join(root, "src/app/dashboard/quotes/[id]/page.tsx"), "utf8"));
+        expect(host).toMatch(/<PageHeader[\s\n]/);
+        expect(host, "quotes/[id]: form da kendi başlığını basıyor → mükerrer numara + rozet")
+            .toMatch(/<QuoteForm[\s\S]{0,400}?pageHeader=\{false\}/);
     });
 
     it("dönüşen yüzeyler BÜYÜK HARF bölüm etiketini geri YAZAMAZ", () => {
@@ -159,6 +202,7 @@ describe("GATE — form ve başlık tipografisi", () => {
             "src/components/dashboard/AISummaryCard.tsx",
             "src/components/alerts/CalendarNotesSection.tsx",
             "src/components/alerts/DayDetailPanel.tsx",
+            "src/app/dashboard/quotes/_components/QuoteForm.tsx",
         ];
         for (const rel of CONVERTED) {
             const code = stripComments(readFileSync(join(root, rel), "utf8"));

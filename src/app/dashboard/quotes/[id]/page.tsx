@@ -490,6 +490,10 @@ export default function QuoteDetailPage() {
                 initialData={quote}
                 readOnly={!editable}
                 status={status}
+                // Sayfanın kendi `PageHeader`ı (h1 = teklif numarası) yukarıda.
+                // 2026-09-08'e kadar form ayrıca kendi kırıntısını basıyordu ve
+                // teklif numarası + durum rozeti aynı ekranda İKİ KEZ görünüyordu.
+                pageHeader={false}
                 onSaved={(d) => setQuote(prev => (prev ? { ...prev, ...d } : (d as QuoteDetailWithConversion)))}
             />
 

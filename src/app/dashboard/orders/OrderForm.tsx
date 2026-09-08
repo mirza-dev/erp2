@@ -14,6 +14,7 @@ import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-u
 import { dateDaysFromToday, localISODate } from "@/lib/stock-utils";
 import { fieldStyle } from "@/components/ui/Input";
 import SectionHeader from "@/components/ui/SectionHeader";
+import PageHeader from "@/components/ui/PageHeader";
 
 // ── Shared types ───────────────────────────────────────────────
 
@@ -334,47 +335,50 @@ export default function OrderForm({ mode, orderId, initial }: OrderFormProps) {
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
+            {/* ── Header ──
+                2026-09-08: sayfa başlığı 14px bir `<div>`di ve `/orders/new` ile
+                `/orders/[id]/edit` sayfalarının h1'i YOKTU — `PageHeader`ın
+                2026-08-31'de kapattığı kalıbın aynısı, iki sayfada açık kalmıştı.
+                Düzen `orders/[id]` emsaline oturuyor: geri bağlantısı AYRI
+                satırda, altında `PageHeader`. */}
+            <div>
+                <div style={{ marginBottom: "8px" }}>
                     <ButtonLink href={backHref} variant="secondary" size="sm" leftIcon={<ArrowLeft size={14} />}>
                         {isEdit ? "Sipariş" : "Siparişler"}
                     </ButtonLink>
-                    <svg width="10" height="10" viewBox="0 0 10 10" fill="none">
-                        <path d="M3 2l3 3-3 3" stroke="var(--text-tertiary)" strokeWidth="1" strokeLinecap="round" />
-                    </svg>
-                    <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
-                        {isEdit ? `${breadcrumbLabel} — Düzenle` : "Yeni Sipariş"}
-                    </div>
                 </div>
-                {!isMobile && (
-                    <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
-                        <div style={{ display: "flex", gap: "8px" }}>
-                            {isEdit ? (
-                                <>
-                                    <ButtonLink href={backHref} variant="secondary" disabled={isSubmitting}>Vazgeç</ButtonLink>
-                                    <Button variant="primary" loading={isSubmitting} onClick={handleSaveEdit} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
-                                        {isSubmitting ? "Kaydediliyor…" : "Değişiklikleri Kaydet"}
-                                    </Button>
-                                </>
-                            ) : (
-                                <>
-                                    <Button variant="secondary" loading={isSubmitting} onClick={() => buildAndSave("draft")} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
-                                        {isSubmitting ? "Kaydediliyor…" : "Taslak Kaydet"}
-                                    </Button>
-                                    <Button variant="primary" loading={isSubmitting} onClick={() => buildAndSave("pending_approval")} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
-                                        {isSubmitting ? "Gönderiliyor…" : "Gönder →"}
-                                    </Button>
-                                </>
+                <PageHeader
+                    title={isEdit ? `${breadcrumbLabel} — Düzenle` : "Yeni Sipariş"}
+                    align="start"
+                    actions={!isMobile ? (
+                        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "4px" }}>
+                            <div style={{ display: "flex", gap: "8px" }}>
+                                {isEdit ? (
+                                    <>
+                                        <ButtonLink href={backHref} variant="secondary" disabled={isSubmitting}>Vazgeç</ButtonLink>
+                                        <Button variant="primary" loading={isSubmitting} onClick={handleSaveEdit} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
+                                            {isSubmitting ? "Kaydediliyor…" : "Değişiklikleri Kaydet"}
+                                        </Button>
+                                    </>
+                                ) : (
+                                    <>
+                                        <Button variant="secondary" loading={isSubmitting} onClick={() => buildAndSave("draft")} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
+                                            {isSubmitting ? "Kaydediliyor…" : "Taslak Kaydet"}
+                                        </Button>
+                                        <Button variant="primary" loading={isSubmitting} onClick={() => buildAndSave("pending_approval")} disabled={isDemo} title={isDemo ? DEMO_DISABLED_TOOLTIP : undefined}>
+                                            {isSubmitting ? "Gönderiliyor…" : "Gönder →"}
+                                        </Button>
+                                    </>
+                                )}
+                            </div>
+                            {submitAttempted && !canSubmit && !isSubmitting && (
+                                <div style={{ fontSize: "11px", color: "var(--danger-text)" }}>
+                                    {disabledReasonText}
+                                </div>
                             )}
                         </div>
-                        {submitAttempted && !canSubmit && !isSubmitting && (
-                            <div style={{ fontSize: "11px", color: "var(--danger-text)" }}>
-                                {disabledReasonText}
-                            </div>
-                        )}
-                    </div>
-                )}
+                    ) : undefined}
+                />
             </div>
 
             {/* Main grid */}

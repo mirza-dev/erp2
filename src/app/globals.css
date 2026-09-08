@@ -1875,16 +1875,23 @@ select:focus-visible {
   /* Her iki sütun için padding ve satır arası boşluk küçültüldü */
   .q-meta-col { padding: 5px 10px !important; gap: 5px !important; }
   .q-meta-col + .q-meta-col { border-left: 1px solid #bbb !important; }
+  /* ── `.q-meta-col` seçicileri KONUMA bağlanır, ETİKETE değil ──
+     2026-09-08: bölüm başlıkları `<div>`ken `<h2>` oldu (o güne kadar
+     `QuoteForm`da hiç başlık elemanı yoktu) ve `> div:first-child` sessizce
+     eşleşmeyi bıraktı: baskıda mavi başlıklar 7.5px yerine 10px, .04em yerine
+     .07em çıkıyor, ayraç rengi düşüyordu. CI baskı almıyor — kusur yeşil
+     kapıdan geçerdi. Bir seçici, bağlandığı şeyin etiketinin değişmeyeceğini
+     varsayamaz. */
   /* Alan satırı alt çizgisi */
-  .q-meta-col > div:not(:first-child) { border-bottom: 0.5px solid #e8e8e8 !important; padding-bottom: 4px !important; }
+  .q-meta-col > :not(:first-child) { border-bottom: 0.5px solid #e8e8e8 !important; padding-bottom: 4px !important; }
   /* Bölüm başlığı — marka mavisi */
-  .q-meta-col > div:first-child { font-size: 7.5px !important; padding-bottom: 3px !important; letter-spacing: 0.04em !important; color: #0072BC !important; border-bottom-color: rgba(0,114,188,0.2) !important; }
+  .q-meta-col > :first-child { font-size: 7.5px !important; padding-bottom: 3px !important; letter-spacing: 0.04em !important; color: #0072BC !important; border-bottom-color: rgba(0,114,188,0.2) !important; }
   /* Alan satırları — label + input grid gap */
-  .q-meta-col > div:not(:first-child) { gap: 4px !important; }
+  .q-meta-col > :not(:first-child) { gap: 4px !important; }
   /* Alan etiketi (COMPANY, CONTACT…) — bold, koyu */
-  .q-meta-col > div:not(:first-child) > div:first-child { font-size: 7.5px !important; letter-spacing: 0.03em !important; font-weight: 700 !important; color: #222 !important; }
+  .q-meta-col > :not(:first-child) > :first-child { font-size: 7.5px !important; letter-spacing: 0.03em !important; font-weight: 700 !important; color: #222 !important; }
   /* Türkçe alt etiket — gri */
-  .q-meta-col > div:not(:first-child) > div:first-child > span { font-size: 6.5px !important; color: #888 !important; font-weight: 400 !important; }
+  .q-meta-col > :not(:first-child) > :first-child > span { font-size: 6.5px !important; color: #888 !important; font-weight: 400 !important; }
   .q-field-inp { background: transparent !important; border: none !important; border-bottom: 0.5px solid #bbb !important; border-radius: 0 !important; padding: 1px 0 !important; font-size: 8px !important; color: #111 !important; }
 
   /* Table toolbar */

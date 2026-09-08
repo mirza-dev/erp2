@@ -80,6 +80,24 @@ function tokenValue(block: string, name: string): string {
 }
 
 describe("GATE: yüzey + buton/kategori tutarlılığı", () => {
+    it("baskı seçicileri ETİKETE değil KONUMA bağlanır", () => {
+        // 2026-09-08: `QuoteForm`un iki bölüm başlığı `<div>`ken `<h2>` oldu
+        // (o güne kadar dosyada HİÇ başlık elemanı yoktu) ve `@media print`
+        // içindeki seçici sessizce eşleşmeyi bıraktı: baskıda mavi başlıklar
+        // 7.5px yerine 10px, .04em yerine .07em çıkıyor, marka mavisi ve
+        // ayraç rengi düşüyordu. CI baskı ALMAZ — kusur yeşil kapıdan geçerdi.
+        // Ölçüm `emulateMedia({ media: "print" })` ile alındı ve düzeltme
+        // öncesi 10px/siyah, sonrası 7.5px/#0072BC okudu.
+        //
+        // Seçici artık konuma bağlı (`> :first-child`); etiket adı yeniden
+        // yazılırsa kural kırmızı yanar.
+        const css = stripComments(GLOBALS);
+        const offenders = css.match(/\.q-meta-col\s*>\s*\w+/g) ?? [];
+        expect(offenders, `etiket adına bağlı baskı seçicisi: ${offenders.join(" | ")}`).toEqual([]);
+        // Anti-vacuous: seçiciler gerçekten orada.
+        expect(css).toMatch(/\.q-meta-col\s*>\s*:first-child/);
+    });
+
     it("kuralın DAYANAĞI: oyuk rengi iki temada da sayfa zeminiyle aynı", () => {
         // Bu test bir iddia değil, GEREKÇE. Biri token'ları ayırırsa buradan
         // haber alır ve "kart olarak kullanma" yasağı gevşetilebilir.

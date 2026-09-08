@@ -4,8 +4,11 @@ import { useState, useEffect, useRef, useCallback, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { Eraser, FileText, Plus, RotateCcw, Save, Send, StickyNote, Trash2 } from "lucide-react";
 import type { QuoteData } from "../components/quote-types";
+import Link from "next/link";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
+import PageHeader from "@/components/ui/PageHeader";
+import SectionHeader from "@/components/ui/SectionHeader";
 import { useToast } from "@/components/ui/Toast";
 import { useCustomers, useProducts } from "@/lib/data-context";
 import type { Customer, Product, QuoteDetail } from "@/lib/mock-data";
@@ -92,6 +95,19 @@ interface QuoteFormProps {
     // Yeni-teklif sayfasında inline "Gönder" butonu + çift onay akışı (yalnız
     // /quotes/new'de true; detay sayfasının kendi header Gönder'i var → çift buton önlenir).
     enableInlineSend?: boolean;
+    // Formun KENDİ sayfa başlığını (h1) basıp basmayacağı. Varsayılan `true`.
+    //
+    // 2026-09-08 ölçümü: `/quotes/new`de sayfanın h1'i YOKTU (form yalnız
+    // tıklanamaz bir kırıntı çubuğu çiziyordu), `quotes/[id]`de ise İKİ tane
+    // vardı — sayfa 2026-09-05'te `PageHeader` aldı ama formun kırıntısı
+    // kalınca teklif numarası ve durum rozeti aynı ekranda iki kez basıldı.
+    //
+    // Varsayılanın `true` olması bilinçli: prop'u unutan yeni bir taşıyıcı
+    // BAŞLIKSIZ değil, fazladan başlıklı kalır — sessiz erişilebilirlik kaybı
+    // yerine gürültülü fazlalık. `enableInlineSend` bu iş için yeniden
+    // KULLANILMAZ: bugün ikisi de yalnız `/quotes/new`de doğru ama biri
+    // gönderim akışı, diğeri sayfa kabuğu.
+    pageHeader?: boolean;
     // Başarılı kayıt sonrası sunucunun döndürdüğü TAZE QuoteDetail parent'a iletilir.
     // Detay sayfası bununla kendi `quote` state'ini tazeler — aksi hâlde Gönder
     // onayındaki müşteri e-postası sayfanın İLK fetch'inden kalır (stale).
@@ -100,7 +116,7 @@ interface QuoteFormProps {
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
-export default function QuoteForm({ initialData, readOnly, status, enableInlineSend, onSaved }: QuoteFormProps) {
+export default function QuoteForm({ initialData, readOnly, status, enableInlineSend, pageHeader = true, onSaved }: QuoteFormProps) {
     // ── Data context ──────────────────────────────────────────────────────────
     const { customers, addCustomer } = useCustomers();
     const { products } = useProducts();
@@ -1061,6 +1077,81 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
         );
     }
 
+    // ── Sayfa başlığı parçaları ──────────────────────────────────────────────
+    // `PageHeader`ın yuvalarına ve `pageHeader={false}` yoluna AYNI kaynaktan
+    // beslenirler; ikinci bir kopya çıkmasın diye burada bir kez kurulurlar.
+    const quoteNoChip = (
+        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "11px", padding: "2px 8px", background: "var(--bg-tertiary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "3px", color: "var(--text-secondary)" }}>
+            {quoteNo || "(Otomatik)"}
+        </span>
+    );
+
+    const statusBadge = (() => {
+        const cfg: Record<string, { label: string; bg: string; color: string }> = {
+            draft:    { label: "Taslak",       bg: "var(--warning-bg)",  color: "var(--warning-text)"   },
+            sent:     { label: "Gönderildi",   bg: "var(--accent-bg)",   color: "var(--accent-text)"    },
+            accepted: { label: "Kabul Edildi", bg: "var(--success-bg)",  color: "var(--success-text)"   },
+            rejected: { label: "Reddedildi",   bg: "var(--danger-bg)",   color: "var(--danger-text)"    },
+            expired:  { label: "Süresi Doldu", bg: "var(--bg-tertiary)", color: "var(--text-secondary)" },
+        };
+        const b = cfg[status ?? "draft"] ?? cfg["draft"];
+        return (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "2px 8px", borderRadius: "4px", fontSize: "10.5px", fontWeight: 600, background: b.bg, color: b.color }}>
+                <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "currentColor", display: "inline-block" }} />
+                {b.label}
+            </span>
+        );
+    })();
+
+    const formActions = (
+        <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
+            <Button
+                size="sm"
+                leftIcon={<FileText size={14} />}
+                onClick={() => { savePreviewData(); router.push("/dashboard/quotes/preview"); }}
+            >
+                Önizle &amp; PDF
+            </Button>
+            {!readOnly && (
+            <Button
+                variant="secondary"
+                size="sm"
+                leftIcon={<Save size={14} />}
+                onClick={handleSave}
+                disabled={saving || sending}
+                loading={saving}
+            >
+                {saving ? "Kaydediliyor…" : "Kaydet"}
+            </Button>
+            )}
+            {/* 088: yeni-teklif inline "Gönder" — çift onay (handleRequestSend → modal). */}
+            {enableInlineSend && !readOnly && (() => {
+                // KOBİ-sim K1 + O2 — gönderimi engelleyen eksikler düğmenin
+                // ÜSTÜNDE söylenir. Eskiden teklif kaydediliyor, kullanıcı iki
+                // onay penceresini geçiyor, ancak sonra sunucudan "adres
+                // girilmeli" / cari hatası yiyordu.
+                const engel = !custId.trim()
+                    ? "Müşteri bir cari kaydına bağlanmalı"
+                    : !custAddress.trim()
+                        ? "Müşteri adresi girilmeli"
+                        : null;
+                return (
+                    <Button
+                        variant="primary"
+                        size="sm"
+                        leftIcon={<Send size={14} />}
+                        onClick={handleRequestSend}
+                        disabled={saving || sending || engel !== null}
+                        loading={sending}
+                        title={engel ? `Gönderilemez — ${engel.toLowerCase()}.` : undefined}
+                    >
+                        {sending ? "Gönderiliyor…" : "Gönder"}
+                    </Button>
+                );
+            })()}
+        </div>
+    );
+
     // ── JSX ──────────────────────────────────────────────────────────────────
     return (
         <>
@@ -1070,87 +1161,30 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
             {/* Page wrapper */}
             <div style={{ padding: "0 0 80px" }}>
 
-                {/* ── Action bar ── */}
-                <div className="q-no-print" style={{
-                    display: "flex", alignItems: "center", justifyContent: "space-between",
-                    marginBottom: "16px",
-                }}>
-                    {/* Breadcrumbs + badges */}
-                    <div style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "12.5px", color: "var(--text-secondary)", flexWrap: "wrap" }}>
-                        <span>Satış</span>
-                        <span style={{ color: "var(--text-tertiary)" }}>/</span>
-                        <span>Teklifler</span>
-                        <span style={{ color: "var(--text-tertiary)" }}>/</span>
-                        <span style={{ color: "var(--text-primary)", fontWeight: 500 }}>
-                            {readOnly ? "Teklif Detay" : quoteId ? "Teklif Düzenle" : "Yeni Teklif"}
-                        </span>
-                        <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "11px", padding: "2px 8px", background: "var(--bg-tertiary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "3px", color: "var(--text-secondary)" }}>
-                            {quoteNo || "(Otomatik)"}
-                        </span>
-                        {(() => {
-                            const cfg: Record<string, { label: string; bg: string; color: string }> = {
-                                draft:    { label: "Taslak",       bg: "var(--warning-bg)",  color: "var(--warning-text)"   },
-                                sent:     { label: "Gönderildi",   bg: "var(--accent-bg)",   color: "var(--accent-text)"    },
-                                accepted: { label: "Kabul Edildi", bg: "var(--success-bg)",  color: "var(--success-text)"   },
-                                rejected: { label: "Reddedildi",   bg: "var(--danger-bg)",   color: "var(--danger-text)"    },
-                                expired:  { label: "Süresi Doldu", bg: "var(--bg-tertiary)", color: "var(--text-secondary)" },
-                            };
-                            const b = cfg[status ?? "draft"] ?? cfg["draft"];
-                            return (
-                                <span style={{ display: "inline-flex", alignItems: "center", gap: "4px", padding: "2px 8px", borderRadius: "4px", fontSize: "10.5px", fontWeight: 600, background: b.bg, color: b.color }}>
-                                    <span style={{ width: "5px", height: "5px", borderRadius: "50%", background: "currentColor", display: "inline-block" }} />
-                                    {b.label}
-                                </span>
-                            );
-                        })()}
-                    </div>
-                    {/* Buttons */}
-                    <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
-                        <Button
-                            size="sm"
-                            leftIcon={<FileText size={14} />}
-                            onClick={() => { savePreviewData(); router.push("/dashboard/quotes/preview"); }}
-                        >
-                            Önizle &amp; PDF
-                        </Button>
-                        {!readOnly && (
-                        <Button
-                            variant="secondary"
-                            size="sm"
-                            leftIcon={<Save size={14} />}
-                            onClick={handleSave}
-                            disabled={saving || sending}
-                            loading={saving}
-                        >
-                            {saving ? "Kaydediliyor…" : "Kaydet"}
-                        </Button>
-                        )}
-                        {/* 088: yeni-teklif inline "Gönder" — çift onay (handleRequestSend → modal). */}
-                        {enableInlineSend && !readOnly && (() => {
-                            // KOBİ-sim K1 + O2 — gönderimi engelleyen eksikler
-                            // düğmenin ÜSTÜNDE söylenir. Eskiden teklif kaydediliyor,
-                            // kullanıcı iki onay penceresini geçiyor, ancak sonra
-                            // sunucudan "adres girilmeli" / cari hatası yiyordu.
-                            const engel = !custId.trim()
-                                ? "Müşteri bir cari kaydına bağlanmalı"
-                                : !custAddress.trim()
-                                    ? "Müşteri adresi girilmeli"
-                                    : null;
-                            return (
-                                <Button
-                                    variant="primary"
-                                    size="sm"
-                                    leftIcon={<Send size={14} />}
-                                    onClick={handleRequestSend}
-                                    disabled={saving || sending || engel !== null}
-                                    loading={sending}
-                                    title={engel ? `Gönderilemez — ${engel.toLowerCase()}.` : undefined}
-                                >
-                                    {sending ? "Gönderiliyor…" : "Gönder"}
-                                </Button>
-                            );
-                        })()}
-                    </div>
+                {/* ── Action bar ──
+                    `pageHeader` true iken form kendi `PageHeader`ını (h1) basar;
+                    false iken (sayfanın kendi başlığı varsa) yalnız buton grubu
+                    kalır. 2026-09-08'e kadar burada tıklanamaz bir kırıntı
+                    çubuğu vardı: `/quotes/new`de sayfanın TEK başlığı oydu ve
+                    `<h1>` değildi, `quotes/[id]`de ise sayfanın `PageHeader`ıyla
+                    aynı numarayı ve rozeti ikinci kez basıyordu. */}
+                <div className="q-no-print" style={{ marginBottom: "16px" }}>
+                    {pageHeader && (
+                        <div style={{ marginBottom: "8px" }}>
+                            <Link href="/dashboard/quotes" style={{ color: "var(--text-tertiary)", textDecoration: "none", fontSize: "13px" }}>
+                                ← Teklifler
+                            </Link>
+                        </div>
+                    )}
+                    {pageHeader ? (
+                        <PageHeader
+                            title={readOnly ? "Teklif Detay" : quoteId ? "Teklif Düzenle" : "Yeni Teklif"}
+                            titleAdornment={<>{quoteNoChip}{statusBadge}</>}
+                            actions={formActions}
+                        />
+                    ) : (
+                        <div style={{ display: "flex", justifyContent: "flex-end" }}>{formActions}</div>
+                    )}
                 </div>
 
                 {/* Faz 2 (V3-A1): GTİP soft uyarı — non-blocking, hiçbir butonu disable etmez */}
@@ -1252,9 +1286,9 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                     }}>
                         {/* Left: Customer */}
                         <div className="q-meta-col" style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: "9px" }}>
-                            <div style={{ fontSize: "10px", fontWeight: 700, color: "#0072BC", textTransform: "uppercase", letterSpacing: "0.07em", paddingBottom: "4px", borderBottom: "1px solid rgba(0,114,188,0.25)" }}>
+                            <h2 style={{ fontSize: "10px", fontWeight: 700, color: "#0072BC", textTransform: "uppercase", letterSpacing: "0.07em", paddingBottom: "4px", borderBottom: "1px solid rgba(0,114,188,0.25)", margin: 0 }}>
                                 Müşteri / Customer
-                            </div>
+                            </h2>
                             {/* Company — autocomplete */}
                             <div ref={custWrapperRef} style={{ display: "grid", gridTemplateColumns: "140px 1fr", alignItems: "center", gap: "8px", paddingBottom: "7px", borderBottom: "0.5px solid var(--border-tertiary)" }}>
                                 <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
@@ -1388,9 +1422,9 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
 
                         {/* Right: Quote details */}
                         <div className="q-meta-col" style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: "9px", borderLeft: "1px solid var(--border-secondary)" }}>
-                            <div style={{ fontSize: "10px", fontWeight: 700, color: "#0072BC", textTransform: "uppercase", letterSpacing: "0.07em", paddingBottom: "4px", borderBottom: "1px solid rgba(0,114,188,0.25)" }}>
+                            <h2 style={{ fontSize: "10px", fontWeight: 700, color: "#0072BC", textTransform: "uppercase", letterSpacing: "0.07em", paddingBottom: "4px", borderBottom: "1px solid rgba(0,114,188,0.25)", margin: 0 }}>
                                 Teklif Detayları / Quote Details
-                            </div>
+                            </h2>
                             {/* Quote No — read-only, DB'de otomatik üretilir */}
                             <div style={{ display: "grid", gridTemplateColumns: "140px 1fr", alignItems: "center", gap: "8px", paddingBottom: "7px", borderBottom: "0.5px solid var(--border-tertiary)" }}>
                                 <div style={{ fontSize: "10px", fontWeight: 700, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.07em" }}>
@@ -1443,9 +1477,9 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                             padding: "10px 24px", borderBottom: "1px solid var(--border-secondary)",
                             background: "var(--bg-tertiary)",
                         }}>
-                            <div style={{ fontSize: "11px", fontWeight: 600, color: "var(--text-secondary)", textTransform: "uppercase", letterSpacing: "0.06em" }}>
+                            <SectionHeader style={{ margin: 0 }}>
                                 Line Items <span style={{ color: "var(--text-tertiary)", fontWeight: 400, fontStyle: "italic" }}>/ Kalemler</span>
-                            </div>
+                            </SectionHeader>
                             {!readOnly && (
                             <div className="q-no-print" style={{ display: "flex", gap: "6px" }}>
                                 <Button variant="secondary" size="xs" leftIcon={<Eraser size={13} />} onClick={clearAll}>
@@ -1831,9 +1865,9 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                     {/* ── Faz 4a (2026-05-23): PMT brand Teslimat / Ödeme ── */}
                     <div className="q-terms-block" style={{ padding: "16px 24px", borderTop: "1px solid var(--border-secondary)", display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px" }}>
                         <div>
-                            <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "8px" }}>
+                            <SectionHeader style={{ marginBottom: "8px" }}>
                                 Delivery Method <span style={{ fontStyle: "italic", fontWeight: 400, opacity: 0.6 }}>/ Teslimat Şekli</span>
-                            </div>
+                            </SectionHeader>
                             {renderTemplatePicker("delivery", deliveryMethod, setDeliveryMethod)}
                             <textarea
                                 className="q-notes"
@@ -1845,9 +1879,9 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                             />
                         </div>
                         <div>
-                            <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "8px" }}>
+                            <SectionHeader style={{ marginBottom: "8px" }}>
                                 Payment Method <span style={{ fontStyle: "italic", fontWeight: 400, opacity: 0.6 }}>/ Ödeme Şekli</span>
-                            </div>
+                            </SectionHeader>
                             {renderTemplatePicker("payment", paymentMethod, setPaymentMethod)}
                             <textarea
                                 className="q-notes"
@@ -1862,9 +1896,9 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
 
                     {/* ── Notes ── */}
                     <div className="q-notes-block" style={{ padding: "16px 24px", borderTop: "1px solid var(--border-secondary)" }}>
-                        <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "8px" }}>
+                        <SectionHeader style={{ marginBottom: "8px" }}>
                             Notes &amp; Terms <span style={{ fontStyle: "italic", fontWeight: 400, opacity: 0.6 }}>/ Notlar</span>
-                        </div>
+                        </SectionHeader>
                         {renderTemplatePicker("notes", notes, setNotes)}
                         <textarea
                             className="q-notes"
@@ -1878,9 +1912,9 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
 
                     {/* ── Signatures ── */}
                     <div className="q-sigs-block" style={{ padding: "16px 24px 28px", borderTop: "1px solid var(--border-secondary)" }}>
-                        <div style={{ fontSize: "10px", fontWeight: 600, color: "var(--text-tertiary)", textTransform: "uppercase", letterSpacing: "0.07em", marginBottom: "12px" }}>
+                        <SectionHeader style={{ marginBottom: "12px" }}>
                             Signatures / İmzalar
-                        </div>
+                        </SectionHeader>
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: "32px" }}>
                             {([
                                 ["Prepared by",  "Hazırlayan",  sig1, setSig1,  sig1Title, setSig1Title],
@@ -1931,9 +1965,9 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                         boxShadow: "0 8px 32px rgba(0,0,0,0.5)",
                     }}
                 >
-                        <div id="quote-send-dialog-title" style={{ fontSize: "13px", fontWeight: 600, color: "var(--text-primary)", marginBottom: "12px" }}>
+                        <SectionHeader variant="dialog" id="quote-send-dialog-title" style={{ marginBottom: "12px" }}>
                             {sendStep === 1 ? "Teklifi Gönder (1/2)" : "Son Onay (2/2)"}
-                        </div>
+                        </SectionHeader>
 
                         {sendStep === 1 ? (
                             <>
