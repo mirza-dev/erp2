@@ -151,7 +151,13 @@ describe("GATE — form ve başlık tipografisi", () => {
         // İddia bu yüzden daraltıldı — SAYI değil imza kilitleniyor.
         const rel = "src/app/dashboard/quotes/_components/QuoteForm.tsx";
         const code = stripComments(readFileSync(join(root, rel), "utf8"));
-        const manual = code.match(/<h2\s+style=\{\{[^}]*\}\}/g) ?? [];
+        // Desen `style={{` DEĞİL `style={` ARIYOR ve araya nitelik alabiliyor:
+        // `<h2 style={h2Style}>` ile `<h2 className="x" style={{…}}>` ikisi de
+        // dar desenden kaçıyordu. `<h1>` kuralı (2026-08-31) tam bu tuzağı
+        // belgeleyip kapatmıştı — `gizlilik` ve `sifre-yenile` stili bir
+        // `const`a çıkarıp kuralın altından geçmişti.
+        const manual = [...code.matchAll(/<h2\s[^>]*style=\{/g)]
+            .map(m => code.slice(m.index, code.indexOf(">", m.index) + 1));
         expect(manual.length, "elle yazılmış h2 kalmamış — istisna vacuous").toBeGreaterThan(0);
         for (const tag of manual) {
             expect(tag, `belge ikizi imzası taşımayan elle h2: ${tag.slice(0, 90)}`).toContain("#0072BC");

@@ -1891,11 +1891,20 @@ select:focus-visible {
   /* Alan etiketi (COMPANY, CONTACT…) — bold, koyu */
   .q-meta-col > :not(:first-child) > :first-child { font-size: 7.5px !important; letter-spacing: 0.03em !important; font-weight: 700 !important; color: #222 !important; }
   /* Türkçe alt etiket — gri */
-  .q-meta-col > :not(:first-child) > :first-child > span { font-size: 6.5px !important; color: #888 !important; font-weight: 400 !important; }
+  .q-meta-col > :not(:first-child) > :first-child > * { font-size: 6.5px !important; color: #888 !important; font-weight: 400 !important; }
   .q-field-inp { background: transparent !important; border: none !important; border-bottom: 0.5px solid #bbb !important; border-radius: 0 !important; padding: 1px 0 !important; font-size: 8px !important; color: #111 !important; }
 
   /* Table toolbar */
   .q-table-toolbar { background: #f2f2f2 !important; border-bottom: 0.5px solid #ccc !important; padding: 4px 12px !important; }
+
+  /* Bölüm başlıkları — ekranda ortak `SectionHeader` (11px / .04em), BASKIDA
+     2026-09-08 öncesi değerinde kalır (10px / .07em; gövde 9px). Ekran
+     tipografisini kâğıda taşımak sessiz bir baskı değişikliği olurdu.
+     `.q-meta-col`in mavi başlıkları bunun DIŞINDA: kendi 7.5px kuralları daha
+     yüksek özgüllükte. */
+  .q-table-toolbar h2, .q-terms-block h2, .q-notes-block h2, .q-sigs-block h2 {
+    font-size: 10px !important; letter-spacing: 0.07em !important;
+  }
 
   /* ── Items table: auto layout → browser A4'e sığdırır ── */
   .q-card table { table-layout: auto !important; width: 100% !important; border-collapse: collapse !important; border: 1px solid #bbb !important; }

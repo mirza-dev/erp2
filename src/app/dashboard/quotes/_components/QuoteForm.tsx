@@ -1080,13 +1080,13 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
     // ── Sayfa başlığı parçaları ──────────────────────────────────────────────
     // `PageHeader`ın yuvalarına ve `pageHeader={false}` yoluna AYNI kaynaktan
     // beslenirler; ikinci bir kopya çıkmasın diye burada bir kez kurulurlar.
-    const quoteNoChip = (
+    const quoteNoChip = pageHeader ? (
         <span style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: "11px", padding: "2px 8px", background: "var(--bg-tertiary)", border: "0.5px solid var(--border-tertiary)", borderRadius: "3px", color: "var(--text-secondary)" }}>
             {quoteNo || "(Otomatik)"}
         </span>
-    );
+    ) : null;
 
-    const statusBadge = (() => {
+    const statusBadge = pageHeader ? (() => {
         const cfg: Record<string, { label: string; bg: string; color: string }> = {
             draft:    { label: "Taslak",       bg: "var(--warning-bg)",  color: "var(--warning-text)"   },
             sent:     { label: "Gönderildi",   bg: "var(--accent-bg)",   color: "var(--accent-text)"    },
@@ -1101,7 +1101,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                 {b.label}
             </span>
         );
-    })();
+    })() : null;
 
     const formActions = (
         <div style={{ display: "flex", gap: "6px", flexShrink: 0 }}>
@@ -1183,7 +1183,12 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                             actions={formActions}
                         />
                     ) : (
-                        <div style={{ display: "flex", justifyContent: "flex-end" }}>{formActions}</div>
+                        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", flexWrap: "wrap" }}>
+                            <span style={{ fontSize: "12.5px", color: "var(--text-secondary)" }}>
+                                {readOnly ? "Teklif Detay" : "Teklif Düzenle"}
+                            </span>
+                            {formActions}
+                        </div>
                     )}
                 </div>
 
@@ -1478,7 +1483,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                             background: "var(--bg-tertiary)",
                         }}>
                             <SectionHeader style={{ margin: 0 }}>
-                                Line Items <span style={{ color: "var(--text-tertiary)", fontWeight: 400, fontStyle: "italic" }}>/ Kalemler</span>
+                                Line Items <span style={{ fontStyle: "italic", fontWeight: 400, opacity: 0.6 }}>/ Kalemler</span>
                             </SectionHeader>
                             {!readOnly && (
                             <div className="q-no-print" style={{ display: "flex", gap: "6px" }}>

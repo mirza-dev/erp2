@@ -91,8 +91,13 @@ describe("GATE: yüzey + buton/kategori tutarlılığı", () => {
         //
         // Seçici artık konuma bağlı (`> :first-child`); etiket adı yeniden
         // yazılırsa kural kırmızı yanar.
+        // Desen ZİNCİRİN TAMAMINA bakar. İlk birleştiriciye bakan ilk hâli
+        // `.q-meta-col > :not(:first-child) > :first-child > span` zincirinin
+        // SONUNDAKİ etiketi göremiyordu — kural iddia ettiğinden azını
+        // denetliyordu (deponun tekrarlayan tuzağının kural tarafındaki hâli).
         const css = stripComments(GLOBALS);
-        const offenders = css.match(/\.q-meta-col\s*>\s*\w+/g) ?? [];
+        const offenders = (css.match(/\.q-meta-col[^{;}]*/g) ?? [])
+            .filter(sel => /(?:^|[\s>+~])[a-zA-Z][\w-]*(?![\w-]*\()/.test(sel.replace(".q-meta-col", "")));
         expect(offenders, `etiket adına bağlı baskı seçicisi: ${offenders.join(" | ")}`).toEqual([]);
         // Anti-vacuous: seçiciler gerçekten orada.
         expect(css).toMatch(/\.q-meta-col\s*>\s*:first-child/);

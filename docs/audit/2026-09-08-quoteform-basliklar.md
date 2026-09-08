@@ -252,3 +252,53 @@ başlıkları" turuna kayıt edildi.
   `labelStyle()` de `textTransform` taşıyamıyor (kullanıcı kararı).
 - **İki diyalog başlığı** (§6) — anlamsal renk taşıyor, ayrı tur.
 - Migration yok · RBAC yok · veri yolu değişikliği yok.
+
+---
+
+## 9 — İnceleme turu (`/code-review`, aynı gün)
+
+12 bulgu geldi; **yedisi doğrulandı ve düzeltildi**, beşi gerekçeli kayda geçti.
+
+### Düzeltilenler
+
+| # | bulgu | doğrulama | düzeltme |
+|---|---|---|---|
+| B2 | **Dönüşen beş başlık BASKIDA da 10→11px oldu** — `.q-terms-block`/`.q-notes-block`/`.q-sigs-block`/`.q-table-toolbar` için `@media print`te font-size kuralı YOK, ekran değeri doğrudan kâğıda çıkıyordu (gövde 9px) | grep: dört blokta font-size kuralı yok ✓ | baskıda 10px/.07em'e sabitlendi; **ölçüldü: 5 başlık 10px/.7px, mavi ikili 7.5px** |
+| B3 | İstisna refakatçisi `style={{` istiyordu → `<h2 style={h2Style}>` ve `<h2 className="x" style={{…}}>` kaçıyordu | simülasyon: ikisi de yakalanmıyordu ✓ | desen `<h2\s[^>]*style=\{`e genişletildi (h1 kuralının 2026-08-31'de kapattığı tuzağın aynısı) · **K8 🔴 · K9 🔴** |
+| B4 | Baskı kuralı yalnız İLK birleştiriciye bakıyordu; zincirin sonundaki `> span` etikete bağlı kalmıştı | `offenders` boş ama `> span` dosyada ✓ | kural zincirin tamamına bakıyor + `> span` → `> *` · **K10 🔴** |
+| B9 | "Line Items"in iki dilli alt etiketi ebeveyniyle **aynı renge düştü** (ikisi de `--text-tertiary`); kardeş dört başlık ayrımı `opacity: .6` ile koruyordu | ölçüm: ikisi de `rgb(100,115,134)` ✓ | alt etiket kardeşlerin diline (`opacity: .6`) geçti — beş başlık artık tutarlı |
+| B10 | `pageHeader={false}` yolunda satır boşaldı → sayfanın `PageHeader` aksiyonları ve formun butonları **iki sağ-yaslı küme** olarak üst üste biniyordu | kaynak ✓ | satır `space-between`, solda kip etiketi |
+| B12 | **"Teklif Detay" / "Teklif Düzenle" kipi detay sayfasından tamamen kayboldu** — ifade yalnız `pageHeader === true` dalında yaşıyor, `quotes/[id]` `false` geçiyor | ölçüm: etiket yok ✓ | kip etiketi aksiyon satırının soluna döndü; **ölçüldü: "Teklif Detay", x=234** |
+| B11 | `quoteNoChip` + `statusBadge` (5 girdilik kayıt + IIFE) kullanılmayan yolda da her render'da kuruluyordu | kaynak ✓ | `pageHeader ? … : null` |
+
+**B12 ayrıca bir YÖNTEM bulgusu:** turun "kaldırılan etiket denetimi" adımı
+dizenin DOSYADA var olmasına bakıyordu, HER TAŞIYICIDA render edilmesine
+değil. `"Teklif Detay"` dosyada duruyordu — ama yalnız `/quotes/new`de
+çiziliyordu. *Bir etiket denetimi, dizenin varlığını değil GÖRÜNÜRLÜĞÜNÜ
+kanıtlamalı.*
+
+### Kayda geçenler (düzeltilmedi, gerekçeli)
+
+- **`/dashboard/quotes/preview` ve `QuoteDocument.tsx`in başlık sayısı SIFIR**
+  (doğrulandı). Bu turun regresyonu değil — raporun §8'i baskı belgelerini
+  bilerek kapsam dışı tutuyor. Ama `preview` bir SAYFA, belge bileşeni değil;
+  ve `H2_EXCEPTIONS` gerekçesi tam da `QuoteDocument`i işaret ediyor.
+  **Ayrı tur olarak kayıtlı** (`form-consistency`in `DETAIL_PAGES` listesine de
+  girmesi gerekir).
+- **`OrderForm`un `pageHeader` muadili yok.** Bugün iki taşıyıcısının da kendi
+  `PageHeader`ı yok, yani mükerrer üretemez; ama kapı kuralının "taşıyıcının
+  kendi başlığı varsa form KAPATIR" yarısı `quotes/[id]`ye sabitli. Üçüncü bir
+  taşıyıcı gelirse kural sessiz kalır. Kayıtlı.
+- **Geri bağlantısının dokunma hedefi ~17px** — `tap-44` ailesinde değil.
+  `quotes/[id]:329`daki BİREBİR aynı bağlantı da değil (2026-09-05'ten kalma);
+  yani yeni bir sapma değil, mevcut kalıbın devamı. Yine de deponun kendi
+  44px tabanının altında.
+- **Aynı geri bağlantısının BEŞİNCİ kopyası** (`QuoteForm` · `quotes/[id]` ·
+  `product-types/[id]` ×2 · `purchase/orders/[id]` varyantı).
+  `memory/feedback_global_over_hardcode.md` gereği ortak bir bileşene çıkmalı —
+  dokunma hedefi düzeltmesiyle **aynı turda** yapılmalı (ikisi tek değişiklik).
+- **Yükseklik bulgusu: sayfa kabuğunu SAYFA sahiplenmeli, form değil.**
+  Doğru yön; `pageHeader` bayrağı ve varsayılanı bir tuzak taşıyor. Karşı
+  gerekçe: formun aksiyonları (Önizle & PDF · Kaydet · Gönder) gönderim akışı
+  state'ine bağlı ve `/quotes/new/page.tsx`e taşınmaları o state'in de
+  taşınmasını gerektirir. Ayrı tura kayıtlı.
