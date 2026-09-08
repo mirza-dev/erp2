@@ -51,6 +51,8 @@ seçicisi etikete bağlanamaz). `\s` sınırı (**5. tekrar**), `GLOBALS` ilk ke
 **6/6 kırmızı-kanıtlı.** tsc 0 · lint 0 · **501 dosya / 7010 test** · build 0
 uyarı · **E2E 94/94 retries=0**.
 
+**İNCELEME TURU (aynı gün, `/code-review`):** 12 bulgu; **yedisi doğrulandı ve düzeltildi** (`a30e6d6`), beşi gerekçeli kayda geçti. En ağırı ikisi: (1) **dönüşen beş başlık BASKIDA da 10→11px olmuştu** — o blokların `@media print` font-size kuralı yok, ekran değeri doğrudan kâğıda çıkıyordu; turun kendi headline dersinin diğer beş başlığa uygulanmamış hâli. (2) **"Teklif Detay"/"Teklif Düzenle" kipi detay sayfasından tamamen kaybolmuştu** — ifade yalnız `pageHeader===true` dalında yaşıyor. Bu ikincisi bir **YÖNTEM bulgusu**: turun "kaldırılan etiket denetimi" adımı dizenin DOSYADA var olmasına bakıyordu, HER TAŞIYICIDA render edilmesine değil. *Bir etiket denetimi, dizenin varlığını değil GÖRÜNÜRLÜĞÜNÜ kanıtlamalı.* Ayrıca iki kapı kuralım iddia ettiğinden azını denetliyordu (`style={{` dar deseni `<h2 style={const}>`i kaçırıyordu — h1 kuralının 2026-08-31'de kapattığı tuzağın aynısı; baskı kuralı yalnız İLK birleştiriciye bakıyordu). K8/K9/K10 kırmızı-kanıtlı. **Kayıtlı kalan beş:** `/quotes/preview` + `QuoteDocument`in başlık sayısı SIFIR · `OrderForm`da `pageHeader` muadili yok · geri bağlantısının dokunma hedefi ~17px ve BEŞİNCİ kopyası (ikisi tek turda) · sayfa kabuğunu SAYFA sahiplenmeli. React Doctor "staged regression" dedi, HEAD~1'de sayıldı, birebir aynı — **sekizinci yanlış alarm**.
+
 **Plandan sapma:** `quotes/[id]:533` `quote-confirm-dialog-title` taşınmadı —
 yıkıcı işlemde `--danger-text`e dönüyor (anlamsal renk); `SectionHeader` bunu
 modellemiyor, `style` sözleşmesi yalnız boşluk. Ortak `ConfirmModal` da
