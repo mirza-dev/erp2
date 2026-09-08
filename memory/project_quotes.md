@@ -472,3 +472,31 @@ Faz 1 → **1a (DB foundation)** ✅ + **1b (QuoteForm/UI)** ✅ tamamlandı. 1b
 - `serviceConvertQuoteToOrder(quoteId, createdBy?)` — ikinci parametre opsiyonel
 - Geçmiş `valid_until` olan accepted teklif dönüştürülemez → 400
 - Ürün eşleşmesi olmayan satırlar atlanır, warnings + notes'a yazılır
+
+## 2026-09-08 — `QuoteForm` başlıkları + `/quotes/new`in eksik h1'i (frontend)
+
+Teklif modülünün İŞLEVİNE dokunmayan sunum turu; ayrıntı
+`memory/project_frontend_renewal.md` ve
+`docs/audit/2026-09-08-quoteform-basliklar.md`.
+
+Teklif tarafını ilgilendiren üç kalıcı bilgi:
+
+1. **`QuoteForm` bastığı PDF'in EKRAN AYNASIDIR.** İki bölüm başlığı
+   (`Müşteri / Customer`, `Teklif Detayları / Quote Details`) marka mavisini
+   (`#0072BC`) `QuoteDocument.tsx`in `metaSectionHeadStyle`ı ile **paylaşır**.
+   Bu bir drift değil, kasıtlı ayna — griye çevirmek aynayı kırar. Gerçek
+   `<h2>` oldular ama `SectionHeader`a GİTMEDİLER; kapının `H2_EXCEPTIONS`
+   listesinde gerekçeli duruyorlar (+ dar refakatçi kural: dosyadaki her elle
+   `<h2 style={` `#0072BC` taşımak zorunda).
+2. **`QuoteForm`un `pageHeader` prop'u** (varsayılan `true`) sayfanın h1'ini
+   FORM basar. `quotes/[id]` `pageHeader={false}` geçer, çünkü sayfanın kendi
+   `PageHeader`ı var — aksi hâlde teklif numarası ve durum rozeti İKİ KEZ
+   basılır (2026-09-05 → 2026-09-08 arasında tam olarak bu oldu).
+   `enableInlineSend` bu iş için kullanılamaz: biri gönderim akışı, diğeri
+   sayfa kabuğu.
+3. **Teklif formunun baskı stilleri `globals.css` `@media print` içinde ve
+   KONUMA bağlı** (`.q-meta-col > :first-child`). Etiket adına bağlanamazlar —
+   2026-09-08'de `<div>`→`<h2>` dönüşümü eski `> div:first-child` seçicisini
+   sessizce düşürdü ve marka mavisi baskıda tamamen kayboldu. Kapı kuralı:
+   `gate/surface-consistency` "baskı seçicileri ETİKETE değil KONUMA bağlanır".
+

@@ -1,9 +1,23 @@
 # Roven — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-09-05_
+_Son güncelleme: 2026-09-08_
 
 > Bu bölüm yalnız **güncel durumu + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda ve `memory/current_focus.md`'de. Aşağıdaki indeks son dönem oturumlarına (commit + konu) hızlı bakış içindir; daha eski dönemler (Faz 2–3d AI Import, Sprint A–C, M-3 Rate Limiting, React Doctor, Teklif V2–V7 plan turları, Paraşüt Faz 1–11) git geçmişinde.
+
+**Son tamamlanan iş:** **`QuoteForm`un bölüm başlıkları + iki form sayfasının eksik h1'i** (2026-09-08; GREEN; **migration YOK**; saf sunum). Kullanıcı "QuoteForm'un bölüm başlıklarını da yapalım" dedi — Faz B kapanış kaydındaki TEK açık madde. Rapor: `docs/audit/2026-09-08-quoteform-basliklar.md`.
+
+**SEKİZ BAŞLIK, SIFIR BAŞLIK ELEMANI.** `QuoteForm.tsx`te h1/h2/h3 sayısı sıfırdı. **`/quotes/new` ölçüldü: toplam başlık 0 → 8** (h1 + 7 h2); `quotes/[id]` 1 → 8. Beşi ortak `SectionHeader`a gitti (10→11px, ls .7→.44px); **iki marka-mavisi belge başlığı (`#0072BC`) elle `<h2>` oldu, piksel farkı 0** — kullanıcı kararı: `QuoteDocument.tsx`in `metaSectionHeadStyle`ı basılan PDF'te aynı başlıkları `C.brand` ile çiziyor, form o belgenin EKRAN AYNASI; griye çevirmek aynayı kırardı. Gönder diyaloğunun adı (`aria-labelledby` hedefi) depodaki son elle yazılmış diyalog başlığıydı → `variant="dialog"` (13→16px **yakınsama**).
+
+**BU TURUN ASIL BULGUSU — BASKI SEÇİCİSİ ETİKETE BAĞLANMIŞTI.** `globals.css` `@media print`: `.q-meta-col > div:first-child`. `<div>`→`<h2>` dönüşümü onu **sessizce eşleşmez** hâle getiriyordu. **`emulateMedia({media:"print"})` ile ölçüldü (depoda baskı çıktısı bugüne kadar HİÇ ölçülmemişti):** düzeltmeden önce 10px / .7px / **rgb(17,17,17)** / gri ayraç — yani **marka mavisi baskıda tamamen düşüyordu**; sonra 7.5px / .3px / `#0072BC` / mavi ayraç. CI baskı almaz, kusur yeşil kapıdan geçerdi. **Ders: bir seçici, bağlandığı şeyin ETİKETİNİN değişmeyeceğini varsayamaz** ("görünmek ≠ olmak" dersinin üçüncü yüzü — bu kez `<div>`i anlamlı bir elemana YÜKSELTMEK stili düşürüyordu).
+
+**h1 BOŞLUĞU VE MÜKERRER GÖSTERİM.** `/quotes/new`in h1'i YOKTU (tek "başlık" tıklanamaz bir kırıntı çubuğuydu — segmentleri bağlantı bile değildi); `quotes/[id]`de ise geçen turun `PageHeader`ı ile formun kırıntısı **teklif numarasını ve durum rozetini İKİ KEZ** basıyordu. Çözüm: `QuoteForm`a `pageHeader?: boolean` (varsayılan **`true`** — prop'u unutan yeni taşıyıcı başlıksız değil, fazladan başlıklı kalır). `enableInlineSend` bilerek yeniden kullanılmadı (biri gönderim akışı, diğeri sayfa kabuğu). **Ek:** kardeş `OrderForm`da da aynı kusur çıktı — `/orders/new` + `/orders/[id]/edit` h1'siz, 14px `<div>` başlıklı → `PageHeader` (yeni kural doğduğu gün istisna taşımasın diye).
+
+**ÖLÇÜ ARACI İKİ KEZ BULGU OLDU.** (a) **Bayat CSS bir sunucu yeniden başlatmasını atlattı**: düzeltmeden SONRA da 10px okundu; `touch`, dev sunucusu restart'ı ve `.next/dev/build` silmek yetmedi — yalnız **`.next` tamamen silinince** taze CSS servis edildi. *Bir CSS iddiasını ölçmeden önce SERVİS EDİLEN çıktıyı doğrula.* (b) **Boşa giden mutasyon zayıf kuraldan ayırt edilemedi, ikinci kez**: K1'in ilk mutasyonu dosyadaki İLK `color: "#0072BC"`ı değiştirdi ama o dize `<h2>`de değil "TEKLİF | QUOTATION" bandındaydı → kural HAKLI olarak yeşil kaldı, SHA denetimi de HAKLI olarak uyarmadı (dosya gerçekten değişti). *Bir mutasyon da iddia ettiği sınırın içine düşmelidir.*
+
+**Kapı:** `form-consistency`e 3 yeni kural (**istisna BLANKET olmasın** — `QuoteForm`daki her elle `<h2 style={` `#0072BC` taşımalı; **form h1 kaynağı** — `QuoteForm`+`OrderForm` `PageHeader` basar, taşıyıcının kendi başlığı varsa form KAPATIR) + `CONVERTED`/`H2_EXCEPTIONS` girdileri; `surface-consistency`e **baskı seçicisi etikete bağlanamaz**. `title` desenine yine `\s` sınırı (**sınır dersinin 5. tekrarı**); `GLOBALS` ilk kez `stripComments`ten geçti (**kendi yorumun kuralı tetikler**, 6. kez). **6/6 kırmızı-kanıtlı.** tsc 0 · lint 0 · **501 dosya / 7010 test** · build 0 uyarı · **E2E 94/94 retries=0** · 10 tarayıcı ölçümü + baskı ölçümü temiz.
+
+**PLANDAN SAPMA (ölçümle gerekçeli):** `quotes/[id]:533`teki `quote-confirm-dialog-title` **taşınmadı** — yıkıcı işlemlerde `--danger-text`e dönüyor, yani ANLAMSAL renk taşıyor; `SectionHeader` bunu modellemiyor ve `style` sözleşmesi (28 çağrının hepsinde yalnız `margin*`) renk kaçışına açık değil. Üstelik deponun ortak `ConfirmModal`ı başlığını `tone="danger"`da bile `--text-primary` bırakıyor. İki yüzey ayrı "diyalog başlıkları" turuna kaydedildi.
 
 **Son tamamlanan iş:** **Faz B'nin son üç bileşeni — `NavLink` · `SectionHeader` · `Stat`** (2026-09-05; GREEN; **migration YOK**; saf sunum/istemci). Kullanıcı "üç bileşeni de yapalım" dedi. **FAZ B KAPANDI.** Üç dilim, üç commit (`4745cae` · `b05f23d` · `497d717`). Rapor: `docs/audit/2026-09-05-uc-bilesen.md`.
 

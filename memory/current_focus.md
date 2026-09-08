@@ -6,6 +6,57 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
 
+## 2026-09-08 — `QuoteForm` bölüm başlıkları + iki form sayfasının eksik h1'i
+
+Faz B'nin 2026-09-05 kapanış kaydındaki **tek açık madde**. Kullanıcı
+"QuoteForm'un bölüm başlıklarını da yapalım" dedi. Rapor
+`docs/audit/2026-09-08-quoteform-basliklar.md`.
+
+**Sekiz başlık, sıfır başlık elemanı.** `QuoteForm.tsx`te h1/h2/h3 sayısı
+SIFIRDI. Ölçüldü: `/quotes/new` **0 → 8 başlık** (h1 + 7 h2), `quotes/[id]`
+1 → 8. Beşi ortak `SectionHeader`a gitti (10→11px, ls .7→.44px); **iki
+marka-mavisi belge başlığı elle `<h2>` oldu, piksel farkı 0** — `QuoteDocument`
+basılan PDF'te aynı başlıkları `C.brand` ile çiziyor, form o belgenin EKRAN
+AYNASI. Gönder diyaloğunun adı depodaki son elle yazılmış diyalog başlığıydı
+→ `variant="dialog"` (13→16px yakınsama).
+
+**ASIL BULGU — baskı seçicisi ETİKETE bağlanmıştı.** `@media print`
+`.q-meta-col > div:first-child`; `<div>`→`<h2>` onu sessizce eşleşmez hâle
+getiriyordu. `emulateMedia({media:"print"})` ile ölçüldü (**depoda baskı
+çıktısı hiç ölçülmemişti**): önce 10px/`rgb(17,17,17)` — marka mavisi baskıda
+TAMAMEN düşüyordu; sonra 7.5px/`#0072BC`. CI baskı almaz. **Ders: bir seçici,
+bağlandığı şeyin ETİKETİNİN değişmeyeceğini varsayamaz** — "görünmek ≠ olmak"
+dersinin üçüncü yüzü, bu kez YÜKSELTMEK stili düşürüyordu.
+
+**h1 boşluğu + mükerrer.** `/quotes/new`in h1'i yoktu (tek "başlık" tıklanamaz
+bir kırıntıydı); `quotes/[id]`de geçen turun `PageHeader`ı ile formun kırıntısı
+numarayı ve rozeti İKİ KEZ basıyordu. `QuoteForm`a `pageHeader?: boolean`
+(varsayılan `true` — unutan taşıyıcı başlıksız değil fazladan başlıklı kalır).
+`enableInlineSend` bilerek yeniden kullanılmadı. Ek: `OrderForm`da da aynı
+kusur (`/orders/new`, `/orders/[id]/edit`) → `PageHeader`.
+
+**Ölçü aracı iki kez bulgu oldu.** (a) **Bayat CSS sunucu restart'ını atlattı** —
+düzeltmeden sonra da 10px okundu; `touch`, restart ve `.next/dev/build` silmek
+yetmedi, yalnız `.next` tamamen silinince taze CSS geldi. *Bir CSS iddiasını
+ölçmeden önce servis edilen çıktıyı doğrula.* (b) **Boşa giden mutasyon zayıf
+kuraldan ayırt edilemedi (2. kez)** — K1'in ilk mutasyonu dosyadaki ilk
+`color: "#0072BC"`ı değiştirdi ama o dize `<h2>`de değil başlık bandındaydı;
+kural haklı olarak yeşil kaldı. *Mutasyon da iddia ettiği sınırın içine
+düşmelidir.*
+
+**Kapı:** `form-consistency` +3 kural (istisna BLANKET olmasın · form h1
+kaynağı) + `CONVERTED`/`H2_EXCEPTIONS`; `surface-consistency` +1 (baskı
+seçicisi etikete bağlanamaz). `\s` sınırı (**5. tekrar**), `GLOBALS` ilk kez
+`stripComments`ten geçti (**kendi yorumun kuralı tetikler**, 6. kez).
+**6/6 kırmızı-kanıtlı.** tsc 0 · lint 0 · **501 dosya / 7010 test** · build 0
+uyarı · **E2E 94/94 retries=0**.
+
+**Plandan sapma:** `quotes/[id]:533` `quote-confirm-dialog-title` taşınmadı —
+yıkıcı işlemde `--danger-text`e dönüyor (anlamsal renk); `SectionHeader` bunu
+modellemiyor, `style` sözleşmesi yalnız boşluk. Ortak `ConfirmModal` da
+`tone="danger"`da başlığı `--text-primary` bırakıyor. İki yüzey ayrı
+"diyalog başlıkları" turuna kayıtlı.
+
 ## 2026-09-05 (2) — Yan çekmeceler ortak `Drawer`'a (Faz B'nin açık yarısı)
 
 2026-08-30 Modal turu 9 diyaloğu ortak çerçeveye almış ama yan çekmeceleri

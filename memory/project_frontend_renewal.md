@@ -32,7 +32,7 @@ metadata:
 
 **Kapı:** `surface-consistency` +7 · `form-consistency` +4 (**`<h2>` için bugüne kadar HİÇ kapı yoktu**) · `console-consistency` ada değil tipografiye bağlandı · üç yeni davranış testi (47 test). 18/18 kırmızı-kanıtlı. 501 dosya / 7006 test · E2E 94/94 · tüketici tarafında net −187 satır.
 
-**KAPSAM DIŞI, kayıtlı:** ~~`orders/[id]`+`quotes/[id]`ye `PageHeader`~~ → **EK TURDA KAPATILDI** (0→5 ve 0→1 başlık; `purchase/orders/[id]` emsali; kalan: `QuoteForm`un kendi bölüm başlıkları) · `KpiCard` (uçtan uca test kilidi) · `Fact` ×2 · `StatsCards` (ölü ama silinmesi yasak) · baskı belgeleri · landing. Kalan 4 DOM-mutasyonlu hover dosyası artık kapı allowlist'inde gerekçeli.
+**KAPSAM DIŞI, kayıtlı:** ~~`orders/[id]`+`quotes/[id]`ye `PageHeader`~~ → **EK TURDA KAPATILDI** (0→5 ve 0→1 başlık; `purchase/orders/[id]` emsali; `QuoteForm`un kendi bölüm başlıkları **2026-09-08'de KAPANDI**, aşağı bak) · `KpiCard` (uçtan uca test kilidi) · `Fact` ×2 · `StatsCards` (ölü ama silinmesi yasak) · baskı belgeleri · landing. Kalan 4 DOM-mutasyonlu hover dosyası artık kapı allowlist'inde gerekçeli.
 
 ---
 
@@ -74,3 +74,68 @@ Oluşturulacak (`src/components/ui/`): `DataTable.tsx`, `Card.tsx`, `Badge.tsx`,
 
 **Why:** Plan hazır ve kullanıcı bu dosyayı "başka bir tane vardı" diyerek 2026-04-23'te sordu — aktif bir sonraki iş olabilir.
 **How to apply:** Bu plana başlanmadan önce yukarıdaki 3 revizyon maddesini kullanıcıyla netleştir.
+
+
+## 2026-09-08 — `QuoteForm` bölüm başlıkları (Faz B'nin son açık maddesi)
+
+**Sekiz başlık, SIFIR başlık elemanı.** Ölçüldü: `/quotes/new` **0 → 8 başlık**
+(h1 + 7 h2), `quotes/[id]` 1 → 8; seviye atlaması 0, taşma 0 (2 tema ×
+{1440,390}). Beşi ortak `SectionHeader`a gitti (10→11px · ls .7→.44px · renk
+1 kademe). **İki marka-mavisi belge başlığı (`#0072BC`) ortak bileşene GİTMEDİ,
+elle `<h2>` oldu — piksel farkı 0**: `QuoteDocument.tsx`in
+`metaSectionHeadStyle`ı basılan PDF'te aynı başlıkları `C.brand` ile çiziyor,
+form o belgenin **ekran aynası**; griye çevirmek aynayı kırardı (kullanıcı
+kararı). Gönder diyaloğunun adı depodaki **son** elle yazılmış diyalog
+başlığıydı → `variant="dialog"`, 13→16px **yakınsama**.
+
+**ASIL BULGU — baskı seçicisi ETİKETE bağlanmıştı.** `globals.css`
+`@media print`: `.q-meta-col > div:first-child`. `<div>`→`<h2>` onu **sessizce
+eşleşmez** hâle getiriyordu. `page.emulateMedia({ media: "print" })` ile
+ölçüldü (**depoda baskı çıktısı bugüne kadar HİÇ ölçülmemişti**): düzeltme
+öncesi 10px / .7px / `rgb(17,17,17)` / gri ayraç — **marka mavisi baskıda
+tamamen düşüyordu**; sonrası 7.5px / .3px / `#0072BC` / mavi ayraç. CI baskı
+almaz. Seçiciler konuma bağlandı (`> :first-child`) ve etiket adı taşımaları
+kapıya yasaklandı. **Ders: bir seçici, bağlandığı şeyin ETİKETİNİN
+değişmeyeceğini varsayamaz** — "görünmek ≠ olmak"ın üçüncü yüzü: bu kez bir
+`<div>`i anlamlı bir elemana YÜKSELTMEK ona bağlı stili düşürüyordu.
+
+**h1 boşluğu + mükerrer gösterim.** `/quotes/new`in h1'i YOKTU (tek "başlık"
+tıklanamaz bir kırıntı çubuğuydu, segmentleri bağlantı bile değildi);
+`quotes/[id]`de ise geçen turun `PageHeader`ı ile formun kırıntısı **teklif
+numarasını ve durum rozetini İKİ KEZ** basıyordu — geçen turun kendi
+eklemesinin yan etkisi. `QuoteForm`a `pageHeader?: boolean`, **varsayılan
+`true`** (prop'u unutan yeni taşıyıcı başlıksız değil, fazladan başlıklı
+kalır). `enableInlineSend` bilerek yeniden KULLANILMADI: biri gönderim akışı,
+diğeri sayfa kabuğu. **Ek:** kardeş `OrderForm`da da aynı kusur —
+`/orders/new` + `/orders/[id]/edit` h1'siz, 14px `<div>` başlıklı → `PageHeader`
+(yeni kapı kuralı doğduğu gün istisna taşımasın diye).
+
+**Ölçü aracı iki kez bulgu oldu.** (a) **Bayat CSS bir sunucu yeniden
+başlatmasını atlattı** — düzeltmeden SONRA da 10px okundu; `touch`, dev
+sunucusu restart'ı ve `.next/dev/build` silmek yetmedi, yalnız **`.next`
+tamamen silinince** taze CSS servis edildi. *Bir CSS iddiasını ölçmeden önce
+SERVİS EDİLEN çıktıyı doğrula.* (b) **Boşa giden mutasyon zayıf kuraldan ayırt
+edilemedi (2. kez)** — K1'in ilk mutasyonu dosyadaki İLK `color: "#0072BC"`ı
+değiştirdi ama o dize `<h2>`de değil "TEKLİF | QUOTATION" bandındaydı; kural
+HAKLI olarak yeşil kaldı, SHA denetimi de HAKLI olarak uyarmadı. *Bir mutasyon
+da iddia ettiği sınırın içine düşmelidir.*
+
+**Kapı:** `form-consistency` +3 kural — **istisna BLANKET olmasın**
+(`H2_EXCEPTIONS`e bir dosya koymak o dosyanın TAMAMINI muaf tutar → `QuoteForm`
+içindeki her elle `<h2 style={` `#0072BC` taşımak zorunda) · **form h1 kaynağı**
+(`QuoteForm`+`OrderForm` `PageHeader` basar ve `title` verir; taşıyıcının kendi
+`PageHeader`ı varsa form kendininkini KAPATIR) · `CONVERTED` girdisi.
+`surface-consistency` +1: **baskı seçicisi etikete bağlanamaz**. `title`
+desenine yine `\s` sınırı (**sınır dersinin 5. tekrarı**); `GLOBALS` ilk kez
+`stripComments`ten geçirildi (**kendi gerekçe yorumun kuralı tetikler**,
+6. kez). **6/6 kırmızı-kanıtlı.** 501 dosya / **7010 test**.
+
+**KAPSAM DIŞI, kayıtlı:** baskı belgeleri (`QuoteDocument` 8px/.1em ·
+`PurchaseOrderDocument` .1em · `RfqDocument` 0.4 — üç ayrı imza, ortak
+"document" varyantı tek kullanıcılı olurdu) · meta ızgarasının form etiketleri
+(başlık değil etiket) · **iki diyalog başlığı** (`quotes/[id]:533` ve ortak
+`ConfirmModal`ın kendi 15px/650 başlığı) — ilki yıkıcı işlemde `--danger-text`e
+dönüyor, yani ANLAMSAL renk taşıyor; `SectionHeader` bunu modellemiyor ve
+`style` sözleşmesi (28 çağrının hepsinde yalnız `margin*`) renk kaçışına açık
+değil. Üstelik ortak `ConfirmModal` `tone="danger"`da bile başlığı
+`--text-primary` bırakıyor → kanonik davranış kırmızı başlık DEĞİL.
