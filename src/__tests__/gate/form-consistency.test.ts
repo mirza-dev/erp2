@@ -61,6 +61,8 @@ const HEADER_EXCEPTIONS: Record<string, string> = {
     "src/app/dashboard/purchase/rfqs/components/RfqDocument.tsx": "baskı belgesi (marka rengi), uygulama kabuğu değil",
     "src/app/gizlilik/page.tsx": "bağımsız hukuki belge sayfası, uygulama kabuğu dışında",
     "src/app/sifre-yenile/page.tsx": "kimlik kurtarma ekranı, uygulama kabuğu dışında (login emsali)",
+    "src/app/dashboard/quotes/preview/page.tsx":
+        "tam-ekran BASKI önizlemesi (position:fixed, kendi araç çubuğu); h1 belge kimliğidir (teklif no · durum), 20px sayfa başlığı burada yanlış olurdu",
 };
 
 describe("GATE — form ve başlık tipografisi", () => {
@@ -184,11 +186,40 @@ describe("GATE — form ve başlık tipografisi", () => {
             expect(code, `${rel}: PageHeader'a title verilmemiş`)
                 .toMatch(/<PageHeader[\s\S]{0,400}?\stitle=\{/);
         }
-        // Taşıyıcı sayfanın kendi `PageHeader`ı varsa form kendininkini KAPATMALI.
-        const host = stripComments(readFileSync(join(root, "src/app/dashboard/quotes/[id]/page.tsx"), "utf8"));
-        expect(host).toMatch(/<PageHeader[\s\n]/);
-        expect(host, "quotes/[id]: form da kendi başlığını basıyor → mükerrer numara + rozet")
-            .toMatch(/<QuoteForm[\s\S]{0,400}?pageHeader=\{false\}/);
+        // ── Kapatma kolu TAŞIYICI-BAĞIMSIZ ─────────────────────────────────
+        //
+        // 2026-09-08'de bu iddianın ikinci yarısı `quotes/[id]`ye SABİTLENMİŞTİ
+        // ve `OrderForm`un `pageHeader` muadili yoktu: üçüncü bir taşıyıcı
+        // gelse kural sessiz kalırdı. Artık iki şey ayrı ayrı kanıtlanıyor:
+        //   (a) HER formun bir kapatma kolu VAR (yoksa taşıyıcı çaresizdir),
+        //   (b) kendi `PageHeader`ını basan HER taşıyıcı o kolu KULLANIYOR.
+        for (const rel of FORMS) {
+            const code = stripComments(readFileSync(join(root, rel), "utf8"));
+            expect(code, `${rel}: pageHeader kapatma kolu yok — taşıyıcı mükerrer başlığı önleyemez`)
+                .toMatch(/pageHeader\?:\s*boolean/);
+            expect(code, `${rel}: pageHeader varsayılanı true olmalı (unutan taşıyıcı BAŞLIKSIZ kalmasın)`)
+                .toMatch(/pageHeader\s*=\s*true/);
+        }
+
+        // Formu gömen HER sayfa taranır — liste elle tutulmaz.
+        const FORM_TAGS: Record<string, string> = {
+            "src/app/dashboard/quotes/_components/QuoteForm.tsx": "QuoteForm",
+            "src/app/dashboard/orders/OrderForm.tsx": "OrderForm",
+        };
+        let hostsChecked = 0;
+        for (const { path, code } of FILES) {
+            if (!/<PageHeader[\s\n]/.test(code)) continue;
+            for (const tag of Object.values(FORM_TAGS)) {
+                if (!new RegExp(`<${tag}[\\s\\n/>]`).test(code)) continue;
+                hostsChecked++;
+                expect(code, `${path}: kendi PageHeader'ı VAR ama <${tag}> pageHeader={false} almıyor → mükerrer başlık`)
+                    .toMatch(new RegExp(`<${tag}[\\s\\S]{0,400}?pageHeader=\\{false\\}`));
+            }
+        }
+        // Anti-vacuous: bugün tam bir taşıyıcı var (`quotes/[id]`). Sıfıra
+        // düşerse döngü hiç koşmaz ve kural sessizce işlevsizleşir.
+        expect(hostsChecked, "form gömen + kendi PageHeader'ı olan taşıyıcı bulunamadı — kural boşa düştü")
+            .toBeGreaterThanOrEqual(1);
     });
 
     it("dönüşen yüzeyler BÜYÜK HARF bölüm etiketini geri YAZAMAZ", () => {
@@ -226,6 +257,55 @@ describe("GATE — form ve başlık tipografisi", () => {
             .filter(f => !f.includes("__tests__"))
             .filter(f => /<SectionHeader\b/.test(readFileSync(f, "utf8")));
         expect(users.length, "SectionHeader kullanan dosya").toBeGreaterThanOrEqual(20);
+    });
+
+    it("başlık RENGİ `style` ile sızdırılamaz — anlamsal renk `tone`'dan gelir", () => {
+        const sh = stripComments(readFileSync(join(root, "src/components/ui/SectionHeader.tsx"), "utf8"));
+
+        // `style` sözleşmesi 2026-09-05'ten beri "yalnız BOŞLUK" diyordu ama
+        // YALNIZ YORUMDAYDI: tip `CSSProperties`ti ve slot'suz çağrıda `style`
+        // en son yayıldığı için tipografiyi EZEBİLİYORDU. Tip daraltılınca
+        // ölçüldü ki BEŞ çağrı yeri sözleşmeyi zaten deliyordu (3 renk,
+        // 2 satır yüksekliği). Kaçış kapısı artık TİPTE kapalı.
+        expect(sh, "style tipi daraltılmamış — renk/ölçek yeniden sızabilir")
+            .toMatch(/style\?:\s*SectionHeaderSpacing/);
+        const spacing = sh.match(/export type SectionHeaderSpacing = Pick<[\s\S]*?>;/)?.[0] ?? "";
+        expect(spacing, "SectionHeaderSpacing tanımı bulunamadı").not.toBe("");
+        for (const forbidden of ["color", "fontSize", "fontWeight", "lineHeight", "letterSpacing", "textTransform"]) {
+            expect(spacing, `SectionHeaderSpacing '${forbidden}' geçiriyor`).not.toContain(forbidden);
+        }
+
+        // Ton bir renk haritasıdır; ölçek/ağırlık varyanttan gelir.
+        expect(sh).toMatch(/const TONE_COLOR: Record<SectionHeaderTone/);
+        expect(sh).toMatch(/danger:\s*"var\(--danger-text\)"/);
+
+        // Anti-vacuous: `tone` gerçekten kullanılıyor olmalı, yoksa kural
+        // kullanılmayan bir prop'u korur. (`FILES` yalnız `src/app`ı tarar;
+        // ton kullanıcılarının çoğu `src/components`ta → açık liste.)
+        const TONE_USERS = [
+            "src/app/dashboard/products/[id]/page.tsx",
+            "src/app/dashboard/quotes/[id]/page.tsx",
+            "src/components/dashboard/AISummaryCard.tsx",
+            "src/components/settings/ResetDemoSection.tsx",
+            "src/components/ui/Modal.tsx",
+        ];
+        for (const rel of TONE_USERS) {
+            expect(stripComments(readFileSync(join(root, rel), "utf8")), `${rel}: tone kullanılmıyor`)
+                .toMatch(/<SectionHeader[\s\S]{0,240}?\stone=/);
+        }
+
+        // Ortak onay diyaloğu tonu BAŞLIĞA da indiriyor (2026-09-10'a kadar
+        // yıkıcılık işareti yalnız butondaydı).
+        const modal = stripComments(readFileSync(join(root, "src/components/ui/Modal.tsx"), "utf8"));
+        expect(modal, "ConfirmModal başlığı hâlâ elle yazılmış")
+            .toMatch(/<SectionHeader[\s\S]{0,200}?id="confirm-modal-title"/);
+        expect(modal, "ConfirmModal tonu başlığa inmiyor")
+            .toMatch(/tone=\{tone === "danger" \? "danger" : "default"\}/);
+
+        // Depodaki SON elle yazılmış diyalog başlığı da taşındı.
+        const quoteDetail = stripComments(readFileSync(join(root, "src/app/dashboard/quotes/[id]/page.tsx"), "utf8"));
+        expect(quoteDetail, "quote-confirm-dialog-title hâlâ elle yazılmış")
+            .toMatch(/<SectionHeader[\s\S]{0,240}?id="quote-confirm-dialog-title"/);
     });
 
     it("üç varyantın tipografisi TEK dosyada ve BÜYÜK HARF form etiketine sızmaz", () => {

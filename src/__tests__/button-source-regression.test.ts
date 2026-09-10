@@ -100,7 +100,11 @@ describe("premium button source regression", () => {
 
         const orderForm = readFileSync(join(projectRoot, DETAIL_BUTTON_FILES.orderForm), "utf8");
         expect(orderForm).toContain("Button, { ButtonLink }");
-        expect(orderForm).toContain("leftIcon={<ArrowLeft");
+        // 2026-09-10: geri gezinme ikonu artık ÇAĞIRANDA değil ortak
+        // `BackLink`te (beş lehçe tek kaynağa indi). İddianın NİYETİ aynı —
+        // "geri gezinme buton dilinden gelir, ham <Link> değil" — yalnız
+        // kaynağı taşındı.
+        expect(orderForm).toContain("<BackLink href={backHref}>");
         expect(orderForm).toContain("leftIcon={<Trash2");
         expect(orderForm).not.toMatch(/<Link href=\{backHref\}>/);
 

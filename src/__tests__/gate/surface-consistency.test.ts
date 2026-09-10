@@ -224,12 +224,77 @@ describe("GATE: yüzey + buton/kategori tutarlılığı", () => {
         }
     });
 
-    it("başlıksız sayfa kalmaz — Uyarılar ve Veri Aktarım kanonik PageHeader kullanır", () => {
-        // Uyarılar'ın HİÇ <h1>'i yoktu; Veri Aktarım'ınki 14px <div>'di.
-        for (const name of ["Uyarılar", "Veri Aktarım Merkezi"] as const) {
-            const src = stripComments(read(CONVERTED[name]));
-            expect(src, `${name}: PageHeader render EDİLMİYOR`).toMatch(/<PageHeader[\s\n]/);
-            expect(src, `${name}: elle küçük başlık geri gelmiş`)
+    it("başlıksız sayfa kalmaz — TÜM dashboard rotaları taranır", () => {
+        // 2026-08-31'de bu kural İKİ DOSYALIK bir allowlist üzerinde yazılmıştı
+        // (Uyarılar'ın hiç <h1>'i yoktu, Veri Aktarım'ınki 14px <div>'di).
+        // 2026-09-10 ölçümü üçüncüsünü buldu: `/dashboard/import/excel` de
+        // başlıksızdı ve başlığı TAM OLARAK bu kuralın yasakladığı imzayla
+        // yazılmıştı — yani kusur kuralın kapsamı dışında, kuralın kendi
+        // deseniyle duruyordu. *Bir kapı yalnız BAKTIĞI yerde koruma sağlar*
+        // (2026-09-05 stat dersi). Kapsam artık tüm rotalar.
+        const routes = walkSrc(join(root, "src/app/dashboard"))
+            .filter(f => /\/page\.tsx$/.test(f))
+            .map(f => relative(root, f));
+        expect(routes.length, "rota taraması boş — kural sahte-yeşil olurdu").toBeGreaterThan(30);
+
+        // Başlığı KENDİ dosyasında basmayan rotalar: gerekçe zorunlu.
+        const HEADLESS_OK: Record<string, string> = {
+            "src/app/dashboard/orders/page.tsx": "başlık `OrdersClient.tsx`te (RSC kabuk + istemci liste)",
+            "src/app/dashboard/customers/page.tsx": "başlık `CustomersClient.tsx`te",
+            "src/app/dashboard/quotes/page.tsx": "başlık `QuotesClient.tsx`te",
+            "src/app/dashboard/vendors/page.tsx": "başlık `VendorsClient.tsx`te",
+            "src/app/dashboard/purchase/orders/page.tsx": "başlık `PurchaseOrdersClient.tsx`te",
+            "src/app/dashboard/orders/new/page.tsx": "gövdesi `OrderForm` — başlığı form basar (pageHeader)",
+            "src/app/dashboard/orders/[id]/edit/page.tsx": "gövdesi `OrderForm` — başlığı form basar (pageHeader)",
+            "src/app/dashboard/quotes/new/page.tsx": "gövdesi `QuoteForm` — başlığı form basar (pageHeader)",
+            "src/app/dashboard/import/extract/[documentId]/page.tsx": "başlık `ExtractionReview.tsx`te",
+            "src/app/dashboard/settings/note-templates/page.tsx": "yalnız `redirect()` — render eden gövdesi yok",
+            "src/app/dashboard/purchase/orders/[id]/print/page.tsx": "BASKI belgesi (`PurchaseOrderDocument`), uygulama kabuğu değil",
+        };
+
+        const headless: string[] = [];
+        for (const rel of routes) {
+            const code = stripComments(read(rel));
+            // `>` ZORUNLU: `settings/page.tsx` başlığını çıplak `<h1>` olarak
+            // yazıyor; yalnız `[\s\n]` arayan desen onu KAÇIRIYORDU ve sayfa
+            // "başlıksız" listesine düşüyordu. (Sınır dersinin bir tekrarı:
+            // bir desen, iddia ettiği kavramın TÜM yazımlarını kapsamalı.)
+            if (/<PageHeader[\s\n]/.test(code) || /<h1[\s\n>]/.test(code)) continue;
+            headless.push(rel);
+        }
+        expect(headless.sort(), "başlıksız rota kümesi değişti — ya başlık ekle ya gerekçeli listeye al")
+            .toEqual(Object.keys(HEADLESS_OK).sort());
+        for (const [rel, why] of Object.entries(HEADLESS_OK)) {
+            expect(why.length, `${rel} için gerekçe çok kısa`).toBeGreaterThan(25);
+        }
+
+        // ── Negatif iddia BİLEREK DAR ──────────────────────────────────────
+        //
+        // `14px/600/--text-primary` imzası repo genelinde AMBİGÜ: aynı değerler
+        // diyalog başlığında, boş-durum metninde, adım etiketinde ve "yükleniyor"
+        // satırında da geçiyor (ölçüldü: 10+ yer, hiçbiri sayfa başlığı değil).
+        // Kural tüm rotalara açılsaydı gürültü üretir ve kapatılırdı — deponun
+        // "bir kural iddia ettiğinden FAZLASINI söylememeli" dersi (2026-09-05
+        // negatif stat kuralı sekme şeridini de yakalamıştı).
+        //
+        // Bu yüzden yasak, başlığı GERÇEKTEN bu imzayla yazılmışken dönüşen üç
+        // dosyaya kilitli; asıl koruma yukarıdaki POZİTİF kapsam iddiasıdır
+        // (her rota ya başlık basar ya gerekçeli istisnadır) — `import/excel`i
+        // yakalayan da oydu.
+        const TITLE_CONVERTED = [
+            CONVERTED["Uyarılar"],
+            CONVERTED["Veri Aktarım Merkezi"],
+            "src/app/dashboard/import/excel/page.tsx",
+        ];
+        for (const rel of TITLE_CONVERTED) {
+            const code = stripComments(read(rel));
+            expect(code, `${rel}: PageHeader render EDİLMİYOR`).toMatch(/<PageHeader[\s\n]/);
+        }
+        // `import/excel`in başlığı imzayı hâlâ taşıyabilir (yükleniyor satırları)
+        // — bu yüzden iddia yalnız ilk ikide, yani imzanın SAYFA BAŞLIĞI olduğu
+        // dosyalarda yapılır.
+        for (const rel of TITLE_CONVERTED.slice(0, 2)) {
+            expect(stripComments(read(rel)), `${rel}: elle küçük sayfa başlığı geri gelmiş`)
                 .not.toMatch(/fontSize:\s*"14px",\s*fontWeight:\s*600,\s*color:\s*"var\(--text-primary\)"/);
         }
     });
