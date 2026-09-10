@@ -170,6 +170,8 @@ export default function SetupStatusPanel({ onOpenStep, disabled, disabledTooltip
                 type="button"
                 onClick={() => setExpandedOverride(!expanded)}
                 aria-expanded={expanded}
+                // Ölçüm: 352×**41.5** — 2.5px eksik. Tam genişlikte açılır başlık.
+                className="tap-44"
                 style={{
                     display: "flex", alignItems: "center", gap: "8px", width: "100%",
                     padding: "11px 14px", background: "transparent", border: "none",

@@ -374,7 +374,7 @@ export default function AISummaryCard() {
                     padding: "10px 14px",
                     marginBottom: "10px",
                 }}>
-                    <SectionHeader level={3} style={{ color: "var(--danger-text)", marginBottom: "6px" }}>
+                    <SectionHeader level={3} tone="danger" style={{ marginBottom: "6px" }}>
                         Anomali Tespiti
                     </SectionHeader>
                     {data.anomalies.map((a, i) => (

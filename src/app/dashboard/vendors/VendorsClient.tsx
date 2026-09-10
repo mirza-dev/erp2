@@ -307,6 +307,7 @@ export default function VendorsClient(props: VendorsClientProps) {
             header: (
                 <input
                     type="checkbox"
+                    className="tap-44"
                     checked={isPageAllSelected(pageIds)}
                     ref={el => { if (el) el.indeterminate = isPageIndeterminate(pageIds); }}
                     onChange={() => toggleAll(pageIds)}
@@ -318,6 +319,7 @@ export default function VendorsClient(props: VendorsClientProps) {
             cell: v => v.is_active ? (
                 <input
                     type="checkbox"
+                    className="tap-44"
                     checked={selectedIds.has(v.id)}
                     onChange={() => toggleOne(v.id)}
                     onClick={e => e.stopPropagation()}
@@ -464,6 +466,7 @@ export default function VendorsClient(props: VendorsClientProps) {
                 <label style={{ fontSize: "12px", color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: "6px", cursor: "pointer" }}>
                     <input
                         type="checkbox"
+                        className="tap-44-v"
                         checked={showAll}
                         onChange={e => navigate({ showAll: e.target.checked, page: 1 })}
                         style={{ cursor: "pointer" }}

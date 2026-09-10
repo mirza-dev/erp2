@@ -191,6 +191,7 @@ export default function QuotesClient(props: QuotesClientProps) {
             header: canDeleteQuotes ? (
                 <input
                     type="checkbox"
+                    className="tap-44"
                     checked={isPageAllSelected(deletablePageIds)}
                     ref={el => { if (el) el.indeterminate = isPageIndeterminate(deletablePageIds); }}
                     onChange={() => toggleAll(deletablePageIds)}
@@ -204,6 +205,7 @@ export default function QuotesClient(props: QuotesClientProps) {
                 <span onClick={e => e.stopPropagation()}>
                     <input
                         type="checkbox"
+                        className="tap-44"
                         checked={selectedIds.has(q.id)}
                         onChange={() => toggleOne(q.id)}
                         onClick={e => e.stopPropagation()}

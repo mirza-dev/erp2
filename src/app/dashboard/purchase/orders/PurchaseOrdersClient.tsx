@@ -180,6 +180,7 @@ export default function PurchaseOrdersClient(props: PurchaseOrdersClientProps) {
             header: (
                 <input
                     type="checkbox"
+                    className="tap-44"
                     checked={isPageAllSelected(cancellablePageIds)}
                     ref={el => { if (el) el.indeterminate = isPageIndeterminate(cancellablePageIds); }}
                     onChange={() => toggleAll(cancellablePageIds)}
@@ -193,6 +194,7 @@ export default function PurchaseOrdersClient(props: PurchaseOrdersClientProps) {
                 <span style={{ display: "inline-flex" }} onClick={e => e.stopPropagation()}>
                     <input
                         type="checkbox"
+                        className="tap-44"
                         checked={selectedIds.has(o.id)}
                         onChange={() => toggleOne(o.id)}
                         onClick={e => e.stopPropagation()}

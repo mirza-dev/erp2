@@ -41,7 +41,7 @@ export function CalendarNoteDetailModal({ note, onClose, onEdit, onDeleted, isDe
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "12px" }}>
                 <div style={{ minWidth: 0 }}>
                     <VisibilityBadge visibility={note.visibility} />
-                    <SectionHeader variant="dialog" style={{ marginTop: "10px", lineHeight: 1.35 }}>{note.title}</SectionHeader>
+                    <SectionHeader variant="dialog" style={{ marginTop: "10px" }}>{note.title}</SectionHeader>
                 </div>
                 <Button variant="icon" size="md" iconOnly aria-label="Kapat" onClick={onClose}><X size={15} /></Button>
             </div>

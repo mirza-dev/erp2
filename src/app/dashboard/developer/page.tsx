@@ -214,7 +214,12 @@ export default function DeveloperOverviewPage() {
                     padding: `0 ${CONSOLE_GUTTER}`,
                 }}>
                     <SectionHeader variant="title" style={{ padding: "12px 0 8px" }}>Son Olaylar</SectionHeader>
-                    <Link href="/dashboard/developer/logs" style={linkStyle}>Tümü →</Link>
+                    {/* Ortak `.row-link` — Genel Bakış panellerindeki "Tümü →"
+                        ile AYNI kavram ve o zaten bu sınıfı kullanıyor
+                        (`RealPanels.tsx` ×3). Yerel `linkStyle` bir kopyaydı;
+                        sınıf hem tek kaynağı hem de `tap-44` hit-area'sını
+                        getiriyor (ölçüm: 46.7×**18**). */}
+                    <Link href="/dashboard/developer/logs" className="row-link">Tümü →</Link>
                 </div>
                 {recentActivity.length === 0 ? (
                     <EmptyState

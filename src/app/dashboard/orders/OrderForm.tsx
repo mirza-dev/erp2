@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
-import { ArrowLeft, Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2 } from "lucide-react";
 import { formatCurrency, safeRandomUUID } from "@/lib/utils";
 import { roundMoney } from "@/lib/money-utils";
 import { type Customer, type Product, type OrderLineItem } from "@/lib/mock-data";
@@ -15,6 +15,7 @@ import { dateDaysFromToday, localISODate } from "@/lib/stock-utils";
 import { fieldStyle } from "@/components/ui/Input";
 import SectionHeader from "@/components/ui/SectionHeader";
 import PageHeader from "@/components/ui/PageHeader";
+import BackLink from "@/components/ui/BackLink";
 
 // ── Shared types ───────────────────────────────────────────────
 
@@ -40,6 +41,23 @@ export interface OrderFormProps {
     mode: "new" | "edit";
     orderId?: string;          // edit only
     initial?: OrderFormInitial; // edit prefill
+    /**
+     * Formun KENDİ sayfa başlığını (geri kırıntısı + `PageHeader`) basıp
+     * basmayacağı. Varsayılan `true`.
+     *
+     * `QuoteForm`la BİREBİR aynı sözleşme ve aynı gerekçe: varsayılanın `true`
+     * olması bilinçli — prop'u unutan yeni bir taşıyıcı BAŞLIKSIZ değil,
+     * fazladan başlıklı kalır; sessiz erişilebilirlik kaybı yerine gürültülü
+     * fazlalık.
+     *
+     * 2026-09-08'de `QuoteForm` bu prop'u aldı ama kardeşi almadı ve kapının
+     * "taşıyıcının kendi başlığı varsa form KAPATIR" yarısı `quotes/[id]`ye
+     * SABİTLENDİ — üçüncü bir taşıyıcı gelse kural sessiz kalırdı. Bugün
+     * `OrderForm`un iki taşıyıcısının da kendi `PageHeader`ı yok, yani
+     * mükerrer üretemez; prop davranışı değiştirmiyor, kuralı
+     * TAŞIYICI-BAĞIMSIZ hale getiriyor.
+     */
+    pageHeader?: boolean;
 }
 
 interface OrderLine {
@@ -85,7 +103,7 @@ const thStyle: React.CSSProperties = {
 // farklı duruyordu (2026-08-24 tespiti).
 const inputStyle: React.CSSProperties = fieldStyle("sm");
 
-export default function OrderForm({ mode, orderId, initial }: OrderFormProps) {
+export default function OrderForm({ mode, orderId, initial, pageHeader = true }: OrderFormProps) {
     const { customers } = useCustomers();
     const { products } = useProducts();
     const { addOrder } = useOrderMutations();
@@ -341,11 +359,10 @@ export default function OrderForm({ mode, orderId, initial }: OrderFormProps) {
                 2026-08-31'de kapattığı kalıbın aynısı, iki sayfada açık kalmıştı.
                 Düzen `orders/[id]` emsaline oturuyor: geri bağlantısı AYRI
                 satırda, altında `PageHeader`. */}
+            {pageHeader && (
             <div>
                 <div style={{ marginBottom: "8px" }}>
-                    <ButtonLink href={backHref} variant="secondary" size="sm" leftIcon={<ArrowLeft size={14} />}>
-                        {isEdit ? "Sipariş" : "Siparişler"}
-                    </ButtonLink>
+                    <BackLink href={backHref}>{isEdit ? "Sipariş" : "Siparişler"}</BackLink>
                 </div>
                 <PageHeader
                     title={isEdit ? `${breadcrumbLabel} — Düzenle` : "Yeni Sipariş"}
@@ -380,6 +397,7 @@ export default function OrderForm({ mode, orderId, initial }: OrderFormProps) {
                     ) : undefined}
                 />
             </div>
+            )}
 
             {/* Main grid */}
             <div style={{
@@ -412,6 +430,8 @@ export default function OrderForm({ mode, orderId, initial }: OrderFormProps) {
                         <div ref={dropdownRef} style={{ position: "relative" }}>
                             <button
                                 onClick={() => setDropdownOpen(!dropdownOpen)}
+                                // Ölçüm: 320×**35.5**. Tam genişlikte, tek başına.
+                                className="tap-44"
                                 style={{
                                     width: "100%",
                                     fontSize: "13px",

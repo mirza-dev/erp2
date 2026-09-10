@@ -167,7 +167,7 @@ export default function DeveloperLogsPage() {
                         style={{ width: "auto", minWidth: "200px", flex: 1 }}
                     />
                 </div>
-                <div style={{
+                <div className="tap-wrap-row" style={{
                     display: "flex",
                     gap: "6px",
                     flexWrap: "wrap",
@@ -198,6 +198,12 @@ export default function DeveloperLogsPage() {
                         <button
                             type="button"
                             onClick={() => setFilter({ sources: "" })}
+                            // Çip satırındaki komşuları `Button size="xs"` ve onlar
+                            // zaten 44'lük kutu taşıyor; bu tek kontrol dışarıda
+                            // kalmıştı (ölçüm: ~19px). Yalnız DİKEY büyür —
+                            // satır yatayda kayıyor, tam genişleme komşu çipin
+                            // görünür alanına girerdi.
+                            className="tap-44-v"
                             style={{
                                 fontSize: "11.5px", padding: "4px 8px", border: "none",
                                 background: "transparent", color: "var(--text-tertiary)",
@@ -274,6 +280,9 @@ export default function DeveloperLogsPage() {
                                             type="button"
                                             onClick={() => setFilter({ requestId: entry.requestId! })}
                                             title="Bu isteğin tüm olaylarını göster"
+                                            // Kayıt satırının İÇİNDE, komşularıyla aynı
+                                            // taban çizgisinde duruyor → yalnız dikey.
+                                            className="tap-44-v"
                                             style={{
                                                 border: "none", background: "transparent", cursor: "pointer",
                                                 padding: 0, color: "var(--accent-text)",

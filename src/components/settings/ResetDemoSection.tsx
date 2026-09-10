@@ -116,7 +116,7 @@ export default function ResetDemoSection() {
                 borderRadius: "8px",
             }}
         >
-            <SectionHeader style={{ color: "var(--danger-text)" }}>
+            <SectionHeader tone="danger">
                 Tehlikeli Bölge
             </SectionHeader>
             <div

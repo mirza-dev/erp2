@@ -76,7 +76,9 @@ export default function QuotePreviewPage() {
         return (
             <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "var(--bg-primary)", display: "grid", placeItems: "center" }}>
                 <div style={{ textAlign: "center", color: "var(--text-secondary)" }}>
-                    <div style={{ fontSize: "16px", marginBottom: "8px", color: "var(--text-primary)" }}>Önizleme verisi bulunamadı</div>
+                    {/* Bu dal da başlıksızdı: 16px bir `<div>`. Boş/hata durumu
+                        da bir SAYFA — ekran okuyucu için adı olmalı. */}
+                    <h1 style={{ fontSize: "16px", fontWeight: 400, marginBottom: "8px", marginTop: 0, color: "var(--text-primary)" }}>Önizleme verisi bulunamadı</h1>
                     <div style={{ fontSize: "12px", marginBottom: "20px" }}>Formu doldurup tekrar deneyin.</div>
                     <Button leftIcon={<ArrowLeft size={14} />} onClick={() => router.push("/dashboard/quotes/new")}>Forma Dön</Button>
                 </div>
@@ -134,9 +136,20 @@ export default function QuotePreviewPage() {
                         >
                             Formu Düzenle
                         </Button>
-                        <span style={{ fontSize: "11px", color: "var(--text-tertiary)" }}>
+                        {/* 2026-09-10: bu `<span>` gerçek bir `<h1>` oldu.
+                            Sayfanın başlık sayısı SIFIRDI — `topbar-title.ts`
+                            onu "Teklif Önizleme" diye tanıyor ama DOM'da hiçbir
+                            başlık elemanı yoktu. Belge kimliği (teklif numarası)
+                            zaten burada duruyordu; görünmek ile OLMAK arasındaki
+                            farkı kapatmak için etiketi değişti, stili DEĞİL —
+                            `margin: 0` dışında piksel farkı yok.
+
+                            İçindeki `QuoteDocument` bilerek başlıksız kalıyor:
+                            o bir BASKI belgesi, uygulama kabuğu değil (emsal:
+                            `RfqDocument` `HEADER_EXCEPTIONS`te). */}
+                        <h1 style={{ fontSize: "11px", fontWeight: 400, color: "var(--text-tertiary)", margin: 0 }}>
                             {data.quoteNo} · {{ draft: "Taslak", sent: "Gönderildi", accepted: "Kabul Edildi", rejected: "Reddedildi", expired: "Süresi Doldu" }[data.status] ?? data.status}
-                        </span>
+                        </h1>
                     </div>
 
                     <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>

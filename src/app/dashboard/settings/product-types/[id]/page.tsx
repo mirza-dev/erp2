@@ -25,6 +25,7 @@ import { fieldStyle, labelStyle as sharedLabelStyle } from "@/components/ui/Inpu
 import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 import SectionHeader from "@/components/ui/SectionHeader";
 import Stat from "@/components/ui/Stat";
+import BackLink from "@/components/ui/BackLink";
 
 const FIELD_TYPE_LABELS: Record<ProductFieldType, string> = {
     text: "Metin",
@@ -450,7 +451,7 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
     if (error || !template) {
         return (
             <div style={pageStyle}>
-                <Link href="/dashboard/settings/product-types" style={{ color: "var(--text-tertiary)", textDecoration: "none", fontSize: "13px" }}>← Teknik Şablonlar</Link>
+                <BackLink href="/dashboard/settings/product-types">Teknik Şablonlar</BackLink>
                 <div role="alert" style={{ marginTop: "16px", color: "var(--danger-text)" }}>{error ?? "Teknik şablon bulunamadı."}</div>
             </div>
         );
@@ -550,7 +551,7 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
 
     return (
         <div style={pageStyle}>
-            <Link href="/dashboard/settings/product-types" style={{ color: "var(--text-tertiary)", textDecoration: "none", fontSize: "13px" }}>← Teknik Şablonlar</Link>
+            <BackLink href="/dashboard/settings/product-types">Teknik Şablonlar</BackLink>
 
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: "16px", marginTop: "12px", marginBottom: "18px" }}>
                 <div>
@@ -764,7 +765,7 @@ export default function ProductTypeDetailPage({ params }: { params: Promise<{ id
                             </label>
                         )}
                         <label style={{ display: "flex", alignItems: "center", gap: "8px", marginTop: "12px", fontSize: "13px", color: "var(--text-secondary)" }}>
-                            <input aria-label="Zorunlu alan" type="checkbox" checked={fieldDraft.required} onChange={event => setFieldDraft(prev => ({ ...prev, required: event.target.checked }))} />
+                            <input aria-label="Zorunlu alan" type="checkbox" className="tap-44-v" checked={fieldDraft.required} onChange={event => setFieldDraft(prev => ({ ...prev, required: event.target.checked }))} />
                             Bu alan ürünlerde zorunlu olsun
                         </label>
                         {fieldError && <div role="alert" style={{ marginTop: "10px", color: "var(--danger-text)", fontSize: "12px" }}>{fieldError}</div>}

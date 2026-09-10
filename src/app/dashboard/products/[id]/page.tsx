@@ -19,6 +19,7 @@ import { missingRequiredTechnicalFields } from "@/lib/technical-templates";
 import { fieldStyle, labelStyle as sharedLabelStyle } from "@/components/ui/Input";
 import SectionHeader from "@/components/ui/SectionHeader";
 import Stat, { StatGrid } from "@/components/ui/Stat";
+import BackLink from "@/components/ui/BackLink";
 
 // Mirror of server-side ALLOWED_MIME — client-safe (no server module imports).
 // Source of truth: src/lib/supabase/product-attachments.ts ALLOWED_MIME.
@@ -875,9 +876,7 @@ export default function ProductDetailPage() {
             `}</style>
             {/* Back breadcrumb */}
             <div>
-                <Link href="/dashboard/products" style={{ fontSize: "12px", color: "var(--text-tertiary)", textDecoration: "none" }}>
-                    ← Ürünler
-                </Link>
+                <BackLink href="/dashboard/products">Ürünler</BackLink>
             </div>
 
             {/* Header */}
@@ -1031,7 +1030,7 @@ export default function ProductDetailPage() {
                         borderRadius: "6px",
                     }}
                 >
-                    <SectionHeader style={{ color: "var(--warning-text)", marginBottom: 0 }}>
+                    <SectionHeader tone="warning" style={{ marginBottom: 0 }}>
                         Aktif Uyarılar ({alerts.length})
                     </SectionHeader>
                     {alerts.slice(0, 3).map(a => (

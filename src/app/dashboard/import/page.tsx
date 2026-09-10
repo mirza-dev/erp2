@@ -222,6 +222,7 @@ export default function ImportPage() {
             <Card
                 as="section"
                 aria-label="Excel şablonları"
+                className="tap-wrap-row"
                 style={{
                     display: "flex", alignItems: "center", gap: "8px", flexWrap: "wrap",
                     padding: "10px 14px",
@@ -236,6 +237,7 @@ export default function ImportPage() {
                         href={tpl.href}
                         download
                         title={`${tpl.title} — ${tpl.columnCount} sütun · ${tpl.requiredCount} zorunlu`}
+                        className="tap-44-v"
                         style={{
                             fontSize: "11px", padding: "4px 9px", borderRadius: "5px",
                             border: "var(--line-width) solid var(--border-tertiary)",

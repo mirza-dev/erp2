@@ -235,7 +235,7 @@ export default function NewRfqPage() {
                             const sug = suggestions.get(v.id);
                             return (
                                 <label key={v.id} style={{ display: "flex", alignItems: "flex-start", gap: "8px", padding: "7px 10px", borderRadius: "6px", cursor: "pointer", fontSize: "13px", border: sug ? "1px solid var(--accent)" : "0.5px solid var(--border-tertiary)", background: selected ? "var(--accent-bg)" : "var(--bg-tertiary)", color: "var(--text-primary)" }}>
-                                    <input type="checkbox" checked={selected} onChange={() => toggleVendor(v.id)} aria-label={v.name} style={{ marginTop: "2px" }} />
+                                    <input type="checkbox" className="tap-44" checked={selected} onChange={() => toggleVendor(v.id)} aria-label={v.name} style={{ marginTop: "2px" }} />
                                     <span>
                                         {v.name}
                                         {sug && <span style={{ marginLeft: "6px", fontSize: "10px", fontWeight: 600, color: "var(--accent-text)", background: "var(--accent-bg)", padding: "1px 6px", borderRadius: "4px" }}>Önerilen</span>}

@@ -190,7 +190,7 @@ const Sidebar = memo(function Sidebar({ onNavigate }: SidebarProps) {
             }}
         >
             {visibleGroups.map((group) => (
-                <div key={group.id} style={{ marginTop: group.label ? "7px" : 0 }}>
+                <div key={group.id} className="nav-rail-group" style={{ marginTop: group.label ? "7px" : 0 }}>
                     {group.label && (
                         <div
                             style={{

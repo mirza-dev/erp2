@@ -567,7 +567,7 @@ export default function AlertsPage() {
                                 style={searchStyle}
                             />
                             <label style={toggleLabelStyle}>
-                                <input type="checkbox" checked={showResolved} onChange={(e) => setShowResolved(e.target.checked)} aria-label="Çözülenleri göster" />
+                                <input type="checkbox" className="tap-44-v" checked={showResolved} onChange={(e) => setShowResolved(e.target.checked)} aria-label="Çözülenleri göster" />
                                 Çözülenler
                             </label>
                         </div>

@@ -244,7 +244,7 @@ export default function EmailDeliveriesPage() {
                                 `aria-label` ise konuyu hiç söylemiyordu. */}
                             <div id="email-delivery-detail-title">
                                 <div style={{ color: "var(--text-tertiary)", fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: 0 }}>Teslimat Detayı</div>
-                                <SectionHeader variant="dialog" style={{ marginTop: "5px", lineHeight: 1.35 }}>{selectedDelivery.subject}</SectionHeader>
+                                <SectionHeader variant="dialog" style={{ marginTop: "5px" }}>{selectedDelivery.subject}</SectionHeader>
                             </div>
                             <Button variant="icon" size="sm" iconOnly aria-label="Teslimat detayını kapat" leftIcon={<X size={15} />} onClick={() => setSelectedDelivery(null)} />
                         </div>

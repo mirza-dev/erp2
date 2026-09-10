@@ -4,7 +4,6 @@ import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import useSWR from "swr";
-import { ArrowLeft } from "lucide-react";
 import Button from "@/components/ui/Button";
 import Card from "@/components/ui/Card";
 import Input, { Select, Textarea, labelStyle as sharedLabelStyle } from "@/components/ui/Input";
@@ -25,6 +24,7 @@ import {
     formatDateTime,
     formatRelative,
 } from "@/components/developer/console-format";
+import BackLink from "@/components/ui/BackLink";
 
 const STATUS_LABELS: Record<ErrorGroupStatus, string> = {
     open: "Açık",
@@ -82,15 +82,7 @@ export default function ErrorDetailPage({ params }: { params: Promise<{ id: stri
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "12px" }}>
             <div>
-                <Link
-                    href="/dashboard/developer/errors"
-                    style={{
-                        display: "inline-flex", alignItems: "center", gap: "5px",
-                        fontSize: "12px", color: "var(--text-tertiary)", textDecoration: "none",
-                    }}
-                >
-                    <ArrowLeft size={13} /> Hatalar
-                </Link>
+                <BackLink href="/dashboard/developer/errors">Hatalar</BackLink>
             </div>
 
             {/* ── Genel ───────────────────────────────────────────────────── */}
@@ -145,7 +137,10 @@ export default function ErrorDetailPage({ params }: { params: Promise<{ id: stri
                     <ul style={{ margin: 0, padding: "0 14px 14px 32px" }}>
                         {bugs.map(b => (
                             <li key={b.id} style={{ fontSize: "12.5px", color: "var(--text-secondary)", padding: "2px 0" }}>
-                                <Link href="/dashboard/developer/bugs" style={{ color: "var(--accent-text)", textDecoration: "none" }}>
+                                {/* Liste öğesi 2px dolgulu → ~19px. Yalnız dikey:
+                                    hemen sağında durum/öncelik metni var, yatay
+                                    büyüme onun üstüne binerdi. */}
+                                <Link href="/dashboard/developer/bugs" className="tap-44-v" style={{ color: "var(--accent-text)", textDecoration: "none" }}>
                                     {b.title}
                                 </Link>{" "}
                                 <span style={{ color: "var(--text-tertiary)" }}>· {b.status} · {b.priority}</span>

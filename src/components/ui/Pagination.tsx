@@ -65,6 +65,11 @@ function PageButton({
     return (
         <button
             type="button"
+            // 2026-09-10 ölçümü: sayfalama düğmeleri 390px'te **32×32**'ydi ve
+            // hiç `::after` taşımıyordu — `Button`a hiç bağlanmamış tek gezinme
+            // kontrolü buydu. `tap-44` görsel 32px'i DEĞİŞTİRMEZ, yalnız
+            // görünmez hit-area'yı 44'e çıkarır (satır aralığı 8px, çakışma yok).
+            className="tap-44"
             aria-label={ariaLabel}
             aria-current={ariaCurrent}
             disabled={disabled}
@@ -109,7 +114,13 @@ export default function Pagination({
             <span style={{ fontVariantNumeric: "tabular-nums" }}>
                 {firstIndex}-{lastIndex} / {totalItems} {itemLabel}
             </span>
-            <div style={{ display: "flex", gap: "4px", alignItems: "center", flexWrap: "wrap" }}>
+            {/* Aralık 4 → 12px: sayfa numaraları 32px genişliğinde ve YAN YANA
+                duruyor; `tap-44`ün görünmez 44px kutusu her birini 6'şar px
+                yana taşırıyor, 4px boşlukta 8px ÜST ÜSTE binerdi ve DOM'da
+                sonra gelen numara öncekinin alanını yerdi. 12px'te merkez
+                mesafesi tam 44 olur — kutular değer ama kesişmez.
+                (`.q-note-btn` ile aynı ders: kutuyu küçültme, boşluğu aç.) */}
+            <div style={{ display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
                 <PageButton
                     onClick={() => onPageChange(currentPage - 1)}
                     disabled={currentPage === 1}

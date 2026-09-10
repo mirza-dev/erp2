@@ -403,6 +403,9 @@ export default function ParasutPage() {
                         <div style={{ display: "flex", gap: "8px" }}>
                             <a
                                 href="/api/parasut/oauth/start"
+                                // Ölçüm: 117.1×**28.5**. Yanında `Button` var
+                                // (o zaten 44) → yalnız dikey, komşusunu yemesin.
+                                className="tap-44-v"
                                 style={{
                                     fontSize: "11px",
                                     padding: "5px 12px",

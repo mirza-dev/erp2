@@ -882,7 +882,8 @@ body {
   .hamburger-btn,
   .topbar-brand,
   .field-link,
-  .row-link {
+  .row-link,
+  .nav-rail-item {
     position: relative;
   }
 
@@ -892,6 +893,7 @@ body {
   .field-link::after,
   .row-link::after,
   .seg button::after,
+  .nav-rail-item::after,
   .tap-44-v::after {
     content: "";
     position: absolute;
@@ -919,6 +921,46 @@ body {
      genişleme bir maliyet yaratmıyor. `!important`: marginRight inline. */
   .q-note-btn {
     margin-right: 24px !important;
+  }
+
+  /* ── Gezinme rayı: ÜST ÜSTE BİNME, kural eklenmeden ÖNCE çözülür ────────
+     Ölçüm (2026-09-10, 390px, mobil çekmece açık): 16 bağlantının hepsi
+     222×**36** ve `::after` YOK — yani uygulamanın EN ÇOK dokunulan yüzeyi
+     deponun kendi 44px tabanının altındaydı. `tap-44` seçici listesi
+     2026-08-31'de yazılmıştı ama `.nav-rail-item` o listeye hiç girmedi;
+     ölçüm de göremedi çünkü çekmece KAPALIYKEN ölçülüyordu.
+
+     Kutuyu tek başına eklemek YETMEZ: bir gruptaki bağlantılar birbirine
+     BİTİŞİK duruyor (grup sarmalayıcısında gap yok). 36px'lik satıra 44px
+     kutu verilirse her satır üstten ve alttan 4'er px taşar → komşusuyla
+     8px ÜST ÜSTE biner ve DOM'da SONRA gelen kazanır. `.q-note-btn`
+     dersinin aynısı; orada da çözüm kutuyu küçültmek değil BOŞLUĞU açmaktı.
+
+     8px boşlukta merkez mesafesi tam 44px olur, iki kutu birbirine değer
+     ama kesişmez. Görsel satır yüksekliği 36px KALIR — Sidebar'ın çekmecede
+     "dikey ray dilini aynen korur" sözü (2026-09-05) bozulmaz. */
+  .nav-rail-group {
+    gap: 8px;
+  }
+
+  /* ── Sarabilen kontrol satırı ───────────────────────────────────────────
+     Görünmez 44px kutu, kontrolün kendi yüksekliğinin ÜSTÜNE taşar: 26px'lik
+     bir çip için 9, 32px'lik bir düğme için 6 px yukarı ve aşağı. Satır
+     sarıyorsa ve satır aralığı bu taşmadan küçükse, alttaki satırın kutusu
+     üsttekinin GÖRÜNÜR dikdörtgenine girer ve DOM'da sonra geldiği için
+     tıklamayı ondan çalar (2026-09-10 ölçümü bunu 14 ayrı yerde buldu).
+
+     18px, en küçük boyun (xs = 26px) tam karşılığı: 26 + 18 = 44, yani
+     kutular değer ama kesişmez. `!important`: bu satırların `gap`i satır içi
+     yazılmış (`.q-note-btn`in aynı gerekçesi).
+
+     NOT: bu, 2026-09-04'te silinen `.tap-row-gap`in geri gelmesi DEĞİL. O
+     kural tek çip-şeridi için yazılmıştı ve yerini YERLEŞİME bıraktı
+     (`FilterChips` sarmaz). Bu kural sarmayı YASAKLAYAMADIĞIMIZ yerler için:
+     aksiyon düğmeleri gerçekten sarmak zorunda — dar ekranda tek satıra
+     sığmazlar ve yatay kaydırma bir AKSİYONU gizlemek olurdu. */
+  .tap-wrap-row {
+    row-gap: 18px !important;
   }
 
   /* 2026-09-04: `.tap-row-gap` SİLİNDİ. Sarma kaynaklı hit-alanı çakışmasını
@@ -1169,6 +1211,29 @@ body {
   text-decoration: none;
   box-sizing: border-box;
   transition: background 0.14s ease, border-color 0.14s ease, color 0.14s ease;
+}
+
+/* Gezinme rayının grup sarmalayıcısı. Masaüstünde bağlantılar bitişik durur
+   (ray dili); mobil blok gap'i 8px'e açar ki görünmez 44px hit alanları
+   birbirini yemesin. Düzen CSS'te: iki tüketici (Sidebar, Ayarlar) de kendi
+   boşluğunu YAZMAZ. */
+/* Yatay sekme/çip şeridi — sarmaz, kendi kabında kayar.
+   `.settings-tab-nav`in mobil davranışının adı konmuş hâli: sarma, görünmez
+   44px hit alanlarını komşu SATIRIN alanına sokar. Tek satır kalınca kusur
+   yapısal olarak imkânsızlaşır. */
+.tab-strip-scroll {
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.tab-strip-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.nav-rail-group {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
 
 .nav-rail-item::before {

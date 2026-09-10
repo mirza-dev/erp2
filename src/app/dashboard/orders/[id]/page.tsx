@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback } from "react";
 import Link from "next/link";
 import { useParams, useRouter } from "next/navigation";
-import { ArrowLeft, CircleOff, FileText, Pencil, RefreshCw, Trash2 } from "lucide-react";
+import { CircleOff, FileText, Pencil, RefreshCw, Trash2 } from "lucide-react";
 import { formatCurrency, maskCurrency, formatDate } from "@/lib/utils";
 import { useCustomers, useOrderMutations, type ShortageItem, type CommercialStatus, type FulfillmentStatus } from "@/lib/data-context";
 import { usePermissions } from "@/lib/auth/use-permissions";
@@ -15,6 +15,7 @@ import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
 import SectionHeader from "@/components/ui/SectionHeader";
 import PageHeader from "@/components/ui/PageHeader";
+import BackLink from "@/components/ui/BackLink";
 type ParasutStepKey = "contact" | "product" | "shipment" | "invoice" | "edoc";
 
 interface ParasutStatusPayload {
@@ -554,9 +555,7 @@ export default function OrderDetailPage() {
                     yoktu; belge numarası görsel olarak başlıktı ama semantik
                     olarak hiçbir şeydi. */}
                 <div>
-                    <ButtonLink href="/dashboard/orders" variant="secondary" size="sm" leftIcon={<ArrowLeft size={14} />}>
-                        Siparişler
-                    </ButtonLink>
+                    <BackLink href="/dashboard/orders">Siparişler</BackLink>
                 </div>
 
                 <PageHeader

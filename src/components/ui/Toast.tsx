@@ -158,6 +158,9 @@ function ToastItem({ item, onDismiss }: { item: ToastItem; onDismiss: (id: numbe
                 {item.action && ("href" in item.action ? (
                     <a
                         href={item.action.href}
+                        // `tap-44-v`: bildirim kartı dar; YALNIZ dikey büyür.
+                        // Tam genişleme kartın kapat düğmesinin alanına girerdi.
+                        className="tap-44-v"
                         style={{ display: "block", marginTop: "3px", fontSize: "12px", color: colors.text, textDecoration: "underline", opacity: 0.85 }}
                     >
                         {item.action.label} →
@@ -166,6 +169,7 @@ function ToastItem({ item, onDismiss }: { item: ToastItem; onDismiss: (id: numbe
                     <button
                         type="button"
                         onClick={item.action.onClick}
+                        className="tap-44-v"
                         style={{ display: "block", marginTop: "3px", padding: 0, background: "none", border: 0, fontSize: "12px", color: colors.text, textDecoration: "underline", opacity: 0.85, cursor: "pointer", font: "inherit" }}
                     >
                         {item.action.label} →
@@ -175,6 +179,9 @@ function ToastItem({ item, onDismiss }: { item: ToastItem; onDismiss: (id: numbe
             <button
                 type="button"
                 onClick={() => onDismiss(item.id)}
+                // 14px glif + 2px dolgu = ~18px. Kartın sağ ucunda tek başına
+                // duruyor, komşusu yok → tam 44×44 kutu güvenli.
+                className="tap-44"
                 style={{
                     background: "none",
                     border: "none",

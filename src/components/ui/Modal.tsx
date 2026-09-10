@@ -3,6 +3,7 @@
 import { useRef, type ReactNode } from "react";
 import Button from "@/components/ui/Button";
 import { DIALOG_BACKDROP, useDialogA11y } from "@/components/ui/dialog-a11y";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 /**
  * Ortak modal çerçevesi — MERKEZÎ kutu. Sağa yaslı tam-boy panel için kardeşi
@@ -121,12 +122,23 @@ export function ConfirmModal({
 }: ConfirmModalProps) {
     return (
         <Modal onClose={onCancel} labelledBy="confirm-modal-title" dismissible={!busy}>
-            <div
+            {/* 2026-09-10: depodaki ORTAK onay diyaloğu kendi başlığını elle
+                yazıyordu (15px/650) ve `tone="danger"` iken bile rengi
+                `--text-primary` bırakıyordu — yani yıkıcılık işareti YALNIZ
+                onay butonundaydı. Artık ton başlığa da iniyor.
+
+                DAVRANIŞ DEĞİŞİKLİĞİ: `tone` varsayılanı `"danger"` olduğu için
+                aksini belirtmeyen her çağrı yeri artık KIRMIZI başlık gösterir.
+                Bu bilinçli — bileşenin adı "Confirm" ve varsayılanı zaten yıkıcı
+                aksiyonu (kırmızı buton) çiziyordu; başlığın nötr kalması
+                tutarsızlıktı. Yıkıcı olmayan onaylar `tone="default"` geçer. */}
+            <SectionHeader
+                variant="dialog"
                 id="confirm-modal-title"
-                style={{ fontSize: "15px", fontWeight: 650, color: "var(--text-primary)" }}
+                tone={tone === "danger" ? "danger" : "default"}
             >
                 {title}
-            </div>
+            </SectionHeader>
             <div style={{ fontSize: "13px", color: "var(--text-secondary)", lineHeight: 1.6 }}>
                 {message}
             </div>

@@ -3,7 +3,6 @@
 import { useState, useEffect, useCallback, use } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
 import { Check, CircleOff, Pencil, Printer, RotateCcw, Send, Truck } from "lucide-react";
 import Button, { ButtonLink } from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
@@ -14,6 +13,7 @@ import type { AuditEntry } from "@/lib/supabase/audit-log";
 import { poActionLabel, poActorLabel } from "@/lib/purchase-order-ui";
 import SectionHeader from "@/components/ui/SectionHeader";
 import Stat from "@/components/ui/Stat";
+import BackLink from "@/components/ui/BackLink";
 
 const thStyle: React.CSSProperties = {
     textAlign: "left", padding: "10px 14px", fontSize: "12px", fontWeight: 500,
@@ -266,7 +266,12 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
     if (!po) {
         return <div style={{ padding: "32px", textAlign: "center", color: "var(--text-tertiary)", fontSize: "13px" }}>
             <p>Sipariş bulunamadı.</p>
-            <Link href="/dashboard/purchase/orders" style={{ color: "var(--accent-text)" }}>← Siparişlere dön</Link>
+            {/* Boş-durum çıkışı da bir gezinme hedefi — hatta kullanıcının
+                çıkmaza düştüğü tek yol. Elle yazılmış metin bağlantısı yerine
+                ortak `BackLink` (44px hit-area). */}
+            <div style={{ marginTop: "10px" }}>
+                <BackLink href="/dashboard/purchase/orders">Siparişler</BackLink>
+            </div>
         </div>;
     }
 
@@ -278,9 +283,9 @@ export default function PurchaseOrderDetailPage({ params }: { params: Promise<{ 
     return (
         <div style={{ maxWidth: "1100px", margin: "0 auto" }}>
             {/* Breadcrumb */}
-            <Link href="/dashboard/purchase/orders" style={{
-                fontSize: "12px", color: "var(--text-tertiary)", textDecoration: "none", display: "inline-block", marginBottom: "12px",
-            }}>← Siparişler</Link>
+            <div style={{ marginBottom: "12px" }}>
+                <BackLink href="/dashboard/purchase/orders">Siparişler</BackLink>
+            </div>
 
             {/* Header */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginBottom: "16px", flexWrap: "wrap", gap: "12px" }}>

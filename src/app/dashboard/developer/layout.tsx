@@ -58,12 +58,21 @@ export default function DeveloperLayout({ children }: { children: React.ReactNod
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "14px" }}>
+            {/* 2026-09-10: şerit SARMIYOR. Ölçüm (390px): altı sekme 69–98×**35.5**
+                ve hiçbiri `tap-44` ailesinde değildi — konsolun tamamında sınıf
+                SIFIRDI. Kutuyu eklemek tek başına yetmezdi: `flexWrap: wrap`
+                dar ekranda iki satır üretiyor, 2px satır aralığında 44'lük
+                kutular 6.5px üst üste binerdi. Çözüm CSS yaması değil YERLEŞİM —
+                2026-09-04'te `.tap-row-gap` tam bu yüzden silinmişti ve tek
+                çip-satırı üreticisi `FilterChips` de sarmaz. Ayarlar rayı da
+                mobilde aynı dili konuşuyor (`.settings-tab-nav`). */}
             <nav
                 aria-label="Developer Console bölümleri"
+                className="tab-strip-scroll"
                 style={{
                     display: "flex",
                     gap: "2px",
-                    flexWrap: "wrap",
+                    flexWrap: "nowrap",
                     borderBottom: "0.5px solid var(--border-secondary)",
                     paddingBottom: "1px",
                 }}
@@ -80,6 +89,9 @@ export default function DeveloperLayout({ children }: { children: React.ReactNod
                             key={item.href}
                             href={item.href}
                             aria-current={active ? "page" : undefined}
+                            // Yalnız DİKEY: sekmeler yan yana ve en darı 69px —
+                            // yatay büyüme komşusunun alanını yerdi.
+                            className="tap-44-v"
                             style={{
                                 fontSize: "13px",
                                 fontWeight: active ? 600 : 500,

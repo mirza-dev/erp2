@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect } from "react";
-import { ButtonLink } from "@/components/ui/Button";
 import FilterChips from "@/components/ui/FilterChips";
 import PageHeader from "@/components/ui/PageHeader";
 import { maskCurrency } from "@/lib/utils";
@@ -9,6 +8,7 @@ import { usePermissions } from "@/lib/auth/use-permissions";
 import type { AgingCategory, AgingRow } from "@/lib/supabase/aging";
 import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
 import Stat, { StatGrid } from "@/components/ui/Stat";
+import BackLink from "@/components/ui/BackLink";
 
 // ── Badge config ──────────────────────────────────────────────
 
@@ -218,9 +218,7 @@ export default function AgingPage() {
                 title="Stok Eskime Raporu"
                 subtitle="Stokta bekleyen ürünler · bağlanan sermaye"
                 actions={
-                    <ButtonLink href="/dashboard/products" variant="secondary" size="sm">
-                        ← Ürünler
-                    </ButtonLink>
+                    <BackLink href="/dashboard/products">Ürünler</BackLink>
                 }
             />
 

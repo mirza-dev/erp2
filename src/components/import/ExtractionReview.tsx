@@ -427,6 +427,7 @@ export default function ExtractionReview({ document: doc, initialLines, productT
             return (
                 <input
                     type="checkbox"
+                    className="tap-44"
                     checked={value === true}
                     disabled={disabled}
                     onChange={event => void patchTechnicalAttribute(line, field, event.target.checked)}
@@ -767,6 +768,7 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                                                             <label style={productFieldCheckStyle(isNewProductLine || isDocApplied || isDocApplying)}>
                                                                 <input
                                                                     type="checkbox"
+                                                                    className="tap-44"
                                                                     checked={isNewProductLine || productNameApproved}
                                                                     disabled={isNewProductLine || isDemo || isDocApplied || isDocApplying || !hasTechnicalReviewValue(line.extracted_name)}
                                                                     onChange={event => setProductFieldApproval(line.id, "name", event.target.checked)}
@@ -778,6 +780,7 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                                                             <label style={productFieldCheckStyle(isNewProductLine || isDocApplied || isDocApplying)}>
                                                                 <input
                                                                     type="checkbox"
+                                                                    className="tap-44"
                                                                     checked={isNewProductLine || productSkuApproved}
                                                                     disabled={isNewProductLine || isDemo || isDocApplied || isDocApplying || !hasTechnicalReviewValue(line.extracted_sku)}
                                                                     onChange={event => setProductFieldApproval(line.id, "sku", event.target.checked)}
@@ -818,6 +821,7 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                                                         <label style={{ ...productFieldCheckStyle(isDocApplied || isDocApplying || !line.product_type_id), marginTop: "7px" }}>
                                                             <input
                                                                 type="checkbox"
+                                                                className="tap-44"
                                                                 checked={productTypeApproved}
                                                                 disabled={isDemo || isDocApplied || isDocApplying || !line.product_type_id}
                                                                 onChange={event => setProductFieldApproval(line.id, "product_type_id", event.target.checked)}
@@ -929,6 +933,7 @@ export default function ExtractionReview({ document: doc, initialLines, productT
                                                                                     >
                                                                                         <input
                                                                                             type="checkbox"
+                                                                                            className="tap-44"
                                                                                             checked={fieldApproved}
                                                                                             disabled={approvalDisabled}
                                                                                             onChange={event => setTechnicalFieldApproval(line.id, field.field_key, event.target.checked)}

@@ -154,7 +154,7 @@ export default function DeveloperDiagnosticsPage() {
                     satır değil, tekrar sayısı 2 olan TEK satır görmelisiniz — gruplamanın
                     çalıştığının kanıtı budur.
                 </p>
-                <div style={{ display: "flex", gap: "8px", marginTop: "10px", flexWrap: "wrap", ...cardBodyLast }}>
+                <div className="tap-wrap-row" style={{ display: "flex", gap: "8px", marginTop: "10px", flexWrap: "wrap", ...cardBodyLast }}>
                     <Button variant="secondary" size="sm" onClick={() => void runTestError()} disabled={busy}>
                         Test hatası üret
                     </Button>

@@ -4,7 +4,6 @@ import { useState, useRef, useCallback, useEffect } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
-    ArrowLeft,
     CheckCircle2,
     Download,
     Eye,
@@ -38,6 +37,8 @@ import {
 } from "@/lib/import-center";
 import Stat, { StatGrid } from "@/components/ui/Stat";
 import Card from "@/components/ui/Card";
+import PageHeader from "@/components/ui/PageHeader";
+import BackLink from "@/components/ui/BackLink";
 
 // Excel/CSV toplu aktarım sihirbazı — kendi sayfası (2026-06-10 sadeleştirme).
 // Önceden /dashboard/import içinde <details> accordion'daydı; hub artık
@@ -626,24 +627,28 @@ export default function ImportExcelWizardPage() {
 
     return (
         <div style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
-            {/* Header */}
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: "8px" }}>
-                <div>
-                    <Link href="/dashboard/import" style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "11px", color: "var(--text-tertiary)", textDecoration: "none", marginBottom: "4px" }}>
-                        <ArrowLeft size={12} aria-hidden /> Veri Aktarım Merkezi
-                    </Link>
-                    <div style={{ fontSize: "14px", fontWeight: 600, color: "var(--text-primary)" }}>
-                        Excel/CSV ile Toplu Aktarım
-                    </div>
-                    <div style={{ fontSize: "12px", color: "var(--text-secondary)", marginTop: "3px" }}>
-                        Şablonlu veya serbest tablo dosyalarını sheet, kolon ve alan bazlı onayla içe aktar.
-                    </div>
+            {/* ── Başlık ──
+                2026-09-10 ölçümü: 41 dashboard rotasından TEK başlıksız olan
+                buydu — sayfanın h1'i yoktu ve başlık tam olarak kapının
+                YASAKLADIĞI imzayla yazılmıştı (`14px / 600 / --text-primary`),
+                yani `PageHeader`ın 2026-08-31'de kapattığı kalıbın birebir
+                aynısı. Kural `surface-consistency`de vardı ama İKİ DOSYALIK bir
+                allowlist üzerindeydi (Uyarılar + Veri Aktarım Merkezi) — bir
+                kapı yalnız BAKTIĞI yerde koruma sağlar (2026-09-05 dersi).
+                Kural artık tüm rotalara bakıyor. */}
+            <div>
+                <div style={{ marginBottom: "8px" }}>
+                    <BackLink href="/dashboard/import">Veri Aktarım Merkezi</BackLink>
                 </div>
-                {state !== "idle" && state !== "analyzing" && (
-                    <Button type="button" variant="secondary" size="sm" onClick={reset}>
-                        Yeni Dosya
-                    </Button>
-                )}
+                <PageHeader
+                    title="Excel/CSV ile Toplu Aktarım"
+                    subtitle="Şablonlu veya serbest tablo dosyalarını sheet, kolon ve alan bazlı onayla içe aktar."
+                    actions={state !== "idle" && state !== "analyzing" ? (
+                        <Button type="button" variant="secondary" size="sm" onClick={reset}>
+                            Yeni Dosya
+                        </Button>
+                    ) : undefined}
+                />
             </div>
 
             {/* Step indicator */}
@@ -791,11 +796,12 @@ export default function ImportExcelWizardPage() {
                                 <div style={{ fontSize: "12px", fontWeight: 700, color: "var(--text-primary)" }}>Örnek şablon indir</div>
                                 <Download size={15} color="var(--text-tertiary)" aria-hidden />
                             </div>
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "6px" }}>
+                            <div className="tap-wrap-row" style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: "6px" }}>
                                 {Object.values(EXCEL_IMPORT_TEMPLATES).map(template => (
                                     <a
                                         key={template.kind}
                                         href={`/api/import/templates?kind=${template.kind}`}
+                                        className="tap-44-v"
                                         style={{
                                             fontSize: "11px",
                                             padding: "6px 8px",
@@ -902,7 +908,7 @@ export default function ImportExcelWizardPage() {
                                     // satırı yarı saydam yapmak eylemsiz gibi gösterirdi.
                                     opacity: 1,
                                 }}>
-                                    <input type="checkbox" checked={sheet.selected} disabled={sheet.status !== "importable"}
+                                    <input type="checkbox" className="tap-44" checked={sheet.selected} disabled={sheet.status !== "importable"}
                                         aria-label={`${sheet.displayName} sheet seçimi`}
                                         onChange={() => toggleSheet(idx)}
                                         style={{ cursor: sheet.status === "importable" ? "pointer" : "default", accentColor: "var(--accent)" }} />
@@ -966,6 +972,7 @@ export default function ImportExcelWizardPage() {
                                                     <label key={op} title={STOCK_OP_META[op].hint} style={{ display: "inline-flex", alignItems: "center", gap: "5px", fontSize: "11px", color: checked ? "var(--text-primary)" : "var(--text-tertiary)", cursor: "pointer" }}>
                                                         <input
                                                             type="radio"
+                                                            className="tap-44"
                                                             name={`stock-op-${sheet.name}`}
                                                             checked={checked}
                                                             onChange={() => setStockOps(prev => ({ ...prev, [sheet.name]: op }))}
@@ -1094,7 +1101,7 @@ export default function ImportExcelWizardPage() {
 
                             {/* Remember toggle */}
                             <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                                <input type="checkbox" id="remember-mappings" checked={rememberMappings}
+                                <input type="checkbox" className="tap-44" id="remember-mappings" checked={rememberMappings}
                                     aria-label="Kolon eşleştirmesini hatırla"
                                     onChange={e => setRememberMappings(e.target.checked)}
                                     style={{ accentColor: "var(--accent)", cursor: "pointer" }} />
@@ -1279,6 +1286,7 @@ export default function ImportExcelWizardPage() {
                                                             <div style={{ padding: "6px 10px", fontSize: "12px", fontWeight: "var(--font-table-cell-weight)", color: isSkipped ? "var(--text-tertiary)" : isEmpty ? "var(--danger-text)" : "var(--text-primary)", outline: isEmpty && !isSkipped ? "1px solid var(--danger-border)" : "none", minHeight: "42px", display: "grid", gridTemplateColumns: "18px minmax(0, 1fr)", alignItems: "center", gap: "6px", opacity: isSkipped ? 0.62 : 1 }}>
                                                                 <input
                                                                     type="checkbox"
+                                                                    className="tap-44"
                                                                     checked={!isSkipped}
                                                                     aria-label={`${fieldLabels.get(f) ?? f} alanını uygula`}
                                                                     title={isSkipped ? "Bu alan aktarımda atlanacak" : "Bu alan aktarımda uygulanacak"}
@@ -1349,6 +1357,7 @@ export default function ImportExcelWizardPage() {
                     <label style={{ display: "flex", alignItems: "flex-start", gap: "8px", padding: "10px 12px", background: "var(--surface-subtle)", border: "var(--line-width) solid var(--surface-border)", borderRadius: "6px", cursor: "pointer" }}>
                         <input
                             type="checkbox"
+                            className="tap-44"
                             checked={overwriteExisting}
                             onChange={e => setOverwriteExisting(e.target.checked)}
                             aria-label="Mevcut dolu alanların üzerine yaz"

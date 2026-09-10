@@ -14,6 +14,8 @@ import QuoteForm from "../_components/QuoteForm";
 import type { QuoteDetail } from "@/lib/mock-data";
 import type { QuoteStatus } from "@/lib/database.types";
 import PageHeader from "@/components/ui/PageHeader";
+import BackLink from "@/components/ui/BackLink";
+import SectionHeader from "@/components/ui/SectionHeader";
 
 // ── Status config ────────────────────────────────────────────────────────────
 
@@ -322,9 +324,7 @@ export default function QuoteDetailPage() {
             }}>
                 {/* Back + breadcrumb */}
                 <div style={{ marginBottom: "8px" }}>
-                    <Link href="/dashboard/quotes" style={{ color: "var(--text-tertiary)", textDecoration: "none", fontSize: "13px" }}>
-                        ← Teklifler
-                    </Link>
+                    <BackLink href="/dashboard/quotes">Teklifler</BackLink>
                 </div>
 
                 <PageHeader
@@ -534,13 +534,22 @@ export default function QuoteDetailPage() {
                                     <path d="M5 1L9 9H1z" fill={confirmDialog.variant === "danger" ? "var(--danger-text)" : "var(--warning-text)"} />
                                 </svg>
                             </div>
-                            <div id="quote-confirm-dialog-title" style={{
-                                fontSize: "13px",
-                                fontWeight: 600,
-                                color: confirmDialog.variant === "danger" ? "var(--danger-text)" : "var(--text-primary)",
-                            }}>
+                            {/* 2026-09-08'de bu başlık `SectionHeader`a TAŞINAMAMIŞTI:
+                                yıkıcı işlemde `--danger-text`e dönüyor ve bileşende
+                                anlamsal rengi ifade edecek bir kol yoktu. 2026-09-10'da
+                                `tone` eklendi → depodaki son elle yazılmış diyalog
+                                başlığı da ortak kaynağa girdi.
+
+                                GÖRÜNÜR YAKINSAMA: 13px/600 → 16px/650 (`dialog`
+                                varyantı). Diğer on bir diyalog başlığı zaten bu
+                                ölçekte; bu ikisi son hold-out'tu. */}
+                            <SectionHeader
+                                variant="dialog"
+                                id="quote-confirm-dialog-title"
+                                tone={confirmDialog.variant === "danger" ? "danger" : "default"}
+                            >
                                 {confirmDialog.title}
-                            </div>
+                            </SectionHeader>
                         </div>
 
                         <div style={{
@@ -581,6 +590,7 @@ export default function QuoteDetailPage() {
                                 }}>
                                     <input
                                         type="checkbox"
+                                        className="tap-44"
                                         checked={hasCustomerEmail && sendEmailChecked}
                                         disabled={!hasCustomerEmail}
                                         onChange={(e) => setSendEmailChecked(e.target.checked)}

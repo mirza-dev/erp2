@@ -53,6 +53,31 @@ import type { CSSProperties, ReactNode } from "react";
 
 export type SectionHeaderVariant = "label" | "title" | "dialog";
 
+/**
+ * Başlığın ANLAMSAL rengi. Varsayılan `default`.
+ *
+ * 2026-09-08 turunda `quotes/[id]`nin onay diyaloğu `SectionHeader`a
+ * TAŞINAMADI: başlığı yıkıcı işlemde `--danger-text`e dönüyor ve bileşende
+ * bunu ifade edecek bir kol yoktu. `style` kaçış kapısı da doğru cevap
+ * değildi — sözleşmesi yalnız BOŞLUK ve renk oradan sızarsa kural ölçülemez
+ * hale gelirdi.
+ *
+ * Ton bir VARYANT değil: ölçek/ağırlık/harf aralığı aynen kalır, yalnız renk
+ * anlamı taşır. Bu yüzden ayrı bir eksen.
+ *
+ * `warning` de gerçek bir ihtiyaçtan geldi: `style` tipi daraltılınca ölçüldü
+ * ki BEŞ çağrı yeri sözleşmeyi zaten deliyordu — üçü renk (2× danger, 1×
+ * warning), ikisi satır yüksekliği. Kaçış kapısı YORUMDA yasaklıydı ama
+ * TİPTE açıktı ve fiilen kullanılıyordu.
+ */
+export type SectionHeaderTone = "default" | "danger" | "warning";
+
+const TONE_COLOR: Record<SectionHeaderTone, string | undefined> = {
+    default: undefined,
+    danger: "var(--danger-text)",
+    warning: "var(--warning-text)",
+};
+
 const TYPOGRAPHY: Record<SectionHeaderVariant, CSSProperties> = {
     label: {
         fontSize: "11px",
@@ -72,6 +97,11 @@ const TYPOGRAPHY: Record<SectionHeaderVariant, CSSProperties> = {
         fontSize: "16px",
         fontWeight: "var(--font-heading-weight)",
         color: "var(--text-primary)",
+        // Diyalog başlığı SARABİLİR (e-posta konusu, not başlığı) ve iki çağrı
+        // yeri 2026-09-10'a kadar bunu bağımsız olarak `style` ile telafi
+        // ediyordu — ikisi de tam olarak 1.35 yazmıştı. Tekrarlayan ayar
+        // bileşen varsayılanı olur (`feedback_global_over_hardcode`).
+        lineHeight: 1.35,
         margin: 0,
     },
 };
@@ -118,9 +148,31 @@ export interface SectionHeaderProps {
     rule?: boolean;
     /** Sağ blok: buton · "Tümü →" · sayaç. */
     action?: ReactNode;
-    /** BOŞLUK istisnası. En dış elemana iner. */
-    style?: CSSProperties;
+    /**
+     * Anlamsal renk. Yalnız `color` değişir; ölçek/ağırlık varyanttan gelir.
+     * Yıkıcı onay diyaloglarında `danger`.
+     */
+    tone?: SectionHeaderTone;
+    /**
+     * BOŞLUK istisnası. En dış elemana iner.
+     *
+     * Tip, boşluk anahtarlarıyla SINIRLI: sözleşme 2026-09-05'te yalnız
+     * yorumda yazıyordu ve `CSSProperties` renk/ölçek geçirmeye açıktı
+     * (slot'suz çağrıda `style` en son yayıldığı için tipografiyi EZERDİ).
+     * Renk için `tone`, ölçek için `variant` var — kaçış kapısı kapalı.
+     */
+    style?: SectionHeaderSpacing;
 }
+
+/** `style` yalnız dış boşluk taşır — renk `tone`, ölçek `variant` işidir. */
+export type SectionHeaderSpacing = Pick<
+    CSSProperties,
+    "margin" | "marginTop" | "marginBottom" | "marginLeft" | "marginRight"
+    | "marginBlock" | "marginBlockStart" | "marginBlockEnd"
+    | "marginInline" | "marginInlineStart" | "marginInlineEnd"
+    | "padding" | "paddingTop" | "paddingBottom" | "paddingLeft" | "paddingRight"
+    | "paddingBlock" | "paddingInline"
+>;
 
 export default function SectionHeader({
     children,
@@ -131,6 +183,7 @@ export default function SectionHeader({
     description,
     rule,
     action,
+    tone = "default",
     style,
 }: SectionHeaderProps) {
     const Tag = level === 3 ? "h3" : "h2";
@@ -141,6 +194,7 @@ export default function SectionHeader({
             id={id}
             style={{
                 ...TYPOGRAPHY[variant],
+                ...(TONE_COLOR[tone] ? { color: TONE_COLOR[tone] } : null),
                 ...(icon ? WITH_ICON : null),
                 // Sarmalayıcı varsa boşluk ONUN işi; başlık sıfırlanır.
                 ...(hasSlot ? { margin: 0 } : null),

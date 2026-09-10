@@ -297,6 +297,7 @@ export default function CustomersClient(props: CustomersClientProps) {
             header: (
                 <input
                     type="checkbox"
+                    className="tap-44"
                     checked={isPageAllSelected(pageIds)}
                     ref={el => { if (el) el.indeterminate = isPageIndeterminate(pageIds); }}
                     onChange={() => toggleAll(pageIds)}
@@ -309,6 +310,7 @@ export default function CustomersClient(props: CustomersClientProps) {
                 <span style={{ display: "inline-flex" }} onClick={e => e.stopPropagation()}>
                     <input
                         type="checkbox"
+                        className="tap-44"
                         checked={selectedIds.has(customer.id)}
                         onChange={() => toggleOne(customer.id)}
                         onClick={e => e.stopPropagation()}

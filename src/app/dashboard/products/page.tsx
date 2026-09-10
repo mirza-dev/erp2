@@ -518,6 +518,7 @@ export default function ProductsPage() {
             header: (
                 <input
                     type="checkbox"
+                    className="tap-44"
                     checked={isPageAllSelected(pageIds)}
                     ref={el => { if (el) el.indeterminate = isPageIndeterminate(pageIds); }}
                     onChange={() => toggleAll(pageIds)}
@@ -533,6 +534,7 @@ export default function ProductsPage() {
                 <span style={{ display: "inline-flex" }} onClick={e => e.stopPropagation()}>
                     <input
                         type="checkbox"
+                        className="tap-44"
                         checked={selectedIds.has(product.id)}
                         onChange={() => toggleOne(product.id)}
                         onClick={e => e.stopPropagation()}
@@ -928,6 +930,7 @@ export default function ProductsPage() {
                 }}>
                     <input
                         type="checkbox"
+                        className="tap-44-v"
                         checked={showPassive}
                         onChange={e => { setShowPassive(e.target.checked); setCurrentPage(1); }}
                         style={{ cursor: "pointer" }}

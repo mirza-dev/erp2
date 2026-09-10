@@ -206,7 +206,7 @@ export default function ProductVendorsPanel({
                         </div>
                     </div>
                     <label style={{ display: "flex", alignItems: "center", gap: "6px", fontSize: "12px", color: "var(--text-secondary)" }}>
-                        <input type="checkbox" checked={preferred} onChange={e => setPreferred(e.target.checked)} />
+                        <input type="checkbox" className="tap-44-v" checked={preferred} onChange={e => setPreferred(e.target.checked)} />
                         Tercihli tedarikçi yap (ürün kartındaki tedarikçiyi günceller)
                     </label>
                     <div style={{ display: "flex", gap: "6px" }}>

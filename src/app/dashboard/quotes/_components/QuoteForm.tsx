@@ -4,7 +4,6 @@ import { useState, useEffect, useRef, useCallback, Fragment } from "react";
 import { useRouter } from "next/navigation";
 import { Eraser, FileText, Plus, RotateCcw, Save, Send, StickyNote, Trash2 } from "lucide-react";
 import type { QuoteData } from "../components/quote-types";
-import Link from "next/link";
 import Button from "@/components/ui/Button";
 import Modal from "@/components/ui/Modal";
 import PageHeader from "@/components/ui/PageHeader";
@@ -22,6 +21,7 @@ import { applyTemplateToField, templatesForField } from "@/lib/quote-note-templa
 import type { NoteTemplate, NoteTemplateKind } from "@/lib/mock-data";
 import { addDaysToISODate, normalizeValidityDays } from "../_utils/quote-display";
 import { stockHintForLine, stockHintColor } from "@/lib/stock-availability";
+import BackLink from "@/components/ui/BackLink";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -1171,9 +1171,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                 <div className="q-no-print" style={{ marginBottom: "16px" }}>
                     {pageHeader && (
                         <div style={{ marginBottom: "8px" }}>
-                            <Link href="/dashboard/quotes" style={{ color: "var(--text-tertiary)", textDecoration: "none", fontSize: "13px" }}>
-                                ← Teklifler
-                            </Link>
+                            <BackLink href="/dashboard/quotes">Teklifler</BackLink>
                         </div>
                     )}
                     {pageHeader ? (
@@ -1991,6 +1989,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                                     }}>
                                         <input
                                             type="checkbox"
+                                            className="tap-44"
                                             checked={!!custEmail.trim() && sendEmailChecked}
                                             disabled={!custEmail.trim()}
                                             onChange={(e) => setSendEmailChecked(e.target.checked)}

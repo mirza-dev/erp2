@@ -224,6 +224,8 @@ function AiSignalButton({ enrichment, loading, onClick }: {
         <button
             onClick={onClick}
             aria-label="AI analizi detaylarını gör"
+            // Ölçüm: 78.1×**21**. Tablo hücresinde tek başına → tam kutu.
+            className="tap-44"
             style={AI_SIGNAL_BUTTON_STYLES[urgency]}
         >
             <span>✦ AI</span>
@@ -444,6 +446,7 @@ function RecActionCell({
                 color: "var(--text-tertiary)", background: "none", border: "none",
                 cursor: "pointer", textDecoration: "underline", padding: 0,
             }}
+            className="tap-44-v"
         >
             Kararı geri al
         </button>
@@ -490,6 +493,7 @@ function RecActionCell({
                 opacity: (isDemo || hasActivePO) ? 0.5 : 1,
             }}
             aria-label="Satın alma siparişi oluştur"
+            className="tap-44-v"
         >
             📋 Sipariş Aç
         </button>
@@ -640,7 +644,7 @@ function RecActionCell({
     }
 
     return (
-        <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
+        <div className="tap-wrap-row" style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
             <Button
                 variant="success"
                 size="xs"
@@ -1423,7 +1427,7 @@ export default function PurchaseSuggestedPage() {
 
             {/* Decision summary — clickable filters */}
             {recMap.size > 0 && (
-                <div style={{ marginTop: "12px", fontSize: "12px", color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
+                <div className="tap-wrap-row" style={{ marginTop: "12px", fontSize: "12px", color: "var(--text-secondary)", display: "flex", alignItems: "center", gap: "6px", flexWrap: "wrap" }}>
                     {([
                         { key: "accepted" as DecisionFilter, count: acceptedCount, color: "var(--success-text)", label: "kabul" },
                         { key: "rejected" as DecisionFilter, count: rejectedCount, color: "var(--danger-text)", label: "red" },
@@ -1433,6 +1437,9 @@ export default function PurchaseSuggestedPage() {
                             {i > 0 && <span style={{ color: "var(--border-secondary)" }}>·</span>}
                             <button
                                 onClick={() => setDecisionFilter(decisionFilter === item.key ? "all" : item.key)}
+                                // Ölçüm: 31.5–76.9 × **18**. Aralarında "·"
+                                // ayraçları var → yalnız dikey büyür.
+                                className="tap-44-v"
                                 style={{
                                     background: "transparent",
                                     border: "none",
@@ -1451,6 +1458,7 @@ export default function PurchaseSuggestedPage() {
                     {decisionFilter !== "all" && (
                         <button
                             onClick={() => setDecisionFilter("all")}
+                            className="tap-44-v"
                             style={{
                                 background: "transparent", border: "none", cursor: "pointer",
                                 fontSize: "11px", color: "var(--text-tertiary)", padding: "0 2px",

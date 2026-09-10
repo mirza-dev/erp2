@@ -58,6 +58,7 @@ export function DynamicFieldEdit({
             <FieldEdit label={label}>
                 <input
                     type="checkbox"
+                    className="tap-44"
                     checked={value === true}
                     onChange={e => onChange(e.target.checked)}
                     aria-label={ariaLabel}

@@ -56,6 +56,7 @@ function RoleCheckboxes({
                     >
                         <input
                             type="checkbox"
+                            className="tap-44"
                             checked={checked}
                             disabled={disabled}
                             onChange={() => onToggle(r)}
