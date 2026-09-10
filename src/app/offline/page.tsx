@@ -41,6 +41,7 @@ export default function OfflinePage() {
                     tam bir belge isteği zorlar, yani "ağı tekrar dene" anlamına gelir. */}
                 <a
                     href="/dashboard"
+                    className="tap-44"
                     style={{
                         display: "inline-block",
                         padding: "8px 16px",

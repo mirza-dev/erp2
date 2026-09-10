@@ -117,7 +117,15 @@ export default function PrivacyPage() {
                 </Section>
 
                 <div style={{ marginTop: "34px" }}>
-                    <Link href="/login" style={backLinkStyle}>&larr; Giriş ekranına dön</Link>
+                    {/* Geri bağlantısının ALTINCI lehçesi — 2026-09-10 turu beşini
+                        `BackLink`te birleştirmişti, bu ölçüme girmediği için kaçmıştı
+                        (128.6×**16**, oturumsuz setin en küçük hedefi).
+
+                        `BackLink`e ÇEVRİLMEDİ: `/gizlilik` bilinçli olarak uygulama
+                        kabuğunun DIŞINDA ve kendi sessiz hukuk-metni dilini taşıyor —
+                        aynı gerekçeyle geçen turun kapsamı dışında bırakılmıştı.
+                        Değişen yalnız dokunma alanı; görünen bağlantı aynı. */}
+                    <Link href="/login" className="tap-44" style={backLinkStyle}>&larr; Giriş ekranına dön</Link>
                 </div>
             </article>
         </main>

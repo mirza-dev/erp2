@@ -111,10 +111,15 @@ export default function LandingPage() {
                     <a href="#yapayzeka">Yapay zeka</a>
                 </nav>
                 <div className="rv-nav-cta">
-                    <Link href="/login" className="rv-link-quiet">
+                    {/* 2026-09-10 ölçümü: "Giriş Yap" 55.5×20.3, "Demo Gez"
+                        116.2×35.5 — açılış sayfasının İKİ birincil eylemi de 44px
+                        tabanının altındaydı. Sayfa kendi stil dilini (`rv-*`)
+                        taşıyor ama `tap-44` mekanizmasını zaten kullanıyor
+                        (alt bilgideki gizlilik bağlantısı). Görsel boyut değişmez. */}
+                    <Link href="/login" className="rv-link-quiet tap-44">
                         Giriş Yap
                     </Link>
-                    <a href="/api/auth/demo" className="rv-btn rv-btn-primary rv-btn-sm">
+                    <a href="/api/auth/demo" className="rv-btn rv-btn-primary rv-btn-sm tap-44">
                         Demo Gez <ArrowRight size={14} />
                     </a>
                 </div>

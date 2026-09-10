@@ -418,7 +418,19 @@ function LoginMonolith() {
             </div>
             <section className="monolith-access" aria-labelledby="login-tag">
                 <div className="mono-brand">
-                    <RovenLogo size={32} wordmarkSize={27} gap={8} />
+                    {/* 2026-09-10: `/login` deponun BAŞLIK ELEMANI HİÇ OLMAYAN tek
+                        yüzeyiydi — üstelik uygulamanın giriş kapısı. Ölçüm (390×844,
+                        oturumsuz) h1/h2/h3 sayısını 0 buldu; `/sifre-yenile`, `/gizlilik`,
+                        `/offline` ve 404'ün hepsinde h1 vardı.
+
+                        Uydurma bir başlık metni EKLENMEDİ: bir giriş ekranında sayfanın
+                        görünen kimliği zaten wordmark'ın kendisi, o yüzden `<h1>` logoyu
+                        SARIYOR ve erişilebilir adı "Roven" oluyor. `mono-brand-tag`
+                        ("Endüstriyel ERP") kaşlık olarak kalıyor ve `aria-labelledby`
+                        hedefi olmayı sürdürüyor. Görsel çıktı birebir aynı. */}
+                    <h1 className="mono-brand-title">
+                        <RovenLogo size={32} wordmarkSize={27} gap={8} />
+                    </h1>
                     <span className="mono-brand-tag" id="login-tag">
                         {t.monoTag}
                     </span>

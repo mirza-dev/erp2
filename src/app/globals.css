@@ -368,6 +368,16 @@ body {
   gap: 14px;
   color: var(--text-primary);
 }
+/* `<h1>` yalnız ANLAM taşır — görsel olarak logonun kendisi neyse odur.
+   Tarayıcının h1 varsayılanları (2em, bold, blok, dikey margin) `.mono-brand`
+   flex satırını bozardı; hepsi geri alınıyor. */
+.mono-brand-title {
+  margin: 0;
+  display: inline-flex;
+  font-size: inherit;
+  font-weight: inherit;
+  line-height: inherit;
+}
 .mono-brand-tag {
   padding-left: 14px;
   border-left: var(--line-width) solid var(--surface-border);
@@ -883,7 +893,10 @@ body {
   .topbar-brand,
   .field-link,
   .row-link,
-  .nav-rail-item {
+  .nav-rail-item,
+  .icon-btn,
+  .check,
+  .input-wrap .trail {
     position: relative;
   }
 
@@ -894,6 +907,9 @@ body {
   .row-link::after,
   .seg button::after,
   .nav-rail-item::after,
+  .icon-btn::after,
+  .check::after,
+  .input-wrap .trail::after,
   .tap-44-v::after {
     content: "";
     position: absolute;
@@ -909,9 +925,16 @@ body {
   .hamburger-btn::after,
   .topbar-brand::after,
   .field-link::after,
-  .row-link::after {
+  .row-link::after,
+  .icon-btn::after,
+  .input-wrap .trail::after {
     min-width: 44px;
   }
+
+  /* `.check` ("Beni hatırla", `role="checkbox"` bir span) bilerek YALNIZ dikey
+     büyür: ölçümde 91.7×18 çıktı, yani genişlik zaten iki katı fazla. Yatay
+     büyütmek onu aynı satırdaki `.field-link` ("Şifremi unuttum") üzerine
+     iterdi — geçen turun `q-note-btn` dersinin aynısı. */
 
   /* Teklif satırındaki not|sil çifti 22×22 ve aralarında 2px var. İkisi de
      `tap-44` aldığı için her biri 11px yana taşar → 20px ÜST ÜSTE binerdi ve
