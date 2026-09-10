@@ -26,6 +26,7 @@
 - [reference_theming.md](reference_theming.md) — Koyu+aydınlık tema (Cool slate): `data-theme` token sistemi, FOUC bootstrap, ThemeProvider/useTheme/ThemeToggle, tema-muaf yüzeyler (baskı/logo/lightbox); kural: renkte CSS var kullan→otomatik temalanır
 - [reference_worktree_branches.md](reference_worktree_branches.md) — İki worktree (erp2=main, proje-codex=codex-experiment) birebir-ayna; push akışı (commit→ff main→push both→SHA doğrula); `~/.claude/memory`=SYMLINK→erp2/memory (proje-codex ayrı kopya)
 - [reference_rfq_module.md](reference_rfq_module.md) — Tedarikçi Fiyat Talebi (RFQ) modülü (mig.100→103): talep→gönder→fiyat gir→karşılaştır→award→PO; veri modeli, RPC'ler, RBAC, UI; takip: PO son-fiyat önerisi/tedarikçi önerisi/PDF eki/rfq_response_due alert + award integrity (sunucu-otoriter, mükerrer-reddi); kalan v1 erteleme: ayrı print sayfası (arşiv-view yeterli)
+- [reference_quote_line_columns.md](reference_quote_line_columns.md) — Teklif satır kolon modeli: **Ölçü (Size) kolonu KALDIRILDI** (kullanıcı kararı 2026-06-16) — ürün adı DN+basınç sınıfını zaten içeriyor, `size_text` redundant; **gelecekte tekrar EKLEME**, `size_text` dormant korunur
 - [reference_review_agent.md](reference_review_agent.md) — `erp2-reviewer` inceleme/güvenlik subagent'ı (`/erp-review`) + Semgrep/gitleaks (`brew install`); Bulgular K/Y/O/D çıktısı; subagent oturum-başında yüklenir (restart gerek)
 
 ## Roadmap

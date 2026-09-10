@@ -1,3 +1,10 @@
+---
+name: deferred_backlog
+description: Ertelenen büyük işler ve açık kullanıcı-tarafı ön koşullar — yeni oturumun başlangıç noktası (A/B/C/D blokları)
+metadata:
+  type: project
+---
+
 # Ertelenen Büyük İşler (Backlog) — yeni oturumda devam
 
 _Son güncelleme: 2026-09-10 (C0 listesindeki üç bayat madde düzeltildi; ilk yazım 2026-06-17). Kullanıcı isteğiyle "sonraki tura bıraktığımız büyük işler" buraya çıkarıldı. Detaylı açık-yükümlülük + smoke listesi `CLAUDE.md` §Açık yükümlülükler'de._
