@@ -77,8 +77,13 @@ test("kategori filtre çipleri görünür", async ({ page }) => {
     await expect(page.getByRole("tablist", { name: /eskime/i })).toBeVisible();
 });
 
-test("'← Ürünler' linki çalışıyor", async ({ page }) => {
-    await page.getByRole("link", { name: /← ürünler/i }).click();
+test("geri bağlantısı çalışıyor", async ({ page }) => {
+    // 2026-09-10: `←` METİN oku kalktı. Beş lehçe ortak `BackLink`e indi ve o
+    // `ArrowLeft` ikonunu `aria-hidden` bir SÜS olarak basıyor — ok, ekran
+    // okuyucuda "sol ok" diye seslendiriliyordu ve erişilebilir adın parçasıydı.
+    // İddianın niyeti aynı (geri bağlantısı ürünlere götürür), yalnız
+    // erişilebilir ad artık yalnız HEDEFİN adı.
+    await page.getByRole("link", { name: /^ürünler$/i }).click();
     await page.waitForURL("**/products**", { timeout: 5_000 });
     expect(page.url()).toContain("/products");
 });

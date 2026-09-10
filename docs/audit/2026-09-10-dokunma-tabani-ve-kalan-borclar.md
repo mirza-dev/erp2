@@ -269,6 +269,15 @@ hiç üretilmiyor (kural `@media (max-width: 768px)` altında). Yatay taşma 0.
 | kırmızı-kanıt | **14/14** |
 | migration | YOK |
 
+**E2E bir GERÇEK sözleşme kırığı yakaladı ve haklıydı.** `aging.spec`
+geri bağlantısını `getByRole("link", { name: /← ürünler/i })` ile arıyordu;
+`←` **metin** oku ortak `BackLink`e geçince kalktı (`ArrowLeft` artık
+`aria-hidden` bir süs) ve erişilebilir ad yalnız hedefin adı oldu — ki bu
+zaten istenen sonuç: ok, ekran okuyucuda "sol ok" diye seslendiriliyordu.
+İddia gevşetilmedi, **niyeti korunarak** yeni erişilebilir ada taşındı.
+*Bir rol-locator'ı işaretlemenin ANLAMINI izler* (2026-09-05'in
+`FilterChips` → `role="tab"` dersinin aynısı).
+
 **React Doctor — DOKUZUNCU yanlış alarm, yeni bir sebeple.** Özet +4 hata
 gösterdi; `HEAD~2` geçici worktree'de karşılaştırıldı: **`src/` altında fark
 SIFIR** (1250 = 1250). Dördü de gitignore'lı TÜRETİLMİŞ dosyalardaydı
@@ -276,3 +285,18 @@ SIFIR** (1250 = 1250). Dördü de gitignore'lı TÜRETİLMİŞ dosyalardaydı
 `npm run build` + `schema:bundle` koşulmuş, taban worktree'sinde hiç
 üretilmemişlerdi. *Bir karşılaştırma, iki tarafın aynı üretilmiş durumda
 olmasını gerektirir.*
+
+---
+
+## 9 — Bu turdan çıkan açık madde
+
+**YOK.** Yedi maddenin yedisi, ölçümün çıkardığı dört ek kusurun dördü kapandı.
+
+§7'deki kapsam dışı küme bir "erteleme" değil **karar**: her satırın gerekçesi
+ölçüme dayanıyor ve çoğunda düzeltme, düzeltmediğinden daha kötü bir sonuç
+üretirdi (yoğun tablo hücresi bağlantılarını büyütmek komşu SATIRIN görünür
+alanını yer; bitişik `.seg` segmentlerini genişletmek birbirini yer).
+
+`input`/`select` ailesi (256 hit) kullanıcı kararıyla dışarıda; kararın
+gerekçesi WCAG AA tabanı (24px) ve form ritmi. Taban 44'e çekilmek istenirse
+bu ayrı bir tasarım turudur, dokunma hedefi turu değil.
