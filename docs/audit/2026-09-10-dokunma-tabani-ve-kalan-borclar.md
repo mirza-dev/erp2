@@ -211,6 +211,9 @@ taşıdığı için kural HAKLI olarak yeşil kaldı.
   dersinin tersine düşerdi.
 - **Cümle içi düz yazı bağlantıları** (13–15px, 2 yüzey) — dokunma hedefi
   değil, metin.
+- **`quotes/new` satırındaki 2–3px'lik kalan çakışmalar** — not düğmesinin
+  kutusu GTİP alanının görünür kenarına 2px giriyor; görünür hedef
+  ıskalanmıyor. Ölçüldü, kovalanmadı.
 - **`.seg button` genişliği** (36.1px) — segmentler bitişik; genişletmek
   komşusunun görünür alanına girer. Şerit bütün olarak tek hedef.
 - **Baskı belgeleri** (`QuoteDocument` · `QuotePdfDocument` · `RfqDocument` ·
@@ -220,10 +223,56 @@ taşıdığı için kural HAKLI olarak yeşil kaldı.
 
 ## 8 — Doğrulama
 
+### Ölçüm ÖNCE / SONRA (390×844 · 2 tema · 29 rota)
+
+| | ÖNCE | SONRA |
+|---|---|---|
+| toplam kontrol | 1664 | 1662 |
+| **44px altı** | **584** | **290** |
+| checkbox/radio | 150 | **0** |
+| buton | 36 | **4** |
+| bağlantı | 142 | **30** |
+| `field` (kapsam dışı) | 256 | 256 |
+| başlıksız rota | 1 | **0** |
+| yatay taşma | 0 | 0 |
+
+Kalan 34 yüzeyin tamamı §7'deki gerekçeli kümede.
+
+### Komşu çakışması
+
+Ölçüt keskinleştirildikten (görünür alan) ve sabit katmanlar hariç
+tutulduktan sonra, dokuz rotalık odaklı taramada **beş çakışma kaldı ve
+hepsi 2–3px**, tek rotada (`quotes/new`: not düğmesi ↔ GTİP alanı 2px yatay
+×3, "Yeni satır ekle" ↔ birim alanı 3px dikey). Görünür hedef ıskalanmıyor;
+kayda geçti, kovalanmadı.
+
+**Tur kendi eklediği iki çakışmayı düzeltti:** `<label>` içindeki
+"Pasifleri göster" kutuları tam 44px kutu alınca komşusunun (filtre butonu /
+arama alanı) görünür alanına giriyordu → o ailede `tap-44-v` (yatay hedefi
+zaten etiket metni sağlıyor).
+
+### Masaüstü nötrlüğü — 1440px'te HİÇBİR ŞEY değişmedi
+
+Altı rotada ölçüldü: `.nav-rail-item` 199×36 · `.tap-44` 30×30 ·
+`.tap-44-v` — **hepsinde `after=false`**, yani görünmez kutular masaüstünde
+hiç üretilmiyor (kural `@media (max-width: 768px)` altında). Yatay taşma 0.
+"Görünmez hit-area, görsel boyutu değiştirmez" iddiasının kanıtı budur.
+
+### Gate
+
 | ölçüt | sonuç |
 |---|---|
 | `tsc` | 0 |
 | `lint` | 0 |
 | test | **501 dosya / 7017 test** |
+| build | 0 uyarı |
 | kırmızı-kanıt | **14/14** |
 | migration | YOK |
+
+**React Doctor — DOKUZUNCU yanlış alarm, yeni bir sebeple.** Özet +4 hata
+gösterdi; `HEAD~2` geçici worktree'de karşılaştırıldı: **`src/` altında fark
+SIFIR** (1250 = 1250). Dördü de gitignore'lı TÜRETİLMİŞ dosyalardaydı
+(`supabase/schema-bundle/*.sql` ve `.next/static/chunks/*`) — bu tarafta
+`npm run build` + `schema:bundle` koşulmuş, taban worktree'sinde hiç
+üretilmemişlerdi. *Bir karşılaştırma, iki tarafın aynı üretilmiş durumda
+olmasını gerektirir.*
