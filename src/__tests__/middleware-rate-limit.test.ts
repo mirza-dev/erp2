@@ -105,9 +105,13 @@ describe("middleware rate-limit — CRON_SECRET Bearer", () => {
 
 describe("middleware rate-limit — eski ALWAYS_PUBLIC artık rate limit'te", () => {
     it("/api/auth/demo GET → rate limit ÇAĞRILIR (DEMO policy seçilir)", async () => {
-        // M-3 Review (2026-05-25): Demo route gerçek akışı GET (route.ts:10 GET handler;
-        // DemoButton.tsx:16 <Link href>). Eski test POST'tu — gerçek abuse yüzeyini
-        // ölçmüyordu. GET'e geçirildi.
+        // M-3 Review (2026-05-25): Demo route gerçek akışı GET (route.ts:10 GET
+        // handler; açılış sayfasındaki "Demo Gez" düz bir <a href>). Eski test
+        // POST'tu — gerçek abuse yüzeyini ölçmüyordu. GET'e geçirildi.
+        //
+        // 2026-09-10: gönderme `DemoButton.tsx:16 <Link href>` diyordu; o dosya
+        // silindi (tüketicisi sıfırdı) ve zaten `<Link>` değil `<a>` kullanıyordu
+        // — yorum iki kere yanlıştı. Canlı yüzey `src/app/page.tsx`.
         const res = await middleware(makeRequest("/api/auth/demo", { method: "GET" }));
         expect(mockRateLimitCheck).toHaveBeenCalled();
         // 1. arg: ip:0.0.0.0 (header yok), 2. arg: DEMO policy
