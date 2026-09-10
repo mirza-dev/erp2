@@ -23,7 +23,9 @@ _Son güncelleme: 2026-09-08_
 
 **Kapı 14 kural, 14/14 kırmızı-kanıtlı.** Tur **dört zayıflık** yakaladı: desen komşusuna tutundu (**sınır dersinin 6. tekrarı**) · kural **BOŞ KÜMEYİ** denetliyordu (`<input[\s\S]{0,400}?/>` sıfır eşleşme üretiyordu — gerçek etiketler 400 karakteri aşıyor) · kural **kendi gerekçe yorumuna** tutundu (**7. düşüş** → `stripSrcComments`) · "en az bir dosya" bir SAYI iddiasıydı (2026-09-04 dersi). Ayrıca **kapının kendi ayrıştırıcısı zayıftı**: `rules()` yorumları virgülle bölünmüş parçalarda soyuyordu → virgül içeren çok satırlı gerekçe seçici listesine yapışıyor, sonraki kural hiç bulunamıyordu. **Mutasyon da sınırın içine düşmeli** (3. kez).
 
-tsc 0 · lint 0 · **501 dosya / 7017 test** · build 0 uyarı · migration YOK.
+**E2E BİR GERÇEK SÖZLEŞME KIRIĞI YAKALADI ve haklıydı:** `aging.spec` geri bağlantısını `getByRole("link", {name: /← ürünler/i})` ile arıyordu; `←` METİN oku ortak `BackLink`e geçişte kalktı (`ArrowLeft` artık `aria-hidden` bir SÜS ve erişilebilir ad yalnız HEDEFİN adı — zaten istenen sonuç buydu, ok ekran okuyucuda "sol ok" diye seslendiriliyordu). İddia gevşetilmedi, niyeti korunarak yeni ada taşındı. *Bir rol-locator'ı işaretlemenin ANLAMINI izler* (2026-09-05'in `FilterChips`→`role="tab"` dersinin aynısı).
+
+tsc 0 · lint 0 · **501 dosya / 7017 test** · build 0 uyarı · **E2E 94/94** · migration YOK. React Doctor **DOKUZUNCU yanlış alarm, yeni bir sebeple**: özet +4 hata dedi, `HEAD~2` worktree'de karşılaştırıldı → **`src/` altında fark SIFIR** (1250=1250); dördü de gitignore'lı TÜRETİLMİŞ dosyalardaydı (`supabase/schema-bundle/*.sql`, `.next/static/*`) ve taban worktree'sinde hiç üretilmemişlerdi. *Bir karşılaştırma, iki tarafın aynı üretilmiş durumda olmasını gerektirir.*
 
 **Son tamamlanan iş:** **`QuoteForm`un bölüm başlıkları + iki form sayfasının eksik h1'i** (2026-09-08; GREEN; **migration YOK**; saf sunum). Kullanıcı "QuoteForm'un bölüm başlıklarını da yapalım" dedi — Faz B kapanış kaydındaki TEK açık madde. Rapor: `docs/audit/2026-09-08-quoteform-basliklar.md`.
 

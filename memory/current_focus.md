@@ -59,7 +59,15 @@ Ayrıca **kapının kendi ayrıştırıcısı zayıftı**: `rules()` yorumları 
 bölünmüş parçalarda soyuyordu → virgül içeren yorum seçici listesine yapışıyor
 ve sonraki kural hiç bulunamıyordu.
 
-tsc 0 · lint 0 · **501 dosya / 7017 test** · build 0 uyarı · migration YOK.
+**E2E bir GERÇEK sözleşme kırığı yakaladı:** `aging.spec` geri bağlantısını
+`/← ürünler/i` ile arıyordu; `←` METİN oku `BackLink`e geçişte kalktı
+(`ArrowLeft` artık `aria-hidden` süs, erişilebilir ad yalnız hedefin adı —
+istenen sonuç buydu). İddia gevşetilmedi, niyeti korunarak taşındı.
+*Bir rol-locator'ı işaretlemenin ANLAMINI izler.*
+
+tsc 0 · lint 0 · **501 dosya / 7017 test** · build 0 uyarı · **E2E 94/94** ·
+migration YOK. React Doctor **dokuzuncu yanlış alarm** (src/ altında fark
+SIFIR; +4 hata gitignore'lı türetilmiş dosyalarda).
 
 ## 2026-09-08 — `QuoteForm` bölüm başlıkları + iki form sayfasının eksik h1'i
 
