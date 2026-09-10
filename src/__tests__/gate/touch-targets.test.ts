@@ -388,6 +388,58 @@ describe("GATE — dokunma hedefleri", () => {
             .toEqual([]);
     });
 
+    it("OTURUMSUZ yüzeyler kapsamda — envanterin hiç girmediği bölge", () => {
+        // 2026-09-10 dokunma turu 29 `/dashboard/*` rotası gezdi ve "kapandı"
+        // dedi. `/login`, `/`, `/sifre-yenile`, `/gizlilik`, `/offline` ve 404
+        // o listede HİÇ yoktu — oysa `/login` uygulamanın giriş kapısı ve
+        // oturumu olmayan herkes ÖNCE oraya düşüyor. Yeniden ölçüldü
+        // (390×844, 2 tema, oturumsuz): 78 kontrolün 50'si 44px altındaydı.
+        // *Bir envanter, ölçmediği durumu kapsayamaz* — dersin ikinci tekrarı.
+        //
+        // Kural SINIF ADIYLA kilitler, SAYIYLA değil: sayı iddiası bayatlar.
+        const SELECTORS: [string, string][] = [
+            [".icon-btn", "login tema düğmesi 32×32'ydi"],
+            [".check", '"Beni hatırla" 91.7×18\'di (role=checkbox taşıyan bir span)'],
+            [".input-wrap .trail", '"Parolayı göster" 42×42\'ydi'],
+        ];
+        // İDDİA KUTUYU YARATAN KURALA BAĞLI. İlk yazımda "mobil blokta bir yerde
+        // geçiyor mu" diye bakılıyordu; `.icon-btn::after`ı kutu kuralından
+        // düşürdüm ve kural YEŞİL kaldı — çünkü seçici `min-width` kuralında da
+        // duruyor ve `some()` onu ORADAN buluyordu. `min-width` tek başına kutu
+        // yaratmaz (`content` ve konumlandırma öteki kuralda). Deponun
+        // "desen komşusuna tutundu" dersinin 8. tekrarı.
+        const boxRule = MOBILE_RULES.find(
+            (r) => /content:\s*""/.test(r.body) && /min-height:\s*44px/.test(r.body),
+        );
+        expect(boxRule, "hit-area kutusunu yaratan kural bulunamadı — alttaki iddia sahte-yeşil olurdu").toBeTruthy();
+        for (const [sel, why] of SELECTORS) {
+            expect(boxRule!.sels, `${sel}::after kutu kuralında yok — ${why}`).toContain(sel + "::after");
+        }
+
+        // `.check` bilerek YALNIZ dikey büyür. Ölçümde 91.7px genişti; yatay
+        // büyütmek onu aynı satırdaki `.field-link` ("Şifremi unuttum")
+        // üzerine iterdi. `q-note-btn` dersinin aynısı.
+        const minWidthRule = MOBILE_RULES.find((r) => /min-width:\s*44px/.test(r.body));
+        expect(minWidthRule, "min-width: 44px kuralı bulunamadı — alttaki iddia sahte-yeşil olurdu").toBeTruthy();
+        expect(minWidthRule!.sels, "`.check` yatay da büyütülmüş — komşusunun dokunma alanını yer")
+            .not.toContain(".check::after");
+        expect(minWidthRule!.sels, "`.icon-btn` yalnız dikey büyümüş — 32px genişlik 44'e çıkmaz")
+            .toContain(".icon-btn::after");
+    });
+
+    it("oturumsuz sayfaların tekil eylemleri hit-area taşıyor", () => {
+        // Sınıf tabanlı çözümün ulaşamadığı, tek tek yazılmış kontroller.
+        const PAGES: [string, RegExp, string][] = [
+            ["src/app/page.tsx", /rv-link-quiet tap-44/, 'açılış "Giriş Yap" 55.5×20.3\'tü'],
+            ["src/app/page.tsx", /rv-btn-sm tap-44/, 'açılış "Demo Gez" 116.2×35.5\'ti'],
+            ["src/app/offline/page.tsx", /className="tap-44"/, '"Tekrar dene" 37.5px\'ti'],
+            ["src/app/gizlilik/page.tsx", /className="tap-44"/, "geri bağlantısı 128.6×16'ydı — setin EN küçüğü"],
+        ];
+        for (const [file, pattern, why] of PAGES) {
+            expect(readFileSync(join(root, file), "utf8"), `${file}: ${why}`).toMatch(pattern);
+        }
+    });
+
     it("demo bandosunun kapat düğmesi erişilebilir (envanterin en kötüsüydü: 13×14)", () => {
         const banner = readFileSync(join(root, "src/components/ui/DemoBanner.tsx"), "utf8");
         expect(banner).toMatch(/aria-label="Bildirimi kapat"/);

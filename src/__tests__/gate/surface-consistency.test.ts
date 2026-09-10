@@ -299,6 +299,37 @@ describe("GATE: yüzey + buton/kategori tutarlılığı", () => {
         }
     });
 
+    it("OTURUMSUZ rotalar da başlıksız kalamaz — `/login` başlıksızdı", () => {
+        // Üstteki kural "TÜM rotalar" diyor ama taradığı ağaç YALNIZ
+        // `src/app/dashboard`. Oturum açmamış birinin gördüğü her yüzey o
+        // ağacın DIŞINDA kalıyor — ve ölçüm (2026-09-10, 390×844, oturumsuz)
+        // `/login`in h1/h2/h3 sayısını **0** buldu. Uygulamanın GİRİŞ KAPISI,
+        // deponun başlık elemanı hiç olmayan tek yüzeyiydi; `/sifre-yenile`,
+        // `/gizlilik`, `/offline` ve 404'ün hepsinde h1 vardı.
+        //
+        // *Bir kapı yalnız BAKTIĞI yerde koruma sağlar* — bu kuralın kendisi
+        // o dersin ürünü, ama kapsamı bir kez daha dar çizilmişti.
+        const PUBLIC_ROUTES = [
+            "src/app/login/page.tsx",
+            "src/app/page.tsx",
+            "src/app/sifre-yenile/page.tsx",
+            "src/app/gizlilik/page.tsx",
+            "src/app/offline/page.tsx",
+            "src/app/not-found.tsx",
+        ];
+        for (const rel of PUBLIC_ROUTES) {
+            const code = stripComments(read(rel));
+            expect(/<h1[\s\n>]/.test(code), `${rel}: oturumsuz yüzey başlık elemanı taşımıyor`).toBe(true);
+        }
+
+        // `/login`in başlığı UYDURULMUŞ bir metin olmamalı: bir giriş
+        // ekranında sayfanın görünen kimliği wordmark'ın kendisidir, o yüzden
+        // `<h1>` logoyu SARIYOR (erişilebilir ad "Roven"). Biri buraya ayrı
+        // bir başlık metni yazarsa kural kırılır ve karar yeniden tartışılır.
+        const login = stripComments(read("src/app/login/page.tsx"));
+        expect(login, "`/login` h1'i logoyu sarmıyor — başlık metni uydurulmuş olabilir")
+            .toMatch(/<h1[^>]*className="mono-brand-title"[^>]*>\s*<RovenLogo/);
+    });
     it("Yenile BEYAZ — şeffaf toolbar'a geri dönmez", () => {
         const refresh = PAGE_HEADER.slice(PAGE_HEADER.indexOf("{onRefresh &&"));
         expect(refresh).toContain('variant="secondary"');

@@ -151,6 +151,50 @@ describe("GATE — route-guard matrisi (method-seviye)", () => {
         expect(stale, stale.join("\n")).toEqual([]);
     });
 
+    it("hız sınırlayıcı TEK BAŞINA guard sayılamaz — ALWAYS_PUBLIC ile kesişim BOŞ", () => {
+        // GUARD_PATTERNS listesinde `guardAiRoute(` bilinçli olarak duruyor
+        // ("AI maliyet kapısı"). Ama `guardAiRoute` ÖLÇÜLDÜ: gövdesi yalnız
+        // `extractClientIp` + sayaç — sıfır kimlik, sıfır yetki kontrolü.
+        // Yani bu matris, bir HIZ SINIRLAYICIYI yetkilendirme sayıyor.
+        //
+        // Bugün bunun bir bedeli YOK: `ai/parse` ve `ai/score` proxy'nin
+        // oturum kontrolünden geçiyor, `ai/purchase-copilot` ALWAYS_PUBLIC ama
+        // kendi `checkAuth`ını (CRON_SECRET veya oturum) taşıyor. Kesişim boş.
+        //
+        // Tehlike GİZİL ve İKİ DOSYALIK: biri `proxy.ts`nin ALWAYS_PUBLIC
+        // listesine yeni bir `/api/ai/*` eklerse ve route yalnız
+        // `guardAiRoute` taşırsa, uç TAMAMEN açık olur — ve bu matris yeşil
+        // kalır, çünkü deseni "guarded" sayar. Hiçbir dosyanın kendi testi
+        // bu bileşimi görmüyor. Kural tam olarak kesişimi kilitler.
+        const proxy = readFileSync(join(process.cwd(), "src/proxy.ts"), "utf8");
+        const listMatch = proxy.match(/const ALWAYS_PUBLIC\s*=\s*\[([\s\S]*?)\]/);
+        expect(listMatch, "ALWAYS_PUBLIC listesi okunamadı — kural sahte-yeşil olurdu").toBeTruthy();
+        const alwaysPublic = [...listMatch![1].matchAll(/"([^"]+)"/g)].map((m) => m[1]);
+        expect(alwaysPublic.length, "ALWAYS_PUBLIC boş çıktı — ayrıştırma kırık").toBeGreaterThan(5);
+
+        // Yalnız hız sınırlayıcıya dayanan route'lar (başka guard deseni YOK).
+        const AUTH_PATTERNS = GUARD_PATTERNS.filter((g) => g !== "guardAiRoute(");
+        const rateOnly: string[] = [];
+        for (const f of files) {
+            const src = readFileSync(f, "utf8");
+            if (!src.includes("guardAiRoute(")) continue;
+            const localTokens = [...localGuardHelpers(src)].map((h) => h + "(");
+            if ([...AUTH_PATTERNS, ...localTokens].some((t) => src.includes(t))) continue;
+            rateOnly.push("/api/" + routeKey(f));
+        }
+
+        const open = rateOnly.filter((p) =>
+            alwaysPublic.some((pub) => p === pub || p.startsWith(pub + "/")),
+        );
+        expect(open, "bir uç hem ALWAYS_PUBLIC hem de YALNIZ hız sınırlayıcı taşıyor — tamamen açık")
+            .toEqual([]);
+
+        // Anti-vakum: tarama gerçekten `guardAiRoute` kullanan dosya buldu mu?
+        const usesRateLimit = files.filter((f) => readFileSync(f, "utf8").includes("guardAiRoute("));
+        expect(usesRateLimit.length, "hiç `guardAiRoute` bulunamadı — kural boş kümeyi denetliyor")
+            .toBeGreaterThanOrEqual(3);
+    });
+
     it("ACIK-BULGU sınıfı kayıtlar rapora referans verir (gerekçe boş olamaz)", () => {
         for (const b of GUARDLESS_BASELINE) {
             expect(b.reason.length, `${b.path} gerekçesiz`).toBeGreaterThan(5);
