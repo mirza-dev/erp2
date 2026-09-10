@@ -40,5 +40,6 @@
 - [feedback_memory_updates.md](feedback_memory_updates.md) — MEMORY.md ve memory dosyaları düzenli güncel tutulmalı
 - [feedback_auto_context_update.md](feedback_auto_context_update.md) — current_focus.md ve CLAUDE.md Mevcut Durum her iş sonunda otomatik güncellenmeli
 - [feedback_plan_domain_check.md](feedback_plan_domain_check.md) — Plan yazmadan önce domain-rules.md okunmalı; projeden kopuk özellik planlanmamalı
+- [feedback_contract_in_types_not_comments.md](feedback_contract_in_types_not_comments.md) — Sözleşme yalnız YORUMDA yaşıyorsa fiilen yok (tipi daralt: 5 çağrı yeri zaten deliyordu); ve bir ENVANTER, ölçmediği durumu kapsayamaz (çekmece kapalıyken sayılan 36, gerçekte 584)
 - [feedback_global_over_hardcode.md](feedback_global_over_hardcode.md) — Tekrarlayan UI ayarını sayfa-bazlı hardcode yerine component varsayılanı/global yap
 - [feedback_ask_scope_decisions.md](feedback_ask_scope_decisions.md) — Kapsam/varsayım kararlarını AskUserQuestion ile sor, sonra kendin ilerle (mikro-onay bekleme)
