@@ -500,3 +500,18 @@ Teklif tarafını ilgilendiren üç kalıcı bilgi:
    sessizce düşürdü ve marka mavisi baskıda tamamen kayboldu. Kapı kuralı:
    `gate/surface-consistency` "baskı seçicileri ETİKETE değil KONUMA bağlanır".
 
+## 2026-09-10 — teklif yüzeylerine dokunan kapanış turu
+
+- **`/dashboard/quotes/preview` artık başlıklı.** Araç çubuğundaki
+  `{teklif no} · {durum}` `<span>`ı gerçek `<h1>` oldu (**piksel farkı 0**);
+  boş-durum başlığı da 16px `<div>`den `<h1>`e. Sayfa `HEADER_EXCEPTIONS`e
+  gerekçeli girdi: tam-ekran BASKI önizlemesi, `PageHeader`ın 20px sayfa
+  başlığı burada yanlış olurdu. **`QuoteDocument` başlıksız KALIYOR** — o bir
+  baskı belgesi, uygulama kabuğu değil (emsal: `RfqDocument`).
+- **`quotes/[id]` onay diyaloğunun başlığı ortak kaynağa girdi.**
+  2026-09-08'de taşınamamıştı çünkü yıkıcı işlemde `--danger-text`e dönüyor ve
+  `SectionHeader` bunu modellemiyordu. YENİ `tone` prop'u ile taşındı;
+  **görünür yakınsama 13px/600 → 16px/650** (diğer on bir diyalog başlığı
+  zaten bu ölçekteydi).
+- **`QuoteForm`un geri kırıntısı** ortak `BackLink`e geçti (ölçüm: 65.3×**16**).
+- Teklif satırındaki not/sil çifti ve `q-note-btn` boşluk kuralı DEĞİŞMEDİ.

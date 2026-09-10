@@ -5,6 +5,61 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-09-10 — Dokunma tabanı + kalan yedi borç KAPANDI
+
+2026-09-08'in beş gerekçeli ertelemesi + `deferred_backlog` §A5/§A6.
+Kullanıcı: *"bu kalan işlerin hepsini detaylı planla ve kapat"*. Rapor
+`docs/audit/2026-09-10-dokunma-tabani-ve-kalan-borclar.md`.
+
+**KAYITLI ÜÇ SAYININ ÜÇÜ DE YANLIŞTI** (ön tarama envanter değildir — 5. kez).
+"36 kontrol" değil **1664'ün 584'ü**; "5 kopya geri bağlantısı" değil **beş
+lehçe / 11 yüzey**; Developer Console'un "kimseye açık değil" notu **bayat**
+(erişilebilir çıktı).
+
+**ASIL BULGU — uygulamanın ANA GEZİNMESİ tabanın altındaydı.** `.nav-rail-item`
+(Sidebar'ın 16 bağlantısı + Ayarlar rayı) **222×36, `::after` YOK**. `tap-44`
+seçici listesi 2026-08-31'de yazılmıştı ama bu sınıf listeye hiç girmedi — **ve
+ölçüm de göremedi, çünkü mobil çekmece KAPALIYKEN ölçülüyordu.** Kutuyu eklemek
+tek başına yetmedi: bağlantılar bitişik, 36px satıra 44px kutu komşusuyla 8px
+çakışırdı → `.nav-rail-group` mobilde `gap: 8px` (görsel yükseklik 36px KALDI).
+
+**PLANIN BİR VARSAYIMI ÖLÇÜMLE ÇÜRÜDÜ.** Plan `::after`in `<input>`ta
+çalışmadığını varsayıp sarmalayıcı `<label>` öngörüyordu. `elementFromPoint`
+ile ölçüldü: 14px checkbox'ın merkezinden **20px** aşağıdaki tıklama hâlâ
+input'a düşüyor → 32 checkbox doğrudan sınıfı aldı. Ara adım da ders:
+`getComputedStyle(el,"::after")` 44×44 diyordu ama **hesaplanmış stil boyanmış
+demek değildir**; gerçek testi isabet testi verdi.
+
+**ÖLÇÜ ARACI DÖRT KEZ BULGU OLDU:** (a) bekleme koşulum (`main`) her zaman
+doğruydu → altı rota YÜKLENMEDEN ölçüldü, beşi yarış **biri gerçek kusur**
+(`import/excel` h1'siz); (b) çakışma ölçüsü fazla kabaydı — boş oluğa taşma ile
+komşunun GÖRÜNÜR alanını yeme ayrışmıyordu; (c) çekmece kör noktası; (d) ajan
+tahmini çürüdü — `DataTable` satırları "~38px" değil **75–94px**, düzeltme
+gerekmedi.
+
+**`SectionHeader.style` sözleşmesi YORUMDAYDI, TİPTE AÇIKTI.** Tip
+daraltılınca **beş çağrı yeri sözleşmeyi zaten deliyordu** (3 renk, 2 satır
+yüksekliği). Üçü yeni `tone` prop'una (`danger`/`warning`), ikisi `dialog`
+varyantının kendi tipografisine indi (ikisi de bağımsız olarak **aynı 1.35**'i
+yazmıştı). *Bir sözleşme yorumda yaşıyorsa, yaşamıyordur.* Depodaki son iki
+elle yazılmış diyalog başlığı (`quotes/[id]` + **`ConfirmModal`ın kendisi**)
+ortak kaynağa girdi; `ConfirmModal` `tone="danger"`da bile başlığı nötr
+bırakıyordu — **davranış değişikliği, altı çağrı yerinin altısı da yıkıcı**.
+
+**YENİ `BackLink`** (kullanıcı kararı: buton dili kazanır) · **`import/excel`
+PageHeader** · **`OrderForm.pageHeader`** (kural taşıyıcı-bağımsız oldu) ·
+**`quotes/preview` h1** · konsol sekme şeridi `nowrap`+kaydırma ·
+`.tap-wrap-row` (sarabilen aksiyon satırları).
+
+**Kapı 14 kural, 14/14 kırmızı-kanıtlı** — tur **dört zayıflık** yakaladı:
+desen komşusuna tutundu (sınır dersi, **6. tekrar**) · kural **boş kümeyi**
+denetliyordu (`<input[\s\S]{0,400}?/>` sıfır eşleşme) · kural **kendi gerekçe
+yorumuna** tutundu (**7. düşüş**) · "en az bir dosya" bir sayı iddiasıydı.
+Ayrıca **kapının kendi ayrıştırıcısı zayıftı**: `rules()` yorumları virgülle
+bölünmüş parçalarda soyuyordu → virgül içeren yorum seçici listesine yapışıyor
+ve sonraki kural hiç bulunamıyordu.
+
+tsc 0 · lint 0 · **501 dosya / 7017 test** · build 0 uyarı · migration YOK.
 
 ## 2026-09-08 — `QuoteForm` bölüm başlıkları + iki form sayfasının eksik h1'i
 
@@ -59,79 +114,537 @@ modellemiyor, `style` sözleşmesi yalnız boşluk. Ortak `ConfirmModal` da
 `tone="danger"`da başlığı `--text-primary` bırakıyor. İki yüzey ayrı
 "diyalog başlıkları" turuna kayıtlı.
 
-## 2026-09-05 (2) — Yan çekmeceler ortak `Drawer`'a (Faz B'nin açık yarısı)
+## 2026-09-05 (4) — FAZ B'NİN SON ÜÇ BİLEŞENİ: `NavLink` · `SectionHeader` · `Stat` — FAZ B BİTTİ
 
-2026-08-30 Modal turu 9 diyaloğu ortak çerçeveye almış ama yan çekmeceleri
-**bilerek** dışarıda bırakmıştı ("Modal yanlış yüzey" — doğru gerekçe, kapanmamış
-boşluk). Kullanıcı "sıradaki işe geçelim" dedi; kapsam: **yalnız çekmeceler, tam
-birleştirme**. Rapor `docs/audit/2026-09-05-yan-cekmeceler.md`.
+Kullanıcı "üç bileşeni de yapalım" dedi. Üç dilim/üç commit: `4745cae` ·
+`b05f23d` · `497d717`. Rapor `docs/audit/2026-09-05-uc-bilesen.md`.
 
-**Kayıtlı sayı yanlıştı: 4 değil YEDİ.** İkisi sayfaların İÇİNE gömülüydü
-(`VendorsClient` `justifyContent:"flex-end"`, `email-deliveries` `<aside>`) ve
-`role="dialog"` + `right:0` araması ikisini de kaçırdı. **Çekmece sayımı imzaya
-göre yapılmalı, tek desene göre değil.**
+**ÜÇ KAYITLI SAYININ ÜÇÜ DE DÜŞÜKTÜ** — hepsi önceki turun ÖN TARAMASINDAN
+geliyordu: `SectionHeader` ~45 değil **85 çağrı / 42 varyant** · `Stat` ~28
+değil **3 paylaşılan + 7 dosya-yerel + 26 elle / 20 değer tipografisi** ·
+`NavLink` "3 yüzey, 2 birleşebilir" değil **eksenler ÇAPRAZ**.
+**Ders: ön tarama envanter değildir** (çekmece turundaki "4 değil YEDİ"nin aynısı).
 
-**Beş kusur:** 4'ünde Escape yok · 6'sında odak tuzağı yok · 5'inde odak dönüşü
-yok — **beşi buna rağmen `role="dialog"` İLAN EDİYORDU** · dört z-index katmanı
-(50'dekiler kabuğun mobil menüsünün ALTINDA) · üç dikey teknik (`100vh` iOS
-Safari'de görüntü alanından büyüktür → panelin dibi erişilemez; **hiç
-ölçülmemişti**, 2026-08-31 mobil turu hiçbir çekmece açmamıştı) · token
-ayrışması · gövde kaydırma kilidi hiçbirinde yok (kapsam dışı).
+**Dilim 1 — `NavLink`.** Görsel ikili **Sidebar+Ayarlar** (aynı üç nav token'ı +
+2px sol accent şeridi, iki AYRI uygulama), mantık ikilisi **Sidebar+Developer**
+(`isActive` BİREBİR iki kopya) → tek bileşen üçünü kapsayamaz, iki eksen AYRI
+çözüldü; Developer'ın alt-çizgi dili KASTEN korundu. **ASIL KUSUR a11y:
+Sidebar'ın 16-18 bağlantısında `aria-current` YOKTU** — altı işaret vardı
+(zemin·metin·kenarlık·kalınlık·şerit·ikon opaklığı), altısı da yalnız görseldi.
+Hover 6 satır DOM mutasyonuydu → `.nav-rail-item` CSS sınıfına geçti. Altı ölçü
+kayması ölçümle tek değere indi (36px · şerit 7px · `0 10px 0 12px` · gap 9 ·
+ikon 0.92 · hover kenarlığı YOK).
 
-**YENİ `dialog-a11y.ts` + `Drawer.tsx`.** Çekirdek çıkarıldı çünkü aynı mantığın
-EKSİK KOPYALARI dağılmıştı (`PurchaseOrderModal`'ınki "focus trap" adını taşıyor
-ama tuzak DEĞİLDİ). Davranış-nötrlük kanıtı: **`modal-ui.test.tsx`'in 17 testi
-dosyaya dokunulmadan yeşil.** `Drawer`da `height` HİÇ yazılmaz (`top:0`+
-`bottom:0` — `100dvh`ten de iyi); `padded={false}` `Modal`'dan farklı olarak
-flex sütunu KORUR.
+**Dilim 2 — `SectionHeader`: GÖRÜNMEK ≠ OLMAK.** Drawer turunun "ilan etmek ≠
+davranmak" dersinin TERSTEN hâli: orada işaretleme vardı davranış yoktu, burada
+görünüm vardı İŞARETLEME YOKTU. 44 bölüm etiketi `<div>`di →
+**`orders/[id]` ve `quotes/[id]`nin h1/h2/h3 sayısı SIFIRDI.** Dört rakip kanon,
+ikisi AYNI DOSYADA (`settings/page.tsx`). Üç rol/üç ölçek (`label`/`title`/
+`dialog`); `Input.labelStyle()`ından TÜRETİLEMEZ (o `textTransform`
+taşımamaya kilitli). Tipografi imzası **42→4**, seviye atlaması **0/16**.
 
-**24 tarayıcı ölçümü temiz** (6 çekmece × 2 tema × {1440,390}); yedincisi
-tarayıcıda AÇILAMADI çünkü yerel DB'de sıfır uyarı olayı var → gerçek React
-render'ıyla kanıtlandı.
+**Dilim 3 — `Stat`: kapının kanıtladığı kusur, kapının BAKMADIĞI yerde.**
+Beş yüzey kutu zemini olarak `--bg-secondary` kullanıyordu = gate'in kendi
+"kuralın DAYANAĞI" testinin kanıtladığı gibi sayfa zeminiyle BİREBİR aynı renk,
+**görünmez kutu**; kural 2026-08-31'de yazılmıştı ama **beş sayfalık bir
+allowlist üzerinde**. Ton haritası **4 KOPYA → 1** (`Badge.TONE_TOKENS`).
+`0` ÖLÇÜLMÜŞ BİR DEĞERDİR. Değer tipografisi **20→1**. **Öngörülen kırılma
+geldi:** gate'in ≥7/≥3 sayacı kırıldı (Öneriler 3→0, üçü de stat kutusuydu) →
+yapı iddiasına çevrildi + **eksik `stripComments` eklendi**.
 
-**Dersler:** (1) **bir yüzeyin diyalog İLAN etmesi, diyalog gibi DAVRANDIĞI
-anlamına gelmez** — `customers-ui`'nin kuralı tam bunu arayıp yeşil yanıyordu.
-(2) **Kırmızı-kanıt koşumunun kendisi de kanıtlanmalı**: bir mutasyonum sessizce
-boşa gitti ve "kural zayıf" raporladı; boşa giden mutasyon zayıf kuraldan
-ayırt edilemez → SHA kontrolü eklendi. (3) Gerekçe yorumu kuralı tetikledi,
-**beşinci kez** → `stripComments`. (4) Ölçü aracı yine bulguydu: rect'ler
-**kayma animasyonu sürerken** yakalanmıştı.
+**DERSLER:** (1) görünmek ≠ olmak · (2) **bir kapı yalnız BAKTIĞI yerde koruma
+sağlar** — kanıtlı bir kuralın KAPSAMI da kanıtlanmalı · (3) **bir kural iddia
+ettiğinden fazlasını söylememeli** (negatif stat kuralı ilk yazımda sekme
+şeridini/tablo sarmalayıcısını da yakaladı → stat imzasına daraltıldı) ·
+(4) ön tarama envanter değildir.
 
-**498 dosya / 6947 test · E2E 94/94 · 10/10 kırmızı kanıtlı · net −68 satır.**
+40 tarayıcı ölçümü temiz · 18/18 kırmızı-kanıtlı · **`<h2>` için bugüne kadar
+HİÇ kapı yoktu** · React Doctor 260→262 (ikisi de birleştirmenin mekanizması) ·
+**501 dosya / 7006 test · E2E 94/94 · net −187 satır (tüketici tarafı).**
+
+**EK TUR — bilinen boşluk KAPATILDI.** Kullanıcı "`orders/[id]` ve
+`quotes/[id]`'ye `PageHeader` ekleyelim" dedi. Emsal hazırdı
+(`purchase/orders/[id]`: geri-kırıntı AYRI satırda, altında `PageHeader`).
+**`orders/[id]` 0 → 5 başlık** (h1 + 4 h2) · **`quotes/[id]` 0 → 1** (h1;
+gövdesi `QuoteForm`, ayrı tur). Belge numarası 14px `<div>` / 12px MONO
+`<span>` iken artık **20px `<h1>`**.
+
+Görünür değişiklikler: başlık ayrı satıra çıktı · kırıntı ayraçları (chevron
+SVG ve `/`) silindi — başlık ayrı satıra çıkınca anlamlarını yitirdiler ·
+teklif numarası monospace'i kaybetti · durum açıklaması `subtitle` oldu.
+`quotes/[id]`nin tam genişlikli şerit kimliği (alt kenarlık + kendi zemini)
+KORUNDU; değişen yalnız şeridin içi.
+
+**8 ölçüm temiz** (2 sayfa × 2 tema × {1440,390}) · seviye atlaması 0 ·
+taşma 0 · görünür metin kaybı yok.
+
+**Ölçü aracı yine bulguydu:** 900ms'lik sabit bekleme dört ölçümden BİRİNDE
+yükleniyor ekranını yakalayıp "0 başlık" raporladı → bekleme olaya bağlandı
+(`waitForSelector("h1")`), 4/4 tutarlı.
+
+**Kapı:** `form-consistency`e **detay sayfası h1 KAYNAĞI** kuralı — yedi
+belge/detay sayfasının her biri ya `PageHeader`dan beslenir ya da gerekçeli
+istisnadır. **Kırmızı-kanıt bir zayıflık yakaladı:** `title={` deseni
+`subtitle={` dizesinin İÇİNDE geçiyor, bu yüzden `title`ı `titleAdornment`a
+çevirdiğimde kural YEŞİL kaldı; desene `\s` sınırı eklendi. Bu, **"bir kaynak
+iddiası, iddia ettiği SINIRIN içinde kalmalı" dersinin DÖRDÜNCÜ tekrarı**.
+3/3 kırmızı-kanıtlı. 501 dosya / 7007 test.
+
+**Kalan:** `QuoteForm`un kendi bölüm başlıkları hâlâ `<div>` — form belgenin
+ekran ikizi (marka mavisi, baskı dili), ayrı bir tur.
+
+## 2026-09-05 (3) — Yan çekmeceler ortak `Drawer`'a (Faz B'nin açık yarısı)
+
+Kullanıcı "sıradaki işe geçelim" dedi; kapsam **yalnız çekmeceler, tam
+birleştirme**. Commit `888dcc3`. Rapor `docs/audit/2026-09-05-yan-cekmeceler.md`.
+
+**KAYITLI SAYI YANLIŞTI: 4 değil YEDİ çekmece** — ikisi sayfaların İÇİNE
+gömülüydü (`VendorsClient` `justifyContent:"flex-end"`, `email-deliveries`
+`<aside>`). **Ders: çekmece sayımı İMZAYA göre yapılmalı, tek desene göre değil.**
+
+**Beş kusur:** 4'ünde Escape / 6'sında odak tuzağı / 5'inde odak dönüşü yoktu
+ama **beşi `role="dialog"` İLAN EDİYORDU** (`customers-ui`'nin kuralı tam bunu
+arayıp YEŞİL yanıyordu) · dört z-katmanı (50'dekiler kabuğun mobil menüsünün
+ALTINDA) · üç dikey teknik (`height:100vh` iOS'ta panelin dibini erişilemez
+yapar; **hiç ölçülmemişti**) · token ayrışması · gövde kaydırma kilidi yok.
+
+YENİ `ui/dialog-a11y.ts` (`Modal`+`Drawer` ortak çekirdeği) + `ui/Drawer`
+(`height` HİÇ yazılmaz → `top:0`+`bottom:0`). Nötrlük kanıtı: `modal-ui`nin 17
+testi DOKUNULMADAN yeşil. 24 tarayıcı ölçümü temiz. 498 dosya / 6947 test ·
+E2E 94/94 · 10/10 kırmızı-kanıtlı · net −68 satır.
+
+## 2026-09-05 (2) — Yedek geri-yükleme PROVA EDİLDİ (#11 kapandı)
+
+Kullanıcı "ikincisini hallet" dedi. Kapsam kararı: **yerel DB sıfırlanıp geri
+yüklensin** (tam sadık prova). Rapor: `docs/backup-restore.md` §Prova.
+
+Yerel dev DB yedeklendi → `supabase db reset --local` (111 migration sıfırdan,
+runbook §0 böylece de doğrulandı) → **tek geçişte** geri yüklendi:
+**64/64 tablo · 952 satır · 1 hesap · 13/13 obje · 0 hata.** Sonra
+`preflight:auth` ✅ (kalıcı admin korundu — brick değil), `check:chains` ✅
+(tek kopukluk YEDEKTE DE vardı → veri, prova değil), **94/94 E2E** geri
+yüklenmiş DB'ye karşı yeşil.
+
+**YENİ `scripts/restore.ts` / `npm run restore`** — yordam artık çalıştırılabilir:
+kuru çalışma varsayılan, canlı hedefte `ALLOW_PROD_TARGET=1`, `manifest.errors`
+doluysa REDDEDER (yarım veri, veri yokluğundan kötüdür).
+
+**PROVA DÖRT GERÇEK KUSUR ÇIKARDI** — hepsi yordamın kâğıt üstünde doğru görünen
+kısımlarındaydı:
+1. **`restoreOrder` yanlış üretiliyordu.** Belgedeki gerekçe ("yaratma sırası
+   geçerli topolojik sıradır") **yanlış**: FK sonradan `ALTER TABLE` ile
+   eklenebiliyor — `purchase_commitments` mig.020, `purchase_order_lines`
+   mig.049, FK mig.050 → sıra ters, 23503. Artık sıra **canlı FK grafiğinden**.
+2. `company_settings` tekil satırı migration'da tohumlu → 23505 → **firma
+   profili hiç geri gelmiyordu.**
+3. `product_type_fields` ikincil unique kısıtta çakışıyor (merge-duplicates
+   yalnız PK'dan çözer) → 68 satır yüklenmiyordu.
+4. Yedek **obje içerik türünü saklamıyordu** → teklif arşivi `.html`leri HTTP
+   400. İnceliği: tür önce indirme BAŞLIĞINDAN alındı, yine olmadı — **Supabase
+   Storage HTML'i stored-XSS'e karşı `text/plain` SERVİS EDER**. Doğru kaynak
+   obje listesindeki `metadata.mimetype`.
+
+**Geri yüklemenin değiştirdiği TEK şey `updated_at`:** SHA-256 ile **60/64 tablo
+birebir**; farklı dördünde yalnız `updated_at` kaymış (o yollarda INSERT değil
+UPDATE yapılıyor: tohum satırları + `trg_pol_after_change`).
+
+**DERS — prova edilmemiş bir yordam, doğru görünen bir hipotezdir.** Dört kusurun
+dördü de belgede makul gerekçelerle yazılıydı; hiçbiri okumakla görülmezdi.
+
+Kapı: `backup-script.test.ts` 6 → 10 test, **5/5 kırmızı kanıtlı**.
+tsc 0 · lint 0 · **497 dosya / 6925 test** · build 0 · migration YOK.
+
+
+## 2026-09-05 — E2E suite yeşillendi (#19 kapandı): "yeşil" görünen suite yeşil değildi
+
+Kullanıcı "sırada ne var" dedi; seçim: **E2E suite'ini yeşile getir**. Rapor:
+`docs/audit/2026-09-05-e2e-suite-yesillendirme.md`.
+
+**Baseline: 85 passed · 8 flaky · 1 failed · 32,8 dk.** "Flaky" bir tür değil
+**ÖRTÜYDÜ** — o testler ilk denemede düşüp retry'da 1 sn'de geçiyordu ve
+`retries: 1` yüzünden özet hep "passed" gibi okunuyordu. Bir test **15,0 dk**,
+biri **8,2 dk** sürdü (test timeout'u 60 sn; fark teardown'da).
+
+**KÖK SEBEP 1 — HİDRASYON YARIŞI (4 test).** `gotoApp` yalnız kabuğun
+BOYANDIĞINI bekliyordu. Ölçüldü: `domcontentloaded` anında `main` üzerinde
+`__react*` anahtarı **YOK**, ~2,5 sn sonra var. O pencerede `setInputFiles`
+native `change` atıyor, React'in `onChange`i bağlı olmadığı için olay hiçbir
+yere ulaşmıyor → sihirbaz idle'da kalıyor. **Süre büyütmek çözmez** (2026-08-30'da
+15→30 sn denenmişti). YENİ `waitForHydration` — sinyal React'in DOM'a yazdığı
+fiber anahtarı; `gotoApp`+`waitForApp` içinden çağrılıyor. `import.spec`
+retry'sız 4 düştü → **12/12**.
+
+**KÖK SEBEP 2 — SOĞUK DERLEME (4 test).** Turbopack'in ilk-istek derlemesi
+testin bütçesi İÇİNDEYDİ. **"Üretim sunucusuna karşı koş" DENENDİ ve ÇALIŞMADI:**
+üretim CSP'si `connect-src`i `*.supabase.co` ile sınırlıyor, yerel Supabase
+`127.0.0.1:54321`de → `next start`ta giriş sessizce düşüyor, globalSetup takıldı.
+Yani **E2E yerelde `next dev`e mahkûm** ve CSP gate ile kilitli. Çözüm derlemeyi
+bütçe DIŞINA almak: `globalSetup` 16 rotayı ısıtıyor (salt-okunur, fail-soft).
+
+**KÖK SEBEP 3 — TAŞINMIŞ SÖZLEŞME (1 test, ÖNCEKİ TURUN SESSİZ REGRESYONU).**
+`aging.spec` eskime filtrelerini `getByRole("button")` ile arıyordu; filtreler
+2026-09-04'te `FilterChips`e taşınmıştı ve o bileşen `tablist` üretiyor → rol
+`tab`. Vitest bunu göremezdi (kaynak kilidi işaretlemenin ANLAMINI değil metnini
+görür), E2E de dönüşümden beri hiç koşmamıştı.
+
+**YAN BULGU:** `auth.spec`'in iki demo testi `if (görünürse)` ile sarılıydı —
+buton bulunamazsa **sessizce geçiyordu**, yani hiçbir şey kanıtlamıyordu.
+
+**SONUÇ: 94/94, retries=0, 2,3 dk (iki ardışık koşum).** `retries` yerelde
+**1 → 0** (CI'da 2 kalıyor).
+
+**DERS — "flaky" bir sonuç değil bir ERTELEMEDİR.** Sekizinin de altında
+tekrarlanabilir kusur vardı; biri gerçek regresyondu. **Retry açıkken bir
+suite'in yeşilliği bir iddia değildir.**
+
+**DERS 2 — kırmızı-kanıt turu yine zayıf kural yakaladı (4. kez, üst üste 2 gün).**
+`gotoApp[\s\S]*?waitForHydration` kuralı, çağrı silinince yeşil kaldı: desen
+gövdeden çıkıp `waitForApp`inkine ulaşıyordu. Gövde ayrıştırılacak biçimde
+düzeltildi.
+
+**Kapı:** YENİ `gate/e2e-harness.test.ts` (4 test, **5/5 kırmızı kanıtlı**).
+tsc 0 · lint 0 · **497 dosya / 6921 test** · build 0 · migration YOK.
+Ayrıca CLAUDE.md'nin "Açık yükümlülükler" bölümündeki **bayat 3 satır**
+(mig.088 "BLOKER" / 091 / 099) silindi — `check-migrations` 17/17 GREEN.
+
+
+## 2026-09-04 (3) — Kalan üç madde kapandı (§A7 · ghostDanger · A4)
+
+Kullanıcı: *"Kalan: topbar'ın 390px'te 6px taşması · Button'da ghost-danger
+varyantı · A4 konsol URL filtreleri. **planla ve bitir**"*. Kapsam kararı
+(AskUserQuestion): **hepsi kapansın** — ölçümün bulduğu sayfa-bazlı taşmalar
+dâhil. Rapor: `docs/audit/2026-09-04-kalan-uc-madde.md`.
+
+**§A7 — kayıtlı teşhis YANLIŞTI.** Sebep `.topbar-right`'ın `flex-shrink: 0`'ı
+ve döviz ticker'ı değildi: o küme ≤768px'te **zaten `display: none`** ve 76px.
+Gerçek sebep: `.dashboard-grid` dar ekranda tek kolon (`1fr`) ve ızgara
+kolonunun otomatik minimumu `auto`dur → kolon çocuklarının **min-content**'i
+kadar taban alır; üst bar başlığı `nowrap` taşıyor ve `overflow: hidden`
+min-content'i **küçültmez**; `<main>`de `minWidth: 0` vardı,
+**`.topbar-wrapper`da YOKTU** → kolon başlık kadar genişliyor, ellipsis hiç
+devreye girmiyordu. Taşan 5 rota **başlık uzunluğuna göre sıralıydı** (396 ·
+386 · 383 · 378 · 371). Düzeltme iki satır: wrapper'a `minWidth: 0` + sağ
+kümedeki ölü/yanıltıcı `min-width: 0`un silinmesi. **120 ölçüm (30 rota ×
+{360,390} × 2 tema) → taşma 0.**
+
+**ÖLÇÜ ARACININ KENDİSİ DE BULGUDUR.** İlk metrik
+`documentElement.scrollWidth − clientWidth`'ti ve `/dashboard/quotes/new`'de
+**285px'lik HAYALET taşma** raporladı — mobil emülasyonda shrink-to-fit
+`innerWidth`i içeriğe göre şişiriyor. Doğru ölçü `document.body.scrollWidth` ↔
+yerleşim görüntü alanı; "kendi kabında kayan tablo" (tasarım) ile "gövdeyi iten
+kutu" (kusur) ancak böyle ayrışıyor. Doğru metrik 2026-09-04 kaydındaki
+**6px**'i birebir yeniden üretti.
+
+**`Button.ghostDanger`** — `.file-action-btn.is-danger:hover` depodaki **TEK**
+`--danger` hover kuralıydı (grep'le doğrulandı); "dinlenirken sessiz, dokununca
+kırmızı" tonunun sistemde karşılığı yoktu (`ghost` nötr, `dangerSoft` sürekli
+dolgu). Kural silinmedi, **varyanta taşındı**. Elle `<button>` **60 → 59**;
+kontrol `tap-44` kazandı. Dinlenme rengi bilinçli `--text-tertiary` →
+`--text-secondary` (komşuları `ghost`a geçince üç ikondan biri soluk kalmıştı).
+Ölçüldü: iki temada da hover üç token'a birebir oturuyor, 12 satır aksiyonu
+26×26.
+
+**A4** — YENİ `src/hooks/useUrlFilters.ts`, `useListUrlState`in **istemci**
+kardeşi (liste sayfaları RSC → sunucu okur; konsol `"use client"`+SWR → URL'i
+kendisi geri okumalı). Sözleşme: **yok = varsayılan, VAR (boş olsa bile) = o
+değer** → varsayılanı `open` olan `status` "Tüm durumlar"a çekilebiliyor
+(`?status=`), uydurma `all` sentinel'i gerekmedi. 5 sayfa; imleçler URL'e
+YAZILMAZ; Suspense sınırı altı sayfaya değil **kabuğa** kondu. Tarayıcıda
+doğrulandı (yenileme + derin link + çok seçimli `sources`), konsol hatası yok.
+
+**DERS — kırmızı-kanıt turu ZAYIF bir kural yakaladı (3. kez).** A4'ün "her
+filtre URL'e bağlı" kuralı `useUrlFilters\(\{[\s\S]*?<key>:` diyordu;
+`[\s\S]*?` **nesne literalinden çıkabiliyor** → anahtar sözlükten silinse bile
+dosyanın ilerisindeki başka bir `priority:` desene yetiyor ve kural YEŞİL
+kalıyordu. Sözlüğün gövdesi ayrıştırılıp iddia yalnız onun içinde yapılacak
+biçimde yeniden yazıldı. **Genel kural: bir kaynak iddiası, iddia ettiği
+SINIRIN içinde kalmalı** — "mesafeye değil yapıya bağla" dersinin ikinci yüzü.
+
+**Gate:** tsc 0 · lint 0 · **496 dosya / 6917 test** · build 0 uyarı ·
+**8/8 kırmızı kanıtlı** · migration YOK. Yeni rakip kapı açılmadı (kurallar
+`touch-targets` / `button-source-regression` / `console-consistency` evlerine);
+tek yeni test dosyası `url-filters.test.tsx`.
+
+**Bu turdan açık madde ÇIKMADI.**
+
+
+## 2026-09-04 (2) — Buton dili Dilim 2·3·4 KAPANDI
+
+Kullanıcı "kalanlarla devam et" dedi. **Elle `<button>` 101 → 60** (bu turda 41;
+Dilim 1 ile birlikte 127 → 60). Buton görünümlü `<Link>` 3 → 1. Kalan 60'ın
+tamamı bilinçli dışarıda bırakılan küme (altyapı · login · hata sınırları ·
+`.seg` · nav şeridi · dropzone · toggle · menü · anlam taşıyan rozetler).
+
+**İKİ YENİ KAPSAM KARARI (kullanıcı):**
+1. **Panel sekmeleri de beyaz/mavi dile geçti** — 2026-08-31'in "alt çizgili
+   kalsın" kararı TERSİNE ÇEVRİLDİ. `rfqs/[id]` → `FilterChips` (o sekmelerin
+   hiç tab semantiği yoktu, bileşen onu da getirdi); `products/[id]` →
+   işaretleme elde kaldı (`aria-controls` panel bağı gerekli, `FilterChips`
+   üretmiyor), yalnız yüzey `Button`'dan. `gate/surface-consistency`'deki
+   muafiyetin GEREKÇESİ yeniden yazıldı + ayrı kural eklendi.
+2. **İkon-only kontroller `Button`'a** — uygulamada inceltildi: `icon` varyantı
+   kenarlık ÇİZİYOR, o yüzden **kenarlıklı → `icon`, kenarlıksız → `ghost`**.
+   Ölçüm: ikon 28→26px, satır yüksekliği 109px → satırı ikon belirlemiyor.
+
+**Üç yerel lehçe silindi:** `btn()` (rfqs/[id] — ALTINCI lehçe; `"ghost"` adı
+yanıltıcıydı, şeffaf değil bordürlü beyaz = `secondary`), `iconButtonStyle`,
+`.tap-row-gap`.
+
+**`.tap-row-gap` silinmesi bir KURAL DEĞİŞİMİ:** sarma kaynaklı hit-alanı
+çakışması artık CSS yamasıyla değil YERLEŞİMLE çözülüyor — tek çip-satırı
+üreticisi `FilterChips` ve o sarmıyor. `nowrap` bileşende AÇIKÇA yazıldı (flex
+varsayılanıydı ama örtük kalırsa kilitlenemiyordu) ve `gate/touch-targets` onu
+arıyor. Ölçüm: 390px'te 6/6 çip 44×44, gövde taşması 0.
+
+**Çip lehçeleri:** `products/aging` → FilterChips · `products/page` kategori
+tetikleyicisi → Button varyantı (elle `onMouseEnter` DOM mutasyonu da kalktı) ·
+`developer/logs` ÇOK SEÇİMLİ olduğu için FilterChips DEĞİL ama palet aynı
+(`aria-pressed` + `variant={active ? "primary" : "secondary"}`) ·
+`DynamicFieldEdit`/`NoteFormModal`/Paraşüt dikey listeleri dokunulmadı.
+
+**Dokunulmayan iki yüzey, gerekçeli:** `PurchaseOrderDocument` araç çubuğu
+(tema-muaf BASKI yüzeyi — koyu temada açık kâğıt üstünde koyu buton çıkardı) ·
+`DosyalarTab` silme ikonu (`.is-danger` hover'da kırmızı = yıkıcı aksiyon
+işareti; `Button`'da ghost-danger varyantı YOK → backlog).
+
+**DERSLER:** (1) **Dinamik içerik dönüşümde sessizce düşüyor — İKİ KEZ oldu**
+(`({acceptedAndEditedCount})` ve `(n/3)` deneme sayacı). Yakalandı çünkü
+"kaldırılan her etiketi yeni kodda ara" denetimi koştum — bu adım dönüşüm
+turlarının PARÇASI olmalı. (2) Kaynak-kilidi testi "en az N tane olmalı"
+DEMEMELİ; `production-ui` "en az bir `<button>`" diyordu, hepsi dönüşünce
+kırıldı — değişmez değil o günkü sayı kilitlenmişti. (3) Bir CSS yaması
+silinirken YERİNE GEÇEN garanti kilitlenmeli.
+
+495 dosya / 6905 test · migration YOK · 7/7 kırmızı kanıtlı.
+Rapor: `docs/audit/2026-09-04-buton-dili-dilim2-3-4.md`.
+
+## 2026-09-04 — Buton dili Dilim 1: Veri Aktarım sihirbazı
+
+`deferred_backlog` §A6'da bekleyen "kalan elle örülmüş butonlar" turunun ilk
+dilimi. Ölçüm: **50 dosyada 127 elle `<button>`**, `gate/surface-consistency`
+kapsamı DIŞINDA.
+
+**Sihirbaz 26 → 8 buton.** Üç ana aksiyon `--accent-bg` (%10 tint) ile
+çiziliyordu — kullanıcının açıkça reddettiği renk, üstelik kurulum akışının
+kalbinde ("Dosya Seç" · "Kolon Eşleştirmeye Geç" · "Eşleştirmeyi Uygula").
+`tabBtnStyle` (depodaki DÖRDÜNCÜ hap-çipi lehçesi) ve `btnSecondary` silindi;
+sheet + kayıt-türü sekmeleri `FilterChips`e geçti.
+
+**`<button>` taraması YETMEDİ:** bitiş ekranında beş buton-görünümlü `<Link>`
+vardı — ikisi `--bg-secondary` (= `--app-bg`, yüzeyi yok = beş sayfa turunun
+kök kusuru), üçü tint. Hepsi `ButtonLink`. Depoda bu sınıftan 2 tane kaldı
+(`PurchaseOrderDocument`, `AiPanel`).
+
+**Bilerek bırakılan 8 buton** gerekçeleriyle raporda; ayrıca 3 hata sınırı
+(`global-error`/`error`/`dashboard/error`) kapsam dışı — yalnız react+sentry
+import ediyorlar, son çare arayüzü patlayabilecek bileşene bağlanmaz.
+
+**Doğrulama:** referans hatırlanan hex'ten değil CANLI DOM'dan (PageHeader
+Yenile + aktif FilterChip); aydınlık ve koyu temada birebir eşleşme, hepsi
+`tap-44`.
+
+**Bulunan ama DÜZELTİLMEYEN — 390px'te 6px taşma** (`/dashboard/import/excel`,
+ölçülen 7 rotanın yalnız bunda). Dosya geçici olarak HEAD'e döndürülüp ölçüldü:
+**396, birebir aynı** → benim turumdan gelmiyor. Sebep `.topbar-right`'ın
+`min-width:0` ile ÇELİŞEN `flex-shrink: 0`'ı; bu rotanın başlığı uzun olduğu
+için sağ küme küçülmeyi reddedince kabuk 396'ya itiliyor. Paylaşılan üst bar →
+34 rota + iki tema, ayrı tur.
+
+**Dersler:** (1) yorum self-match tuzağı **4. kez** — kuralın aradığı
+`tabBtnStyle`/`btnSecondary` adları benim silme gerekçesi yorumlarımda geçiyor,
+`stripComments` şart. (2) Kaynak-iddiası kuralı MESAFEYE değil YAPIYA bağlanmalı
+— "en fazla 320 karakter" derin girintide aştı, `(?:(?!</Button>)[\s\S])*?`
+ile "aynı eleman içinde"ye çevrildi. (3) **Mock yüzeyi bileşenle birlikte
+büyür** — `classifier-queue-interaction` Button'ı yalnız `default` ile
+mock'luyordu, `ButtonLink` undefined kalınca React patladı ve 8 test "elementi
+bulamadım" diye DOLAYLI hata verdi; izole koşumda görünmüyordu, tam suite
+yakaladı. (4) `role` locator'ı işaretlemeyi izler: FilterChips `tab`,
+ButtonLink `link` — `getByRole("button")` ikisini de bulamaz.
+
+495 dosya / 6903 test · migration YOK · 6/6 kırmızı kanıtlı.
+Rapor: `docs/audit/2026-09-04-buton-dili-dilim1-veri-aktarim.md`.
+
+## 2026-08-31 (10) — Kart yüzeyi + buton/kategori dili
+
+Kullanıcı beş sayfayı gösterdi (Öneriler · Teknik Şablonlar · Uyarılar · Veri
+Aktarım · Paraşüt): kartlar zeminden ayrışmıyor, butonlar/kategoriler beyaz
+olmalı, mavi olması gerekenler mavi, Yenile beyaz.
+
+**Bulgu tek satırdı: `--bg-secondary` her iki temada `--app-bg` ile birebir
+aynı renk.** O kartların yüzeyi hiç yoktu. Token DOĞRU (iç oyuk rengi),
+kullanımı yanlıştı. Yenile butonu `variant="toolbar"` = `transparent` olduğu
+için sayfa zemini rengindeydi — ölçülen `#e8eef5`.
+
+**Hedef sistemde zaten vardı:** login ekranı = mavi `primary` + beyaz
+`secondary`. Yeni token/tasarım üretilmedi.
+
+Yapılan: YENİ `FilterChips` (rengini `Button`'dan alır → çip ve buton tek
+palet), 4 ayrı kategori dili → 1, iki bileşen silindi, `PageHeader` Yenile
+beyaz (12 sayfa), beş sayfa `Card`/`PageHeader`/`Button`'a, `Card`'a `as`,
+`buildAlertClassItems` saf yardımcısı, `gate/surface-consistency` 7 kural.
+
+**Uyarılar sayfasının hiç `<h1>`'i yokmuş** — dashboard'daki tek başlıksız
+ekran. Veri Aktarım'ınki 14px'ti (kanonik 20px).
+
+495 dosya / 6902 test · migration YOK · 7/7 kırmızı-kanıtlı.
+
+**Kalan:** 390px mobil turu ölçülemedi (pencere OS alt sınırı 1470px + uygulama
+iframe'i reddediyor). Kapsam dışı: ~115 elle örülmüş `<button>` (49 dosya).
+
+## 2026-08-31 (9) — Developer Console frontend turu
+
+Kullanıcı Chrome eklentisini bağladı (önceki turda `list_connected_browsers`
+boş dönüyordu — Chrome yeniden başlatınca oturdu) ve konsolun frontend'ine
+odaklanmamızı istedi. Rapor: `docs/audit/2026-08-31-developer-console-frontend.md`.
+
+**Önce erişim:** `.env.local`'de 15 anahtar vardı, `INTERNAL_OPERATOR_EMAILS`
+**yoktu** — konsol kimseye açık değildi. Zincirin diğer yarısı doğrulandı
+(allowlist ∧ `view_settings`); canlı hesaplar okundu, iki gmail de zaten
+`["admin"]` → tek eksik allowlist'ti. Dev sunucusu prod-koruma kapısına takıldı,
+tur `ALLOW_PROD_TARGET=1` ile **yalnız görsel inceleme** olarak yürütüldü.
+
+**8 bulgu ölçüldü** (ekran görüntüsü değil, `getComputedStyle`): Y1 kart dolgusu
+yok (5 kartta içerik kenarlığa 1px; Kayıtlar hücresinin sağ kenarı = kartın iç
+kenarı) · Y2 Hata Detayı'nda İstemci 192×113px, 7 satır, sağında 1019px boş ·
+O1 Performans satırları 58px'e karşı 41px · O2 Yapılandırma tabanları 610 vs 627 ·
+O3 `<dt>` 11px/**450** (kanonik 600 — **önceki turun kapısı kaçırdı**) ·
+O4 `sectionTitle` 3 kopya, zaten ayrışmış · O5 yüklenirken "0 grup" iddiası ·
+D1 filtreler URL'ye yazılmıyor.
+
+**Kapsam (kullanıcı):** Y1–Y2 + O1–O5 kapatıldı, **D1 ertelendi**. Y1'in yöntemi
+de kullanıcı kararı: satır dolgusunu 14px'e çıkar (`Card`'a padding prop'u
+ayraçları içeri çeker ve 12 dosyayı etkilerdi).
+
+**YENİ `console-ui.ts`** tek stil kaynağı. `consoleRow` dolguyu satır kutusunun
+İÇİNDE tutar → ayraç tam genişlikte kalır.
+
+**Ders:** O2'yi ilk denemede yanlış katmanda çözdüm — `alignItems: "start"`
+tarayıcıda hâlâ 742 vs 756 gösterdi; kayma hücreler arasında değil, hücrenin
+içinde. Doğru kol `factCell` (`height:100%`) + `factValue` (`marginTop:auto`).
+Ölçüm olmasa "düzelttim" diye geçecekti.
+
+**Ders 2:** kırmızı-kanıt turunda `basename` çakışması dört `page.tsx`'i aynı
+yedeğe yazıp üçünü ezdi → `HEAD`'den geri alındı, kanıt dosya-başına yedek +
+SHA-256 ile tekrarlandı. **11/11 kırmızı.**
+
+Kapı: YENİ `gate/console-consistency.test.ts` (10 test).
+tsc 0 · lint 0 · **494 dosya / 6891 test** · build 0 · migration YOK.
+
+**Ölçülen önce/sonra:** kart içeriği 1px→**15px** · İstemci 192×113px (7 satır)→
+**1183×19px (1 satır)** · `<dt>` 450→**600** · Yapılandırma 610/627→**756** ·
+Performans 58/41→**41**. O5 tarayıcıda gözlemlenemedi (SWR önbelleği yükleme
+penceresini yutuyor) — kaynak seviyesinde kilitli, kırmızı kanıtlı.
+
+## 2026-08-31 (8) — Frontend tutarlılığı (Faz B form tarafı)
+
+Kullanıcı "son yapılan işlerin frontend iyileştirmelerine odaklanalım" dedi.
+Rapor: `docs/audit/2026-08-31-frontend-tutarliligi.md`.
+
+**Ölçüm: kod çalışıyordu ama ekrandan ekrana FARKLI görünüyordu.**
+- Form etiketi **10 kopya / 5 varyant**; iki aile tam eşit bölünmüş (5-5) →
+  kanonik kullanıcı kararıyla seçildi: **login `.lbl` referansı, BÜYÜK HARF YOK**.
+- **16 elle yazılmış `<h1>`, 5 farklı boyut** (16·18·19·20·24) — `PageHeader`
+  vardı ve 15 dosyada kullanılıyordu, uygulama ikiye bölünmüştü. Panonun kendi
+  yorumu bile `{/* PageHeader */}` diyordu ama bileşeni kullanmıyordu.
+
+**Çözüm deseni (tekrar kullanılacak):** merkezî yardımcı YALNIZ tipografi taşır,
+yerleşim çağıranda kalır; yerel sabitin **gövdesi** bağlanır, çağrı yerleri
+değişmez (`fieldStyle` emsali) → blast radius sıfır.
+
+**`PageHeader`'a iki yuva:** `titleAdornment` (**süs yoksa sarmalayıcı düğüm de
+üretilmiyor** → mevcut 20+ çağıranın DOM'u aynı; mevcut yapı testi bu yüzden
+kırılmadı) · `align="start"`.
+
+**Kapı testi yazılırken İKİ GERÇEK KUSUR çıktı, ikisi de sessiz:**
+`--danger-soft-bg` ve `--danger-rgb` **yok**; biri hata kutusunu `transparent`
+yapıyor, öteki aydınlık temada koyu-tema kırmızısı gösteriyordu.
+**Ders: `var(--x, yedek)` hatayı yutar — yanlış token uyarı üretmez.**
+
+**Ders 2:** kapı kuralı ilk hâlinde `<h1 style={{…}}` arıyordu; ölçüm iki sayfanın
+stili `const h1Style` diye çıkarıp **altından geçtiğini** gösterdi. Kaynak-iddiası
+testlerinde desen daima gerçek kullanımla doğrulanmalı.
+
+**ÖLÇÜM SINIRI (yeni kısıt):** demo/viewer RBAC nedeniyle production/vendors/
+users/rfqs/purchase/parasut ekranlarına giremiyor → o ekranların görsel
+doğrulaması kullanıcıda. Developer Console ise `INTERNAL_OPERATOR_EMAILS` boş
+olduğu için kimseye kapalı.
+
+tsc 0 · lint 0 · **493 dosya / 6881 test** · build 0 · **70/70 taşmasız** ·
+migration YOK. **6/6 kırmızı kanıtlı.**
 
 ---
 
-**2026-09-05 (devam) — Faz B'nin son üç bileşeni KAPANDI, FAZ B BİTTİ.**
-Kullanıcı "üç bileşeni de yapalım" dedi. Üç dilim/üç commit: `NavLink`
-(`4745cae`) · `SectionHeader` (`b05f23d`) · `Stat` (`497d717`). Rapor
-`docs/audit/2026-09-05-uc-bilesen.md`.
+## 2026-08-31 (7) — Lansman öncesi 20 maddelik ÜRÜN OLGUNLUĞU listesi
 
-**ÜÇ KAYITLI SAYININ ÜÇÜ DE DÜŞÜKTÜ** — hepsi önceki turun ön taramasından
-geliyordu: SectionHeader 85 çağrı/42 varyant · Stat 3+7 bileşen + 26 blok/20
-değer tipografisi · NavLink'in eksenleri ÇAPRAZ (görsel ikili Sidebar+Ayarlar,
-mantık ikilisi Sidebar+Developer).
+Kullanıcı ikinci bir 20 maddelik liste paylaştı ("20 things to tell Claude before
+launching your app") — bu sefer güvenlik değil **ürün olgunluğu**: onboarding,
+giriş, parola kurtarma, boş/yükleniyor/hata/ağ durumları, bildirimler, analitik,
+gizlilik. Rapor: `docs/audit/2026-08-31-20-madde-urun-olgunlugu.md`.
 
-**Üç kök bulgu:** (1) **Sidebar'ın 16-18 bağlantısında `aria-current` YOKTU** —
-altı görsel işaret vardı, hiçbiri semantik değildi; hover'ı 6 satır DOM
-mutasyonuydu. (2) **GÖRÜNMEK ≠ OLMAK**: 44 bölüm etiketi `<div>`di ve
-`orders/[id]` + `quotes/[id]` sayfalarının h1/h2/h3 sayısı SIFIRDI. (3) **Kapının
-kanıtladığı kusur, kapının BAKMADIĞI yerde**: beş stat yüzeyi `--bg-secondary`
-zeminliydi (görünmez kutu) ve kural 2026-08-31'de yazılmıştı ama yalnız beş
-sayfalık bir allowlist üzerinde.
+**Denetim: 9 kapalı · 6 kısmi · 4 eksik/kırık · 1 kullanıcı-tarafı → 6 madde kapatıldı.**
 
-**Öngörülen kırılma geldi:** `gate/surface-consistency`nin ≥7/≥3 sayacı — Öneriler'in
-üç literalinin ÜÇÜ DE stat kutusuydu (3→0). Kural düzeltmeyi kusur sandı; yapı
-iddiasına çevrildi + eksik `stripComments` eklendi.
+### ASIL BULGU — parola sıfırlama TAMAMEN KIRIKTI (#4)
 
-**Doğrulama:** 8 nav + 20 başlık + 12 stat = 40 tarayıcı ölçümü, hepsi temiz.
-Seviye atlaması 0 · taşma 0 · tipografi imzası 42→4 (başlık), 20→1 (stat) ·
-görünür metin kaybı yok. 501 dosya / 7006 test · E2E 94/94 · 18/18
-kırmızı-kanıtlı · React Doctor 260→262 (ikisi de birleştirmenin mekanizması).
+E-posta gidiyordu ama dönüş `/login`'e düşüyordu; `/login` PKCE `?code=`'unu hiç
+işlemiyordu; "yeni şifre" ekranı YOKTU; Ayarlar MEVCUT şifreyi istiyordu; admin
+PATCH yalnız `{ roles }` alıyordu. **Şifresini unutan herkes — admin dâhil —
+kalıcı kilitleniyordu**, tek çıkış Supabase Studio.
 
-**Dersler:** görünmek ≠ olmak · bir kapı yalnız BAKTIĞI yerde korur · bir kural
-iddia ettiğinden fazlasını söylememeli · ön tarama envanter değildir.
+**Kırıklığın şekli ders:** her parça tek başına makul görünüyordu (düğme var,
+e-posta gidiyor, callback var, şifre ekranı var) — kopuk olan BAĞLANTILARDI.
+Kapı testi bu yüzden parçaları değil bağlantıları kilitliyor.
 
-**Bilinen boşluk KAPATILDI (ek tur):** kullanıcı "`orders/[id]` ve `quotes/[id]`'ye `PageHeader` ekleyelim" dedi. Emsal hazırdı (`purchase/orders/[id]`: geri-kırıntı AYRI satırda, altında `PageHeader`). **`orders/[id]` 0 → 5 başlık** (h1 + 4 h2), **`quotes/[id]` 0 → 1** (h1; gövdesi `QuoteForm`, ayrı tur). Belge numarası 14px `<div>` / 12px MONO `<span>` iken artık **20px `<h1>`**. Görünür değişiklikler: başlık ayrı satıra çıktı · kırıntı ayraçları (chevron + `/`) silindi (anlamlarını yitirdiler) · teklif numarası mono'yu kaybetti · durum açıklaması `subtitle` oldu; `quotes/[id]`nin tam genişlikli şerit kimliği KORUNDU. **8 ölçüm temiz** (2 sayfa × 2 tema × {1440,390}), seviye atlaması 0, taşma 0. **Ölçü aracı yine bulguydu:** 900ms sabit bekleme dört ölçümden BİRİNDE yükleniyor ekranını yakalayıp "0 başlık" raporladı → bekleme olaya bağlandı. Kapı: `form-consistency`e **detay sayfası h1 kaynağı** kuralı (7 sayfa: ya `PageHeader` ya gerekçeli istisna). **Kırmızı-kanıt bir zayıflık yakaladı:** `title={` deseni `subtitle={` dizesinin İÇİNDE geçiyor → `titleAdornment`a çevirdiğimde kural yeşil kaldı; `\s` sınırı eklendi (**"bir kaynak iddiası, iddia ettiği SINIRIN içinde kalmalı" dersinin DÖRDÜNCÜ tekrarı**). 3/3 kırmızı-kanıtlı. 501 dosya / 7007 test.
+Çözüm iki bağımsız yol: (a) self-servis `redirectTo` → `/auth/callback?next=/sifre-yenile`
++ YENİ `src/app/sifre-yenile/page.tsx`; (b) admin sıfırlama (`PATCH` + `{password}`
+→ politika → audit `password_reset_by_admin`) — bu yol e-postaya HİÇ bağlı değil
+(`EMAIL_FROM` boş + Supabase SMTP saatte birkaç mailde tıkanıyor).
+`next` açık yönlendirme kolu DEĞİL: `resolveNextPath` allowlist'le tam eşleşme
+arar (`src/lib/auth/recovery-route.ts`), canlı doğrulandı.
+**Kayda geçen karar:** exchange sonrası tam oturum olur, kullanıcı şifre
+belirlemeden panoya gidebilir — Supabase kurtarma modelinin doğası, kapatılmadı.
+
+### Diğer kapatılanlar
+
+- **#9 hata durumları:** `not-found.tsx` ve `global-error.tsx` **ikisi de yoktu**
+  (404 = Next varsayılanı; kök layout hatası hiçbir sınıra ulaşmıyor, Sentry'ye
+  de gitmiyordu). `app/error.tsx`'teki yanıltıcı `GlobalError` adı → `AppError`.
+- **#10 ağ durumları:** `navigator.onLine` repoda HİÇ geçmiyordu. `OfflineBanner`
+  (**kapatılamaz** — kapatılsa kullanıcı kopuk hâlde çalışıp işini kaybeder) +
+  kural **`ToastProvider`'da TEK huniden** (53 çağrı yeri düzeltilmedi).
+  `onLine` yalnız `false` yönünde güvenilir → mutasyon bloklanmıyor.
+- **#14 analitik:** modül kullanım sayacı; altyapının %90'ı hazırdı
+  (`request_metrics` + RUM ingest + `KNOWN_ENDPOINTS`'te 41 dashboard yolu).
+  **BEDELİ:** aynı tablo iki şey taşıyor → `dbPerformanceSummary` `/api/%` ile
+  SINIRLANDI, yoksa p95 düşer + hata oranı suni azalır + sağlık kararı bozulur.
+- **#16 gizlilik:** `/gizlilik` (ALWAYS_PUBLIC) + `docs/kvkk-veri-envanteri.md`
+  (canlı şemadan çıkarıldı). Firma alanları görünür `[köşeli parantez]` — hukuk
+  onayı gerekli.
+- **#1 onboarding:** `SetupProgressBanner` panoda; `buildSetupSteps()` import
+  ediliyor (kopya yok), tamamlanınca kaybolur, 403'te sessiz.
+- **#8 yükleniyor:** pano `data-context.loading`'i hiç okumuyordu → yüklenirken
+  SIFIR gösteriyordu; products listesi "Ürün bulunamadı" diyordu.
+
+### Ölçüm düzeltmesi (#7)
+
+Plan "6 tabloda boş-durum eksik" diyordu — **YANLIŞTI**. 14 DataTable yüzeyinin
+HEPSİNDE var: 9'u `emptyMessage`, 5'i tablodan önce koşullu render. İlk grep
+yalnız `emptyMessage` anahtarını aramıştı.
+
+### Test dersi (tekrar eden tuzak)
+
+`global-error` kırmızı-kanıtı YANMADI: dosyanın **yorumu** da `<html>` içeriyor
+ve regex onu yakalıyordu — test kodu değil kendi açıklamasını doğruluyordu.
+Yorum soyucu eklendi. Aynı sınıf hata dokunma-hedefi turunda da iki kez çıkmıştı:
+**kaynak-iddiası testlerinde yorumları soy.**
+
+**9/9 kural kırmızı kanıtlı. tsc 0 · lint 0 · 492 dosya / 6873 test · build 0 ·
+migration YOK.**
+
+**Yeni kullanıcı-tarafı madde:** Supabase → Authentication → URL Configuration →
+**Redirect URLs**'e dönüş adresi eklenmeli, yoksa sıfırlama linki "requested path
+is invalid" ile döner.
+
+---
 
 ## 2026-08-31 (6) — 20 maddelik "vibe-coded" listesi denetimi
 
