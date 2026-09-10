@@ -79,3 +79,63 @@ sessizce yanlış şeyi doğruluyordu. Sıra düzeltildi (önce satır, sonra bl
 
 **Yeni kalıcı kapılar:** `gate/route-error-coverage` · `gate/rum-endpoint-allowlist`
 (`known-endpoints.ts` dizinden üretilir) · `sql-migration-lint`'te rol-hedefli REVOKE.
+
+---
+
+## Frontend turu (2026-08-31) — `console-ui.ts`
+
+Konsol kurulduğundan beri **hiç görsel olarak incelenmemişti**:
+`INTERNAL_OPERATOR_EMAILS` boştu, kimse giremiyordu, sidebar linki bile render
+edilmiyordu. Bu turda allowlist açıldı ve altı ekran canlı veriyle ölçüldü.
+Rapor: `docs/audit/2026-08-31-developer-console-frontend.md`.
+
+**Erişim zinciri:** `hasInternalOperatorAccess` allowlist **ve** `view_settings`
+ister. Canlı hesaplar okundu — iki gmail de zaten `["admin"]`, yani `view_settings`
+vardı; eksik olan tek şey allowlist'ti (`ADMIN_EMAILS`'e dokunulmadı).
+Dev sunucusu prod-koruma kapısına takıldı (`predev` → canlı fabrika hedefi);
+tur `ALLOW_PROD_TARGET=1` ile **yalnız görsel inceleme** olarak yürütüldü.
+
+**Kök örüntü: `Card` kasten dolgusuzdur, dolgu çocuğun sorumluluğudur** —
+`DataTable` bunu verir (`10px 14px`), elle örülen yüzeyler vermiyordu. Sonuç:
+Tanılama'nın **5 kartının hepsinde içerik kenarlığa 1px** kalıyordu, Kayıtlar
+satırının son hücresinin sağ kenarı kartın iç kenarıyla **birebir aynıydı**.
+Konsolun `DataTable` kullanan üç sayfası (Bug'lar/Hatalar/Performans) zaten temizdi.
+
+**YENİ `src/app/dashboard/developer/console-ui.ts`** — `CONSOLE_GUTTER = "14px"`
+(DataTable ritmi) · `consoleRow(v)` · `sectionTitle` (3 kopyaydı, `margin` 6px'e
+karşı 8px ayrışmıştı) · `factGrid`/`factCell`/`factValue`/`factWide`/`factLabel`.
+`consoleRow` dolguyu satır kutusunun İÇİNDE tutar, `borderBottom` kenarda kalır →
+**ayraç tam genişlikte kalır**, tablo görünümü bozulmaz.
+
+**Ders — hizalama sorununu yanlış katmanda çözdüm, ölçüm yakaladı.** İki satıra
+kırılan etiket komşularının değerini aşağı itiyordu (610 vs 627). `factGrid`'e
+`alignItems: "start"` verdim; tarayıcı hâlâ **742 vs 756** gösterdi. Kayma
+hücreler *arasında* değil hücrenin *içinde*: bir satırlık etiketin altındaki
+değer, iki satırlığınkinden yukarıda kalıyor. Doğru kol `factCell`
+(`height:100%`) + `factValue` (`marginTop:auto`).
+
+**Ders — bir önceki turun kapısı bir varyantı kaçırdı.** `form-consistency`
+yalnız `const labelStyle` bildirimlerine bakıyordu; konsolun `<dt>`'si satır içi
+yazılmıştı → ölçülen **11px/450**, kanonik 11px/600. *Kaynak-iddiası kuralı,
+ihlalin tek bir yazım biçimini değil, kavramın tüm yazım biçimlerini kapsamalı.*
+
+**Ders — yedeklemede `basename` çakışması.** Kırmızı-kanıt turunda dört farklı
+`page.tsx` aynı yedek dosyaya yazıldı ve üçü ezildi. `HEAD`'den geri alındı,
+düzenlemeler yeniden uygulandı, kanıt dosya-başına yedek + SHA-256 doğrulamasıyla
+tekrarlandı (**11/11 kırmızı**).
+
+**Kapı:** YENİ `gate/console-consistency.test.ts` (10 test). `<li>` kuralın
+dışında — whitelist değil, kuralın doğru sınırı (liste öğesinin yatay girintisi
+ebeveyn `<ul>`'nin işi); muafiyet gerçek kusuru gizlemesin diye `<ul>`'nin
+gutter'ı taşıdığı **ayrıca** kilitlendi.
+
+**Ölçülen sonuç:** kart içeriği 1px → **15px** · İstemci hücresi 192×113px
+(7 satır) → **1183×19px (1 satır)** · `<dt>` 450 → **600** · Yapılandırma
+tabanları 610/627 → **756 (hepsi)** · Performans satırları 58/41 → **41 (hepsi)**.
+
+**AÇIK — D1 (ertelendi, kullanıcı kararı):** konsolun filtreleri URL'ye
+yazılmıyor (`?status=all&range=30d` yok sayılıyor; dizinde `useSearchParams`/
+`router.replace`/`replaceState` **sıfır**) → filtrelenmiş görünüm paylaşılamıyor.
+`useSearchParams` + Suspense sınırı gerektirir, ayrı tur.
+**Kapsam dışı:** Developer Console mobil / dokunma hedefleri (6 sayfada `tap-44`
+sıfır, 14 rotalık duyarlılık denetimine hiç girmediler).

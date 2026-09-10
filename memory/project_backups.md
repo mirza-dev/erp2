@@ -46,3 +46,38 @@ yapılmadı** (prova edilmemiş yedek hipotezdir) · Pro planı değerlendirilme
 
 Rapor: `docs/audit/2026-08-30-supabase-yedek-dogrulamasi.md`. İlgili:
 [[project_security]] · [[deferred_backlog]] · [[reference_worktree_branches]]
+
+**2026-09-05 — GERİ YÜKLEME PROVA EDİLDİ (ilk kez), #11 kapandı.** Yerel dev DB
+yedeklendi → `supabase db reset --local` (111 migration sıfırdan) → **tek geçişte**
+geri yüklendi: **64/64 tablo · 952 satır · 1 hesap · 13/13 obje · 0 hata**;
+ardından `preflight:auth` ✅, `check:chains` ✅ (tek kopukluk yedekte de vardı),
+**94/94 E2E** geri yüklenmiş DB'ye karşı yeşil. YENİ `scripts/restore.ts`
+(`npm run restore`, kuru çalışma varsayılan; canlıda `ALLOW_PROD_TARGET=1`;
+`manifest.errors` doluysa REDDEDER).
+
+**Prova DÖRT gerçek kusur çıkardı — hepsi yordamın kâğıt üstünde doğru görünen
+kısımlarındaydı:**
+1. **`restoreOrder` YANLIŞ ÜRETİLİYORDU.** Belgedeki gerekçe — "yaratma sırası
+   geçerli topolojik sıradır, çünkü FK için hedef önce var olmalı" — **yanlış**:
+   FK sonradan `ALTER TABLE` ile eklenebiliyor. `purchase_commitments` (mig.020)
+   ↔ `purchase_order_lines` (mig.049), FK mig.050 → sıra ters, 23503. Artık sıra
+   **canlı FK grafiğinden** (PostgREST OpenAPI `<fk table=…/>`) topolojik olarak
+   üretiliyor + `restoreOrderCycles`.
+2. **`company_settings` tekil satırı** migration'da tohumlanıyor → 23505 →
+   **firma profili hiç geri gelmiyordu.**
+3. **`product_type_fields`** ikincil unique kısıtta çakışıyor (merge-duplicates
+   yalnız PK'dan çözer) → 68 satır yüklenmiyordu.
+4. **Yedek obje içerik TÜRÜNÜ saklamıyordu** → `quote-pdfs` (allowlist yalnız
+   `text/html`) teklif arşivlerini HTTP 400 ile reddediyordu. İnceliği: tür ilk
+   düzeltmede indirme yanıtının BAŞLIĞINDAN alındı ve yine olmadı — **Supabase
+   Storage HTML'i stored-XSS'e karşı `text/plain` SERVİS EDER**, başlık saklanan
+   türü söylemez. Doğru kaynak obje listesindeki `metadata.mimetype`.
+
+**Geri yüklemenin değiştirdiği TEK şey `updated_at`:** kaynak ↔ sonuç SHA-256
+karşılaştırmasında **60/64 tablo birebir**; farklı dördünde (`note_templates`,
+`product_types`, `product_type_fields`, `purchase_orders`) yalnız `updated_at`
+kaymış. Sebep: bu yollarda INSERT değil UPDATE yapılıyor (tohum satırları +
+`trg_pol_after_change`) ve `updated_at` trigger'ları BEFORE UPDATE.
+
+Kapı: `backup-script.test.ts` 6 → 10 test, **5/5 kırmızı kanıtlı**.
+

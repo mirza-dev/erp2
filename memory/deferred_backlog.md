@@ -1,6 +1,6 @@
 # Ertelenen Büyük İşler (Backlog) — yeni oturumda devam
 
-_Son güncelleme: 2026-06-17. Kullanıcı isteğiyle "sonraki tura bıraktığımız büyük işler" buraya çıkarıldı. Detaylı açık-yükümlülük + smoke listesi `CLAUDE.md` §Açık yükümlülükler'de._
+_Son güncelleme: 2026-09-10 (C0 listesindeki üç bayat madde düzeltildi; ilk yazım 2026-06-17). Kullanıcı isteğiyle "sonraki tura bıraktığımız büyük işler" buraya çıkarıldı. Detaylı açık-yükümlülük + smoke listesi `CLAUDE.md` §Açık yükümlülükler'de._
 
 ## A. Ertelenmiş büyük teknik turlar (kod)
 - **A1. Tam server-side pagination** — ✅ **TAMAMLANDI 6/6** (2026-06-17). orders (pilot) + quotes + purchase/orders + customers + vendors RSC + `loading.tsx` + `db*Paged`/count + `<X>Client.tsx` URL-driven (shared `useListUrlState`/`useDebouncedSearch` + `lib/list-query.orIlikeFilter`). **products** (son liste) farklı çözüldü: sayfa `"use client"` KALDI (risk/alert overlay AI/POST → RSC'ye taşınamaz) ama mega-fetch öldü → `dbListProductsPaged` (arama/çoklu-kategori/tip + **sinyal `id.in`** tam sadakat) + `GET /api/products/counts` (tüm-katalog total/kategori/kritik); sinyal sekmeleri overlay ID seti sunucuya geçer. **Kalan: yalnız manuel smoke** (kod tamamlandı).
@@ -25,9 +25,9 @@ _Son güncelleme: 2026-06-17. Kullanıcı isteğiyle "sonraki tura bıraktığı
 - **Supabase → Authentication → URL Configuration → Redirect URLs** — parola sıfırlama dönüş adresi kayıtlı olmalı; **YOKSA yeni kurtarma akışı çalışmaz** ("requested path is invalid").
 - `ADMIN_EMAILS` + `NEXT_PUBLIC_APP_URL` `.env.local`'de boş.
 - `/gizlilik` firma alanları (`[ticari unvan]`, `[VERBİS]`, `[irtibat]`) + hukuk danışmanı onayı. Kaynak: `docs/kvkk-veri-envanteri.md`.
-- **`INTERNAL_OPERATOR_EMAILS` BOŞ** (2026-08-31 ölçümü) → **Developer Console kimseye açık değil**; `Sidebar.tsx` linki `internalOperator` filtresiyle hiç render edilmiyor ve `/dashboard/developer` → `/dashboard`'a döner. Kullanıcı kendi e-postasını eklemeli + dev sunucusunu yeniden başlatmalı. **DC'de görsel iş yapmanın ön koşulu budur** (demo/viewer rolü oraya giremediği için AI tarafı da ölçemiyor).
-- **Yedek geri-yükleme provası hiç yapılmadı** (madde #11) — `npm run backup` çalışıyor ama denenmemiş yedek yedek sayılmaz.
-- **E2E kilidi** (madde #19) — 13 Playwright spec `preflight:env` tarafından durduruluyor (canlı DB hedefi). Frankfurt dev projesi açılmadan koşamazlar.
+- ~~**`INTERNAL_OPERATOR_EMAILS` BOŞ** → Developer Console kimseye açık değil~~ — **BU NOT BAYATTI** (2026-09-10 ölçümü): konsolun altı sayfası da erişilebilir çıktı ve dokunma turunda canlı olarak ölçüldü. Allowlist bir noktada dolduruldu; kayıt güncellenmemişti. Ön koşul maddesi DEĞİL.
+- ~~**Yedek geri-yükleme provası hiç yapılmadı** (madde #11)~~ — ✅ **PROVA EDİLDİ** (2026-09-05): tek geçişte 64/64 tablo · 13/13 obje · 0 hata, 94/94 E2E yeşil; YENİ `npm run restore`. Detay [[project_backups]].
+- ~~**E2E kilidi** (madde #19) — 13 spec `preflight:env` tarafından durduruluyor~~ — ✅ **AÇILDI** (2026-08-31): yerel Supabase (colima) kuruldu, kapı kod değişmeden geçti; bugün **94/94 retries=0**. Detay [[project_local_dev_db]].
 - **PMT beta pilot haftası** (madde #20).
 
 ## C. Deploy / altyapı doğrulamaları (kod tek başına yetmez)
