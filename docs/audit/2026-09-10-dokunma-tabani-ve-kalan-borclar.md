@@ -112,7 +112,7 @@ kaydırma bir AKSİYONU gizlemek olurdu). YENİ `.tap-wrap-row` — mobilde
 | madde | yapılan |
 |---|---|
 | `/quotes/preview` başlıksız | araç çubuğundaki `{no · durum}` `<span>`ı **gerçek `<h1>`** (piksel farkı 0) + boş-durum başlığı; `HEADER_EXCEPTIONS`e gerekçeli girdi. `QuoteDocument` **baskı belgesi olarak muaf** (emsal `RfqDocument`). |
-| **YENİ:** `/import/excel` h1'siz | 41 rota tarandı, tek başlıksız olan buydu ve başlığı tam olarak kapının YASAKLADIĞI imzayla yazılmıştı (`14px/600/--text-primary`) → `PageHeader` + `BackLink`. |
+| **YENİ:** `/import/excel` h1'siz | Kaynak taraması 41 dashboard rotasında 12 aday gösterdi; **tarayıcı ölçümü tek gerçek kusuru ayırdı** — diğer 11'i ya başlığını istemci bileşeninde basıyor (`OrdersClient` vb.), ya bir `redirect()`, ya baskı sayfası, ya da başlığı forma bırakıyor. `import/excel`in başlığı tam olarak kapının YASAKLADIĞI imzayla yazılmıştı (`14px/600/--text-primary`) → `PageHeader` + `BackLink`. |
 | `OrderForm`da `pageHeader` yok | `QuoteForm` ile **birebir** sözleşme (varsayılan `true`). Davranış değişmedi; kural taşıyıcı-bağımsız oldu. |
 | Diyalog başlıklarının anlamsal rengi | `SectionHeader`a **`tone`** eklendi → `quotes/[id]` onay diyaloğu ve **`ConfirmModal`ın kendisi** ortak kaynağa girdi. |
 
