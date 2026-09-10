@@ -42,4 +42,23 @@ Aynı sınıf: `getComputedStyle(el, "::after")` kutuyu 44×44 gösteriyordu ama
 Kapalı çekmece, yüklenmemiş sayfa, render edilmemiş bileşen — hepsi sayıyı
 sessizce küçültür. Ölçüm yönteminin kendisi de bulgudur.
 
-Bağlantılar: [[feedback_global_over_hardcode]] · [[project_frontend_renewal]]
+### Aynı gün, aynı dersin İKİNCİ tekrarı (2026-09-10 · 2. tur)
+
+Dokunma turu kapandıktan **sonra** oturumsuz yüzeyler ölçüldü: 29 rotalık
+envanter yalnız `/dashboard/*` gezmişti, yani oturum açmamış birinin gördüğü
+**her** yüzey dışarıdaydı — ve **`/login` deponun başlık elemanı hiç olmayan
+tek yüzeyiydi**. Kapı da aynı yerden kördü: *"başlıksız sayfa kalmaz — **TÜM**
+rotalar"* kuralı `src/app/dashboard` ağacını tarıyordu. **İsim "tüm" diyor,
+kapsam demiyor.**
+
+**Uygula:** bir kuralın ya da envanterin *adına* değil, **yürüdüğü ağaca** bak.
+"Tüm X" diyen bir iddiada ilk soru: X'in kökü nerede tanımlı?
+
+### Üçüncü kardeş: bir iddia, iki dosyanın BİLEŞİMİNDE yaşayabilir
+
+Aynı turda `route-guard-matrix` bir **hız sınırlayıcıyı** (`guardAiRoute` —
+gövdesi sıfır kimlik/yetki) yetkilendirme sayıyordu. Her dosya kendi başına
+doğruydu; kusur yalnız `proxy.ts`nin `ALWAYS_PUBLIC` listesiyle **kesişimde**
+vardı ve o kesişime bakan hiçbir test yoktu. Detay [[project_security]].
+
+Bağlantılar: [[feedback_global_over_hardcode]] · [[project_frontend_renewal]] · [[project_security]]

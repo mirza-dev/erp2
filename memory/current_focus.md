@@ -5,6 +5,97 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-09-10 (2) — Oturumsuz yüzeyler + kapının kör noktası
+
+Aynı gün, dokunma turunun ardından. Kullanıcı kalan iki maddeyi seçti:
+**C1 (LoginMonolith UI)** ve **küçük borçlar turu**. Rapor
+`docs/audit/2026-09-10-oturumsuz-yuzeyler-ve-kapinin-kor-noktasi.md`.
+
+**ASIL BULGU: `/login` deponun başlık elemanı hiç olmayan TEK yüzeyiydi** —
+üstelik uygulamanın giriş kapısı. `/`, `/gizlilik`, `/offline`,
+`/sifre-yenile` ve 404'ün hepsinde h1 vardı.
+
+**Neden kaçmıştı:** sabahki tur **29 `/dashboard/*` rotası** gezip "kapandı"
+dedi; oturum açmamış birinin gördüğü **her** yüzey o listenin dışındaydı.
+*Bir envanter, ölçmediği durumu kapsayamaz* — dersin **ikinci** tekrarı (ilki
+aynı gün, çekmece kapalıyken ölçülen Sidebar). Kapı da aynı yerden kördü:
+*"başlıksız sayfa kalmaz — **TÜM** rotalar"* kuralı `src/app/dashboard`
+ağacını tarıyor; isim "tüm" diyor, kapsam demiyor.
+
+**İşaretlemede niyet zaten duruyordu:** `<div className="mono-heading-block">`
+adında, flex-kolon, `gap: 10px` bir sarmalayıcı vardı ve **içinde yalnız bir
+`<p>`** bulunuyordu. Başlık için ayrılmış yer, başlıksız kalmıştı.
+
+**Uydurma başlık metni EKLENMEDİ.** Bir giriş ekranında sayfanın görünen
+kimliği wordmark'ın kendisi → `<h1>` **logoyu sarıyor**, erişilebilir ad
+"Roven". Görsel nötrlük **ölçüldü, iddia değil**: h1 kutusu = çocuk kutusu
+(390 ve 1440px'te birebir), margin 0/0/0/0, font-size miras.
+
+**Ölçüm (390×844, 2 tema, 6 rota, OTURUMSUZ):** 78 kontrolün **50'si → 24**
+44px altında · bağlantı **8→0** · buton **30→12** · başlıksız rota **1→0** ·
+taşma 0 · çakışma 0. Masaüstü nötrlüğü: 1440px'te `::after` üreten eleman
+**0**. Düzeltilenler: `.icon-btn` (32×32) · `.check` (91.7×**18**) ·
+`.trail` (42×42) · açılış "Giriş Yap" (55.5×**20.3**) + "Demo Gez"
+(116.2×**35.5**) · `/offline` "Tekrar dene" (**37.5**) · `/gizlilik` geri
+bağlantısı (128.6×**16**, setin en küçüğü).
+
+**`.check` bilerek YALNIZ dikey büyür** — 91.7px zaten geniş; yatay büyütmek
+onu aynı satırdaki "Şifremi unuttum" üzerine iterdi (`q-note-btn` dersi).
+
+**Geri bağlantısının ALTINCI lehçesi** `/gizlilik`te bulundu; sabah beşi
+`BackLink`te birleşmişti. `BackLink`e ÇEVRİLMEDİ (kabuk dışı hukuk metni,
+kendi sessiz dili) — yalnız hit alanı düzeltildi.
+
+**KAPININ KÖR NOKTASI — hız sınırlayıcı guard sayılıyordu.**
+`route-guard-matrix`in `GUARD_PATTERNS`inde `guardAiRoute(` duruyor
+("AI maliyet kapısı — bilinçli sınıf"). Fonksiyon **okundu**: gövdesi yalnız
+`extractClientIp` + sayaç → **sıfır kimlik, sıfır yetki**. Yani yetkilendirme
+matrisi bir **hız sınırlayıcıyı** yetkilendirme sayıyordu.
+
+Bugün bedeli **YOK** — kesişim ölçüldü, **boş**: `ai/parse`+`ai/score`
+proxy'nin oturum kontrolünden geçiyor, `ai/purchase-copilot` ALWAYS_PUBLIC ama
+kendi `checkAuth`ını (CRON_SECRET veya oturum) taşıyor. Tehlike **gizil ve
+İKİ DOSYALIK**: `ALWAYS_PUBLIC`e yalnız-rate-limit bir `/api/ai/*` eklenirse
+uç **tamamen açılır** ve matris yeşil kalır — hiçbir dosyanın kendi testi bu
+bileşimi görmüyor. Yeni kural kesişimi kilitler.
+
+`deferred_backlog`un "gate bunları guarded sayar → gerçek borç değil" kaydı
+**sonucu doğru, gerekçesi yanlış**tı; düzeltildi. Kalan gerçek boşluk izin
+seviyesinde (`viewer` de `ai/parse` çağırabiliyor). **Kullanıcı kararı: izin
+EKLENMEDİ, kayda geçirildi** — `view_import` bugün yalnız admin+satınalmada,
+izin koymak sihirbazı başka bir rol için sessizce kesebilir ve yerelde
+doğrulanamıyor.
+
+**KIRMIZI KANIT BİR ZAYIFLIK YAKALADI (8. kez).** K1'in ilk yazımı "seçici
+mobil blokta bir yerde geçiyor mu" diye bakıyordu. `.icon-btn::after` kutu
+kuralından düşürüldü → kural **YEŞİL KALDI**, çünkü seçici `min-width`
+kuralında da duruyor ve `some()` onu oradan buluyordu (`min-width` tek başına
+kutu yaratmaz). İddia, kutuyu gerçekten yaratan kurala
+(`content:"" + min-height:44px`) bağlandı. **7 mutasyon / 7 kırmızı.**
+
+**Küçük borçlar beklenenden AZ iş çıkardı** — çoğu kayıtta borç görünüp fiilen
+borç değildi: audit actor trigger zaten *karar* olarak yazılı + APPLY
+kullanıcı tarafında (aksiyon alınabilir değil) · `view_import` bir ürün kararı
+· **`DemoButton.tsx` SİLİNDİ** (kullanıcı onayı; tüketicisi sıfır, tek
+gönderme bir test **yorumunun** içindeydi ve o yorum iki kere yanlıştı —
+`<Link>` diyordu, dosya `<a>` kullanıyordu).
+
+**BELLEK KAYMASI KAPATILDI.** `~/.claude/.../memory` sembolik bağı
+`erp2/memory`yi gösteriyor (Memory özelliğinin YAZDIĞI yer), commit ise hep
+proje-codex kopyasından atılıyordu → **dört dosya / 179 satır hiçbir
+commit'te yoktu**: `project_auth` (+7), `project_backups` (+30),
+`project_developer_console` (+47), `project_local_dev_db` (75, YENİ — MEMORY.md
+ona bağ veriyordu ama dosya yoktu). Bir `reset --hard` sessizce silerdi;
+main'i ileri sarma denemesi tam da bunu tetikleyecekti. Ayrıca C0'daki üç
+bayat madde düzeltildi. İki worktree + iki uzak ref **aynı SHA'da**.
+
+**Kapı:** `tsc 0 · lint 0 · 501 dosya / 7021 test · build uyarısız ·
+E2E 94/94 retries=0 · 7/7 kırmızı-kanıtlı · migration YOK`.
+
+**Açık madde: yok.**
+
+---
+
 ## 2026-09-10 — Dokunma tabanı + kalan yedi borç KAPANDI
 
 2026-09-08'in beş gerekçeli ertelemesi + `deferred_backlog` §A5/§A6.

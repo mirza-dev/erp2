@@ -1,11 +1,23 @@
 # Roven — Claude Code Rehberi
 
 ## Mevcut Durum
-_Son güncelleme: 2026-09-08_
+_Son güncelleme: 2026-09-10_
 
 > Bu bölüm yalnız **güncel durumu + açık yükümlülükleri** tutar. Tam oturum geçmişi git log'unda ve `memory/current_focus.md`'de. Aşağıdaki indeks son dönem oturumlarına (commit + konu) hızlı bakış içindir; daha eski dönemler (Faz 2–3d AI Import, Sprint A–C, M-3 Rate Limiting, React Doctor, Teklif V2–V7 plan turları, Paraşüt Faz 1–11) git geçmişinde.
 
-**Son tamamlanan iş:** **Dokunma tabanı + kalan yedi borç** (2026-09-10; GREEN; **migration YOK**; saf sunum). Kullanıcı: *"bu kalan işlerin hepsini detaylı planla ve kapat"* — 2026-09-08'in beş gerekçeli ertelemesi + `deferred_backlog` §A5/§A6. Rapor: `docs/audit/2026-09-10-dokunma-tabani-ve-kalan-borclar.md`.
+**Son tamamlanan iş:** **Oturumsuz yüzeyler + kapının kör noktası** (2026-09-10, ikinci tur; GREEN; **migration YOK**). Rapor: `docs/audit/2026-09-10-oturumsuz-yuzeyler-ve-kapinin-kor-noktasi.md`.
+
+**`/login` DEPONUN BAŞLIK ELEMANI HİÇ OLMAYAN TEK YÜZEYİYDİ** — uygulamanın giriş kapısı. Aynı günün dokunma turu 29 `/dashboard/*` rotası gezip "kapandı" dedi; **oturumsuz görülen HER yüzey o listenin dışındaydı** (*envanter, ölçmediği durumu kapsayamaz* — 2. tekrar). Kapı da aynı yerden kördü: "başlıksız sayfa kalmaz — **TÜM** rotalar" kuralı yalnız `src/app/dashboard` ağacını tarıyordu. İşaretlemede niyet zaten duruyordu: `mono-heading-block` adlı flex-kolon sarmalayıcının **içinde yalnız bir `<p>`** vardı. Uydurma başlık YAZILMADI — `<h1>` **logoyu sarıyor** (erişilebilir ad "Roven"); görsel nötrlük ölçüldü (h1 kutusu = çocuk kutusu, margin 0, iki genişlikte de). **Oturumsuz ölçüm: 78 kontrolün 50'si → 24; bağlantı 8→0, buton 30→12, başlıksız rota 1→0.** Geri bağlantısının **ALTINCI lehçesi** `/gizlilik`te bulundu (sabah beşi `BackLink`te birleşmişti) — dili korunarak yalnız hit alanı düzeltildi.
+
+**KAPININ KÖR NOKTASI: hız sınırlayıcı guard sayılıyordu.** `route-guard-matrix`in `GUARD_PATTERNS`inde `guardAiRoute(` duruyor; fonksiyon okundu — gövdesi **yalnız IP + sayaç, sıfır kimlik/yetki**. Bugün bedeli YOK (kesişim ölçüldü, **boş**: `ai/parse`+`ai/score` proxy oturumundan geçiyor, `purchase-copilot` ALWAYS_PUBLIC ama kendi `checkAuth`ını taşıyor) ama tehlike **gizil ve iki dosyalık** — `ALWAYS_PUBLIC`e yalnız-rate-limit bir `/api/ai/*` eklenirse uç tamamen açılır ve matris yeşil kalır. Yeni kural kesişimi kilitliyor. Backlog'un "gerçek borç değil" kaydı **sonucu doğru, gerekçesi yanlış** olduğu için düzeltildi.
+
+**KIRMIZI KANIT BİR KURAL ZAYIFLIĞI YAKALADI (8. kez "desen komşusuna tutundu"):** ilk yazım "seçici mobil blokta bir yerde geçiyor mu" diye bakıyordu; `.icon-btn::after` kutu kuralından düşürüldü ve kural **yeşil kaldı** — seçici `min-width` kuralında da duruyordu ve `some()` onu oradan buluyordu. İddia, kutuyu **gerçekten yaratan** kurala (`content:"" + min-height:44px`) bağlandı. 7 mutasyon / 7 kırmızı. **`DemoButton.tsx` silindi** (kullanıcı onayı; tüketicisi sıfır — tek gönderme bir test yorumunun içindeydi ve o yorum iki kere yanlıştı). **501 dosya / 7021 test · E2E 94/94.**
+
+**BELLEK KAYMASI KAPATILDI:** `~/.claude/.../memory` sembolik bağı `erp2/memory`yi gösterirken commit'ler hep proje-codex kopyasından atılıyordu → **dört dosya / 179 satır hiçbir commit'te yoktu** (`project_local_dev_db.md` dahil — MEMORY.md ona bağ veriyordu ama dosya yoktu). Bir `reset --hard` sessizce silerdi. İki worktree + iki uzak ref artık **aynı SHA'da**.
+
+---
+
+**Önceki iş:** **Dokunma tabanı + kalan yedi borç** (2026-09-10; GREEN; **migration YOK**; saf sunum). Kullanıcı: *"bu kalan işlerin hepsini detaylı planla ve kapat"* — 2026-09-08'in beş gerekçeli ertelemesi + `deferred_backlog` §A5/§A6. Rapor: `docs/audit/2026-09-10-dokunma-tabani-ve-kalan-borclar.md`.
 
 **KAYITLI ÜÇ SAYININ ÜÇÜ DE YANLIŞTI** (ön tarama envanter değildir — 5. kez). "36 kontrol 30–43px bandında" değil **1664 kontrolün 584'ü** 44px altında; "geri bağlantısı 5 kopya" değil **beş lehçe / 11 yüzey**; Developer Console'un "kimseye açık değil" notu **bayat** (erişilebilir çıktı).
 

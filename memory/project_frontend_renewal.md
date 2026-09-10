@@ -296,3 +296,37 @@ rota 0 · taşma 0. Kapı 14 kural, **14/14 kırmızı-kanıtlı**; tur dört za
 yakaladı (desen komşusuna tutundu · kural BOŞ KÜMEYİ denetliyordu · kural
 kendi yorumuna tutundu [7. kez] · "en az bir dosya" sayı iddiasıydı) ve
 **kapının kendi CSS ayrıştırıcısı** da düzeltildi.
+
+
+## 2026-09-10 (2) — OTURUMSUZ yüzeyler (C1 kapanışı)
+
+C1'in *"LoginMonolith UI redesign ayrı iş, kapsam dışı"* notu bu turda
+kapandı — ama **yeniden tasarım olarak değil**: ölçüm, sayfanın stil dilinde
+değil **anlam katmanında** kusur buldu.
+
+**`/login` deponun başlık elemanı hiç olmayan TEK yüzeyiydi.** İşaretlemede
+niyet duruyordu: `mono-heading-block` adlı flex-kolon sarmalayıcının içinde
+**yalnız bir `<p>`** vardı; yanındaki CSS yorumu bile
+`/* Form (bare — başlık formun dışında) */` diyordu. Başlık için ayrılmış yer,
+başlıksız kalmıştı.
+
+**Çözüm uydurma metin DEĞİL:** bir giriş ekranında sayfanın görünen kimliği
+wordmark'ın kendisidir → `<h1 className="mono-brand-title">` **logoyu sarıyor**,
+erişilebilir ad "Roven". `mono-brand-tag` ("Endüstriyel ERP") kaşlık olarak
+kalıyor ve `aria-labelledby` hedefi olmayı sürdürüyor. Tarayıcının h1
+varsayılanları (2em/bold/blok/margin) `.mono-brand` flex satırını bozardı;
+`.mono-brand-title` hepsini geri alıyor ve **nötrlük ölçüldü** (h1 kutusu =
+çocuk kutusu, 390 ve 1440px'te birebir; margin 0; font-size miras).
+
+**Dokunma:** `.icon-btn` (32×32) · `.check` (91.7×**18**, YALNIZ dikey büyür —
+yatay büyütmek "Şifremi unuttum"un alanını yerdi) · `.trail` (42×42) mobil
+`tap-44` ailesine girdi. Açılış sayfasının iki birincil eylemi
+("Giriş Yap" 55.5×**20.3**, "Demo Gez" 116.2×**35.5**), `/offline` "Tekrar
+dene" (**37.5**) ve `/gizlilik` geri bağlantısı (128.6×**16**) `tap-44` aldı.
+
+**Kapı:** oturumsuz rotalar artık `surface-consistency`te başlık zorunluluğu
+taşıyor; `/login`in h1'inin logoyu sardığı ayrıca kilitli (biri oraya uydurma
+bir başlık metni yazarsa kural kırılır → karar yeniden tartışılır).
+
+**`DemoButton.tsx` silindi** (kullanıcı onayı) — tüketicisi sıfırdı; açılış
+sayfası aynı işi elle yazılmış `<a href="/api/auth/demo">` ile yapıyor.

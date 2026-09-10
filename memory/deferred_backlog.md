@@ -16,7 +16,7 @@ _Son güncelleme: 2026-09-10 (C0 listesindeki üç bayat madde düzeltildi; ilk 
 - Tamamlanan derin incelemeler: **RFQ ✅** (`docs/audit/2026-06-17-review-bulgular.md`), **Orders ✅** (`docs/audit/2026-06-17-orders-review-bulgular.md`), **Quotes ✅** (`docs/audit/2026-06-18-quotes-review-bulgular.md`; O1 legacy expire-quotes silindi), **Paraşüt ✅** (`docs/audit/2026-06-18-parasut-review-bulgular.md`; O1 checkAuthAlertThreshold orphaned→wire), **import/AI ✅** (`docs/audit/2026-06-18-import-ai-review-bulgular.md`; O1 iki guard'sız import GET→view_import, D1 ops-summary auth; purchase-copilot/parse/score RBAC İZLENEN), **production ✅** (`docs/audit/2026-06-18-production-review-bulgular.md`; O1 reverse_production eşzamanlı çift-DELETE idempotency→mig.104 `for update`; GET by-design dashboard-tier; `2aaf14f`; **mig.104 APPLY ✅**), **customers/products ✅** (`docs/audit/2026-06-19-customers-products-review-bulgular.md`; O1 customers GET→view_customers [PII cross-role], D1 products/[id]/quotes GET→view_products [teklif pipeline], Nit PATCH customers revalidateTag; `ab635ff`), **alerts ✅** (`docs/audit/2026-06-19-alerts-review-bulgular.md`; çok olgun K:0 Y:0 O:0 D:1; D1 GET /api/alerts/[id]→view_alerts [tam satır AI gerekçe+user_note, UI tüketicisi yok]; migration YOK; PUSH BEKLİYOR).
 - **Sonradan eklenen denetimler:** **inventory ✅** (`docs/audit/2026-06-19-inventory-review-bulgular.md`; D-O1 recount_stock mig 105 + D2 ölü helper temizliği; `4179fd8`), **purchase ✅** (`docs/audit/2026-06-19-purchase-review-bulgular.md`; O1 actor/created_by sunucu-otoriter 8 route; `4d70b65`), **vendors ✅** (`docs/audit/2026-06-19-vendors-review-bulgular.md`; D1 create/update audit actor; `dcfd0ff`).
 - **✅ MODÜL DENETİM KAMPANYASI TAMAMLANDI** — denetlenmemiş modül KALMADI. Tüm modüller (RFQ/orders/quotes/paraşüt/import-AI/production/customers-products/alerts/settings/inventory/purchase/vendors) derin tarandı.
-- **İzlenen RBAC borçları:** ~~GET /api/quotes(+[id]) view_quotes~~ ✅ A3'te kapandı. Kalan (düşük): purchase-copilot POST + ai/parse + ai/score RBAC'siz (oturum-only, demo/anon bloklu). Yeni method-seviye gate bunları zaten "guarded" sayar (guardAiRoute/checkAuth) — gerçek borç değil.
+- **İzlenen RBAC borçları:** ~~GET /api/quotes(+[id]) view_quotes~~ ✅ A3'te kapandı. Kalan (düşük): purchase-copilot POST + ai/parse + ai/score RBAC'siz (oturum-only, demo/anon bloklu). **2026-09-10 DÜZELTME — bu kaydın SONUCU doğru, GEREKÇESİ yanlıştı.** Eski gerekçe "gate bunları guarded sayar (guardAiRoute)" diyordu; `guardAiRoute` okundu: gövdesi **yalnız IP + sayaç, sıfır kimlik/yetki** — yani gate bir **hız sınırlayıcıyı** yetkilendirme sayıyor. Uçların güvenliği gate'ten değil **proxy'nin oturum kontrolünden** geliyor (`purchase-copilot` ALWAYS_PUBLIC ama kendi `checkAuth`ını taşıyor). Kesişim bugün BOŞ; tehlike gizil ve iki dosyalık → YENİ kapı kuralı `route-guard-matrix`te kilitledi. Kalan gerçek boşluk **izin seviyesinde**: `viewer` de `ai/parse` çağırabiliyor (10/dk). **Kullanıcı kararı 2026-09-10: izin EKLENMEDİ** — `view_import` yalnız admin+satınalmada, izin koymak sihirbazı başka bir rol için sessizce kesebilir ve yerelde doğrulanamaz.
 - `/erp-review <modül-yolu>` ile veya `erp2-reviewer` ajanını kapsam vererek çağır. Detay [[reference_review_agent]].
 
 ## C0. Teslim öncesi kullanıcı-tarafı (2026-08-31 ürün olgunluğu denetimi)
@@ -151,3 +151,25 @@ başlıksız rota **0** · yatay taşma **0**.
 - Cümle içi düz yazı bağlantıları (13–15px ×2) — metin, dokunma hedefi değil.
 
 Rapor: `docs/audit/2026-09-10-dokunma-tabani-ve-kalan-borclar.md`.
+
+
+### 2026-09-10 (2) — OTURUMSUZ bölge KAPANDI (envanterin altıncı boşluğu)
+
+Aynı günün dokunma turu **29 `/dashboard/*` rotası** gezip "kapandı" dedi.
+Oturum açmamış birinin gördüğü **her** yüzey o listenin dışındaydı ve
+**`/login` deponun başlık elemanı hiç olmayan TEK yüzeyiydi** — uygulamanın
+giriş kapısı.
+
+Ölçüm (390×844, 2 tema, 6 rota, oturumsuz): 78 kontrolün **50'si → 24**;
+bağlantı **8→0**, buton **30→12**, başlıksız rota **1→0**, taşma 0, çakışma 0.
+Masaüstü (1440px) nötrlüğü kanıtlandı: `::after` üreten eleman **0**.
+
+`<h1>` uydurma metin değil, **logoyu sarıyor** (erişilebilir ad "Roven");
+görsel nötrlük ölçüldü. Geri bağlantısının **altıncı lehçesi** `/gizlilik`te
+bulundu — dili korunarak yalnız hit alanı düzeltildi.
+
+**Gerekçeli kapsam dışı:** TR/EN dil segmentleri (bitişik şerit, `.seg`
+kararıyla aynı) · login'in iki input'u (kullanıcının `input`/`select` kararı) ·
+`/gizlilik` ve açılış sayfasının kendi stil dilleri.
+
+Rapor: `docs/audit/2026-09-10-oturumsuz-yuzeyler-ve-kapinin-kor-noktasi.md`.

@@ -214,3 +214,32 @@ Son kalan ertelenen:
   backend (Upstash REST, Cloudflare WAF) seçilene kadar güvenli geçici durum.
 - `purchase_commitments` + `column_mappings` RLS — 029'da ENABLE ROW LEVEL SECURITY mevcut ✅; explicit policy yok (proje genelinde aynı pattern)
 - **Yedekleme ayrı dosyada:** Free planda otomatik yedek yok + Storage hiçbir planda DB yedeğine girmiyor → [[project_backups]] (`npm run backup` ile kapatıldı 2026-08-30)
+
+
+## 2026-09-10 — Kapının kör noktası: hız sınırlayıcı guard sayılıyordu
+
+`route-guard-matrix`in `GUARD_PATTERNS` listesinde `guardAiRoute(` duruyor,
+yanında *"IP rate-limit (AI maliyet kapısı — bilinçli sınıf)"* yorumuyla.
+Fonksiyon **okundu**: gövdesi yalnız `extractClientIp` + sayaç → **sıfır
+kimlik, sıfır yetki**. Yani yetkilendirme matrisi bir **hız sınırlayıcıyı**
+yetkilendirme sayıyordu.
+
+**Bugün bir bedeli YOK** — kesişim ölçüldü ve **boş**:
+
+| uç | proxy | kendi guard'ı |
+|---|---|---|
+| `/api/ai/parse` | oturum ister | yalnız rate-limit |
+| `/api/ai/score` | oturum ister | yalnız rate-limit |
+| `/api/ai/purchase-copilot` | **ALWAYS_PUBLIC** | kendi `checkAuth`ı (CRON_SECRET veya oturum) |
+
+**Tehlike gizil ve İKİ DOSYALIK:** biri `proxy.ts`nin `ALWAYS_PUBLIC`
+listesine yeni bir `/api/ai/*` eklerse ve route yalnız `guardAiRoute` taşırsa,
+uç **tamamen açık** olur — ve matris **yeşil kalır**. Hiçbir dosyanın kendi
+testi bu bileşimi görmüyor: `proxy` testleri route'ları, route testleri
+proxy'yi bilmiyor. Yeni kural tam olarak **kesişimi** kilitliyor
+(kırmızı-kanıt: `ai/parse` `ALWAYS_PUBLIC`e eklenince kural kırmızı).
+
+**Ders — bir kapının iddiası, iki dosyanın BİLEŞİMİNDE yaşıyor olabilir.**
+Her dosya kendi başına doğru; kusur yalnız kesişimde var ve o kesişime bakan
+kimse yok. `deferred_backlog`un ilgili kaydı **sonucu doğru, gerekçesi
+yanlış** olduğu için düzeltildi.
