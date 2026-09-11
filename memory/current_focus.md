@@ -5,6 +5,81 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-09-11 (2) — Migrasyon durumu kesinleşti + 108'in kapsama boşluğu
+
+Kullanıcı canlı Supabase projesini uyandırdı (Free plan hareketsizlikten
+duraklatmıştı), **mig.107 + 108'i uyguladı** ve sordu: *"111'in hepsi de
+eksiksiz var mı?"*
+
+**Probe listesine güvenilmedi.** Yerel veritabanı 111 migration'ın sıfırdan
+uygulanmış hâli olduğu için canlı doğrudan **ona karşı diff'lendi**:
+**64 tablo · 837 kolon (ad + tip) · 60 RPC · 6 bucket → fark SIFIR.**
+Bu yöntem SQL ayrıştırmaya hiç ihtiyaç duymaz, yani mig.017'nin hizalı
+kolonlarının 2026-08-30'da ürettiği sahte-drift sınıfına kapalıdır.
+
+Bucket diff'i bedavadan yedi "kayıtsız" migration'ı da doğruladı — **046'nın
+kanıtı mime listesinde duruyor**: `user-avatars`ta svg YOK, `company-assets`te
+VAR (033 · 045 · 046 · 058 · 076 · 091 · 100).
+
+**RLS ilk kez canlıda ölçüldü** (017/029 satırları 2026-08-30'da dosyaya
+eklenmiş ama hiç koşulmamıştı): anon anahtarıyla 64 tablo, **0 sızan** —
+ve **kırmızı-kanıtlı**, çünkü aynı istek servis anahtarıyla `customers`ta
+18 satır döndürüyor. Yoksa "count=0" boş kümeyi denetlemek olurdu.
+
+**ÖLÇÜ ARACI KENDİ BULGUSUNU VERDİ.** İlk RLS probe'u `select=id` kullanıyordu;
+`order_counters`ta `id` kolonu YOK → HTTP 400 → kural onu "korumalı" saydı.
+**Sorgu bozuk olduğu için geçti.** `HEAD` + `count=exact`e çevrildi (gövdesiz,
+her tabloda çalışır; depoda `id`siz 8 tablo var).
+
+### Asıl bulgu: 108'in CHECK parçasını hiçbir şey doğrulamıyordu
+
+`check-migrations`in 108 probe'u yalnız `sales_orders.parasut_payment_status`
+**kolonuna** bakıyor; `parasut-payment-status.test.ts:214` ise migration
+**dosyasının metnini** kilitliyor. İkisi de veritabanını görmez — kolonlar inip
+`alerts` kısıtı inmeseydi **her iki kapı da yeşil derdi**.
+
+Aynı körlük **107'de de vardı**: `chk_pol_vat_rate` + iki CRON index'i.
+
+Eklenenler: `manual-migration-checks.sql`e dört satır (107a · 107b · 108a ·
+108b), `check-migrations.ts` MANUAL'ına iki kayıt (⚠️ mesajı artık
+*"probe ✅ ama CHECK/index GÖRÜNMEZ"* diyor), iki kaynak kilidi testi.
+108b, 092'nin **yalnız yorumda yaşayan** kararını ölçüye çevirir: `user_note`
+listeye geri EKLENMEZ.
+
+### İkinci bulgu: mevcut 089/101 satırları boş kümeyi denetliyordu
+
+Kısıt **tamamen** düşseydi o satırlar sonuç kümesinden sessizce kaybolurdu —
+ekranda bir satır eksilir, ❌ görünmezdi. Dördü de aggregate'e çevrildi
+(`count(*) = 0` → *"CHECK'İ HİÇ YOK"*). Kanıtlandı: kısıt drop edilmiş
+transaction'da **19 satır hâlâ dönüyor**.
+
+### Üçüncü: testimin ilk yazımı yorumdan besleniyordu
+
+`'alerts'::regclass` dosyanın **sonundaki yorum bloğunda** da geçiyor →
+blok sayısı 3 yerine 4 çıktı. *Desen komşusuna tutundu* (10. kez). İddia
+yorumlar soyularak **yürüyen sorguya** bağlandı.
+
+### Bayat kayıtlar
+
+Dosyanın başlığı *"23/23 otomatik probe"* diyordu; gerçek **22**. Git geçmişi
+tarandı: **22 ekleme, 0 silme** → hiçbir migration kapsamdan düşmemiş, sayı
+elle yanlış yazılmış. Ayrıca `110/112` hayalet referansı düzeltildi — 112 diye
+bir migration yok. CLAUDE.md'nin "açık migration işi: 107+108" satırı da
+güncellendi.
+
+### Yan bulgu: env profil dosyaları eksikti
+
+`EMAIL_FROM` ve `NEXT_PUBLIC_APP_URL` yalnız çalışan `.env.local`da vardı,
+`.env.yerel.local` ve `.env.canli.local`ın **ikisinde de yoktu** → `cp` ile
+profil değiştiren herkes e-postayı sessizce öldürüyordu
+(`email-service.ts:56` erken döner, hata vermez). İkisine de eklendi; canlı
+profile `NEXT_PUBLIC_APP_URL=https://erp.getmedspace.com` ve göndericinin
+Resend **sandbox** adresi olduğu uyarısı yazıldı.
+
+**6/6 kırmızı-kanıtlı · tsc 0 · lint 0 · 508 dosya / 7079 test · migration YOK.**
+
+---
+
 ## 2026-09-11 — Dış inceleme raporu: 12 bulgu doğrulandı ve kapatıldı
 
 Kullanıcı dışarıdan bir kod-inceleme raporu paylaşıp tek kelime yazdı:
