@@ -198,4 +198,69 @@ describe("DataTable", () => {
         );
         expect(screen.getByText("FOOTER")).toBeTruthy();
     });
+
+    // ── Satır klavyesi ÇOCUK KONTROLLERİ YUTMAZ (2026-09-11, dış inceleme #9) ──
+    // Kusur: `onKeyDown` olayın kaynağını denetlemiyordu. Satır içindeki bir
+    // checkbox'ta Space'e basmak hem `preventDefault` ile kutucuğun KENDİ
+    // davranışını iptal ediyor hem de satırı tetikliyordu. Hücrelerdeki
+    // `onClick` + `stopPropagation` buna çare DEĞİL: `onClick`, `keydown`
+    // bubbling'ini durdurmaz — iki ayrı olay.
+
+    it("satır içindeki checkbox'ta Space satırı TETİKLEMEZ ve iptal EDİLMEZ", () => {
+        const onRowClick = vi.fn();
+        const withCheckbox = [
+            {
+                key: "sel",
+                header: "",
+                cell: () => <input type="checkbox" aria-label="seç" onClick={e => e.stopPropagation()} />,
+            },
+            ...columns,
+        ];
+        render(
+            <DataTable columns={withCheckbox} rows={rows} rowKey={r => r.id} onRowClick={onRowClick} />,
+        );
+        const box = screen.getAllByLabelText("seç")[0];
+
+        const space = fireEvent.keyDown(box, { key: " " });
+
+        expect(onRowClick, "checkbox'ta Space satırı tetikledi — kullanıcı detaya savruluyor").not.toHaveBeenCalled();
+        // `false` dönmesi preventDefault demek; checkbox'ın kendi işini yapabilmesi
+        // için olay İPTAL EDİLMEMELİ.
+        expect(space, "checkbox'ın kendi Space davranışı preventDefault ile iptal edildi").toBe(true);
+    });
+
+    it("satır içindeki butonda Enter satırı TETİKLEMEZ", () => {
+        const onRowClick = vi.fn();
+        const withButton = [
+            { key: "act", header: "", cell: () => <button type="button">Sil</button> },
+            ...columns,
+        ];
+        render(
+            <DataTable columns={withButton} rows={rows} rowKey={r => r.id} onRowClick={onRowClick} />,
+        );
+        fireEvent.keyDown(screen.getAllByText("Sil")[0], { key: "Enter" });
+        expect(onRowClick, "butonda Enter hem butonu hem satırı çalıştırıyor — çift aksiyon").not.toHaveBeenCalled();
+    });
+
+    it("satırın KENDİSİNDE Enter/Space hâlâ çalışır (daraltma fazla geniş değil)", () => {
+        const onRowClick = vi.fn();
+        const { container } = render(
+            <DataTable columns={columns} rows={rows} rowKey={r => r.id} onRowClick={onRowClick} />,
+        );
+        const firstRow = container.querySelector("tbody tr") as HTMLElement;
+        fireEvent.keyDown(firstRow, { key: "Enter" });
+        expect(onRowClick).toHaveBeenCalledWith(rows[0]);
+    });
+
+    it("FARE davranışı değişmedi — hücreden gelen tıklama satıra taşır", () => {
+        // Daraltma yalnız KLAVYE kolunda; tıklamada hücreler `stopPropagation`
+        // ile zaten kendilerini koruyor, sade hücre ise satırı tetiklemeli.
+        const onRowClick = vi.fn();
+        const { container } = render(
+            <DataTable columns={columns} rows={rows} rowKey={r => r.id} onRowClick={onRowClick} />,
+        );
+        const firstCell = container.querySelector("tbody tr td") as HTMLElement;
+        fireEvent.click(firstCell);
+        expect(onRowClick).toHaveBeenCalledWith(rows[0]);
+    });
 });

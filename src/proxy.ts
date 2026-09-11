@@ -366,12 +366,20 @@ export const middleware = proxy;
  *
  * Yeni desen yalnız BİLİNEN statik uzantılarla BİTEN yolları muaf tutar.
  * `public/` yalnız `.svg` içeriyor; `/icon.svg` ve `/favicon.ico` da listede.
- * Uzantısız her yol (tüm API route'ları ve sayfalar) artık middleware'den geçer.
+ *
+ * 2026-09-11 (dış inceleme #12) — D7'nin bıraktığı ARTIK açık kapandı ve buradaki
+ * cümle düzeltildi. Eski hâli "uzantısız her yol (tüm API route'ları)" diyordu;
+ * ikisi aynı şey DEĞİL: `/api/products/foo.js` gibi uzantıyla BİTEN dinamik bir
+ * API yolu hâlâ muaf kalıyordu — request-id üretilmiyor, rate-limit ve oturum
+ * kapısı hiç çalışmıyordu. Muafiyet koluna `(?!api/)` eklendi: `/api/` altındaki
+ * hiçbir yol artık uzantısına bakılmaksızın muaf olamaz. Statik varlıklar
+ * (`/sw.js`, `/manifest.webmanifest`, `/icon.svg`, `/_next/**`) aynen muaf —
+ * PWA'nın bağlı olduğu `webmanifest|js|png` muafiyeti korunur.
  */
 // NOT: Next `config.matcher` STATİK literal olmak zorunda — string
 // birleştirme build'de "route-segment-config" hatası verir (denendi).
 export const config = {
-    matcher: ["/((?!_next/static|_next/image|favicon\\.ico|.*\\.(?:svg|png|jpe?g|gif|webp|avif|ico|css|js|mjs|map|woff2?|ttf|otf|txt|xml|webmanifest)$).*)"],
+    matcher: ["/((?!_next/static|_next/image|favicon\\.ico|(?!api/).*\\.(?:svg|png|jpe?g|gif|webp|avif|ico|css|js|mjs|map|woff2?|ttf|otf|txt|xml|webmanifest)$).*)"],
 };
 
 // M-3 Review 2 (2026-05-25): Bu dosya **proxy.ts** convention'ı (eski

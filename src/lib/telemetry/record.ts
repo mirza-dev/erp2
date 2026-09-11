@@ -90,7 +90,10 @@ function noteFailure(err: unknown): void {
     // ASLA recordError çağırma — telemetri arızasını telemetriye yazmak
     // sonsuz döngü demektir. Konsol + sayaç yeterli.
     if (diagnostics.failures <= CONSOLE_LOG_FIRST_N || diagnostics.failures % 100 === 0) {
-        console.error(`[telemetry] kayıt başarısız (#${diagnostics.failures}):`, message);
+        // 2026-09-11: HAM mesaj değil, bir satır yukarıda REDAKTE EDİLENİ yaz.
+        // Veritabanı hata metni kullanıcı girdisi ya da hassas değer taşıyabilir;
+        // `diagnostic` alanı redaksiyondan geçerken konsol geçmiyordu.
+        console.error(`[telemetry] kayıt başarısız (#${diagnostics.failures}):`, diagnostics.lastFailureMessage);
     }
 }
 

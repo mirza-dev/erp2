@@ -29,6 +29,14 @@ const manifest = JSON.parse(readFileSync(join(root, "public/manifest.webmanifest
     display_override?: string[];
 };
 const sw = readFileSync(join(root, "public/sw.js"), "utf8");
+/**
+ * `sw`in YORUMSUZ hâli. Bu depoda kaynak-iddiası testleri 7 kez kendi gerekçe
+ * yorumuna tutundu; `void trim` yasağı tam o tuzağın içinde (yasağın gerekçesi
+ * dosyada `void` kelimesini geçiriyor). Yalnız KOD iddiaları bunu kullanır —
+ * dosyada bir metnin YAZILI olduğunu söyleyen iddialar (KILL SWITCH yordamı)
+ * ham `sw`de kalır, çünkü onlar bilerek yorumu ölçer.
+ */
+const swCode = sw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
 const layout = readFileSync(join(root, "src/app/layout.tsx"), "utf8");
 const nextConfig = readFileSync(join(root, "next.config.ts"), "utf8");
 
@@ -87,7 +95,11 @@ describe("GATE — PWA", () => {
         // içinde sınırsız büyür ve hiçbir şey onu küçültmez.
         expect(sw).toMatch(/MAX_ENTRIES\s*=\s*\d+/);
         expect(sw).toMatch(/async function trim\(/);
-        expect(sw).toMatch(/void trim\(cache\)/);
+        // 2026-09-11 (dış inceleme #10): eskiden `void trim(cache)` idi.
+        // `respondWith` promise'i çözüldükten sonra service worker
+        // sonlandırılabilir → budama yarıda kalır, tavan FİİLEN uygulanmaz.
+        expect(swCode, "budama beklenmiyor — tavan garanti değil").toMatch(/await trim\(cache\)/);
+        expect(swCode, "`void trim(cache)` geri gelmiş").not.toMatch(/void\s+trim\(/);
     });
 
     it("çevrimdışı yedek sayfa precache'te ve gezinme YAKALAMASINDA", () => {
@@ -220,6 +232,26 @@ describe("GATE — PWA", () => {
         expect(matcher).toContain("webmanifest");
         expect(matcher).toMatch(/\|js\|/);
         expect(matcher).toContain("png");
+
+        // 2026-09-11 (dış inceleme #12) — muafiyetin SINIRI da burada kilitli.
+        // Matcher'a dair her iddia tek dosyada toplanır; iki gate'e bölmek
+        // tam olarak drift'in başladığı yerdir.
+        //
+        // Statik uzantı muafiyeti `/api/` altına SIZAMAZ: `/api/x/foo.js` gibi
+        // uzantıyla biten dinamik bir yol muaf kalsaydı request-id üretilmez,
+        // rate-limit ve oturum kapısı hiç çalışmazdı.
+        expect(matcher, "muafiyet kolunda `(?!api/)` yok — /api/**/*.js middleware'i atlar")
+            .toContain("(?!api/)");
+
+        // İddia metne değil DAVRANIŞA da bağlanır: desen gerçekten derlenip
+        // örnek yollara uygulanır (metin eşleşmesi tek başına sahte-yeşil olabilir).
+        const re = new RegExp("^" + JSON.parse(matcher.trim().replace(/,$/, "")) + "$");
+        for (const p of ["/api/products/foo.js", "/api/q/x.txt", "/api/x/y.webmanifest", "/api/products"]) {
+            expect(re.test(p), `${p} middleware'den geçmiyor`).toBe(true);
+        }
+        for (const p of ["/sw.js", "/manifest.webmanifest", "/icon.svg", "/apple-icon.png"]) {
+            expect(re.test(p), `${p} artık muaf değil — PWA kırılır`).toBe(false);
+        }
     });
 
     it("dar ekranda girdiler 16px — iOS otomatik yakınlaştırması", () => {

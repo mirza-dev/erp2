@@ -102,7 +102,10 @@ self.addEventListener("fetch", (event) => {
             if (res.ok) {
                 const cache = await caches.open(CACHE);
                 await cache.put(req, res.clone());
-                void trim(cache);
+                // 2026-09-11: `void` DEĞİL `await`. `respondWith` promise'i
+                // çözüldükten sonra service worker sonlandırılabilir; beklenmeyen
+                // budama yarıda kalır ve 200 girdilik tavan fiilen uygulanmazdı.
+                await trim(cache);
             }
             return res;
         })(),

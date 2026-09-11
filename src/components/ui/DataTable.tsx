@@ -135,6 +135,14 @@ export default function DataTable<T>({
                                 ? {
                                     tabIndex: 0,
                                     onKeyDown: (e: KeyboardEvent<HTMLTableRowElement>) => {
+                                        // 2026-09-11: olay SATIRIN KENDİSİNDEN gelmeli.
+                                        // Öncesinde her keydown satıra taşıyordu: satır içindeki
+                                        // checkbox'ta Space'e basmak hem `preventDefault` ile
+                                        // kutucuğun KENDİ davranışını iptal ediyor hem de detaya
+                                        // gidiyordu. Hücrelerdeki `onClick` + `stopPropagation`
+                                        // bunu engellemez — `onClick`, `keydown` bubbling'ini
+                                        // durdurmaz (iki ayrı olay).
+                                        if (e.target !== e.currentTarget) return;
                                         if (e.key === "Enter" || e.key === " ") {
                                             e.preventDefault();
                                             onRowClick(row);

@@ -95,6 +95,29 @@ describe("fail-safe (§20) — asla throw etmez", () => {
         expect(telemetryDiagnostics().failures).toBe(1);
     });
 
+    it("konsola yazılan arıza mesajı da REDAKTE (dış inceleme #11)", async () => {
+        // Kusur: `diagnostic` alanı `redactString`ten geçiyordu ama hemen
+        // altındaki `console.error` HAM `message`ı yazıyordu. Veritabanı hata
+        // metni kullanıcı girdisi ya da hassas değer taşıyabilir — o zaman
+        // redaksiyon sunucu logunda tamamen atlanmış oluyordu.
+        const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+        try {
+            mockRecordOccurrence.mockRejectedValue(
+                new Error('insert failed: {"password":"sUperGizli1"} for ali@firma.com'),
+            );
+            await recordError({ error: new Error("iş hatası") });
+
+            expect(spy, "arıza konsola hiç yazılmadı — teşhis kayboldu").toHaveBeenCalled();
+            const printed = spy.mock.calls.flat().join(" ");
+            expect(printed, "parola ham hâlde loglandı").not.toContain("sUperGizli1");
+            expect(printed, "e-posta ham hâlde loglandı").not.toContain("ali@firma.com");
+            // Teşhis değeri korunmalı: sayaç ve genel şekil hâlâ görünür.
+            expect(printed).toContain("kayıt başarısız");
+        } finally {
+            spy.mockRestore();
+        }
+    });
+
     it("scheduleTelemetry istek kapsamı dışında patlamaz", () => {
         // `after()` istek kapsamı dışında fırlatır; helper bunu yutup görevi
         // yine de tetiklemeli.
