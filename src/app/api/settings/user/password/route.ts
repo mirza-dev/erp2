@@ -12,9 +12,9 @@ import { checkPasswordPolicy } from "@/lib/auth/password-policy";
 // 1. Session'dan kullanıcıyı al
 // 2. Cookie'siz fresh anon client ile signInWithPassword → mevcut şifre doğrulaması
 //    (Supabase updateUser({ password }) eski şifre sormuyor; çalınmış oturum riskine
-//    karşı manuel doğrulama. Doğrulama session'ı global state'e karışmasın diye
-//    paylaşılmayan ayrı client kullanıyoruz; signOut çağırmamıza gerek yok.)
-// 3. Mevcut session ile updateUser({ password: newPassword })
+//    karşı manuel doğrulama. Ayrı client: yanlış şifre çerez oturumuna dokunmasın.)
+// 3. Tarayıcı doğrulamanın TAZE oturumuna taşınır (setSession), parola O oturumla
+//    değişir — "Secure password change" 24 saatten eski oturumu reddeder (aşağıda).
 // 4. audit_log entry
 //
 // Brute-force koruması: Supabase GoTrue katmanı signInWithPassword için kendi
@@ -47,7 +47,8 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Yeni şifre mevcut şifreden farklı olmalı." }, { status: 400 });
         }
 
-        // Mevcut şifre doğrulama — paylaşılmayan, cookie'siz client (mevcut session etkilenmez)
+        // Mevcut şifre doğrulama — paylaşılmayan, cookie'siz client (yanlış şifre
+        // çerez oturumuna dokunmasın)
         const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
         const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
         if (!url || !anonKey) {
@@ -56,7 +57,7 @@ export async function POST(req: NextRequest) {
         const verifyClient = createSupabaseJsClient(url, anonKey, {
             auth: { persistSession: false, autoRefreshToken: false },
         });
-        const { error: signInError } = await verifyClient.auth.signInWithPassword({
+        const { data: verified, error: signInError } = await verifyClient.auth.signInWithPassword({
             email: user.email,
             password: currentPassword,
         });
@@ -64,7 +65,35 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Mevcut şifre hatalı." }, { status: 400 });
         }
 
-        // Şifreyi güncelle (mevcut session ile)
+        // Tarayıcıyı doğrulamanın TAZE oturumuna taşı, parolayı O oturumla değiştir.
+        //
+        // 2026-09-11: prod'da Supabase "Secure password change" AÇIK. GoTrue,
+        // oturumu 24 saatten eski olan bir `updateUser({ password })`ı
+        // `reauthentication_needed` ile reddeder — ve Ayarlar'a gelen kullanıcının
+        // çerez oturumu tipik olarak günlerce eskidir. Yerel GoTrue'da ölçüldü:
+        // 25 saatlik oturumla bu uç 500 "Password update requires
+        // reauthentication" dönüyordu. Mevcut şifre doğrulaması ZATEN yeniden
+        // kimlik doğrulamadır; ayarın istediği kanıt yukarıda alındı.
+        //
+        // SIRA önemli: GoTrue parolayı değiştiren oturumu yaşatır, kullanıcının
+        // ÖTEKİ oturumlarını kapatır (bu da ölçüldü). Değişikliği doğrulama
+        // istemcisi yapsaydı çerez oturumu kapanır, kullanıcı çıkış yapmış olurdu.
+        // Önce taşı (yeni çerezler yanıta yazılır), sonra değiştir. Taşıma
+        // başarısızsa parolaya DOKUNULMAZ.
+        const fresh = verified.session;
+        const moved = fresh
+            ? await supabase.auth.setSession({
+                access_token: fresh.access_token,
+                refresh_token: fresh.refresh_token,
+            })
+            : null;
+        if (!moved || moved.error) {
+            return NextResponse.json(
+                { error: "Oturum yenilenemedi; şifre değiştirilmedi. Lütfen tekrar deneyin." },
+                { status: 500 },
+            );
+        }
+
         const { error: updateError } = await supabase.auth.updateUser({ password: newPassword });
         if (updateError) {
             return NextResponse.json({ error: updateError.message }, { status: 500 });

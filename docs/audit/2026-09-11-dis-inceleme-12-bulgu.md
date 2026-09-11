@@ -53,7 +53,7 @@ panelinde yaşar ve repodan okunamaz. Raporun kendisi de "prod ayarlarının
 repodakiyle aynı olduğu varsayımına dayanıyor" diye hedge etmişti — varsayım
 yanlıştı. **Asıl iddia (dördüncü parola yüzeyi istemci-tek) delilden bağımsız
 olarak doğruydu** ve düzeltildi. Prod panelindeki iki ayar **kullanıcı-tarafı
-madde** olarak açıldı (§9).
+madde** olarak açıldı (§10) — **2026-09-11'de kullanıcı açtı.**
 
 **#12 — yorumun kendisi fazla iddialıydı.** `proxy.ts:369` *"Uzantısız her yol
 (tüm API route'ları ve sayfalar) artık middleware'den geçer"* diyordu. İki şey
@@ -272,7 +272,9 @@ gate dosyasına bölmek drift'in başladığı yerdir.
 - **Atomik yedek snapshot'ı** — REST üzerinden imkânsız; Pro planda PITR ya da
   `pg_dump` gerekir. Belge düzeltildi, **kullanıcı-tarafı madde** açıldı.
 - **Prod Supabase `password_min_length` / `secure_password_change`** — panel
-  ayarı, kodla ölçülemez. **Kullanıcı-tarafı madde.**
+  ayarı, kodla ölçülemez. **Kullanıcı-tarafı madde → ✅ 2026-09-11'de açıldı.**
+  Açılması Ayarlar'daki şifre değiştirmeyi kırıyordu (24 saatten eski çerez
+  oturumu) → düzeltildi: `docs/audit/2026-09-11-secure-password-change.md`.
 - **`originFromRequest` / `ORIGIN_HEADER` ölü** — tanımlı ama hiçbir yerde
   kullanılmıyor; istemci başlığı göndermiyor, hiçbir route yayına origin
   koymuyor. Yani "kendi değişikliğini ikinci kez çekme" optimizasyonu fiilen

@@ -10,11 +10,13 @@ import { NextRequest } from "next/server";
 
 const mockGetUser = vi.fn();
 const mockUpdateUser = vi.fn();
+const mockSetSession = vi.fn();
 vi.mock("@/lib/supabase/server", () => ({
     createClient: () => Promise.resolve({
         auth: {
             getUser: mockGetUser,
             updateUser: mockUpdateUser,
+            setSession: mockSetSession,
         },
     }),
 }));
@@ -27,6 +29,8 @@ vi.mock("@/lib/supabase/service", () => ({
 }));
 
 const mockSignInWithPassword = vi.fn();
+/** Mevcut-şifre doğrulamasının açtığı TAZE oturum (yalnız route'un taşıdığı iki alan). */
+const VERIFIED_SESSION = { access_token: "at-dogrulama", refresh_token: "rt-dogrulama" };
 vi.mock("@supabase/supabase-js", () => ({
     createClient: () => ({
         auth: { signInWithPassword: mockSignInWithPassword },
@@ -41,7 +45,8 @@ beforeEach(() => {
     process.env.NEXT_PUBLIC_SUPABASE_URL = "https://test.supabase.co";
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY = "test-anon-key";
     mockGetUser.mockResolvedValue({ data: { user: { id: "u-1", email: "user@example.com" } } });
-    mockSignInWithPassword.mockResolvedValue({ data: {}, error: null });
+    mockSignInWithPassword.mockResolvedValue({ data: { session: VERIFIED_SESSION }, error: null });
+    mockSetSession.mockResolvedValue({ data: {}, error: null });
     mockUpdateUser.mockResolvedValue({ data: {}, error: null });
     mockServiceInsert.mockResolvedValue({ error: null });
 });
@@ -122,5 +127,37 @@ describe("POST /api/settings/user/password", () => {
         expect(res.status).toBe(500);
         const body = await res.json();
         expect(body.error).toBe("Password too weak");
+    });
+
+    // 2026-09-11: prod'da "Secure password change" AÇIK. GoTrue, 24 saatten eski
+    // bir oturumla gelen `updateUser({ password })`ı `reauthentication_needed` ile
+    // reddeder — ve Ayarlar'a gelen kullanıcının çerez oturumu tipik olarak
+    // günlerce eskidir. Yerel GoTrue'da ÖLÇÜLDÜ: 25 saatlik oturumla bu uç 500
+    // "Password update requires reauthentication" dönüyordu. Mevcut-şifre
+    // doğrulaması ZATEN yeniden kimlik doğrulamadır; tarayıcı o taze oturuma
+    // taşınır, parola onunla değişir. SIRA önemli: GoTrue değişikliği YAPAN
+    // oturumu yaşatır, ötekileri kapatır — önce taşımazsak kullanıcı çıkış yapar.
+    it("secure password change: tarayıcı TAZE doğrulama oturumuna taşınır, parola O oturumla değişir", async () => {
+        const res = await POST(makeReq({ currentPassword: "currentpass", newPassword: "newpassword123" }));
+        expect(res.status).toBe(200);
+        expect(mockSetSession).toHaveBeenCalledWith(VERIFIED_SESSION);
+        expect(mockSetSession.mock.invocationCallOrder[0])
+            .toBeLessThan(mockUpdateUser.mock.invocationCallOrder[0]);
+    });
+
+    it("oturum taşınamazsa parola DEĞİŞMEZ", async () => {
+        mockSetSession.mockResolvedValue({ data: {}, error: { message: "Invalid Refresh Token" } });
+        const res = await POST(makeReq({ currentPassword: "currentpass", newPassword: "newpassword123" }));
+        expect(res.status).toBe(500);
+        expect(mockUpdateUser).not.toHaveBeenCalled();
+        expect(mockServiceInsert).not.toHaveBeenCalled();
+    });
+
+    it("doğrulama oturum döndürmezse parola DEĞİŞMEZ", async () => {
+        mockSignInWithPassword.mockResolvedValue({ data: { session: null }, error: null });
+        const res = await POST(makeReq({ currentPassword: "currentpass", newPassword: "newpassword123" }));
+        expect(res.status).toBe(500);
+        expect(mockSetSession).not.toHaveBeenCalled();
+        expect(mockUpdateUser).not.toHaveBeenCalled();
     });
 });

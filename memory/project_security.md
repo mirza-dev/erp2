@@ -260,7 +260,12 @@ istemci aynası korundu (anında geri bildirim).
 ⚠️ **İncelemenin DELİLİ yanlıştı:** kanıt olarak `supabase/config.toml`
 gösterilmişti — o dosya **yerel** `supabase start` config'i
 (`project_id="proje-codex"`, port 54321), prod ayarı değil. Prod Auth ayarları
-panelde yaşar ve repodan okunamaz → kullanıcı-tarafı madde.
+panelde yaşar ve repodan okunamaz → kullanıcı-tarafı madde → **2026-09-11'de
+kullanıcı açtı** (min 12 + Secure password change). Açılması Ayarlar şifre
+değişimini kırıyordu, düzeltildi ([[project_auth]]). **Kayıtlı sınır:** çalınmış
+oturum parolayı GoTrue'yu DOĞRUDAN çağırarak değiştirebilir — uygulamanın
+mevcut-şifre sorusu buna karşı koruma değil; gerçek sınır bu ayar (24 saatten
+eski oturum değiştiremez).
 
 **13. YÜZEYİ KAPI BULDU:** `/api/seed` altı gerçek auth hesabını
 `SEED_DEMO_PASSWORD`'dan hiçbir kontrol olmadan yaratıyordu. Politika oraya da

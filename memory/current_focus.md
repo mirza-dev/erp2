@@ -5,6 +5,46 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-09-11 (3) — "Secure password change" açıldı; Ayarlar'daki şifre değiştirme kırılıyordu
+
+Kullanıcı prod panelinde 12 bulgu turunun kullanıcı-tarafı maddesini kapattı
+(*"parola ayarlarını da yaptım"*): `password_min_length = 12` + **Secure
+password change**. Prod ayarı repodan okunamıyor (yönetim belirteci yok) →
+beyan esas; iş, ayarın KODLA etkileşimini ölçmekti.
+
+**Ayar, açıldığı an bir ekranı kırıyordu.** GoTrue 24 saatten eski oturumla
+gelen `updateUser({ password })`ı `reauthentication_needed` ile reddeder.
+`POST /api/settings/user/password` mevcut şifreyi ayrı çerezsiz istemcide
+doğruluyor, parolayı ise **çerez oturumuyla** değiştiriyordu — ve Ayarlar'a
+gelen kullanıcının çerez oturumu tipik olarak günlerce eski (oturum yenileme
+belirteciyle yaşar, `created_at` ilk girişte kalır). Yerel GoTrue'da ölçüldü
+(`auth.sessions.created_at` 25 saat geri): **500 + İngilizce "Password update
+requires reauthentication"**, kullanıcının ekranına.
+
+**Düzeltmenin biçimini ölçüm belirledi** (dört senaryolu probe): GoTrue
+parolayı değiştiren oturumu YAŞATIR, kullanıcının öteki oturumlarını KAPATIR;
+admin API hepsini kapatır. Yani değişikliği doğrulama istemcisi yapsaydı çerez
+oturumu kapanırdı (kullanıcı çıkar); admin API aynı; e-posta koduyla yeniden
+doğrulama ise Supabase SMTP'ye bağlı (saatte birkaç mail). Doğru yol: tarayıcıyı
+doğrulamanın TAZE oturumuna taşı (`setSession`), parolayı O oturumla değiştir.
+Sonra: 25 saatlik oturum **200**, yanıttaki çerezle profil 200, eski çerez 401.
+
+**Etkilenmeyenler:** kurtarma (oturumu kod takasında açılır → hep taze; 24
+saatten eski sekmede 400 ve mesajı doğru) · admin sıfırlama (admin API).
+
+**Yerel yığın prod'a hizalandı:** `config.toml` 12 + secure (restart ile
+etkin). Gevşek kalsaydı bu kusur yerelde hiç görülmezdi — 12 bulgu turundaki
+inceleme `config.toml`'u prod sanmıştı; artık ikisi aynı.
+
+**Güvenlik notu (kayıtlı):** çalınmış bir oturum parolayı GoTrue'nun `PUT
+/user` ucunu DOĞRUDAN çağırarak değiştirebilir (anon anahtar açık, belirteç
+tarayıcıda) — uygulamanın mevcut-şifre sorusu buna karşı koruma değil. Gerçek
+sınır bu ayar: 24 saatten eski oturum artık değiştiremez. Aynı sebeple
+`recovery-password`in oturum türüne bakmaması ek açık DEĞİL.
+
+3/3 kırmızı-kanıtlı · tsc 0 · lint 0 · 508 dosya / 7082 test · E2E 94/94 retries=0 · build 0 uyarı ·
+migration YOK. Rapor: `docs/audit/2026-09-11-secure-password-change.md`.
+
 ## 2026-09-11 (2) — Migrasyon durumu kesinleşti + 108'in kapsama boşluğu
 
 Kullanıcı canlı Supabase projesini uyandırdı (Free plan hareketsizlikten
