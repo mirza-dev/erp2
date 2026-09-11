@@ -79,6 +79,12 @@ const MANUAL: Record<string, string> = {
     "103": "award_rfq_create_pos bütünlük: SELECT prosrc LIKE '%fiyat vermedi%' FROM pg_proc WHERE proname='award_rfq_create_pos'; (O2 sunucu-otoriter fiyat + D2 mükerrer satır guard)",
     "104": "reverse_production REDEFINE — entry select satır kilidi: SELECT prosrc LIKE '%for update%' FROM pg_proc WHERE proname='reverse_production'; (O1 eşzamanlı çift-DELETE → stok 2× düşme fix)",
     "105": "recount_stock RPC var mı + FOR UPDATE: SELECT prosrc LIKE '%for update%' FROM pg_proc WHERE proname='recount_stock'; (D-O1 atomik stok sayımı — mutlak on_hand ataması)",
+    // 107/108 PROBES'ta DA var — kolonları OpenAPI'de görünür, ama ikisinin de
+    // CHECK/index parçası GÖRÜNMEZ. 2026-09-11'e kadar 108'in `payment_overdue`
+    // kısıtını hiçbir şey doğrulamıyordu: probe kolona bakıyor, vitest ise
+    // migration DOSYASININ metnini kilitliyor — ikisi de veritabanını görmez.
+    "107": "purchase_order_lines chk_pol_vat_rate + 2 Paraşüt index'i (107a/107b satırları): docs/audit/manual-migration-checks.sql",
+    "108": "alerts type CHECK 'payment_overdue' içeriyor + 'user_note' İÇERMİYOR (108a/108b satırları): docs/audit/manual-migration-checks.sql",
     // RLS ve yetki değişiklikleri OpenAPI'de GÖRÜNMEZ → tek doğrulama yolu elle SQL.
     "110": "5 DEFINER RPC'sinde anon/authenticated EXECUTE kapalı mı (hepsi false dönmeli): SELECT p.proname, has_function_privilege('anon', p.oid, 'EXECUTE') AS anon_exec, has_function_privilege('authenticated', p.oid, 'EXECUTE') AS auth_exec FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace WHERE n.nspname='public' AND p.proname IN ('purge_telemetry','record_error_occurrence','record_request_metrics','claim_notification_outbox','update_email_delivery_from_provider');",
     "017": "23 çekirdek tabloda RLS açık mı (hepsi true dönmeli): SELECT c.relname, c.relrowsecurity FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname IN ('customers','products','sales_orders','order_lines','quotes','audit_log','alerts','inventory_movements','production_entries','invoices','payments','shipments','bills_of_materials','stock_reservations','shortages','import_batches','import_drafts','ai_entity_aliases','ai_feedback','ai_recommendations','ai_runs','order_counters','integration_sync_logs');",
@@ -132,7 +138,10 @@ async function main() {
         const file = local.find((f) => f.startsWith(prefix));
         if (file) {
             manualFiles.push(file);
-            console.log(`  ⚠️  ${file} — otomatik probe yok, elle doğrula: ${hint}`);
+            // Bir migration HER İKİ haritada da olabilir (107/108): kolonu OpenAPI'de
+            // görünür ama CHECK/index parçası görünmez. Mesaj hangisi olduğunu söylemeli.
+            const alsoProbed = Boolean(PROBES[prefix]);
+            console.log(`  ⚠️  ${file} — ${alsoProbed ? "probe ✅ ama CHECK/index GÖRÜNMEZ" : "otomatik probe yok"}, elle doğrula: ${hint}`);
         }
     }
     // Hiçbir listede olmayan migration'lar: script bunları eskiden HİÇ anmıyor,

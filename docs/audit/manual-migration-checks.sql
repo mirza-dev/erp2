@@ -16,8 +16,17 @@
 -- Ham tanıma bakmak gerekirse dosyanın sonundaki yorumlu blok var.
 --
 -- SON KOŞUM: 2026-08-30 — canlı `erp2` projesinde 9/9 ✅ (089, 093, 094 ×2,
--- 095, 101, 102, 103, 104, 105). `check-migrations.ts` da 23/23 otomatik
--- probe'u yeşil raporluyor.
+-- 095, 101, 102, 103, 104, 105).
+--
+-- 2026-09-11 GÜNCELLEME: `check-migrations.ts` 23 değil **22** otomatik probe
+-- taşıyor (git geçmişi: 22 ekleme, 0 silme — hiçbir migration kapsamdan
+-- düşmemiş, sayı elle yanlış yazılmıştı). Aynı gün 107 + 108 canlıya
+-- uygulandı ve yapı tarafı YEREL VERİTABANINA KARŞI DIFF'LENEREK doğrulandı:
+-- 64 tablo · 837 kolon · 60 RPC · 6 bucket — fark SIFIR. 017/029 RLS satırları
+-- da anon anahtarıyla canlıda ölçüldü (64 tablo tarandı, 0 sızan; kırmızı-kanıt:
+-- aynı istek servis anahtarıyla 18 satır döndürüyor). Bu dosyadaki satırlar
+-- bunların HİÇBİRİNİN göremediği katmanı ölçer: fonksiyon GÖVDESİ, CHECK,
+-- index, grant.
 --
 -- 2026-08-30 EK: 110 (DEFINER grant) + 017/029 (tablo RLS) satırları eklendi.
 -- Üçü de canlıda GEÇMİŞ durumda olmalı; yeni migration DEĞİL, mevcut korumanın
@@ -28,20 +37,73 @@
 -- + `npm run preflight:auth` üçlüsü açılış hamlesidir.
 -- ────────────────────────────────────────────────────────────────────────────
 
+-- alerts type CHECK'i ÜÇ migration birlikte kuruyor (089 · 101 · 108).
+-- DİKKAT: bu dört satır AGGREGATE — kısıt HİÇ yoksa bile bir satır döner.
+-- Eski biçim (count'suz) kısıt tamamen düşmüş olsaydı sonuç kümesinden
+-- SESSİZCE kaybolurdu; ekranda bir satır eksilirdi, ❌ görünmezdi.
 select '089' as mig, 'alerts type CHECK → po_overdue' as kontrol,
-       case when pg_get_constraintdef(oid) like '%po_overdue%'
-            then '✅ VAR' else '❌ YOK — 089 uygulanmamış' end as sonuc
+       case when count(*) = 0 then '❌ alerts type CHECK''İ HİÇ YOK'
+            when bool_or(pg_get_constraintdef(oid) like '%po_overdue%') then '✅ VAR'
+            else '❌ YOK — 089 uygulanmamış' end as sonuc
   from pg_constraint
  where conrelid = 'alerts'::regclass and contype = 'c'
    and pg_get_constraintdef(oid) ilike '%stock_critical%'
 
 union all
 select '101', 'alerts type CHECK → rfq_response_due',
-       case when pg_get_constraintdef(oid) like '%rfq_response_due%'
-            then '✅ VAR' else '❌ YOK — 101 uygulanmamış' end
+       case when count(*) = 0 then '❌ alerts type CHECK''İ HİÇ YOK'
+            when bool_or(pg_get_constraintdef(oid) like '%rfq_response_due%') then '✅ VAR'
+            else '❌ YOK — 101 uygulanmamış' end
   from pg_constraint
  where conrelid = 'alerts'::regclass and contype = 'c'
    and pg_get_constraintdef(oid) ilike '%stock_critical%'
+
+-- 108'in CHECK parçası: 2026-09-11'e kadar HİÇBİR ŞEY doğrulamıyordu.
+-- `check-migrations.ts`in 108 probe'u yalnız sales_orders.parasut_payment_status
+-- KOLONUNA bakıyor; `parasut-payment-status.test.ts:214` ise migration
+-- DOSYASININ metnini kilitliyor — ikisi de veritabanını görmez. Kolonlar inip
+-- kısıt inmeseydi her iki kapı da yeşil derdi.
+union all
+select '108a', 'alerts type CHECK → payment_overdue',
+       case when count(*) = 0 then '❌ alerts type CHECK''İ HİÇ YOK'
+            when bool_or(pg_get_constraintdef(oid) like '%payment_overdue%') then '✅ VAR'
+            else '❌ YOK — 108''in CHECK parçası inmemiş' end
+  from pg_constraint
+ where conrelid = 'alerts'::regclass and contype = 'c'
+   and pg_get_constraintdef(oid) ilike '%stock_critical%'
+
+-- 092 kararı: takvim notları `calendar_notes` tablosuna taşındı, `user_note`
+-- uyarı tipi listeden BİLİNÇLİ düşürüldü. Bu sözleşme bugüne kadar yalnız
+-- 108'in YORUMUNDA yaşıyordu — yorumda yaşayan sözleşme fiilen yoktur.
+union all
+select '108b', 'alerts type CHECK → user_note GERİ GELMEMİŞ (092 kararı)',
+       case when count(*) = 0 then '❌ alerts type CHECK''İ HİÇ YOK'
+            when bool_or(pg_get_constraintdef(oid) like '%user_note%')
+                 then '❌ GERİ GELMİŞ — takvim notları calendar_notes''ta olmalı'
+            else '✅ YOK (doğru)' end
+  from pg_constraint
+ where conrelid = 'alerts'::regclass and contype = 'c'
+   and pg_get_constraintdef(oid) ilike '%stock_critical%'
+
+-- 107 de aynı körlükte: kolonları OpenAPI'de görünür (probe ✅ der) ama
+-- CHECK'i ve iki CRON index'i görünmez. Yarım uygulanmış bir 107'de alış
+-- faturası satır KDV'si sınırsız girilebilir, tahsilat pollu da tam tarama yapar.
+union all
+select '107a', 'purchase_order_lines → chk_pol_vat_rate (KDV 0..100)',
+       case when count(*) > 0 then '✅ VAR'
+            else '❌ YOK — 107''in CHECK parçası inmemiş' end
+  from pg_constraint
+ where conrelid = 'purchase_order_lines'::regclass and contype = 'c'
+   and conname = 'chk_pol_vat_rate'
+
+union all
+select '107b', 'Paraşüt CRON index''leri (retry + contact lease)',
+       case when count(*) = 2 then '✅ 2/2 VAR'
+            else '❌ ' || count(*)::text || '/2 — 107''in index parçası eksik' end
+  from pg_indexes
+ where schemaname = 'public'
+   and indexname in ('idx_po_parasut_retry',
+                     'idx_vendors_parasut_contact_creating_until')
 
 union all
 select '093', 'create_order_with_lines → v_line_total (finansal recompute)',
@@ -93,7 +155,7 @@ select '106', 'company_settings.quote_validity_days (teklif geçerlilik varsayı
                  where table_name = 'company_settings' and column_name = 'quote_validity_days')
             then '✅ VAR' else '❌ YOK — 106 uygulanmamış' end
 
--- 110/112: yetki ve RLS değişiklikleri. Hiçbiri OpenAPI'de görünmez →
+-- 110 + 017/029: yetki ve RLS değişiklikleri. Hiçbiri OpenAPI'de görünmez →
 -- `check-migrations.ts` bunları probe EDEMEZ, tek doğrulama yolu burası.
 union all
 select '110', 'DEFINER RPC''leri anon/authenticated''a KAPALI (5 fonksiyon)',

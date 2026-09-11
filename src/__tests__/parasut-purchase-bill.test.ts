@@ -255,6 +255,19 @@ describe("migration 107", () => {
         const gate = readFileSync("scripts/check-migrations.ts", "utf8");
         expect(gate).toContain('"107": { kind: "column", table: "purchase_orders", column: "parasut_bill_id" }');
     });
+
+    /** 108 ile aynı körlük: kolon probe'u CHECK'i ve index'leri göremez. */
+    it("CHECK + index parçaları canlı doğrulama listesine kayıtlı", () => {
+        const gate = readFileSync("scripts/check-migrations.ts", "utf8");
+        expect(gate).toMatch(/"107":\s*"purchase_order_lines chk_pol_vat_rate/);
+
+        const sql = readFileSync("docs/audit/manual-migration-checks.sql", "utf8");
+        expect(sql).toContain("'107a'");
+        expect(sql).toContain("'107b'");
+        expect(sql).toContain("chk_pol_vat_rate");
+        expect(sql).toContain("idx_po_parasut_retry");
+        expect(sql).toContain("idx_vendors_parasut_contact_creating_until");
+    });
 });
 
 describe("tedarikçi contact upsert", () => {

@@ -258,4 +258,37 @@ describe("migration 108", () => {
         const gate = readFileSync("scripts/check-migrations.ts", "utf8");
         expect(gate).toContain('"108": { kind: "column", table: "sales_orders", column: "parasut_payment_status" }');
     });
+
+    /**
+     * 2026-09-11: 108'in CHECK parçasını HİÇBİR ŞEY doğrulamıyordu.
+     * Yukarıdaki probe kolona bakar, `MIG` iddiası dosyanın METNİNE bakar —
+     * ikisi de veritabanını görmez. Kolonlar inip kısıt inmeseydi iki kapı da
+     * yeşil derdi. Canlıyı ölçen tek yer Studio sorgusu; o satırlar burada kilitli.
+     */
+    it("CHECK parçası canlı doğrulama listesine kayıtlı (probe kolonu göremez)", () => {
+        const gate = readFileSync("scripts/check-migrations.ts", "utf8");
+        expect(gate).toMatch(/"108":\s*"alerts type CHECK 'payment_overdue'/);
+
+        const sql = readFileSync("docs/audit/manual-migration-checks.sql", "utf8");
+        expect(sql).toContain("'108a'");
+        expect(sql).toContain("'108b'");
+        expect(sql).toContain("%payment_overdue%");
+        // 092 kararı: user_note listeye geri EKLENMEZ — yorumda değil sorguda.
+        expect(sql).toContain("%user_note%");
+    });
+
+    /** Kısıt TAMAMEN düşerse satır kaybolmamalı, ❌ demeli (boş küme denetimi). */
+    it("alerts CHECK satırları aggregate — kısıt yoksa sessizce kaybolmaz", () => {
+        // Yorumları SOY: dosyanın sonundaki "ham tanımlar" bloğu da
+        // `'alerts'::regclass` içeriyor ve ilk yazımda kuralı yanılttı
+        // (desen komşusuna tutundu). İddia YÜRÜYEN sorguya bağlanmalı.
+        const sql = readFileSync("docs/audit/manual-migration-checks.sql", "utf8")
+            .split("\n").filter((l) => !l.trimStart().startsWith("--")).join("\n");
+        const blocks = sql.split("union all").filter((b) => b.includes("'alerts'::regclass"));
+        expect(blocks).toHaveLength(4); // 089 (ilk select) · 101 · 108a · 108b
+        for (const block of blocks) {
+            expect(block).toContain("count(*) = 0");
+            expect(block).toContain("bool_or(");
+        }
+    });
 });
