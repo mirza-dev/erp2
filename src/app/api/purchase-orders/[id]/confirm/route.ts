@@ -3,6 +3,7 @@ import { dbGetPurchaseOrderById } from "@/lib/supabase/purchase-orders";
 import { serviceConfirmPO } from "@/lib/services/purchase-order-service";
 import { handleApiError } from "@/lib/api-error";
 import { requirePermission, getCurrentUserId } from "@/lib/auth/role-guard";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 import { revalidateTag } from "next/cache";
 
 // POST /api/purchase-orders/[id]/confirm — draft|sent → confirmed (B4 guards in RPC)
@@ -25,6 +26,7 @@ export async function POST(
         const result = await serviceConfirmPO(id, actor);
         revalidateTag("purchase-orders", "max");
         revalidateTag("products", "max");  // commitment seed → incoming/forecasted etkilenir
+        void broadcastDataChange(["purchase_orders", "products"]);
         return NextResponse.json(result);
     } catch (err) {
         if (err instanceof Error && (

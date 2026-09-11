@@ -14,6 +14,7 @@ import type { AlertType } from "@/lib/database.types";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { getCurrentUserPermissions, requirePermission } from "@/lib/auth/role-guard";
 import { redactProductsForPerms } from "@/lib/auth/redact";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 import { revalidateTag } from "next/cache";
 
 const PRODUCT_ALERT_TYPES: AlertType[] = [
@@ -78,6 +79,7 @@ export async function PATCH(
         if (validationErr) return NextResponse.json({ error: validationErr }, { status: 400 });
         const product = await dbUpdateProduct(id, body);
         revalidateTag("products", "max");
+        void broadcastDataChange(["products"]);
         // Ürün deaktif edildiyse ilgili aktif uyarıları ve önerileri kapat
         if (body.is_active === false) {
             await resolveProductAlerts(id, "product_deactivated");
@@ -107,6 +109,7 @@ export async function DELETE(
         await resolveProductAlerts(id, "product_deleted");
         await dbExpireEntityRecommendations(id, "product").catch(() => {});
         revalidateTag("products", "max");
+        void broadcastDataChange(["products"]);
         return NextResponse.json({ ok: true });
     } catch (err) {
         return handleApiError(err, "DELETE /api/products/[id]");

@@ -9,6 +9,7 @@ import { validateQuoteLineQuantities, validateQuoteLineNotes, validateDiscount, 
 import { serviceTransitionQuote } from "@/lib/services/quote-service";
 import { requirePermission, getCurrentUserPermissions, getCurrentUserId } from "@/lib/auth/role-guard";
 import { redactQuoteForPerms } from "@/lib/auth/redact";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 function getCachedQuote(id: string) {
     return unstable_cache(
@@ -116,6 +117,7 @@ export async function PATCH(
             const updated = await dbGetQuote(id);
             revalidateTag("quotes", "max");
             revalidateTag(`quote-${id}`, "max");
+            void broadcastDataChange(["quotes", "orders", "products"]);
             // Faz 4: send'te arşiv üretilemezse archiveWarning (UI warning toast).
             // 088: send'te bağlı bekleyen sipariş + rezervasyon sonucu (shortage/uyarı) taşınır.
             return NextResponse.json(
@@ -160,6 +162,7 @@ export async function PATCH(
         const row = await dbUpdateQuote(id, body as unknown as CreateQuoteInput);
         revalidateTag("quotes", "max");
         revalidateTag(`quote-${id}`, "max");
+        void broadcastDataChange(["quotes"]);
         return NextResponse.json(mapQuoteDetail(row));
     } catch (err) {
         return handleApiError(err, "PATCH /api/quotes/[id]");
@@ -189,6 +192,7 @@ export async function DELETE(
         await dbDeleteQuote(id, actor);
         revalidateTag("quotes", "max");
         revalidateTag(`quote-${id}`, "max");
+        void broadcastDataChange(["quotes"]);
         return NextResponse.json({ ok: true });
     } catch (err) {
         return handleApiError(err, "DELETE /api/quotes/[id]");

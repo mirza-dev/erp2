@@ -4,6 +4,7 @@ import { dbUpsertVendorQuote } from "@/lib/supabase/supplier-rfqs";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 import { validateVendorPrices, isValidRfqCurrency } from "@/lib/rfq-validation";
 import { resolveAuthContext, requirePermissionFor, actorFromAuthContext } from "@/lib/auth/role-guard";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 // PATCH /api/rfqs/[id]/vendors/[vendorId]/quote — bir tedarikçinin verdiği fiyatları kaydet.
 // [vendorId] = supplier_rfq_vendors.id (RFQ-vendor satırı), vendors.id DEĞİL.
@@ -43,6 +44,7 @@ export async function PATCH(
         );
 
         revalidateTag("rfqs", "max");
+        void broadcastDataChange(["rfqs"]);
         return NextResponse.json({ ok: true });
     } catch (err) {
         return handleApiError(err, "PATCH /api/rfqs/[id]/vendors/[vendorId]/quote");

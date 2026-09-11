@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireCronSecret } from "@/lib/auth/cron-guard";
 import { serviceCheckOverdueShipments } from "@/lib/services/alert-service";
 import { handleApiError } from "@/lib/api-error";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 export async function POST(req?: NextRequest) {
     // Denetim D4 (2026-06): route-içi CRON_SECRET (derinlemesine savunma —
@@ -14,6 +15,8 @@ export async function POST(req?: NextRequest) {
 
     try {
         const result = await serviceCheckOverdueShipments();
+        // Geciken sevkiyat taraması yalnız uyarı üretir.
+        void broadcastDataChange(["alerts"]);
         return NextResponse.json(result);
     } catch (err) {
         return handleApiError(err, "POST /api/orders/check-shipments");

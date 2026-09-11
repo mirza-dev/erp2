@@ -29,6 +29,7 @@ import {
 } from "@/lib/parasut-constants";
 import { handleApiError } from "@/lib/api-error";
 import { requirePermission } from "@/lib/auth/role-guard";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 export async function POST(
     _req: NextRequest,
@@ -99,6 +100,7 @@ export async function POST(
 
         await dbUpdateAlertStatus(id, "resolved", "sync-retry-from-alert");
 
+        void broadcastDataChange(["alerts"]);
         return NextResponse.json({ success: true, action });
     } catch (err) {
         return handleApiError(err, "POST /api/alerts/[id]/sync-retry");

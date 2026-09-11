@@ -6,6 +6,7 @@ import {
 } from "@/lib/supabase/product-attachments";
 import { requireRole } from "@/lib/auth/role-guard";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 import { revalidateTag } from "next/cache";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -45,6 +46,7 @@ export async function PATCH(
             }
             await dbSetPrimaryImage(id, attachmentId);
             revalidateTag("products", "max");
+            void broadcastDataChange(["products"]);
             return NextResponse.json({ ok: true });
         }
 
@@ -76,6 +78,7 @@ export async function DELETE(
 
         await dbDeleteAttachment(attachmentId);
         revalidateTag("products", "max");
+        void broadcastDataChange(["products"]);
         return new NextResponse(null, { status: 204 });
     } catch (err) {
         return handleApiError(err, "DELETE /api/products/[id]/attachments/[attachmentId]");

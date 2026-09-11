@@ -3,6 +3,7 @@ import { dbDeleteCustomer, dbUpdateCustomer } from "@/lib/supabase/customers";
 import { dbCountOrdersByCustomer } from "@/lib/supabase/orders";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 import { requirePermission, getCurrentUserId } from "@/lib/auth/role-guard";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 import { revalidateTag } from "next/cache";
 
 // PATCH /api/customers/[id]
@@ -43,6 +44,7 @@ export async function PATCH(
         // POST/DELETE paritesi: düzenleme de unstable_cache("customers", 30s)'i
         // tazelemeli — yoksa düzenlenen müşteri ≤30s bayat görünüyordu.
         revalidateTag("customers", "max");
+        void broadcastDataChange(["customers"]);
         return NextResponse.json(customer);
     } catch (err) {
         return handleApiError(err, "PATCH /api/customers/[id]");
@@ -69,6 +71,7 @@ export async function DELETE(
         const actor = await getCurrentUserId();
         await dbDeleteCustomer(id, actor);
         revalidateTag("customers", "max");
+        void broadcastDataChange(["customers"]);
         return NextResponse.json({ ok: true });
     } catch (err) {
         return handleApiError(err, "DELETE /api/customers/[id]");

@@ -3,6 +3,7 @@ import { requireCronSecret } from "@/lib/auth/cron-guard";
 import { revalidateTag } from "next/cache";
 import { serviceExpireQuotes } from "@/lib/services/quote-service";
 import { handleApiError } from "@/lib/api-error";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 // POST /api/quotes/expire
 // CRON: Süresi dolmuş teklifleri (draft/sent + valid_until < today) expired yapar.
@@ -22,6 +23,12 @@ export async function POST(req?: NextRequest) {
             for (const id of result.expiredIds) {
                 revalidateTag(`quote-${id}`, "max");
             }
+            // Yayın DÖNGÜNÜN DIŞINDA: koşum başına TEK sinyal. İçeride olsaydı
+            // 40 süresi dolmuş teklif 40 yayın üretirdi ve her istemci 40 kez
+            // yeniden çekerdi. `orders`+`products` de dahil: mig.088'den beri
+            // süresi dolan teklif bağlı bekleyen siparişi iptal eder ve
+            // rezervasyonu çözer.
+            void broadcastDataChange(["quotes", "orders", "products", "alerts"]);
         }
         return NextResponse.json(result);
     } catch (err) {

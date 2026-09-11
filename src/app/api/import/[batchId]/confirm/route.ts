@@ -3,6 +3,7 @@ import { getCurrentUserId, getCurrentUserPermissions, requirePermission } from "
 import { serviceConfirmBatch } from "@/lib/services/import-service";
 import { revalidateTag } from "next/cache";
 import { handleApiError } from "@/lib/api-error";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 // POST /api/import/[batchId]/confirm
 // Tüm confirmed/pending draftları gerçek entity'lere merge eder (domain-rules §9.2)
@@ -28,6 +29,7 @@ export async function POST(
         ]);
         const result = await serviceConfirmBatch(batchId, { actorUserId, permissions, overwrite });
         revalidateTag("products", "max");
+        void broadcastDataChange(["products", "customers", "vendors"]);
         return NextResponse.json(result);
     } catch (err) {
         return handleApiError(err, "POST /api/import/[batchId]/confirm", {

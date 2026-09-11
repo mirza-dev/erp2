@@ -7,6 +7,7 @@ import {
 } from "@/lib/supabase/purchase-commitments";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { requirePermission } from "@/lib/auth/role-guard";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 import { revalidateTag } from "next/cache";
 
 // GET /api/purchase-commitments/[id]
@@ -52,12 +53,14 @@ export async function PATCH(
         if (action === "receive") {
             await dbReceiveCommitment(id);
             revalidateTag("products", "max");
+            void broadcastDataChange(["products"]);
             return NextResponse.json({ success: true });
         }
 
         if (action === "cancel") {
             await dbCancelCommitment(id);
             revalidateTag("products", "max");
+            void broadcastDataChange(["products"]);
             return NextResponse.json({ success: true });
         }
 

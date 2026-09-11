@@ -16,6 +16,7 @@ import {
 } from "@/lib/services/import-apply-service";
 import { resolveAuthContext, requireRoleFor } from "@/lib/auth/role-guard";
 import { handleApiError } from "@/lib/api-error";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 export const dynamic = "force-dynamic";
 
@@ -62,6 +63,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
         const result = await serviceApplyImportDocument(id, auth.userId, options);
 
         revalidateTag("products", "max");
+        void broadcastDataChange(["products", "customers", "vendors"]);
         return NextResponse.json({ ok: true, result }, { status: 200 });
     } catch (err) {
         if (err instanceof Error) {

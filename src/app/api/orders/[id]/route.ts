@@ -19,6 +19,7 @@ import {
     resolveAuthContext,
 } from "@/lib/auth/role-guard";
 import { redactOrderForPerms } from "@/lib/auth/redact";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 import { revalidateTag } from "next/cache";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -82,6 +83,7 @@ export async function PATCH(
                 return NextResponse.json({ error: linked.error }, { status: 400 });
             }
             revalidateTag("customers", "max");
+            void broadcastDataChange(["orders", "customers"]);
             const relinked = await serviceGetOrder(id);
             return NextResponse.json(
                 relinked ? redactOrderForPerms(relinked, linkAuth.perms) : { ok: true },
@@ -130,6 +132,7 @@ export async function PATCH(
         const updated = await serviceGetOrder(id);
 
         revalidateTag("products", "max");
+        void broadcastDataChange(["orders", "products"]);
         // RBAC R3/F3b: production (ship_sales_orders var, view_sales_prices yok)
         // PATCH ship response'unda satış finansallarını GÖRMESİN (per-request).
         const response: Record<string, unknown> = updated ? { ...redactOrderForPerms(updated, auth.perms) } : {};
@@ -174,6 +177,7 @@ export async function PUT(
         }
 
         revalidateTag("products", "max");
+        void broadcastDataChange(["orders", "products"]);
         const updated = await serviceGetOrder(id);
         const perms = await getCurrentUserPermissions(req);
         return NextResponse.json(updated ? redactOrderForPerms(updated, perms) : { ok: true });
@@ -200,6 +204,7 @@ export async function DELETE(
                 return NextResponse.json({ error: result.error }, { status: 400 });
             }
             revalidateTag("products", "max");
+            void broadcastDataChange(["orders", "products"]);
             return NextResponse.json({ ok: true });
         } catch (err) {
             return handleApiError(err, "DELETE /api/orders/[id]");
@@ -221,6 +226,7 @@ export async function DELETE(
         const actor = await getCurrentUserId();
         await dbHardDeleteOrder(id, actor);
         revalidateTag("products", "max");
+        void broadcastDataChange(["orders", "products"]);
         return NextResponse.json({ success: true });
     } catch (err) {
         return handleApiError(err, "DELETE /api/orders/[id]?permanent=1");

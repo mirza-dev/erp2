@@ -3,6 +3,7 @@ import { dbGetPurchaseOrderById } from "@/lib/supabase/purchase-orders";
 import { serviceSendPO } from "@/lib/services/purchase-order-service";
 import { handleApiError } from "@/lib/api-error";
 import { requirePermission, getCurrentUserId } from "@/lib/auth/role-guard";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 import { revalidateTag } from "next/cache";
 
 // POST /api/purchase-orders/[id]/send — draft → sent
@@ -24,6 +25,7 @@ export async function POST(
 
         const result = await serviceSendPO(id, actor);
         revalidateTag("purchase-orders", "max");
+        void broadcastDataChange(["purchase_orders"]);
         return NextResponse.json(result);
     } catch (err) {
         if (err instanceof Error && err.message.includes("Geçersiz durum geçişi")) {

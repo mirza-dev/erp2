@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { serviceRunAlertScan } from "@/lib/services/alert-scan-runner";
 import { createClient } from "@/lib/supabase/server";
 import { handleApiError } from "@/lib/api-error";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 // POST /api/alerts/scan — scans all products and creates/resolves stock alerts
 // Auth: CRON_SECRET Bearer token (Vercel Cron) OR authenticated session (UI "Tara" butonu)
@@ -39,6 +40,8 @@ export async function POST(request: Request) {
                 { status: 409 }
             );
         }
+        // Tarama uyarı açar/kapatır; ürün satırlarına dokunmaz.
+        void broadcastDataChange(["alerts"]);
         return NextResponse.json(result);
     } catch (err) {
         return handleApiError(err, "POST /api/alerts/scan", { clientMessage: "Tarama başarısız." });

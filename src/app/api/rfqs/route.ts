@@ -5,6 +5,7 @@ import type { SupplierRfqStatus } from "@/lib/database.types";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 import { isValidRfqCurrency, validateRfqLines, validateRfqVendorIds } from "@/lib/rfq-validation";
 import { resolveAuthContext, requirePermissionFor, actorFromAuthContext } from "@/lib/auth/role-guard";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 // GET /api/rfqs?status=...&search=...
 export async function GET(req: NextRequest) {
@@ -63,6 +64,7 @@ export async function POST(req: NextRequest) {
         });
 
         revalidateTag("rfqs", "max");
+        void broadcastDataChange(["rfqs"]);
         return NextResponse.json(result, { status: 201 });
     } catch (err) {
         return handleApiError(err, "POST /api/rfqs");

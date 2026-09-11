@@ -7,6 +7,7 @@ import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-
 import { validateQuoteLineQuantities, validateQuoteLineNotes, validateDiscount, type QuoteLineForValidation } from "@/lib/quote-validation";
 import { requirePermission, getCurrentUserPermissions } from "@/lib/auth/role-guard";
 import { redactQuotesForPerms } from "@/lib/auth/redact";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 const getCachedQuotes = unstable_cache(
     async (status?: string) => {
@@ -69,6 +70,7 @@ export async function POST(req: NextRequest) {
 
         const row = await dbCreateQuote(body);
         revalidateTag("quotes", "max");
+        void broadcastDataChange(["quotes"]);
         return NextResponse.json(mapQuoteDetail(row), { status: 201 });
     } catch (err) {
         return handleApiError(err, "POST /api/quotes");

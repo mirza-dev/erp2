@@ -4,6 +4,7 @@ import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { validateStringLengths } from "@/lib/validation/string-lengths";
 import { requirePermission, getCurrentUserPermissions, getCurrentUserId } from "@/lib/auth/role-guard";
 import { redactPurchaseOrdersForPerms } from "@/lib/auth/redact";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 import { revalidateTag } from "next/cache";
 
 // GET /api/purchase-orders?status=...&vendor_id=...
@@ -66,6 +67,7 @@ export async function POST(req: NextRequest) {
         });
 
         revalidateTag("purchase-orders", "max");
+        void broadcastDataChange(["purchase_orders"]);
         return NextResponse.json(result, { status: 201 });
     } catch (err) {
         if (err instanceof Error && (

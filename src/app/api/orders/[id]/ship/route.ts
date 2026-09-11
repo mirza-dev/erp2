@@ -10,6 +10,7 @@ import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { dbBatchResolveAlerts } from "@/lib/supabase/alerts";
 import { actorFromAuthContext, requirePermissionFor, resolveAuthContext } from "@/lib/auth/role-guard";
 import { redactOrderForPerms } from "@/lib/auth/redact";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
 const MAX_FIELD_LEN = 100;
@@ -94,6 +95,7 @@ export async function POST(
         const updated = await serviceGetOrder(id);
 
         revalidateTag("products", "max");
+        void broadcastDataChange(["orders", "products"]);
         // RBAC R3/F3a: ship_sales_orders tutan production view_sales_prices tutmaz
         // → ship response'undaki satış finansalları redakte edilir (per-request).
         const responseBody = updated ? redactOrderForPerms(updated, auth.perms) : { ok: true };

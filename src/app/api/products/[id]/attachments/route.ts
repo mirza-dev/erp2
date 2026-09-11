@@ -13,6 +13,7 @@ import { handleApiError } from "@/lib/api-error";
 import { mapProductAttachment } from "@/lib/api-mappers";
 import { revalidateTag } from "next/cache";
 import type { ProductAttachmentKind } from "@/lib/database.types";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const SIGNED_URL_TTL = 3600;
@@ -130,6 +131,7 @@ export async function POST(
         });
 
         revalidateTag("products", "max");
+        void broadcastDataChange(["products"]);
         return NextResponse.json(row, { status: 201 });
     } catch (err) {
         if (err instanceof Error && (

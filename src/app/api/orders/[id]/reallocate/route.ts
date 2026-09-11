@@ -4,6 +4,7 @@ import { serviceReallocateOrder, serviceGetOrder } from "@/lib/services/order-se
 import { handleApiError } from "@/lib/api-error";
 import { resolveAuthContext, requirePermissionFor } from "@/lib/auth/role-guard";
 import { redactOrderForPerms } from "@/lib/auth/redact";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 // POST /api/orders/[id]/reallocate
 // Onaylı + (partially_)allocated bir siparişin açık shortage'larını mevcut stoktan
@@ -22,6 +23,7 @@ export async function POST(
         const result = await serviceReallocateOrder(id);
 
         revalidateTag("products", "max");
+        void broadcastDataChange(["orders", "products"]);
 
         const updated = await serviceGetOrder(id);
         const order = updated ? redactOrderForPerms(updated, ctx.perms) : null;

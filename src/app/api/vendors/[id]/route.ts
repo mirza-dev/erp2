@@ -6,6 +6,7 @@ import {
 } from "@/lib/supabase/vendors";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 import { getCurrentUserId, requirePermission } from "@/lib/auth/role-guard";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 import { revalidateTag } from "next/cache";
 
 // GET /api/vendors/[id]
@@ -66,6 +67,7 @@ export async function PATCH(
         }, await getCurrentUserId());
 
         revalidateTag("vendors", "max");
+        void broadcastDataChange(["vendors"]);
         return NextResponse.json(updated);
     } catch (err) {
         if (err instanceof Error && (
@@ -98,6 +100,7 @@ export async function DELETE(
         // delete'lerle tutarlı; vendor soft-delete bilinçli — PO FK koruması).
         await dbDeactivateVendor(id, await getCurrentUserId());
         revalidateTag("vendors", "max");
+        void broadcastDataChange(["vendors"]);
         return NextResponse.json({ success: true });
     } catch (err) {
         if (err instanceof Error && err.message.includes("aktif PO")) {

@@ -3,6 +3,7 @@ import { revalidateTag } from "next/cache";
 import { serviceSendRfq } from "@/lib/services/rfq-service";
 import { handleApiError } from "@/lib/api-error";
 import { resolveAuthContext, requirePermissionFor, actorFromAuthContext } from "@/lib/auth/role-guard";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 // POST /api/rfqs/[id]/send — draft → sent; tedarikçilere PDF arşiv + e-posta.
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -15,6 +16,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         const result = await serviceSendRfq(id, actorFromAuthContext(ctx).label ?? "system");
 
         revalidateTag("rfqs", "max");
+        void broadcastDataChange(["rfqs"]);
         return NextResponse.json(result);
     } catch (err) {
         if (err instanceof Error && err.message.includes("gönderilemez")) {

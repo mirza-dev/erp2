@@ -3,6 +3,7 @@ import { revalidateTag } from "next/cache";
 import { serviceCreateQuoteRevision } from "@/lib/services/quote-service";
 import { handleApiError } from "@/lib/api-error";
 import { requirePermission } from "@/lib/auth/role-guard";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 // POST /api/quotes/[id]/revise
 // Faz 5: sent/rejected/expired teklifin düzenlenebilir kopyasını (revizyon) yaratır;
@@ -28,6 +29,7 @@ export async function POST(
 
         revalidateTag("quotes", "max");
         revalidateTag(`quote-${id}`, "max");
+        void broadcastDataChange(["quotes"]);
 
         return NextResponse.json({
             newQuoteId: result.newQuoteId,

@@ -3,6 +3,7 @@ import { dbGetPurchaseOrderById, dbReplacePurchaseOrderLines, validatePoLines } 
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { validateStringLengths } from "@/lib/validation/string-lengths";
 import { requirePermission, getCurrentUserId } from "@/lib/auth/role-guard";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 import { revalidateTag } from "next/cache";
 
 // PUT /api/purchase-orders/[id]/lines — atomik replace (B3)
@@ -47,6 +48,7 @@ export async function PUT(
         );
 
         revalidateTag("purchase-orders", "max");
+        void broadcastDataChange(["purchase_orders", "products"]);
         const updated = await dbGetPurchaseOrderById(id);
         return NextResponse.json(updated);
     } catch (err) {

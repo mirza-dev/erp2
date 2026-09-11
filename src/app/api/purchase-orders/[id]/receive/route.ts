@@ -3,6 +3,7 @@ import { dbGetPurchaseOrderById } from "@/lib/supabase/purchase-orders";
 import { serviceReceivePOLines } from "@/lib/services/purchase-order-service";
 import { requireRole, getCurrentUserId } from "@/lib/auth/role-guard";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 import { revalidateTag } from "next/cache";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -92,6 +93,7 @@ export async function POST(
 
         revalidateTag("purchase-orders", "max");
         revalidateTag("products", "max");  // on_hand artar → stok hesapları etkilenir
+        void broadcastDataChange(["purchase_orders", "products", "alerts"]);
 
         return NextResponse.json(result);
     } catch (err) {

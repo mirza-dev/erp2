@@ -9,6 +9,7 @@ import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { validateStringLengths } from "@/lib/validation/string-lengths";
 import { requirePermission, getCurrentUserPermissions } from "@/lib/auth/role-guard";
 import { redactPurchaseOrderForPerms } from "@/lib/auth/redact";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 import { revalidateTag } from "next/cache";
 
 // GET /api/purchase-orders/[id]
@@ -93,6 +94,7 @@ export async function PATCH(
                 vendor_invoice_date: typeof rawDate === "string" ? (rawDate || null) : rawDate as null | undefined,
             });
             revalidateTag("purchase-orders", "max");
+            void broadcastDataChange(["purchase_orders"]);
             const refreshed = await dbGetPurchaseOrderById(id);
             return NextResponse.json(refreshed ?? { ok: true });
         }
@@ -121,6 +123,7 @@ export async function PATCH(
         });
 
         revalidateTag("purchase-orders", "max");
+        void broadcastDataChange(["purchase_orders"]);
         return NextResponse.json(updated);
     } catch (err) {
         return handleApiError(err, "PATCH /api/purchase-orders/[id]");

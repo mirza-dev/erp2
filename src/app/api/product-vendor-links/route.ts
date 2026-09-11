@@ -5,6 +5,7 @@ import { getCurrentUserId } from "@/lib/auth/role-guard";
 import { revalidateTag } from "next/cache";
 import { resolveAuthContext, requirePermissionFor } from "@/lib/auth/role-guard";
 import { redactVendorLinksForPerms } from "@/lib/auth/redact";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 // GET /api/product-vendor-links?vendor_id=<uuid>   (PO formu: tedarikçi son fiyatları)
 //   veya ?product_ids=a,b,c                          (RFQ formu: ürünleri tedarik edenler)
@@ -100,6 +101,7 @@ export async function POST(req: NextRequest) {
         });
 
         revalidateTag("products", "max");
+        void broadcastDataChange(["products", "vendors"]);
         return NextResponse.json(link, { status: 201 });
     } catch (err) {
         return handleApiError(err, "POST /api/product-vendor-links");

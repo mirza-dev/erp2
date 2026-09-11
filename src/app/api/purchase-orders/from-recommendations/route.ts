@@ -7,6 +7,7 @@ import {
 } from "@/lib/services/purchase-order-service";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { validateStringLengths } from "@/lib/validation/string-lengths";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const CURRENCY_WHITELIST = new Set(["TRY", "USD", "EUR"]);
@@ -94,6 +95,7 @@ export async function POST(req: NextRequest) {
 
         revalidateTag("purchase-orders", "max");
         revalidateTag("products", "max");
+        void broadcastDataChange(["purchase_orders"]);
         return NextResponse.json(result, { status: 201 });
     } catch (err) {
         if (err instanceof Error && (

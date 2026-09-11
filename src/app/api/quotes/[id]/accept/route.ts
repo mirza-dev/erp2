@@ -3,6 +3,7 @@ import { revalidateTag } from "next/cache";
 import { resolveAuthContext, requirePermissionFor } from "@/lib/auth/role-guard";
 import { serviceAcceptQuoteToOrder } from "@/lib/services/quote-service";
 import { handleApiError } from "@/lib/api-error";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 // POST /api/quotes/[id]/accept
 // Faz 6 (V5-A4 / V4-A8): kabul + taslak sipariş TEK atomik işlem (RPC 077).
@@ -40,6 +41,7 @@ export async function POST(
         revalidateTag(`quote-${id}`, "max");
         revalidateTag("orders", "max");
         revalidateTag("products", "max");
+        void broadcastDataChange(["quotes", "orders", "products"]);
 
         return NextResponse.json({
             orderId: result.orderId,

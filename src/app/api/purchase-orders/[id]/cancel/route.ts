@@ -3,6 +3,7 @@ import { dbGetPurchaseOrderById } from "@/lib/supabase/purchase-orders";
 import { serviceCancelPO } from "@/lib/services/purchase-order-service";
 import { requireRole, getCurrentUserId } from "@/lib/auth/role-guard";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 import { revalidateTag } from "next/cache";
 
 // POST /api/purchase-orders/[id]/cancel — admin only (B7)
@@ -40,6 +41,7 @@ export async function POST(
         const result = await serviceCancelPO(id, reason, actor);
         revalidateTag("purchase-orders", "max");
         revalidateTag("products", "max");  // pending commitment cancel → incoming etkilenir
+        void broadcastDataChange(["purchase_orders", "products"]);
         return NextResponse.json(result);
     } catch (err) {
         if (err instanceof Error && err.message.includes("iptal edilemez")) {

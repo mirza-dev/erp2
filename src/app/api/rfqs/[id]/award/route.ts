@@ -4,6 +4,7 @@ import { dbAwardRfq } from "@/lib/supabase/supplier-rfqs";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { validateRfqAwards } from "@/lib/rfq-validation";
 import { resolveAuthContext, requirePermissionFor, actorFromAuthContext } from "@/lib/auth/role-guard";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 // POST /api/rfqs/[id]/award — kazanan kalemleri PO('lara) çevir.
 // Hem RFQ yönetimi hem PO oluşturma yetkisi gerekir (PO doğurur).
@@ -31,6 +32,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
         revalidateTag("rfqs", "max");
         revalidateTag("purchase-orders", "max");
+        void broadcastDataChange(["rfqs", "purchase_orders"]);
         return NextResponse.json({ pos }, { status: 201 });
     } catch (err) {
         if (err instanceof Error && (

@@ -3,6 +3,7 @@ import { serviceGenerateAiAlerts } from "@/lib/services/alert-service";
 import { handleApiError } from "@/lib/api-error";
 import { createServiceClient } from "@/lib/supabase/service";
 import { resolveAuthContext, requirePermissionFor } from "@/lib/auth/role-guard";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 /**
  * POST /api/alerts/ai-suggest
@@ -49,6 +50,7 @@ export async function POST(req?: NextRequest) {
 
     try {
         const result = await serviceGenerateAiAlerts();
+        void broadcastDataChange(["alerts"]);
         return NextResponse.json(result);
     } catch (err) {
         return handleApiError(err, "AI öneri oluşturulamadı.");

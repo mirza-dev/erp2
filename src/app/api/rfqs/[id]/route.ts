@@ -5,6 +5,7 @@ import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-
 import { isValidRfqCurrency, validateRfqLines, validateRfqVendorIds } from "@/lib/rfq-validation";
 import { resolveAuthContext, requirePermissionFor, actorFromAuthContext } from "@/lib/auth/role-guard";
 import { redactRfqDetailForPerms } from "@/lib/auth/redact";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 // GET /api/rfqs/[id]
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -58,6 +59,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         );
 
         revalidateTag("rfqs", "max");
+        void broadcastDataChange(["rfqs"]);
         return NextResponse.json({ ok: true });
     } catch (err) {
         if (err instanceof Error && err.message.includes("yalnız draft")) {
@@ -77,6 +79,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
         const { id } = await params;
         await dbDeleteRfq(id);
         revalidateTag("rfqs", "max");
+        void broadcastDataChange(["rfqs"]);
         return NextResponse.json({ ok: true });
     } catch (err) {
         if (err instanceof Error && err.message.includes("Yalnız taslak")) {

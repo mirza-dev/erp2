@@ -3,6 +3,7 @@ import { serviceGetAlert, serviceUpdateAlertStatus } from "@/lib/services/alert-
 import { safeParseJson, handleApiError } from "@/lib/api-error";
 import { requirePermission } from "@/lib/auth/role-guard";
 import type { AlertStatus } from "@/lib/database.types";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 // GET /api/alerts/[id]
 export async function GET(
@@ -51,6 +52,7 @@ export async function PATCH(
         }
 
         const updated = await serviceGetAlert(id);
+        void broadcastDataChange(["alerts"]);
         return NextResponse.json(updated);
     } catch (err) {
         return handleApiError(err, "PATCH /api/alerts/[id]", { clientMessage: "Alert güncellenemedi." });

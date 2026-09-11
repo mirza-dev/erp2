@@ -3,6 +3,7 @@ import { revalidateTag } from "next/cache";
 import { dbCancelRfq } from "@/lib/supabase/supplier-rfqs";
 import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { resolveAuthContext, requirePermissionFor, actorFromAuthContext } from "@/lib/auth/role-guard";
+import { broadcastDataChange } from "@/lib/realtime/broadcast";
 
 // POST /api/rfqs/[id]/cancel
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -18,6 +19,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         await dbCancelRfq(id, reason, actorFromAuthContext(ctx).label ?? "system");
 
         revalidateTag("rfqs", "max");
+        void broadcastDataChange(["rfqs"]);
         return NextResponse.json({ ok: true });
     } catch (err) {
         if (err instanceof Error && err.message.includes("iptal edilemez")) {
