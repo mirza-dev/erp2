@@ -15,8 +15,13 @@
 -- cazip ama SQL editörü uzun metni kırpıyor → hüküm okunamıyordu (2026-08-24).
 -- Ham tanıma bakmak gerekirse dosyanın sonundaki yorumlu blok var.
 --
--- SON KOŞUM: 2026-08-30 — canlı `erp2` projesinde 9/9 ✅ (089, 093, 094 ×2,
--- 095, 101, 102, 103, 104, 105).
+-- SON KOŞUM: 2026-09-11 — canlı `erp2` projesinde 19/19 GEÇTİ. İki çalıştırmada
+-- okundu: dosyanın bir önceki sürümüyle 15 satır (017 · 029 · 089 · 093 ·
+-- 094 ×2 · 095 ×2 · 101 · 102 · 103 · 104 · 105 · 106 · 110) + yeni dört satır
+-- ayrı sorgu olarak (107a · 107b · 108a · 108b). 095'in iki satırı ✅ yerine
+-- search_path değerini basar — `public, pg_catalog` = geçti. 017/029 RLS
+-- satırları 2026-08-30'da eklendiğinden beri İLK KEZ okundu.
+-- Önceki koşum: 2026-08-30 — 9/9 ✅ (089, 093, 094 ×2, 095, 101, 102, 103, 104, 105).
 --
 -- 2026-09-11 GÜNCELLEME: `check-migrations.ts` 23 değil **22** otomatik probe
 -- taşıyor (git geçmişi: 22 ekleme, 0 silme — hiçbir migration kapsamdan

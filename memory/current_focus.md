@@ -76,6 +76,21 @@ profil değiştiren herkes e-postayı sessizce öldürüyordu
 profile `NEXT_PUBLIC_APP_URL=https://erp.getmedspace.com` ve göndericinin
 Resend **sandbox** adresi olduğu uyarısı yazıldı.
 
+### Studio sonucu: 19/19 geçti
+
+Kullanıcı `manual-migration-checks.sql`i canlıda koştu. **İlk çalıştırma 15
+satır döndü, 19 değil** — dört yeni satır `proje-codex`te commit'sizdi,
+kullanıcı dosyayı `erp2`den açmıştı. İki-kopya dersinin (2026-09-10 bellek
+kayması) kod tarafındaki canlı örneği: **commit'lenmemiş bir değişiklik,
+ikinci kopyada yoktur.** Eksik dört satır ayrı sorgu olarak verildi (önce
+yerelde koşturuldu) → **dördü de ✅**. Toplam **19/19** (095'in iki satırı ✅
+yerine `search_path` değerini basar — `public, pg_catalog` = geçti).
+017/029 RLS satırları 2026-08-30'da eklendiğinden beri **ilk kez** okundu.
+
+**111 migration'ın her katmanı canlıda doğrulandı: yapı (diff) · RLS (anon
+probe) · fonksiyon gövdesi / CHECK / index / grant (Studio). Açık migration
+işi YOK.**
+
 **6/6 kırmızı-kanıtlı · tsc 0 · lint 0 · 508 dosya / 7079 test · migration YOK.**
 
 ---
