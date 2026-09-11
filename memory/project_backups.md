@@ -81,3 +81,33 @@ kaymış. Sebep: bu yollarda INSERT değil UPDATE yapılıyor (tohum satırları
 
 Kapı: `backup-script.test.ts` 6 → 10 test, **5/5 kırmızı kanıtlı**.
 
+## 2026-09-11 — Yedek DOĞRULANIYOR (dış inceleme #3 · #8)
+
+**#3 — geri yükleme manifest özetlerini HİÇ okumuyordu.** `backup.ts`
+2026-08-30'dan beri her tablo için SHA-256 yazıyor; `restore.ts` alanı tipinde
+tanıyor ama hiç karşılaştırmıyordu. Tek kontrol, işlem BİTTİKTEN sonraki satır
+sayısıydı → bozulmuş bir yedek, satır sayısı tuttuğu sürece "başarılı" geri
+yüklenebiliyordu. **En sessiz nokta:** manifestte olup diskte olmayan dosya
+`ndjson()` tarafından `[]` dönüyor, yani **boş tablo** sayılıyordu — felaket
+anında o tablonun verisi "silinmiş" görünür ve hiçbir hata üretilmezdi.
+
+YENİ `verifyBackup()`: hedefe **tek bayt yazılmadan önce**, tümü-ya-hiç, kuru
+çalışmada da koşar. Storage tarafında özet hiç yoktu → `backup.ts` artık obje
+başına üretiyor; 2026-09-11 öncesi yedekler reddedilmez ama "bütünlük
+DOĞRULANMADI" diye rapor edilir.
+
+Sentetik yedekle 5 senaryo ölçüldü: sağlam ✓ · tek bayt bozuldu ❌ · dosya
+silindi ❌ ("1 satır kaybı") · storage objesi bozuldu ❌ · eski yedek → kabul +
+uyarı.
+
+**#8 — belge yanıltıcıydı, kod değil.** REST üzerinden atomik snapshot MÜMKÜN
+DEĞİL. `docs/backup-restore.md` *"arada yazma olursa satır sayısı kontrolü
+bunu hata olarak bildirir"* diyordu; artık neyin yakalandığını **ve neyin
+yakalanmadığını** sayıyor: ❌ UPDATE'ler · ❌ eşit sayıda DELETE+INSERT ·
+❌ tablolar arası FK tutarsızlığı. **"0 hata" = "sayıyı değiştiren yazma
+görmedim", "tutarlı bir an yakaladım" DEĞİL.** Gerçek çözüm Pro planda PITR ya
+da `pg_dump` → kullanıcı-tarafı madde.
+
+Kapı: `backup-script` 10 → 16 test; yalnız "doğrulama var mı" demiyor, SIRAYI
+(`verifyBackup` ilk yazmadan ÖNCE) ve iki tarafın AYNI özet gövdesini
+kullandığını da kilitliyor.

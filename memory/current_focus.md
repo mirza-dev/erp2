@@ -5,6 +5,101 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-09-11 — Dış inceleme raporu: 12 bulgu doğrulandı ve kapatıldı
+
+Kullanıcı dışarıdan bir kod-inceleme raporu paylaşıp tek kelime yazdı:
+**"incele"**. Rapor 69 commit / ~525 dosya taramış, 12 bulgu çıkarmış, kod
+değiştirmemiş. `user_review_workflow`: **önce doğrula, sonra düzelt.**
+
+**12/12 GERÇEK.** Ama üç noktada rapor yanılıyordu:
+
+1. **İki delili yanlıştı.** `#2`nin kanıtı olarak gösterilen
+   `supabase/config.toml` **YEREL** `supabase start` config'i
+   (`project_id="proje-codex"`, port 54321) — prod ayarı değil, ve prod Auth
+   ayarları repodan okunamaz. Raporun kendisi de "prod ayarlarının repodakiyle
+   aynı olduğu varsayımına dayanıyor" diye hedge etmişti; varsayım yanlıştı.
+   **İddia (dördüncü parola yüzeyi istemci-tek) delilden bağımsız doğruydu.**
+   `#12`de ise fazla iddialı olan rapor değil **kodun kendi yorumuydu**.
+2. **Sıralaması yanlıştı.** `#4`/`#5` (Paraşüt) bugün **ÖLÜ** —
+   `PARASUT_ENABLED` boş, iki servis de ilk satırda dönüyor — ama "yüksek"
+   sayılmış. `#9` (DataTable klavyesi) **CANLI ve kullanıcı-görünür** ama
+   "orta" sayılmış. Doğru sıfat: gizil vs canlı.
+3. **`#7` gördüğünden dört kat büyüktü.** İki değil, **28 audit insert'inin
+   21'i** `{ error }` çözmüyordu.
+
+### En ağırı `#1` — ve tarayıcıda A/B ölçüldü
+
+`useDialogA11y`nin odak effect'i `onClose` bağımlılığındaydı. Çağıranların
+neredeyse hepsi prop'u inline yazıyor → ebeveynin her render'ında kimlik
+değişiyor → effect sökülüp yeniden kuruluyor → odak diyalogdaki ilk
+odaklanabilir öğeye dönüyor.
+
+**Gerçek Chromium, tuş tuş yazım:** düzeltme geri alınınca başlık alanına
+**yalnız `%` giriyor**, odak `<select>`e atlıyor; düzeltmeyle
+`%50 Avans / %50 Sevk` tam yazılıyor. Yani kullanıcı **ilk karakterden
+sonrasını yazamıyordu**.
+
+**Raporun bulmadığı ikinci tekrar daha ağır:** `purchase/orders/[id]` PO
+iptalinin **zorunlu gerekçe alanı** — yazılamazsa buton kilitli kaldığı için
+PO hiç iptal edilemiyordu.
+
+Düzeltme **tek dosyada**: `dismissible` için 2026-09-05'te zaten kurulmuş olan
+ref emsali `onClose`a da uygulandı. 20+ tüketiciye dokunulmadı. Nötrlük:
+`modal-ui`+`drawer-ui` **32 testi dosyalarına hiç dokunulmadan yeşil**.
+
+### Kapı, raporun bulmadığı ÜÇ şey daha buldu
+
+1. **13. parola yüzeyi** — `/api/seed` altı gerçek auth hesabını
+   `SEED_DEMO_PASSWORD`'dan hiçbir kontrol olmadan yaratıyordu.
+2. **Dört sessiz mutasyon route'u** — en ağırı `import/confirm` +
+   `import/apply`: toplu aktarım ürün/cari/tedarikçi yazıp hiçbir sekmeye
+   haber vermiyordu.
+3. **Planımın bir gerekçesi çürüdü** — ürün ekleri "alan listesinde yok" diye
+   kapsam dışıydı, ama `products` etiketini tazeliyorlar. Muafiyet açmak yerine
+   yayın eklendi.
+
+### Ölçü aracı DÖRT kez bulgu oldu
+
+- Parola kuralının ilk yazımı `seed-runner`ı **yanlış sebeple** yakaladı:
+  "çağrı var + dosyada `password` geçiyor" diyordu, oradaki `updateUserById`
+  yalnız metadata yazıyor — ve gerçek yazıcı `createUser` desende **hiç yoktu**.
+  Yanlışı yakalayıp doğruyu kaçırıyordu → iddia paren derinliği sayılarak
+  **çağrının gövdesine** bağlandı.
+- **"Desen komşusuna tutundu" 9. kez:** `DİSKTE YOK` dizesi storage kolunda da
+  geçtiği için tablo kolu tamamen silindiğinde kural yeşil kalıyordu.
+- **"Kendi yorumuna tutundu" 8. kez:** `void trim` yasağının gerekçe yorumu
+  dosyada `void` kelimesini geçiriyor → `sw` için ayrı yorumsuz gövde; ham `sw`
+  KORUNDU çünkü "KILL SWITCH dosyada yazılı" iddiası bilerek yorumu ölçüyor.
+- `#5`in damga iddiası `catch` bloğunun **içine** bağlandı — başarı kolu zaten
+  damgalıyor, kural ona tutunsaydı hata kolu silinince yeşil kalırdı.
+
+### Üç mevcut kapı yandı, üçü de haklıydı — hiçbiri gevşetilmedi
+
+`password-reset` HALKA 3 `updateUser({password})`ı **sayfada** arıyordu;
+sözleşme sunucuya taşındığı için iddia da taşındı (2026-09-10'da `aging.spec`in
+`←` okunu `BackLink`e taşırken uygulanan yöntemin aynısı) ·
+`route-guard-matrix` → baseline'a `self-auth` gerekçesi ·
+`rum-endpoint-allowlist` → yeniden üretildi.
+
+### Diğer kapananlar
+
+`#9` DataTable satır klavyesi çocuk kontrolleri yutuyordu (checkbox'ta Space
+hem kutucuğun kendi davranışını iptal ediyor hem detaya savuruyordu; **9 liste**
+tek dosyadan düzeldi) · `#6` realtime **5 alan/7 dosya → 9 alan/39 dosya**
+(çapa `revalidateTag`; `quotes/expire`in **döngü** tuzağından kaçınıldı) ·
+`#3` restore manifest özetlerini hiç okumuyordu → `verifyBackup()` yazmadan
+önce, tümü-ya-hiç; **eksik dosya artık "boş tablo" değil HATA** · `#8` belge
+yanıltıcıydı → neyin yakalanMADIĞI tek tek yazıldı · `#4` sırasız `.limit(100)`
+→ deterministik sayfalama (**250 ürün → checked 250**) · `#5` hata kolu
+`checked_at` damgalamıyordu → kuyruk kilidi açıldı · `#2` kurtarma parolası
+sunucuya taşındı · `#10`/`#11`/`#12` tek satırlık.
+
+tsc 0 · lint 0 · **508 dosya / 7076 test** · build 0 uyarı ·
+**E2E 94/94 retries=0** · **31/31 kırmızı-kanıtlı** · migration YOK.
+Rapor: `docs/audit/2026-09-11-dis-inceleme-12-bulgu.md`.
+
+---
+
 ## 2026-09-10 (2) — Oturumsuz yüzeyler + kapının kör noktası
 
 Aynı gün, dokunma turunun ardından. Kullanıcı kalan iki maddeyi seçti:

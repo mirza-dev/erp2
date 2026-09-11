@@ -43,6 +43,12 @@ _Son güncelleme: 2026-09-10 (C0 listesindeki üç bayat madde düzeltildi; ilk 
 
 - **C2. Paraşüt Faz 12-16** — ✅ **KOD TARAFI TAMAMLANDI (2026-08-29)**. Gerçek HTTP adapter (`21497bf`) + alış faturası/indirilecek KDV (`7adc040`, mig.107) + tahsilat geri okuma (`0ba37ef`, mig.108) + stok mutabakatı (`26333b5`) + canlı gate script'i & runbook (`1cf8ee3`). 6100 test. **Kalan tamamı kullanıcı-tarafı:** Paraşüt API başvurusu (`destek@parasut.com` — uzun teslim süreli, ŞİMDİ başlatılmalı) + redirect URI kaydı · **mig.107 + 108 APPLY** · `npm run parasut:gate -- --write` (deneme şirketinde; **stok invariant'ı burada kanıtlanır** — plandaki tek doğrulanmamış varsayımdı) · anahtarları açma. Sıra: `docs/parasut-golive-runbook.md`. Teslim `PARASUT_ENABLED=false` ile KAPALI yapılır.
 
+  **⚠️ 2026-09-11 EKLENDİ — go-live sonrası İLK HAFTA iki sayaç gözlenmeli.** Dış inceleme iki **toplu iş ilerleme** kusuru buldu; ikisi de düzeltilip kapıya bağlandı ama belirtileri sessiz ve **yalnız Paraşüt açıkken** görülür, yani bugün ölçülemezler:
+  - `POST /api/parasut/reconcile-stock` → `checked` ≈ `parasut_product_id` dolu aktif ürün sayısı olmalı ve `truncated` **çıkmamalı**. Sabit bir sayıda takılıyorsa katalog yarım taranıyor. (Eskiden sırasız `.limit(100)` vardı → 100'den sonraki hiçbir ürün kontrol edilmiyordu.) Tavan: `PARASUT_RECONCILE_MAX` (varsayılan 2000).
+  - `POST /api/parasut/poll-payments` → `failed` sürekli >0 ve hep aynı sayıdaysa kuyruk baştaki bozuk belgelere kilitlenmiştir. (Eskiden hata kolu `checked_at` yazmıyordu → kalıcı hata veren 40 belge sonsuza dek ilk sırada kalıyor, gerideki tüm faturaların tahsilat durumu bayatlıyordu.)
+
+  Sorgu (Studio): `select count(*) from products where parasut_product_id is not null and is_active;`
+
 ## D. Migration APPLY + smoke (kullanıcı tarafı; yeşil testler kapsamaz) — ✅ AI tarafı kapandı (2026-06-19)
 - ✅ **Durum kesinleşti:** `npx tsx scripts/check-migrations.ts` → **17/17 auto-probe GREEN** (073…100 canlıda; eski "088 BLOKER / 091 APPLY bekliyor" notları BAYAT). Rapor `docs/audit/2026-06-19-d-migration-smoke.md`.
 - ✅ **Gate hygiene:** `check-migrations.ts` MANUAL'a **mig.104** eklendi (önceden untracked → artık `⚠️ 104` raporlanır; `manuel: 7→8`).

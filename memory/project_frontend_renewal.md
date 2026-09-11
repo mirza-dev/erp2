@@ -330,3 +330,42 @@ bir başlık metni yazarsa kural kırılır → karar yeniden tartışılır).
 
 **`DemoButton.tsx` silindi** (kullanıcı onayı) — tüketicisi sıfırdı; açılış
 sayfası aynı işi elle yazılmış `<a href="/api/auth/demo">` ile yapıyor.
+
+## 2026-09-11 — Ortak bileşenlerde iki davranış kusuru (dış inceleme #1 · #9)
+
+**#1 — diyalog odağı ebeveyn render'ında sıfırlanıyordu.** `useDialogA11y`nin
+odak/Escape/tuzak effect'i `onClose` bağımlılığındaydı; çağıranların neredeyse
+hepsi prop'u inline yazıyor (`onClose={() => setX(null)}`) → ebeveynin her
+render'ında kimlik değişiyor → effect sökülüp yeniden kuruluyor → odak
+diyalogdaki İLK odaklanabilir öğeye dönüyor.
+
+**Tarayıcıda A/B ölçüldü (gerçek Chromium, tuş tuş):** düzeltme geri alınınca
+`NoteTemplatesTab` başlık alanına **yalnız `%` giriyor** ve odak `<select>`e
+atlıyor; düzeltmeyle `%50 Avans / %50 Sevk` tam yazılıyor. Kullanıcı ilk
+karakterden sonrasını yazamıyordu. **Raporun bulmadığı ikinci tekrar daha
+ağır:** `purchase/orders/[id]` PO iptalinin ZORUNLU gerekçe alanı — alan boşken
+buton kilitli olduğu için PO hiç iptal edilemiyordu.
+
+Düzeltme TEK DOSYADA: `dismissible` için 2026-09-05'te zaten kurulmuş ref
+emsali `onClose`a da uygulandı, bağımlılık `[dialogRef]`e indi. 20+ tüketiciye
+dokunulmadı. **Nötrlük kanıtı:** `modal-ui` (17) + `drawer-ui` (15) = 32 test,
+dosyalarına hiç dokunulmadan yeşil.
+
+*Ders: bir effect'in ÖMRÜ bir prop'un KİMLİĞİNE bağlanamaz. Aynı dosya bunu
+`dismissible` için biliyordu ve yazılı gerekçesi vardı — kardeş prop atlanmıştı.*
+
+**#9 — `DataTable` satır klavyesi çocuk kontrolleri yutuyordu.** Satır
+`onKeyDown`'ı olayın KAYNAĞINI denetlemiyordu: satır içindeki checkbox'ta
+Space'e basmak hem `preventDefault` ile kutucuğun kendi davranışını iptal
+ediyor hem de detay sayfasına savuruyordu; butonda Enter çift aksiyon
+üretiyordu. Hücrelerdeki `onClick` + `stopPropagation` buna çare DEĞİL —
+`onClick`, `keydown` bubbling'ini durdurmaz (iki ayrı olay).
+
+Tek satırlık daraltma (`e.target !== e.currentTarget` → return) `onRowClick`
+taşıyan **9 listeyi** birden düzeltti: products · orders · quotes · customers ·
+vendors · purchase/orders · developer/bugs · developer/errors · StockDataGrid.
+Fare davranışı değişmedi.
+
+Kapı: YENİ `gate/dialog-stability` (iddia effect'in BAĞIMLILIK DİZİSİNE bağlı,
+dosyada `onClose` geçmesine değil) + `dialog-focus-stability` (5 davranış
+testi) + `ui/data-table`a 4 klavye testi.

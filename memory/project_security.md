@@ -243,3 +243,43 @@ proxy'yi bilmiyor. Yeni kural tam olarak **kesişimi** kilitliyor
 Her dosya kendi başına doğru; kusur yalnız kesişimde var ve o kesişime bakan
 kimse yok. `deferred_backlog`un ilgili kaydı **sonucu doğru, gerekçesi
 yanlış** olduğu için düzeltildi.
+
+## 2026-09-11 — Dış inceleme: parola · audit · proxy matcher
+
+Dışarıdan gelen bir kod incelemesinin 12 bulgusu doğrulandı (12/12 gerçek).
+Güvenliğe dokunan üçü:
+
+**#2 — DÖRDÜNCÜ parola yüzeyi istemci-tekti.** `/sifre-yenile` politikayı
+`checkPasswordPolicy` ile kontrol edip parolayı doğrudan tarayıcıdan
+(`auth.updateUser`) yazıyordu. Kurtarma oturumuna sahip biri devtools'tan
+politikayı atlayabiliyordu. Yetki yükselmesi DEĞİL (kişi kendi parolasını
+zayıflatıyor) ama 2026-08-31'de kaydedilen *"sunucu otoriter, istemci
+aynalıyor"* sözleşmesinin deliği. YENİ `POST /api/auth/recovery-password`;
+istemci aynası korundu (anında geri bildirim).
+
+⚠️ **İncelemenin DELİLİ yanlıştı:** kanıt olarak `supabase/config.toml`
+gösterilmişti — o dosya **yerel** `supabase start` config'i
+(`project_id="proje-codex"`, port 54321), prod ayarı değil. Prod Auth ayarları
+panelde yaşar ve repodan okunamaz → kullanıcı-tarafı madde.
+
+**13. YÜZEYİ KAPI BULDU:** `/api/seed` altı gerçek auth hesabını
+`SEED_DEMO_PASSWORD`'dan hiçbir kontrol olmadan yaratıyordu. Politika oraya da
+uygulandı (fail-closed ama koşumu patlatmaz: uyarı + atla).
+
+**#7 — audit kayıtları sessizce kaybolabiliyordu.** PostgREST sorgu hatasını
+REJECT ETMEZ, sonuç nesnesinde döndürür; `{ error }` çözülmediği sürece
+çevredeki `try/catch` kısıt ihlalini/RLS reddini **görmez**. Rapor iki yeri
+işaret etmişti; ölçüldü: **28 insert'in 21'i** böyleydi (7 dosya). Sınıf olarak
+kapatıldı — hepsi non-fatal kalır ama artık konsola düşer.
+
+**#12 — proxy matcher muafiyeti `/api/` altına sızıyordu.** `/api/x/foo.js`
+middleware'i atlıyordu: request-id yok, rate-limit yok, oturum kapısı yok.
+`(?!api/)` iç lookahead'i eklendi; 16 örnek yolla ölçüldü — değişen yalnız üç
+`/api/**` yolu, statik varlıkların hiçbiri etkilenmedi (PWA korundu).
+Dosyadaki *"uzantısız her yol (tüm API route'ları)"* cümlesi de gerçeğe
+çekildi: ikisi aynı şey değildi ve fark tam olarak bu bulguydu.
+
+Kapı: `gate/password-policy`e parolayı YAZAN her yeri tarayan iki kural ·
+`gate/route-error-coverage`e audit kardeş kuralı (muafiyet YOK) ·
+`gate/pwa`ya matcher sınırı. Detay
+`docs/audit/2026-09-11-dis-inceleme-12-bulgu.md`.
