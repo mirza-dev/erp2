@@ -122,13 +122,20 @@ export async function dbCreateNoteTemplate(input: CreateNoteTemplateInput): Prom
     if (error) throw new Error(error.message);
     if (!data) throw new Error("Şablon oluşturulamadı.");
 
-    await supabase.from("audit_log").insert({
+    const { error: auditErr } = await supabase.from("audit_log").insert({
         action: "note_template_created",
         entity_type: "note_template",
         entity_id: data.id,
         after_state: { kind: data.kind, title: data.title, sort_order: data.sort_order },
         source: "ui",
     });
+    if (auditErr) {
+        // 2026-09-11 (dış inceleme #7): PostgREST hatayı REJECT ETMEZ,
+        // sonuç nesnesinde döndürür. Çözülmediği sürece audit kaydı
+        // "yazılmış gibi" geçiyordu. Non-fatal — mutasyon gerçekten oldu —
+        // ama artık sessiz değil.
+        console.error(JSON.stringify({ audit_insert_failed: auditErr.message, action: "note_template_created" }));
+    }
 
     return data;
 }
@@ -160,7 +167,7 @@ export async function dbUpdateNoteTemplate(id: string, patch: UpdateNoteTemplate
     if (error) throw new Error(error.message);
     if (!data) throw new Error("Şablon bulunamadı.");
 
-    await supabase.from("audit_log").insert({
+    const { error: auditErr2 } = await supabase.from("audit_log").insert({
         action: "note_template_updated",
         entity_type: "note_template",
         entity_id: id,
@@ -168,6 +175,13 @@ export async function dbUpdateNoteTemplate(id: string, patch: UpdateNoteTemplate
         after_state: updatePayload,
         source: "ui",
     });
+    if (auditErr2) {
+        // 2026-09-11 (dış inceleme #7): PostgREST hatayı REJECT ETMEZ,
+        // sonuç nesnesinde döndürür. Çözülmediği sürece audit kaydı
+        // "yazılmış gibi" geçiyordu. Non-fatal — mutasyon gerçekten oldu —
+        // ama artık sessiz değil.
+        console.error(JSON.stringify({ audit_insert_failed: auditErr2.message, action: "note_template_updated" }));
+    }
 
     return data;
 }
@@ -188,7 +202,7 @@ export async function dbDeactivateNoteTemplate(id: string): Promise<void> {
         .eq("id", id);
     if (error) throw new Error(error.message);
 
-    await supabase.from("audit_log").insert({
+    const { error: auditErr3 } = await supabase.from("audit_log").insert({
         action: "note_template_deactivated",
         entity_type: "note_template",
         entity_id: id,
@@ -196,4 +210,11 @@ export async function dbDeactivateNoteTemplate(id: string): Promise<void> {
         after_state: { is_active: false },
         source: "ui",
     });
+    if (auditErr3) {
+        // 2026-09-11 (dış inceleme #7): PostgREST hatayı REJECT ETMEZ,
+        // sonuç nesnesinde döndürür. Çözülmediği sürece audit kaydı
+        // "yazılmış gibi" geçiyordu. Non-fatal — mutasyon gerçekten oldu —
+        // ama artık sessiz değil.
+        console.error(JSON.stringify({ audit_insert_failed: auditErr3.message, action: "note_template_deactivated" }));
+    }
 }

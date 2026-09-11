@@ -79,13 +79,20 @@ export async function dbCreateQuote(input: CreateQuoteInput): Promise<QuoteWithL
     const created = (await dbGetQuote(quoteId as string))!;
     // Faz 8c: quotes audit katmanı (helper seviyesi — product-types/vendors paterni;
     // best-effort, actor'sız [codebase audit'leri actor yakalamıyor → tutarlı]).
-    await sb.from("audit_log").insert({
+    const { error: auditErr } = await sb.from("audit_log").insert({
         action: "quote_created",
         entity_type: "quote",
         entity_id: created.id,
         after_state: { quote_number: created.quote_number, status: created.status, grand_total: created.grand_total },
         source: "ui",
     });
+    if (auditErr) {
+        // 2026-09-11 (dış inceleme #7): PostgREST hatayı REJECT ETMEZ,
+        // sonuç nesnesinde döndürür. Çözülmediği sürece audit kaydı
+        // "yazılmış gibi" geçiyordu. Non-fatal — mutasyon gerçekten oldu —
+        // ama artık sessiz değil.
+        console.error(JSON.stringify({ audit_insert_failed: auditErr.message, action: "quote_created" }));
+    }
     return created;
 }
 
@@ -197,13 +204,20 @@ export async function dbUpdateQuote(
     if (error) throw error;
     const updated = (await dbGetQuote(id))!;
     // Faz 8c: audit (helper seviyesi, best-effort).
-    await sb.from("audit_log").insert({
+    const { error: auditErr2 } = await sb.from("audit_log").insert({
         action: "quote_updated",
         entity_type: "quote",
         entity_id: id,
         after_state: { quote_number: updated.quote_number, status: updated.status, grand_total: updated.grand_total },
         source: "ui",
     });
+    if (auditErr2) {
+        // 2026-09-11 (dış inceleme #7): PostgREST hatayı REJECT ETMEZ,
+        // sonuç nesnesinde döndürür. Çözülmediği sürece audit kaydı
+        // "yazılmış gibi" geçiyordu. Non-fatal — mutasyon gerçekten oldu —
+        // ama artık sessiz değil.
+        console.error(JSON.stringify({ audit_insert_failed: auditErr2.message, action: "quote_updated" }));
+    }
     return updated;
 }
 
@@ -216,7 +230,7 @@ export async function dbDeleteQuote(id: string, actor?: string | null): Promise<
     const { error } = await sb.from("quotes").delete().eq("id", id);
     if (error) throw error;
     if (existing) {
-        await sb.from("audit_log").insert({
+        const { error: auditErr3 } = await sb.from("audit_log").insert({
             actor: actor ?? null,
             action: "quote_deleted",
             entity_type: "quote",
@@ -224,6 +238,13 @@ export async function dbDeleteQuote(id: string, actor?: string | null): Promise<
             before_state: existing,
             source: "ui",
         });
+        if (auditErr3) {
+            // 2026-09-11 (dış inceleme #7): PostgREST hatayı REJECT ETMEZ,
+            // sonuç nesnesinde döndürür. Çözülmediği sürece audit kaydı
+            // "yazılmış gibi" geçiyordu. Non-fatal — mutasyon gerçekten oldu —
+            // ama artık sessiz değil.
+            console.error(JSON.stringify({ audit_insert_failed: auditErr3.message, action: "quote_deleted" }));
+        }
     }
 }
 
@@ -280,13 +301,20 @@ export async function dbCreateQuoteRevision(sourceId: string): Promise<string> {
     const newQuoteId = data as string;
     // Faz 8c: audit (helper seviyesi, best-effort). entity = kaynak teklif; after_state
     // yeni revizyon teklifine işaret eder.
-    await sb.from("audit_log").insert({
+    const { error: auditErr4 } = await sb.from("audit_log").insert({
         action: "quote_revised",
         entity_type: "quote",
         entity_id: sourceId,
         after_state: { new_quote_id: newQuoteId, source_quote_id: sourceId },
         source: "ui",
     });
+    if (auditErr4) {
+        // 2026-09-11 (dış inceleme #7): PostgREST hatayı REJECT ETMEZ,
+        // sonuç nesnesinde döndürür. Çözülmediği sürece audit kaydı
+        // "yazılmış gibi" geçiyordu. Non-fatal — mutasyon gerçekten oldu —
+        // ama artık sessiz değil.
+        console.error(JSON.stringify({ audit_insert_failed: auditErr4.message, action: "quote_revised" }));
+    }
     return newQuoteId;
 }
 

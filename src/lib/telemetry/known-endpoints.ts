@@ -37,6 +37,7 @@ export const KNOWN_ENDPOINTS: ReadonlySet<string> = new Set([
     "/api/auth/demo",
     "/api/auth/logout",
     "/api/auth/me",
+    "/api/auth/recovery-password",
     "/api/calendar-notes",
     "/api/calendar-notes/[id]",
     "/api/customers",

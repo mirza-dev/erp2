@@ -11,6 +11,7 @@
  * yine kullanılır, sadece dosya önizlemeleri eksik kalır.
  */
 import { createHash } from "node:crypto";
+import { checkPasswordPolicy } from "@/lib/auth/password-policy";
 import { createServiceClient } from "@/lib/supabase/service";
 import { buildMiniHtml, buildMiniPdf, buildPlaceholderPng } from "./seed-assets";
 import {
@@ -194,7 +195,24 @@ export async function runSeed(supabase: Service): Promise<Record<string, unknown
     let demoUsersCreated = 0;
     let firstUserId: string | null = null;
     const demoPassword = process.env.SEED_DEMO_PASSWORD;
-    if (demoPassword) {
+    /**
+     * 2026-09-11: parola politikası BURADA da uygulanır.
+     *
+     * Bu yüzey dış inceleme raporunda YOKTU; kapının kendisi buldu. `/api/seed`
+     * ALTI gerçek auth hesabı yaratıyor ve parolayı `SEED_DEMO_PASSWORD`'dan
+     * alıyordu — hiçbir kontrol olmadan. Depodaki kural "en gevşek yüzey
+     * kazanır" olduğu için zayıf bir env değeri altı hesabı birden zayıflatırdı.
+     *
+     * Fail-closed ama koşumu PATLATMAZ: davranış "env yok" dalının aynısı —
+     * uyarı yazılır, hesaplar atlanır, seed'in geri kalanı sürer.
+     */
+    const demoPasswordError = demoPassword
+        ? checkPasswordPolicy(demoPassword, { email: SEED_DEMO_USERS[0]?.email ?? null })
+        : null;
+    if (demoPasswordError) {
+        warnings.push(`SEED_DEMO_PASSWORD politikayı geçmiyor (${demoPasswordError}) — demo rol hesapları atlandı.`);
+    }
+    if (demoPassword && !demoPasswordError) {
         const { data: existing } = await supabase.auth.admin.listUsers({ page: 1, perPage: 200 });
         const byEmail = new Map((existing?.users ?? []).map(u => [u.email?.toLowerCase(), u]));
         for (const du of SEED_DEMO_USERS) {

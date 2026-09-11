@@ -64,6 +64,12 @@ export const GUARDLESS_BASELINE: GuardlessRoute[] = [
     { path: "settings/user/notifications/test", methods: ["POST"], cls: "self-auth", reason: "getUser() → alıcı gövdeden DEĞİL oturumdan; yalnız kendi gelen kutusuna örnek bildirim" },
     { path: "settings/user/preferences", methods: ["GET", "PATCH"], cls: "self-auth", reason: "getUser() → kendi tercihleri" },
     { path: "settings/user/profile", methods: ["GET", "PATCH"], cls: "self-auth", reason: "getUser() → kendi profili" },
+    // 2026-09-11 (dış inceleme #2) — kurtarma akışının parola yazma ucu.
+    // RBAC izni ARANMAZ: kurtarma oturumu `/auth/callback`te kuruluyor ve kişi
+    // yalnız KENDİ parolasını yazıyor (`getUser()` → `updateUser`). Mevcut şifre
+    // de istenmez — kurtarmanın tanımı gereği kimlik kanıtı e-posta kutusudur.
+    // Politika SUNUCUDA uygulanır (yüzeyin var olma sebebi tam olarak bu).
+    { path: "auth/recovery-password", methods: ["POST"], cls: "self-auth", reason: "getUser() → kendi şifresi; kurtarma oturumu, politika sunucuda" },
 
     // ── bilinçli public ────────────────────────────────────────────────
     { path: "auth/me", methods: ["GET"], cls: "public", reason: "Oturum kendi kimliğini okur" },

@@ -232,7 +232,7 @@ export async function dbTransitionPurchaseOrder(
         throw new Error("PO durum geçişi başarısız: durum bu sırada değişmiş (yarış).");
     }
 
-    await supabase.from("audit_log").insert({
+    const { error: auditErr } = await supabase.from("audit_log").insert({
         action:      next === "draft" ? "po_revised" : `po_${next}`,
         entity_type: "purchase_order",
         entity_id:   id,
@@ -240,6 +240,13 @@ export async function dbTransitionPurchaseOrder(
         source:      "ui",
         actor,
     });
+    if (auditErr) {
+        // 2026-09-11 (dış inceleme #7): PostgREST hatayı REJECT ETMEZ,
+        // sonuç nesnesinde döndürür. Çözülmediği sürece audit kaydı
+        // "yazılmış gibi" geçiyordu. Non-fatal — mutasyon gerçekten oldu —
+        // ama artık sessiz değil.
+        console.error(JSON.stringify({ audit_insert_failed: auditErr.message, action: "audit" }));
+    }
 }
 
 const PO_CURRENCY_WHITELIST = ["TRY", "USD", "EUR"] as const;

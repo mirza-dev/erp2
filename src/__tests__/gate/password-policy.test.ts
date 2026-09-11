@@ -18,7 +18,7 @@
  * + bağlam reddi. Bu bir eksiklik değil, karar — testte de böyle sabitlendi.
  */
 import { describe, it, expect } from "vitest";
-import { readFileSync } from "node:fs";
+import { readFileSync, readdirSync, statSync } from "node:fs";
 import { join } from "node:path";
 import { checkPasswordPolicy, MIN_PASSWORD_LENGTH } from "@/lib/auth/password-policy";
 
@@ -70,7 +70,7 @@ describe("GATE — parola politikası", () => {
         expect(list.split(",").filter((x) => x.trim().startsWith('"')).length).toBeGreaterThanOrEqual(20);
     });
 
-    it("ALTI çağrı yerinin altısı da ortak yardımcıyı kullanıyor", () => {
+    it("YEDİ çağrı yerinin yedisi de ortak yardımcıyı kullanıyor", () => {
         const callers: [string, RegExp][] = [
             ["src/app/api/settings/user/password/route.ts", /checkPasswordPolicy\(/],
             ["src/app/api/admin/users/route.ts", /checkPasswordPolicy\(/],
@@ -79,6 +79,8 @@ describe("GATE — parola politikası", () => {
             // 2026-08-31, madde #4 — parola kurtarma zinciriyle gelen iki yüzey:
             ["src/app/sifre-yenile/page.tsx", /checkPasswordPolicy\(/],
             ["src/app/api/admin/users/[id]/route.ts", /checkPasswordPolicy\(/],
+            // 2026-09-11, dış inceleme #2 — kurtarmanın SUNUCU ucu:
+            ["src/app/api/auth/recovery-password/route.ts", /checkPasswordPolicy\(/],
         ];
         for (const [file, needle] of callers) {
             const src = readFileSync(join(root, file), "utf8");
@@ -87,5 +89,87 @@ describe("GATE — parola politikası", () => {
             expect(src, `${file} içinde elle yazılmış parola uzunluk eşiği var`)
                 .not.toMatch(/(password|Password|Şifre|şifre)[^\n]{0,40}length\s*<\s*\d/);
         }
+    });
+
+    /**
+     * 2026-09-11 — dış inceleme #2. Üstteki kural "her yüzey yardımcıyı
+     * ÇAĞIRIYOR mu" diye soruyordu ve `/sifre-yenile` onu geçiyordu: sayfa
+     * gerçekten çağırıyordu, ama İSTEMCİDE — sonra parolayı yine tarayıcıdan
+     * yazıyordu. Yani kural yeşilken yüzey atlanabilir kalmıştı.
+     *
+     * Eksik olan soru şuydu: parolayı KİM YAZIYOR? Bu kural onu sorar ve
+     * cevabın her zaman sunucu olmasını şart koşar.
+     */
+    describe("parolayı YAZAN her yerin sunucu olması", () => {
+        /** `src/` altındaki tüm .ts/.tsx (testler hariç). */
+        function walk(dir: string, out: string[] = []): string[] {
+            for (const e of readdirSync(dir)) {
+                if (e === "__tests__") continue;
+                const full = join(dir, e);
+                if (statSync(full).isDirectory()) walk(full, out);
+                else if (/\.tsx?$/.test(e)) out.push(full);
+            }
+            return out;
+        }
+
+        /**
+         * Parola YAZAN çağrılar. İddia MESAFEYE değil ÇAĞRININ GÖVDESİNE
+         * bağlanır: paren derinliği sayılarak argüman metni çıkarılır ve
+         * `password` anahtarı yalnız ORADA aranır.
+         *
+         * İlk yazım "çağrı var + dosyada `password` geçiyor" diyordu ve
+         * `seed-runner`ı YANLIŞ sebeple yakaladı: oradaki `updateUserById`
+         * yalnız metadata yazıyor, parola ise bir satır aşağıdaki `createUser`
+         * çağrısında. Dosya doğruydu, ölçü aracı kabaydı — ve `createUser`
+         * desende hiç yoktu, yani gerçek yüzeyi kaçırıp yanlışını yakalıyordu.
+         */
+        const CALL = /auth\.(?:admin\.)?(?:updateUser|updateUserById|createUser)\s*\(/g;
+        function writesPassword(src: string): boolean {
+            for (const m of src.matchAll(CALL)) {
+                let depth = 0;
+                let i = m.index! + m[0].length - 1;
+                const start = i;
+                for (; i < src.length; i++) {
+                    if (src[i] === "(") depth++;
+                    else if (src[i] === ")") {
+                        depth--;
+                        if (depth === 0) break;
+                    }
+                }
+                if (/(^|[\s{,])password\s*:/.test(src.slice(start, i))) return true;
+            }
+            return false;
+        }
+
+        const files = walk(join(root, "src"));
+        const writers = files.filter((f) =>
+            writesPassword(
+                readFileSync(f, "utf8")
+                    .replace(/\/\*[\s\S]*?\*\//g, "")
+                    .replace(/^\s*\/\/.*$/gm, ""),
+            ),
+        );
+
+        it("tarama çalışıyor — parola yazan en az bir yüzey bulundu", () => {
+            // Anti-vakum: desen çökerse aşağıdaki iddia BOŞ KÜMEYİ denetlerdi.
+            expect(writers.length, "hiç parola yazan dosya bulunamadı — ayrıştırıcı bozuk").toBeGreaterThan(0);
+        });
+
+        it("hiçbir İSTEMCİ bileşeni parola yazmıyor", () => {
+            const clientWriters = writers.filter((f) =>
+                /^\s*["']use client["']/m.test(readFileSync(f, "utf8")),
+            );
+            expect(
+                clientWriters.map((f) => f.replace(root + "/", "")),
+                "parola tarayıcıdan yazılıyor — politika devtools'tan atlanabilir",
+            ).toEqual([]);
+        });
+
+        it("parola yazan her sunucu yüzeyi politikayı AYNI dosyada uyguluyor", () => {
+            const bad = writers
+                .map((f) => f.replace(root + "/", ""))
+                .filter((rel) => !/checkPasswordPolicy\(/.test(readFileSync(join(root, rel), "utf8")));
+            expect(bad, "politika uygulanmadan parola yazan yüzey").toEqual([]);
+        });
     });
 });

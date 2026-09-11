@@ -165,7 +165,7 @@ export async function dbDeleteCustomer(id: string, actor?: string | null): Promi
     const { error } = await supabase.from("customers").delete().eq("id", id);
     if (error) throw new Error(error.message);
     if (existing) {
-        await supabase.from("audit_log").insert({
+        const { error: auditErr } = await supabase.from("audit_log").insert({
             actor: actor ?? null,
             action: "customer_deleted",
             entity_type: "customer",
@@ -173,6 +173,13 @@ export async function dbDeleteCustomer(id: string, actor?: string | null): Promi
             before_state: existing,
             source: "ui",
         });
+        if (auditErr) {
+            // 2026-09-11 (dış inceleme #7): PostgREST hatayı REJECT ETMEZ,
+            // sonuç nesnesinde döndürür. Çözülmediği sürece audit kaydı
+            // "yazılmış gibi" geçiyordu. Non-fatal — mutasyon gerçekten oldu —
+            // ama artık sessiz değil.
+            console.error(JSON.stringify({ audit_insert_failed: auditErr.message, action: "customer_deleted" }));
+        }
     }
 }
 

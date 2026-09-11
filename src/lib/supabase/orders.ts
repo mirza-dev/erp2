@@ -535,7 +535,7 @@ export async function dbHardDeleteOrder(id: string, actor?: string | null): Prom
     const { error } = await supabase.from("sales_orders").delete().eq("id", id);
     if (error) throw new Error(error.message);
     if (existing) {
-        await supabase.from("audit_log").insert({
+        const { error: auditErr } = await supabase.from("audit_log").insert({
             actor: actor ?? null,
             action: "order_hard_deleted",
             entity_type: "sales_order",
@@ -543,6 +543,13 @@ export async function dbHardDeleteOrder(id: string, actor?: string | null): Prom
             before_state: existing,
             source: "ui",
         });
+        if (auditErr) {
+            // 2026-09-11 (dış inceleme #7): PostgREST hatayı REJECT ETMEZ,
+            // sonuç nesnesinde döndürür. Çözülmediği sürece audit kaydı
+            // "yazılmış gibi" geçiyordu. Non-fatal — mutasyon gerçekten oldu —
+            // ama artık sessiz değil.
+            console.error(JSON.stringify({ audit_insert_failed: auditErr.message, action: "order_hard_deleted" }));
+        }
     }
 }
 
@@ -568,7 +575,7 @@ export async function dbLogOrderAction(
     actor?: string | null
 ): Promise<void> {
     const supabase = createServiceClient();
-    await supabase.from("audit_log").insert({
+    const { error: auditErr2 } = await supabase.from("audit_log").insert({
         action,
         entity_type: "sales_order",
         entity_id: orderId,
@@ -577,4 +584,11 @@ export async function dbLogOrderAction(
         source: "ui",
         ...(actor ? { actor } : {}),
     });
+    if (auditErr2) {
+        // 2026-09-11 (dış inceleme #7): PostgREST hatayı REJECT ETMEZ,
+        // sonuç nesnesinde döndürür. Çözülmediği sürece audit kaydı
+        // "yazılmış gibi" geçiyordu. Non-fatal — mutasyon gerçekten oldu —
+        // ama artık sessiz değil.
+        console.error(JSON.stringify({ audit_insert_failed: auditErr2.message, action: "audit" }));
+    }
 }

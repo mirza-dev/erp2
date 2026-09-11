@@ -118,9 +118,14 @@ export async function PATCH(
 
         if (wantsPassword) {
             // Başkasının şifresini değiştirmek iz bırakmalı — kim, kime, ne zaman.
+            //
+            // 2026-09-11 (dış inceleme #7): `{ error }` ÇÖZÜLÜYOR. PostgREST
+            // hatayı reject etmez, sonuç nesnesinde döndürür — `catch` onu
+            // görmezdi. Başkasının şifresini sıfırlamak "iz bıraktı" görünüp
+            // audit tablosunda kayıt olmayabiliyordu. Non-fatal, ama sessiz değil.
             try {
                 const actor = (await (await createClient()).auth.getUser()).data.user;
-                await svc.from("audit_log").insert({
+                const { error: auditErr } = await svc.from("audit_log").insert({
                     actor: actor?.email ?? null,
                     action: "password_reset_by_admin",
                     entity_type: "user",
@@ -129,8 +134,19 @@ export async function PATCH(
                     before_state: null,
                     after_state: { user_id: id, email: data.user.email },
                 });
-            } catch {
-                /* non-fatal — şifre değişti, log eksik kalabilir */
+                if (auditErr) {
+                    console.error(JSON.stringify({
+                        audit_insert_failed: auditErr.message,
+                        action: "password_reset_by_admin",
+                        targetUserId: id,
+                    }));
+                }
+            } catch (auditErr) {
+                console.error(JSON.stringify({
+                    audit_insert_threw: String(auditErr),
+                    action: "password_reset_by_admin",
+                    targetUserId: id,
+                }));
             }
         }
 

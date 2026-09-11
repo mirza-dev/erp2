@@ -71,9 +71,15 @@ export async function POST(req: NextRequest) {
         }
 
         // Audit log
+        //
+        // 2026-09-11 (dış inceleme #7): `{ error }` ÇÖZÜLÜYOR. PostgREST sorgu
+        // hatasını reject etmez, sonuç nesnesinde döndürür — yani aşağıdaki
+        // `catch` kısıt ihlalini, RLS reddini, tip hatasını GÖRMEZ. Kayıt
+        // "yazılmış gibi" geçiyordu. Non-fatal kalıyor (şifre gerçekten
+        // değişti), ama artık SESSİZ değil.
         try {
             const service = createServiceClient();
-            await service.from("audit_log").insert({
+            const { error: auditErr } = await service.from("audit_log").insert({
                 actor: user.email,
                 action: "password_changed",
                 entity_type: "user",
@@ -82,8 +88,19 @@ export async function POST(req: NextRequest) {
                 before_state: null,
                 after_state: { user_id: user.id, email: user.email },
             });
-        } catch {
-            /* non-fatal — şifre değişti, log eksik kalabilir */
+            if (auditErr) {
+                console.error(JSON.stringify({
+                    audit_insert_failed: auditErr.message,
+                    action: "password_changed",
+                    userId: user.id,
+                }));
+            }
+        } catch (auditErr) {
+            console.error(JSON.stringify({
+                audit_insert_threw: String(auditErr),
+                action: "password_changed",
+                userId: user.id,
+            }));
         }
 
         return NextResponse.json({ ok: true });

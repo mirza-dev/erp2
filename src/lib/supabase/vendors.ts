@@ -147,7 +147,7 @@ export async function dbCreateVendor(input: CreateVendorInput, actor: string | n
     if (error) throw new Error(error.message);
     if (!data) throw new Error("Tedarikçi oluşturulamadı.");
 
-    await supabase.from("audit_log").insert({
+    const { error: auditErr } = await supabase.from("audit_log").insert({
         action: "vendor_created",
         entity_type: "vendor",
         entity_id: data.id,
@@ -155,6 +155,13 @@ export async function dbCreateVendor(input: CreateVendorInput, actor: string | n
         actor,
         source: "ui",
     });
+    if (auditErr) {
+        // 2026-09-11 (dış inceleme #7): PostgREST hatayı REJECT ETMEZ,
+        // sonuç nesnesinde döndürür. Çözülmediği sürece audit kaydı
+        // "yazılmış gibi" geçiyordu. Non-fatal — mutasyon gerçekten oldu —
+        // ama artık sessiz değil.
+        console.error(JSON.stringify({ audit_insert_failed: auditErr.message, action: "vendor_created" }));
+    }
 
     return data;
 }
@@ -191,7 +198,7 @@ export async function dbUpdateVendor(id: string, patch: UpdateVendorInput, actor
     if (error) throw new Error(error.message);
     if (!data) throw new Error("Tedarikçi bulunamadı.");
 
-    await supabase.from("audit_log").insert({
+    const { error: auditErr2 } = await supabase.from("audit_log").insert({
         action: "vendor_updated",
         entity_type: "vendor",
         entity_id: id,
@@ -200,6 +207,13 @@ export async function dbUpdateVendor(id: string, patch: UpdateVendorInput, actor
         actor,
         source: "ui",
     });
+    if (auditErr2) {
+        // 2026-09-11 (dış inceleme #7): PostgREST hatayı REJECT ETMEZ,
+        // sonuç nesnesinde döndürür. Çözülmediği sürece audit kaydı
+        // "yazılmış gibi" geçiyordu. Non-fatal — mutasyon gerçekten oldu —
+        // ama artık sessiz değil.
+        console.error(JSON.stringify({ audit_insert_failed: auditErr2.message, action: "vendor_updated" }));
+    }
 
     return data;
 }
@@ -228,7 +242,7 @@ export async function dbDeactivateVendor(id: string, actor: string | null = null
 
     if (error) throw new Error(error.message);
 
-    await supabase.from("audit_log").insert({
+    const { error: auditErr3 } = await supabase.from("audit_log").insert({
         action: "vendor_deactivated",
         entity_type: "vendor",
         entity_id: id,
@@ -236,4 +250,11 @@ export async function dbDeactivateVendor(id: string, actor: string | null = null
         actor,
         source: "ui",
     });
+    if (auditErr3) {
+        // 2026-09-11 (dış inceleme #7): PostgREST hatayı REJECT ETMEZ,
+        // sonuç nesnesinde döndürür. Çözülmediği sürece audit kaydı
+        // "yazılmış gibi" geçiyordu. Non-fatal — mutasyon gerçekten oldu —
+        // ama artık sessiz değil.
+        console.error(JSON.stringify({ audit_insert_failed: auditErr3.message, action: "vendor_deactivated" }));
+    }
 }

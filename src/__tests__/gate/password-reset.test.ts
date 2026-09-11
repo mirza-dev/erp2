@@ -52,9 +52,30 @@ describe("GATE — parola sıfırlama zinciri", () => {
 
     it("HALKA 3: yeni şifre ekranı VAR ve ortak politikayı kullanıyor", () => {
         expect(recoveryPageSrc).toMatch(/checkPasswordPolicy\(/);
-        expect(recoveryPageSrc).toMatch(/updateUser\(\{\s*password\s*\}\)/);
         // Elle yazılmış eşik politikadan ayrışır — yasak.
         expect(recoveryPageSrc).not.toMatch(/length\s*<\s*\d/);
+    });
+
+    it("HALKA 3b: parolayı SUNUCU yazar — ekran yalnız aynalar", () => {
+        // 2026-09-11 (dış inceleme #2). Bu iddia ÖNCE HALKA 3'ün içindeydi ve
+        // `updateUser({ password })`ı SAYFADA arıyordu. Sözleşme sunucuya
+        // TAŞINDIĞI için iddia da taşındı — gevşetilmedi, yeni adresinde
+        // aynı şeyi koruyor (aynı ders: `aging.spec`in `←` okunu `BackLink`e
+        // taşırken iddiayı gevşetmek yerine niyetini korumuştuk).
+        //
+        // Sebep: sayfa politikayı kontrol edip parolayı TARAYICIDAN yazıyordu;
+        // kurtarma oturumuna sahip biri devtools'tan politikayı atlayabiliyordu.
+        expect(recoveryPageSrc, "ekran sunucu ucuna gitmiyor")
+            .toContain("/api/auth/recovery-password");
+        expect(recoveryPageSrc, "ekran hâlâ parolayı kendi yazıyor")
+            .not.toMatch(/updateUser\(\{\s*password\s*\}\)/);
+
+        const routeSrc = readFileSync(
+            join(root, "src/app/api/auth/recovery-password/route.ts"), "utf8",
+        );
+        expect(routeSrc).toMatch(/checkPasswordPolicy\(/);
+        expect(routeSrc).toMatch(/updateUser\(\{\s*password\s*\}\)/);
+        expect(routeSrc, "kurtarma yazımı iz bırakmıyor").toMatch(/password_reset_via_recovery/);
     });
 
     it("HALKA 4: admin sıfırlama var, politikadan geçiyor ve iz bırakıyor", () => {

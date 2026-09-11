@@ -19,6 +19,12 @@
  * demektir ve kimlik kanıtı odur. Gizli bir açık değil, yazılı bir karar.
  *
  * Politika `checkPasswordPolicy` ile ayna: kural TEK kaynakta, burada kopyası yok.
+ *
+ * 2026-09-11: parolayı SUNUCU yazıyor (`POST /api/auth/recovery-password`).
+ * Önceden bu sayfa politikayı kontrol edip doğrudan `auth.updateUser` çağırıyordu,
+ * yani kural yalnız TARAYICIDA yaşıyordu ve kurtarma oturumuna sahip biri
+ * devtools'tan atlayabiliyordu. Diğer üç parola yüzeyi zaten sunucu-otoriterdi;
+ * bu dördüncüsü de onlara katıldı.
  */
 
 import { useEffect, useState } from "react";
@@ -69,10 +75,24 @@ export default function RecoveryPage() {
 
         setSaving(true);
         try {
-            const { error: updateErr } = await createClient().auth.updateUser({ password });
-            if (updateErr) {
-                // En sık hâli: kurtarma oturumunun süresi doldu.
-                setError("Şifre güncellenemedi. Bağlantının süresi dolmuş olabilir; yeni bir sıfırlama bağlantısı isteyin.");
+            // 2026-09-11 (dış inceleme #2): parola artık SUNUCUDA yazılıyor.
+            // Önceden burada doğrudan `auth.updateUser` çağrılıyordu; politika
+            // yalnız yukarıdaki istemci kontrolüydü ve devtools'tan atlanabiliyordu.
+            // Yukarıdaki `checkPasswordPolicy` KALDI — anında geri bildirim için
+            // ayna; otorite sunucuda (`validateQuoteForSend` kalıbı).
+            const res = await fetch("/api/auth/recovery-password", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ password }),
+            });
+            if (!res.ok) {
+                const data = await res.json().catch(() => ({}));
+                setError(
+                    typeof (data as { error?: unknown }).error === "string"
+                        ? (data as { error: string }).error
+                        // En sık hâli: kurtarma oturumunun süresi doldu.
+                        : "Şifre güncellenemedi. Bağlantının süresi dolmuş olabilir; yeni bir sıfırlama bağlantısı isteyin.",
+                );
                 setSaving(false);
                 return;
             }

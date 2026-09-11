@@ -120,3 +120,59 @@ describe("GATE — route hata yakalama kapsaması", () => {
         expect(apiError).toMatch(/function capture\([\s\S]{0,200}scheduleTelemetry/);
     });
 });
+
+/**
+ * KARDEŞ KURAL (2026-09-11, dış inceleme #7) — aynı sınıf, farklı boru.
+ *
+ * Yukarıdaki kural "hata YUTULMASIN" diyor. Bu kural bir adım öncesini kapatır:
+ * hata FIRLATILMAZSA da kaybolabilir. Supabase/PostgREST bir sorgu hatasını
+ * reject ETMEZ — sonuç nesnesinin `error` alanında döndürür. `audit_log`
+ * insert'leri `await sb.from("audit_log").insert({...})` biçimindeydi ve
+ * dönüş hiç okunmuyordu; çevredeki `try/catch` de bu yüzden hiçbir şey
+ * görmüyordu.
+ *
+ * Ölçüldü: 28 insert'in 21'i böyleydi. Rapor yalnız ikisini (parola yolları)
+ * işaret etmişti; sınıf olarak kapatıldı. Kayıtlar NON-FATAL kalır — mutasyon
+ * gerçekten oldu — ama artık konsola düşer.
+ */
+describe("GATE — audit_log insert'i sessizce başarısız olamaz", () => {
+    function walk(dir: string, out: string[] = []): string[] {
+        for (const e of readdirSync(dir)) {
+            if (e === "__tests__") continue;
+            const full = join(dir, e);
+            if (statSync(full).isDirectory()) walk(full, out);
+            else if (/\.tsx?$/.test(e)) out.push(full);
+        }
+        return out;
+    }
+
+    const strip = (src: string) =>
+        src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+    /** `from("audit_log").insert(` çağrıları — dosya + çözülüyor mu. */
+    const inserts: { file: string; resolved: boolean }[] = [];
+    for (const f of walk(join(process.cwd(), "src"))) {
+        const code = strip(readFileSync(f, "utf8"));
+        for (const m of code.matchAll(/from\("audit_log"\)\s*\n?\s*\.insert\(/g)) {
+            const pre = code.slice(Math.max(0, m.index! - 160), m.index!).replace(/\n/g, " ");
+            inserts.push({
+                file: f.replace(process.cwd() + "/", ""),
+                resolved: /error[^}]*\}\s*=\s*await\s*[\w.]*\s*$/.test(pre),
+            });
+        }
+    }
+
+    it("tarama çalışıyor — audit insert'leri bulunuyor (anti-vakum)", () => {
+        // Desen çökerse aşağıdaki iddia BOŞ KÜMEYİ denetler ve sahte-yeşil olur.
+        expect(inserts.length, "hiç audit_log insert'i bulunamadı — ayrıştırıcı bozuk")
+            .toBeGreaterThan(10);
+    });
+
+    it("hepsi `{ error }` çözüyor — muafiyet listesi YOK", () => {
+        const unresolved = [...new Set(inserts.filter(i => !i.resolved).map(i => i.file))];
+        expect(
+            unresolved,
+            "audit insert'inin dönüşü okunmuyor — PostgREST hatası sessizce kaybolur",
+        ).toEqual([]);
+    });
+});

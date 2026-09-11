@@ -310,13 +310,20 @@ export async function dbCreateProductType(input: CreateProductTypeInput): Promis
     }
     if (!data) throw new Error("Tip oluşturulamadı.");
 
-    await supabase.from("audit_log").insert({
+    const { error: auditErr } = await supabase.from("audit_log").insert({
         action: "product_type_created",
         entity_type: "product_type",
         entity_id: data.id,
         after_state: { name: data.name, icon: data.icon, sort_order: data.sort_order },
         source: "ui",
     });
+    if (auditErr) {
+        // 2026-09-11 (dış inceleme #7): PostgREST hatayı REJECT ETMEZ,
+        // sonuç nesnesinde döndürür. Çözülmediği sürece audit kaydı
+        // "yazılmış gibi" geçiyordu. Non-fatal — mutasyon gerçekten oldu —
+        // ama artık sessiz değil.
+        console.error(JSON.stringify({ audit_insert_failed: auditErr.message, action: "product_type_created" }));
+    }
 
     return data;
 }
@@ -355,7 +362,7 @@ export async function dbUpdateProductType(id: string, patch: UpdateProductTypeIn
     }
     if (!data) throw new Error("Tip bulunamadı.");
 
-    await supabase.from("audit_log").insert({
+    const { error: auditErr2 } = await supabase.from("audit_log").insert({
         action: "product_type_updated",
         entity_type: "product_type",
         entity_id: id,
@@ -363,6 +370,13 @@ export async function dbUpdateProductType(id: string, patch: UpdateProductTypeIn
         after_state: updatePayload,
         source: "ui",
     });
+    if (auditErr2) {
+        // 2026-09-11 (dış inceleme #7): PostgREST hatayı REJECT ETMEZ,
+        // sonuç nesnesinde döndürür. Çözülmediği sürece audit kaydı
+        // "yazılmış gibi" geçiyordu. Non-fatal — mutasyon gerçekten oldu —
+        // ama artık sessiz değil.
+        console.error(JSON.stringify({ audit_insert_failed: auditErr2.message, action: "product_type_updated" }));
+    }
 
     return data;
 }
@@ -380,7 +394,7 @@ export async function dbDeleteProductType(id: string): Promise<void> {
         .eq("id", id);
     if (error) throw new Error(error.message);
 
-    await supabase.from("audit_log").insert({
+    const { error: auditErr3 } = await supabase.from("audit_log").insert({
         action: "product_type_deactivated",
         entity_type: "product_type",
         entity_id: id,
@@ -388,6 +402,13 @@ export async function dbDeleteProductType(id: string): Promise<void> {
         after_state: { is_active: false },
         source: "ui",
     });
+    if (auditErr3) {
+        // 2026-09-11 (dış inceleme #7): PostgREST hatayı REJECT ETMEZ,
+        // sonuç nesnesinde döndürür. Çözülmediği sürece audit kaydı
+        // "yazılmış gibi" geçiyordu. Non-fatal — mutasyon gerçekten oldu —
+        // ama artık sessiz değil.
+        console.error(JSON.stringify({ audit_insert_failed: auditErr3.message, action: "product_type_deactivated" }));
+    }
 }
 
 // ── Create / Update / Delete (fields) ────────────────────────
@@ -436,7 +457,7 @@ export async function dbAddProductTypeField(input: CreateProductTypeFieldInput):
         await supabase.from("product_types").update({ is_system: false }).eq("id", input.product_type_id);
     }
 
-    await supabase.from("audit_log").insert({
+    const { error: auditErr4 } = await supabase.from("audit_log").insert({
         action: "product_type_field_added",
         entity_type: "product_type",
         entity_id: input.product_type_id,
@@ -449,6 +470,13 @@ export async function dbAddProductTypeField(input: CreateProductTypeFieldInput):
         },
         source: "ui",
     });
+    if (auditErr4) {
+        // 2026-09-11 (dış inceleme #7): PostgREST hatayı REJECT ETMEZ,
+        // sonuç nesnesinde döndürür. Çözülmediği sürece audit kaydı
+        // "yazılmış gibi" geçiyordu. Non-fatal — mutasyon gerçekten oldu —
+        // ama artık sessiz değil.
+        console.error(JSON.stringify({ audit_insert_failed: auditErr4.message, action: "product_type_field_added" }));
+    }
 
     return data;
 }
@@ -575,7 +603,7 @@ export async function dbUpdateProductTypeField(
         await supabase.from("product_types").update({ is_system: false }).eq("id", existing.product_type_id);
     }
 
-    await supabase.from("audit_log").insert({
+    const { error: auditErr5 } = await supabase.from("audit_log").insert({
         action: "product_type_field_updated",
         entity_type: "product_type",
         entity_id: existing.product_type_id,
@@ -592,6 +620,13 @@ export async function dbUpdateProductTypeField(
         },
         source: "ui",
     });
+    if (auditErr5) {
+        // 2026-09-11 (dış inceleme #7): PostgREST hatayı REJECT ETMEZ,
+        // sonuç nesnesinde döndürür. Çözülmediği sürece audit kaydı
+        // "yazılmış gibi" geçiyordu. Non-fatal — mutasyon gerçekten oldu —
+        // ama artık sessiz değil.
+        console.error(JSON.stringify({ audit_insert_failed: auditErr5.message, action: "product_type_field_updated" }));
+    }
 
     return data;
 }
@@ -623,7 +658,7 @@ export async function dbDeleteProductTypeField(id: string, expectedTypeId?: stri
         await supabase.from("product_types").update({ is_system: false }).eq("id", existing.product_type_id);
     }
 
-    await supabase.from("audit_log").insert({
+    const { error: auditErr6 } = await supabase.from("audit_log").insert({
         action: "product_type_field_deactivated",
         entity_type: "product_type",
         entity_id: existing.product_type_id,
@@ -639,6 +674,13 @@ export async function dbDeleteProductTypeField(id: string, expectedTypeId?: stri
         },
         source: "ui",
     });
+    if (auditErr6) {
+        // 2026-09-11 (dış inceleme #7): PostgREST hatayı REJECT ETMEZ,
+        // sonuç nesnesinde döndürür. Çözülmediği sürece audit kaydı
+        // "yazılmış gibi" geçiyordu. Non-fatal — mutasyon gerçekten oldu —
+        // ama artık sessiz değil.
+        console.error(JSON.stringify({ audit_insert_failed: auditErr6.message, action: "product_type_field_deactivated" }));
+    }
 }
 
 export async function dbReorderProductTypeFields(
@@ -680,7 +722,7 @@ export async function dbReorderProductTypeFields(
 
     if (parent?.is_system) {
         await supabase.from("product_types").update({ is_system: false }).eq("id", productTypeId);
-        await supabase.from("audit_log").insert({
+        const { error: auditErr7 } = await supabase.from("audit_log").insert({
             action: "product_type_updated",
             entity_type: "product_type",
             entity_id: productTypeId,
@@ -688,6 +730,13 @@ export async function dbReorderProductTypeFields(
             after_state: { is_system: false },
             source: "ui",
         });
+        if (auditErr7) {
+            // 2026-09-11 (dış inceleme #7): PostgREST hatayı REJECT ETMEZ,
+            // sonuç nesnesinde döndürür. Çözülmediği sürece audit kaydı
+            // "yazılmış gibi" geçiyordu. Non-fatal — mutasyon gerçekten oldu —
+            // ama artık sessiz değil.
+            console.error(JSON.stringify({ audit_insert_failed: auditErr7.message, action: "product_type_updated" }));
+        }
     }
 }
 
