@@ -44,9 +44,29 @@ export function useDialogA11y(
     const dismissibleRef = useRef(dismissible);
     dismissibleRef.current = dismissible;
 
+    /**
+     * 2026-09-11: `onClose` de AYNI SEBEPLE ref'te — ilk yazımda atlanmıştı ve
+     * bedeli ölçüldü. Çağıranların neredeyse hepsi prop'u inline yazıyor
+     * (`onClose={() => setShowForm(false)}`), yani EBEVEYN her render'ında
+     * fonksiyonun KİMLİĞİ değişiyor. Bağımlılık listesinde durduğu sürece bu
+     * effect temizlenip yeniden kuruluyordu: temizlik `previouslyFocused`a
+     * dönüyor, kurulum diyalogdaki İLK odaklanabilir öğeye geçiyor.
+     *
+     * Sonuç, form state'i ebeveynde tutan her diyalogda YAZILAMAMAKTI:
+     *   · `NoteTemplatesTab` — başlığa basılan her harfte odak `<select>`e atlar
+     *   · `purchase/orders/[id]` — PO iptalinin ZORUNLU gerekçe alanı
+     *     yazılamaz, alan boş kaldığı için buton da kilitli kalır
+     *
+     * Ref, yukarıdaki `dismissible` gerekçesinin birebir aynısı: davranış
+     * değişmez (her zaman GÜNCEL `onClose` çağrılır), yalnız effect'in ömrü
+     * prop kimliğinden ayrılır.
+     */
+    const onCloseRef = useRef(onClose);
+    onCloseRef.current = onClose;
+
     const requestClose = useCallback(() => {
-        if (dismissibleRef.current) onClose();
-    }, [onClose]);
+        if (dismissibleRef.current) onCloseRef.current();
+    }, []);
 
     useEffect(() => {
         const previouslyFocused = document.activeElement as HTMLElement | null;
@@ -58,7 +78,7 @@ export function useDialogA11y(
 
         const onKeyDown = (event: KeyboardEvent) => {
             if (event.key === "Escape") {
-                if (dismissibleRef.current) onClose();
+                if (dismissibleRef.current) onCloseRef.current();
                 return;
             }
             if (event.key !== "Tab" || !dialogRef.current) return;
@@ -91,7 +111,7 @@ export function useDialogA11y(
             window.removeEventListener("keydown", onKeyDown);
             previouslyFocused?.focus?.();
         };
-    }, [onClose, dialogRef]);
+    }, [dialogRef]);
 
     return { requestClose };
 }
