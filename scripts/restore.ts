@@ -23,6 +23,7 @@
  * niyet ister. Canlı hedefte ayrıca `ALLOW_PROD_TARGET=1` gerekir.
  */
 import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
+import { createHash } from "node:crypto";
 import { join, relative, sep } from "node:path";
 import { isProdTarget, projectRefFromUrl, PROD_PROJECT_REF } from "../src/lib/env-target";
 import { contentTypeForExt } from "../src/lib/company-files";
@@ -66,11 +67,21 @@ if (isProdTarget(url) && APPLY && process.env.ALLOW_PROD_TARGET !== "1") {
 type Manifest = {
     totals: { tables: number; rows: number; users: number; objects: number };
     tables: Record<string, { rows: number; sha256: string }>;
-    storage: Record<string, { objects: number; public: boolean; types?: Record<string, string> }>;
+    storage: Record<string, {
+        objects: number; public: boolean;
+        types?: Record<string, string>;
+        /** 2026-09-11: obje başına içerik özeti. Eski yedeklerde YOK. */
+        sha256?: Record<string, string>;
+    }>;
     restoreOrder: string[];
     restoreOrderCycles?: string[];
     errors: string[];
 };
+
+/** `backup.ts:64` ile BİREBİR aynı gövde — iki taraf ayrışırsa doğrulama anlamsızlaşır. */
+function sha256(body: string | Uint8Array): string {
+    return createHash("sha256").update(body as never).digest("hex");
+}
 
 const BATCH = 500;
 const errors: string[] = [];
@@ -78,6 +89,10 @@ const notes: string[] = [];
 
 function ndjson(rel: string): Record<string, unknown>[] {
     const p = join(DIR, rel);
+    // 2026-09-11 (dış inceleme #3): eksik dosya sessizce `[]` dönüyordu.
+    // `verifyBackup()` artık bunu YAZMADAN ÖNCE hata sayar; buraya gelindiğinde
+    // dosya vardır. Yine de savunma: manifestte olmayan bir yol istenirse
+    // (auth/users.ndjson gibi opsiyoneller) boş dönmek doğru davranıştır.
     if (!existsSync(p)) return [];
     return readFileSync(p, "utf8")
         .split("\n")
@@ -96,6 +111,69 @@ function walkFiles(root: string): string[] {
     return out;
 }
 
+/**
+ * BÜTÜNLÜK DOĞRULAMASI — hedefe TEK BAYT yazılmadan önce.
+ *
+ * 2026-09-11, dış inceleme #3. `backup.ts` her tablo için SHA-256 üretip
+ * manifeste yazıyordu; geri yükleme bu alanı tipinde TANIYOR ama HİÇ
+ * OKUMUYORDU. Tek kontrol, işlem BİTTİKTEN sonraki satır sayısı
+ * karşılaştırmasıydı. Sonuç: bozulmuş ya da kısmen kopyalanmış bir yedek,
+ * satır sayısı tuttuğu sürece "başarılı" geri yüklenebiliyordu; manifestte
+ * olup diskte olmayan bir dosya ise BOŞ TABLO sayılıp sessizce geçiliyordu
+ * (`ndjson()` `[]` dönüyordu) — yani felaket anında veri "silinmiş" gibi
+ * görünüp kimse fark etmeyecekti.
+ *
+ * Tümü-ya-hiç: bir tek özet tutmazsa hiçbir şey yazılmaz. `manifest.errors`
+ * guard'ının (yukarıda) aynı mantığı — yarım veri, veri yokluğundan kötüdür.
+ *
+ * KURU ÇALIŞMADA DA KOŞAR: prova artık yedeğin bütünlüğünü de ölçüyor.
+ */
+function verifyBackup(manifest: Manifest): string[] {
+    const problems: string[] = [];
+
+    for (const [table, stat] of Object.entries(manifest.tables)) {
+        const rel = `tables/${table}.ndjson`;
+        const p = join(DIR, rel);
+        if (!existsSync(p)) {
+            // Sıfır satırlı tablo için `backup.ts` yine de boş dosya yazar.
+            problems.push(`${rel}: manifestte var, DİSKTE YOK (${stat.rows} satır kaybı)`);
+            continue;
+        }
+        if (!stat.sha256) {
+            problems.push(`${rel}: manifestte özet yok — bu yedek doğrulanamaz`);
+            continue;
+        }
+        const actual = sha256(readFileSync(p, "utf8"));
+        if (actual !== stat.sha256) {
+            problems.push(`${rel}: SHA-256 TUTMUYOR (beklenen ${stat.sha256.slice(0, 12)}…, bulunan ${actual.slice(0, 12)}…)`);
+        }
+    }
+
+    if (!SKIP_STORAGE) {
+        for (const [bucket, stat] of Object.entries(manifest.storage ?? {})) {
+            if (!stat.sha256) {
+                // 2026-09-11 ÖNCESİ yedeklerde obje özeti yok. Reddetmek eski
+                // yedekleri kullanılamaz kılardı; atlanır ama RAPOR EDİLİR.
+                notes.push(`storage/${bucket}: obje özetleri yok (2026-09-11 öncesi yedek) — dosya bütünlüğü DOĞRULANMADI.`);
+                continue;
+            }
+            for (const [rel, expected] of Object.entries(stat.sha256)) {
+                const p = join(DIR, "storage", bucket, ...rel.split("/"));
+                if (!existsSync(p)) {
+                    problems.push(`storage/${bucket}/${rel}: manifestte var, DİSKTE YOK`);
+                    continue;
+                }
+                const actual = sha256(new Uint8Array(readFileSync(p)));
+                if (actual !== expected) {
+                    problems.push(`storage/${bucket}/${rel}: SHA-256 TUTMUYOR`);
+                }
+            }
+        }
+    }
+
+    return problems;
+}
+
 async function main() {
     const manifestPath = join(DIR, "manifest.json");
     if (!existsSync(manifestPath)) {
@@ -111,6 +189,16 @@ async function main() {
         for (const e of manifest.errors) console.error(`  ❌ ${e}`);
         process.exit(1);
     }
+
+    // Bütünlük — HEDEFE YAZMADAN ÖNCE.
+    const integrity = verifyBackup(manifest);
+    if (integrity.length) {
+        console.error(`[restore] ❌ YEDEK BÜTÜNLÜĞÜ BOZUK (${integrity.length} sorun) — hiçbir şey yazılmadı:`);
+        for (const e of integrity.slice(0, 40)) console.error(`  ❌ ${e}`);
+        if (integrity.length > 40) console.error(`  … ve ${integrity.length - 40} tane daha`);
+        process.exit(1);
+    }
+    console.log(`[restore] bütünlük: ${Object.keys(manifest.tables).length} tablo özeti doğrulandı ✓`);
 
     console.log(`[restore] kaynak: ${DIR}`);
     console.log(`[restore] hedef : ${url} (${projectRefFromUrl(url) ?? "yerel"})`);

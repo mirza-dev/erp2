@@ -149,7 +149,17 @@ type TableStat = { rows: number; bytes: number; sha256: string; orderedBy: strin
  * `quote-pdfs` kovasındaki arşiv `.html`leri `application/octet-stream` olarak
  * reddedildi (kovanın MIME allowlist'i var). Tür, verinin kendisi kadar veridir.
  */
-type BucketStat = { objects: number; bytes: number; public: boolean; types: Record<string, string> };
+/**
+ * `sha256`: obje başına içerik özeti (2026-09-11, dış inceleme #3).
+ * Tablolar için özet 2026-08-30'dan beri yazılıyordu ama geri yükleme onu
+ * HİÇ OKUMUYORDU; storage tarafında ise özet hiç üretilmiyordu. İkisi de
+ * kapandı: `restore.ts` yazmadan ÖNCE tüm yedeği doğruluyor.
+ */
+type BucketStat = {
+    objects: number; bytes: number; public: boolean;
+    types: Record<string, string>;
+    sha256: Record<string, string>;
+};
 
 async function main() {
     const errors: string[] = [];
@@ -208,7 +218,7 @@ async function main() {
         if (lines.length !== expected) {
             errors.push(
                 `${table}: ${expected} satır bekleniyordu, ${lines.length} yazıldı ` +
-                    `(sayfalama hatası VEYA yedek sırasında yazma oldu — tekrar koş)`,
+                    `(sayfalama hatası VEYA yedek sırasında SAYIYI DEĞİŞTİREN bir yazma oldu — tekrar koş)`,
             );
         }
     }
@@ -249,6 +259,7 @@ async function main() {
             let objects = 0;
             let bytes = 0;
             const types: Record<string, string> = {};
+            const hashes: Record<string, string> = {};
             const walk = async (prefix: string, depth: number): Promise<void> => {
                 if (depth > 8) {
                     errors.push(`storage/${b.id}: 8 seviyeden derin klasör atlandı (${prefix})`);
@@ -296,6 +307,7 @@ async function main() {
                         const ctype = o.metadata?.mimetype ?? dl.headers.get("content-type");
                         if (ctype) types[full] = ctype.split(";")[0].trim();
                         const buf = new Uint8Array(await dl.arrayBuffer());
+                        hashes[full] = sha256(buf);
                         bytes += write(`storage/${b.id}/${full}`, buf);
                         objects++;
                     }
@@ -303,7 +315,7 @@ async function main() {
                 }
             };
             await walk("", 0);
-            bucketStats[b.id] = { objects, bytes, public: b.public, types };
+            bucketStats[b.id] = { objects, bytes, public: b.public, types, sha256: hashes };
             totalObjects += objects;
             totalBytes += bytes;
             console.log(`[backup] storage/${b.id}: ${objects} obje · ${(bytes / 1048576).toFixed(2)} MB`);

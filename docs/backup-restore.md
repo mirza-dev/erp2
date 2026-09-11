@@ -221,7 +221,25 @@ ateşleniyor. Zararsız ama bilinmeli: geri yükleme sonrası bu dört tabloda
   satırların üstüne yazmak zorunda. `scripts/restore.ts` bunu iki mekanizmayla
   yapıyor: `on_conflict` (ikincil unique kısıt) ve tekil tabloda önce-sil.
 - **Ortam değişkenleri yedekte yok** — bilinçli; sır içeriyorlar.
-- Yedek **anlık tutarlı değil**: tablolar sırayla okunur, arada yazma olursa satır
-  sayısı kontrolü bunu hata olarak bildirir (tekrar koşun). Sistem kullanımdayken
-  değil, gün sonunda alın.
+- Yedek **anlık tutarlı DEĞİL** ve bunun sınırları nettir (2026-09-11'de
+  düzeltildi — burada eskiden *"arada yazma olursa satır sayısı kontrolü bunu
+  hata olarak bildirir"* yazıyordu; bu **yanıltıcıydı**). Tablolar sırayla
+  okunur ve tek kontrol satır SAYISIDIR, dolayısıyla:
+  - ✅ **yakalanır:** satır sayısını değiştiren yazmalar (araya giren INSERT/DELETE)
+  - ❌ **yakalanmaz:** yedek sırasında yapılan **UPDATE**'ler
+  - ❌ **yakalanmaz:** eşit sayıda **DELETE + INSERT**
+  - ❌ **yakalanmaz:** tablolar arası **FK tutarsızlığı** (A tablosu okunduktan
+    sonra eklenen bir satır B'de görünür, A'da görünmez)
+
+  Yani "0 hata" = *"sayıyı değiştiren bir yazma görmedim"*, **"tutarlı bir an
+  yakaladım" DEĞİL**. Gerçekten atomik snapshot REST üzerinden mümkün değildir;
+  Supabase Pro planındaki **PITR** ya da doğrudan `pg_dump` gerekir
+  (kullanıcı-tarafı madde). Pratik kural değişmedi: **sistem kullanımdayken
+  değil, gün sonunda alın.**
+- **Yedeğin kendi bütünlüğü ayrı bir şeydir ve DOĞRULANIR.** `npm run restore`
+  hedefe tek bayt yazmadan önce manifestteki SHA-256'ları hem tablo dosyaları
+  hem storage objeleri için karşılaştırır; bir tanesi bile tutmazsa **hiçbir şey
+  yazılmaz** (exit 1). Manifestte olup diskte olmayan dosya artık "boş tablo"
+  değil **hata** sayılır. Kuru çalışmada da koşar — yani prova, yedeğin
+  okunabilirliğini de ölçer.
 - Free planda **PITR yok**: kayıp penceresi son yedekten bu yanadır.

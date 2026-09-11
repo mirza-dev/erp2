@@ -120,4 +120,75 @@ describe("GATE — yedekleme aracı", () => {
         };
         expect(pkg.scripts.restore).toBe("tsx scripts/restore.ts");
     });
+
+    /**
+     * 2026-09-11 — dış inceleme #3.
+     *
+     * `backup.ts` 2026-08-30'dan beri her tablo için SHA-256 yazıyordu ve
+     * `restore.ts` bu alanı TİPİNDE tanıyordu — ama hiç OKUMUYORDU. Tek kontrol,
+     * işlem bittikten SONRAKİ satır sayısı karşılaştırmasıydı: bozulmuş bir
+     * yedek, satır sayısı tuttuğu sürece "başarılı" geri yüklenebiliyordu.
+     * Daha incesi, manifestte olup diskte olmayan dosya BOŞ TABLO sayılıyordu
+     * (`ndjson()` `[]` dönüyordu) → felaket anında veri "silinmiş" görünür,
+     * kimse fark etmezdi.
+     */
+    describe("yedek bütünlüğü — yazmadan ÖNCE doğrulanır", () => {
+        const restore = readFileSync(join(process.cwd(), "scripts/restore.ts"), "utf8");
+        const backup = readFileSync(join(process.cwd(), "scripts/backup.ts"), "utf8");
+        const code = (s: string) =>
+            s.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+
+        it("restore manifest özetlerini GERÇEKTEN karşılaştırıyor", () => {
+            const c = code(restore);
+            expect(c, "doğrulama fonksiyonu yok").toMatch(/function verifyBackup/);
+            expect(c, "özet hesaplanmıyor").toMatch(/sha256\(readFileSync\(/);
+            expect(c, "manifest özetiyle karşılaştırma yok").toMatch(/!==\s*stat\.sha256/);
+        });
+
+        it("doğrulama hedefe YAZMADAN önce koşuyor ve tümü-ya-hiç", () => {
+            const c = code(restore);
+            const verifyAt = c.indexOf("verifyBackup(manifest)");
+            const firstWrite = c.indexOf('method: "POST"');
+            expect(verifyAt, "verifyBackup çağrılmıyor").toBeGreaterThan(-1);
+            expect(firstWrite, "ayrıştırıcı bozuk — hiç yazma çağrısı bulunamadı").toBeGreaterThan(-1);
+            expect(verifyAt, "doğrulama ilk yazmadan SONRA koşuyor").toBeLessThan(firstWrite);
+            // Bir tek özet tutmazsa hiçbir şey yazılmaz.
+            expect(c).toMatch(/integrity\.length[\s\S]{0,400}process\.exit\(1\)/);
+        });
+
+        it("eksik dosya BOŞ TABLO sayılmıyor", () => {
+            // KIRMIZI-KANIT BİR ZAYIFLIK YAKALADI (9. kez "desen komşusuna
+            // tutundu"): ilk yazım yalnız `/manifestte var, DİSKTE YOK/` diyordu.
+            // Aynı dize STORAGE kolunda da geçtiği için TABLO kolu tamamen
+            // silindiğinde kural YEŞİL kalıyordu. İddia artık tablo kolunun
+            // kendisine bağlı — `satır kaybı` yalnız orada üretiliyor.
+            const c = code(restore);
+            expect(c, "eksik TABLO dosyası hata sayılmıyor").toMatch(/satır kaybı/);
+            expect(c, "eksik STORAGE objesi hata sayılmıyor")
+                .toMatch(/storage\/\$\{bucket\}\/\$\{rel\}: manifestte var, DİSKTE YOK/);
+        });
+
+        it("storage objeleri de özetleniyor ve doğrulanıyor", () => {
+            expect(code(backup), "obje başına özet üretilmiyor").toMatch(/hashes\[full\] = sha256\(buf\)/);
+            expect(code(backup), "özetler manifeste yazılmıyor").toMatch(/sha256: hashes/);
+            expect(code(restore), "obje özetleri doğrulanmıyor").toMatch(/stat\.sha256/);
+            // Eski yedekler (özetsiz) REDDEDİLMEZ ama rapor edilir.
+            expect(code(restore)).toMatch(/2026-09-11 öncesi yedek/);
+        });
+
+        it("iki taraf AYNI özet gövdesini kullanıyor (ayrışırsa doğrulama anlamsızlaşır)", () => {
+            const body = /createHash\("sha256"\)\.update\(body as never\)\.digest\("hex"\)/;
+            expect(code(backup)).toMatch(body);
+            expect(code(restore)).toMatch(body);
+        });
+
+        it("belge artık satır-sayısı kontrolünün NE YAKALAMADIĞINI da yazıyor", () => {
+            // #8: "arada yazma olursa satır sayısı kontrolü bildirir" YANILTICIYDI.
+            const doc = readFileSync(join(process.cwd(), "docs/backup-restore.md"), "utf8");
+            expect(doc).toMatch(/yakalanmaz:\*\* yedek sırasında yapılan \*\*UPDATE/);
+            expect(doc).toMatch(/eşit sayıda \*\*DELETE \+ INSERT/);
+            expect(doc, "yanıltıcı eski cümle geri gelmiş")
+                .not.toMatch(/arada yazma olursa satır\s*\n?\s*sayısı kontrolü bunu hata olarak bildirir \(tekrar koşun\)\./);
+        });
+    });
 });
