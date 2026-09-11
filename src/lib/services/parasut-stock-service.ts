@@ -51,10 +51,32 @@ export interface ReconcileStockResult {
     autocorrect: boolean;
     drifts:      StockDriftRow[];
     disabled?:   boolean;
+    /**
+     * Tavan doldu mu? `true` ise KATALOĞUN TAMAMI TARANMADI ve bir sonraki
+     * koşum da aynı yerden başlar. Sessiz kesilme olmasın diye rapora yazılır.
+     */
+    truncated?:  boolean;
 }
 
-/** Tek koşuda incelenecek ürün sayısı — Paraşüt limiti 10 istek/10 sn. */
-const RECONCILE_BATCH = 100;
+/**
+ * Tek sorguda okunacak ürün sayfası. Paraşüt limiti 10 istek/10 sn olduğu için
+ * API çağrıları zaten seri; bu yalnız DB okuma sayfası.
+ */
+const RECONCILE_PAGE = 100;
+/**
+ * Tek koşumda incelenecek TOPLAM ürün tavanı.
+ *
+ * 2026-09-11 (dış inceleme #4): önceden sabit `.limit(100)` vardı ve sorguda
+ * `.order()` YOKTU. PostgREST sırasız sorguda deterministik bir sıra vaat
+ * etmez ama pratikte aynı ilk 100 satırı döndürür → 100'den sonraki her ürün
+ * HİÇBİR ZAMAN kontrol edilmiyordu ve stok sapmaları kalıcı oluyordu.
+ *
+ * Kolon eklemek yerine (mig.107/108 sırası karışmasın) TAM TARAMA seçildi:
+ * `sku`ya göre deterministik sayfalama, tavana kadar. Gece koşan bir cron için
+ * ürün başına bir API çağrısı kabul edilebilir; tavan yalnız sonsuz koşuma
+ * karşı bir emniyet supabı ve doldu mu diye RAPOR EDİLİYOR.
+ */
+const RECONCILE_MAX = Number(process.env.PARASUT_RECONCILE_MAX ?? 2000);
 /** Tek `stock_updates` çağrısına konacak kalem sayısı. */
 const CORRECTION_CHUNK = 25;
 
@@ -113,16 +135,31 @@ export async function serviceReconcileParasutStock(): Promise<ReconcileStockResu
 
     // Yalnız Paraşüt'e kayıtlı ürünler karşılaştırılır; henüz senkronlanmamış
     // ürün "sapma" değildir (satış/alış akışı sırasında yaratılır).
-    const { data, error } = await supabase
-        .from("products")
-        .select("id, sku, name, on_hand, parasut_product_id")
-        .not("parasut_product_id", "is", null)
-        .eq("is_active", true)
-        .limit(RECONCILE_BATCH);
+    //
+    // SIRA ZORUNLU: `.order("sku")` olmadan `.range()` satır kaçırır/yineler —
+    // `backup.ts`in 2026-08-30'da öğrendiği dersin aynısı.
+    const products: ProductRow[] = [];
+    let truncated = false;
+    for (let from = 0; from < RECONCILE_MAX; from += RECONCILE_PAGE) {
+        const to = Math.min(from + RECONCILE_PAGE, RECONCILE_MAX) - 1;
+        const { data, error } = await supabase
+            .from("products")
+            .select("id, sku, name, on_hand, parasut_product_id")
+            .not("parasut_product_id", "is", null)
+            .eq("is_active", true)
+            .order("sku", { ascending: true })
+            .range(from, to);
 
-    if (error) throw new Error(`Mutabakat için ürünler okunamadı: ${error.message}`);
+        if (error) throw new Error(`Mutabakat için ürünler okunamadı: ${error.message}`);
 
-    const products = (data ?? []) as unknown as ProductRow[];
+        const page = (data ?? []) as unknown as ProductRow[];
+        products.push(...page);
+        if (page.length < to - from + 1) break;          // katalog bitti
+        if (products.length >= RECONCILE_MAX) {
+            truncated = true;                             // tavan doldu — sessiz kalmaz
+            break;
+        }
+    }
     const drifts: StockDriftRow[] = [];
     let failed = 0;
 
@@ -218,5 +255,6 @@ export async function serviceReconcileParasutStock(): Promise<ReconcileStockResu
         failed,
         autocorrect,
         drifts,
+        ...(truncated ? { truncated: true } : {}),
     };
 }

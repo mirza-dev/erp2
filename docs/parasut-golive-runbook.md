@@ -155,6 +155,19 @@ Mal kabul ve sevk anında zaten best-effort tetik var; CRON'lar **emniyet ağı*
 **Acil kapatma:** `PARASUT_ENABLED=false` → redeploy. Tüm yollar anında ölür,
 kesilmiş belgeler Paraşüt'te kalır (oradan iptal edilir).
 
+### Go-live sonrası İLK HAFTA — iki sayacı gözle
+
+2026-09-11 dış incelemesi iki **toplu iş ilerleme** kusuru buldu. İkisi de
+düzeltildi ve kapıya bağlandı, ama belirtileri sessiz olduğu için canlıda bir
+kez doğrulanmalı — çünkü ikisi de yalnız Paraşüt AÇIKKEN görünür:
+
+| Ne | Nerede | Sağlıklı | Kusurun belirtisi |
+|---|---|---|---|
+| Katalog tam taranıyor mu | `POST /api/parasut/reconcile-stock` yanıtı | `checked` ≈ `parasut_product_id` dolu aktif ürün sayısı; `truncated` **yok** | `checked` hep aynı sayıda takılıyor → kalan ürünlerin stok sapması hiç görülmez. `truncated: true` çıkarsa `PARASUT_RECONCILE_MAX`'ı yükseltin. |
+| Tahsilat kuyruğu ilerliyor mu | `POST /api/parasut/poll-payments` yanıtı | `failed` sıfıra yakın; ardışık koşumlarda **farklı** belgeler kontrol ediliyor | `failed` sürekli >0 ve hep aynı sayıda → kuyruk baştaki bozuk belgelere kilitlenmiş, gerideki faturaların tahsilat durumu bayat. |
+
+Sorgu (Studio): `select count(*) from products where parasut_product_id is not null and is_active;`
+
 ---
 
 ## 7. Bilinçli kapsam dışı (v1)

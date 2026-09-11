@@ -172,6 +172,31 @@ async function pollOne(target: PollTarget): Promise<PollPaymentsResult> {
                 parasut_payment_poll_fail: pe.message,
                 kind: pe.kind, table: target.table, rowId,
             }));
+
+            /**
+             * 2026-09-11 (dış inceleme #5) — KUYRUK KİLİDİ.
+             *
+             * Adaylar `parasut_payment_checked_at` sırasıyla (null'lar önce)
+             * 40'lık gruplar hâlinde seçiliyor. Hata kolu bu damgayı YAZMIYORDU:
+             * kalıcı olarak hata veren 40 belge sonsuza dek `null` kalıyor, her
+             * koşumda yeniden ilk sıraya geliyor ve GERİDEKİ TÜM faturaların
+             * tahsilat durumu bayatlıyordu. Tek bir bozuk uzak belge bütün
+             * kuyruğu durdurmaya yetiyordu.
+             *
+             * YALNIZ damga yazılır — durum alanlarına DOKUNULMAZ. Bayat bir
+             * durumu "taze" göstermek, bilmemekten kötü olurdu. Sonuç: başarısız
+             * belge kuyruğun SONUNA düşer, sıradakiler ilerler, kayıt `failed`
+             * sayacında ve konsolda görünür kalır.
+             */
+            const { error: stampErr } = await supabase
+                .from(target.table)
+                .update({ parasut_payment_checked_at: new Date().toISOString() })
+                .eq("id", rowId);
+            if (stampErr) {
+                console.error(JSON.stringify({
+                    parasut_payment_stamp_fail: stampErr.message, table: target.table, rowId,
+                }));
+            }
         }
     }
 
