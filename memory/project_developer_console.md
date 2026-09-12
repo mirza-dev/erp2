@@ -133,9 +133,11 @@ gutter'ı taşıdığı **ayrıca** kilitlendi.
 (7 satır) → **1183×19px (1 satır)** · `<dt>` 450 → **600** · Yapılandırma
 tabanları 610/627 → **756 (hepsi)** · Performans satırları 58/41 → **41 (hepsi)**.
 
-**AÇIK — D1 (ertelendi, kullanıcı kararı):** konsolun filtreleri URL'ye
-yazılmıyor (`?status=all&range=30d` yok sayılıyor; dizinde `useSearchParams`/
-`router.replace`/`replaceState` **sıfır**) → filtrelenmiş görünüm paylaşılamıyor.
-`useSearchParams` + Suspense sınırı gerektirir, ayrı tur.
-**Kapsam dışı:** Developer Console mobil / dokunma hedefleri (6 sayfada `tap-44`
-sıfır, 14 rotalık duyarlılık denetimine hiç girmediler).
+**~~AÇIK — D1~~ → KAPANDI (2026-09-04).** Kayıt "filtreler URL'ye yazılmıyor;
+dizinde `useSearchParams`/`router.replace`/`replaceState` **sıfır**" diyordu.
+2026-09-12'de kaynaktan ölçüldü: YENİ `src/hooks/useUrlFilters.ts` (kendi
+yorumu "A4 — filtre durumunu URL'de tutan istemci hook'u") ve konsolun **beş
+sayfası** onu kullanıyor (`page` · `bugs` · `logs` · `errors` · `performance`).
+**~~Kapsam dışı: mobil / dokunma hedefleri~~ → KAPANDI (2026-09-10, A5):**
+"6 sayfada `tap-44` sıfır" iddiası da bayat — `tap-44` artık `layout.tsx`
+dahil dört konsol dosyasında.

@@ -5,6 +5,50 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-09-12 (3) — MEMORY.md taştı: üç bellek dosyası sessizce yüklenmiyordu
+
+Oturum açılırken harness uyardı: *"MEMORY.md is 24.8KB (limit 24.4KB) — only
+part of it was loaded: **3 of 46 lines were cut off**"*. Yani kalıcı belleğin
+indeksi yükleme bütçesini aşmış ve **son üç girdi oturuma hiç gelmemişti**:
+`feedback_contract_in_types_not_comments` (deponun en çok tekrarlanan
+derslerini taşıyan dosya), `feedback_global_over_hardcode`,
+`feedback_ask_scope_decisions`.
+
+**Sebebi kendi önceki iki commit'imdi** (`b05d749`, `384acea`): tur
+anlatılarını indeks satırlarının başına eklemiştim. **Kusur sessiz** — hiçbir
+şey hata vermez, girdiler yalnızca gelmez; eksikliği ancak uyarıyı okursan
+görürsün.
+
+**Ölçüm:** 27.357 bayt (26,7 KB), bütçe 24.985 → **2.372 bayt taşma**. Tek bir
+girdi — `current_focus.md` — **12.323 bayttı, dosyanın %45'i**. 35 girdinin
+8'i 400 baytı aşıyordu.
+
+**Kırpmak hiçbir şey kaybettirmedi** çünkü indeks satırları saf tekrardı:
+`current_focus.md` 281 KB ve indekse tıkıştırılan her maddenin tam `##`
+bölümünü zaten taşıyor. 14 iddia tek tek `grep`le konu dosyasında doğrulandı.
+8 girdi kancaya indi → **27.357 → 8.789 bayt (8,6 KB)**, ~16 KB pay.
+
+**KAPININ KÖR NOKTASI (bu turun asıl bulgusu):** `gate/memory-index` o turda
+**YEŞİL geçti**. Beş kuralı da indeksin *doğru gösterdiğini* denetliyordu
+(hayalet bağ, öksüz dosya, frontmatter, wiki-bağ) — hiçbiri *yüklendiğini*
+denetlemiyordu. İndeks %100 tutarlıydı; yalnızca teslim edilmiyordu. Aynı
+imzanın üçüncü tekrarı: **bir kapı ölçtüğü şeyi kapsar, adının ima ettiğini
+değil.** İki kural eklendi — toplam ≤ 20 KB (**sonucu**) + girdi başına ≤ 400
+bayt (**sebebi**); tek başına toplam kuralı olsaydı tek dev satır yine
+saklanabilirdi. Eşik gerçek uçurumun (24,4 KB) altında ki kapı önce yansın.
+**İki kural da bağımsız kırmızı-kanıtlı**: her mutasyon yalnız kendi kuralını
+düşürdü, öteki yeşil kaldı.
+
+**Yan bulgu — kırpma bayat kayıt açığa çıkardı:** `project_developer_console.md`
+hâlâ *"AÇIK — D1: filtreler URL'ye yazılmıyor; dizinde `useSearchParams`/
+`router.replace`/`replaceState` **sıfır**"* diyordu. Kaynak: `useUrlFilters.ts`
+VAR ve konsolun **beş sayfası** kullanıyor (A4, 2026-09-04). Aynı bloğun
+"kapsam dışı: 6 sayfada `tap-44` sıfır" iddiası da bayat (A5, 2026-09-10 —
+`tap-44` dört konsol dosyasında). İkisi de düzeltildi.
+
+Ürün kodu değişikliği **YOK** (bellek + gate testi). tsc 0 · lint 0 ·
+**508 dosya / 7084 test** · gate 7/7.
+
 ## 2026-09-12 (2) — "Açık bulgu kalmadı değil mi?" → ölçüm HAYIR dedi; `npm audit` 9 → 0
 
 Kullanıcı Strix turu bitince sordu, sonra hedefi koydu: **kendi yapacakları

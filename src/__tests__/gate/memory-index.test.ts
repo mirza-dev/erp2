@@ -105,4 +105,46 @@ describe("GATE — bellek indeksi bütünlüğü", () => {
         expect(scanned, "hiç wiki-bağ taranmadı — kural boş kümeyi denetliyor").toBeGreaterThanOrEqual(20);
         expect(broken, "kırık [[bağ]] — hedef dosya depoda yok").toEqual([]);
     });
+
+    // ── Bütçe kuralları (2026-09-12'de ölçülen gerçek kusur) ──────────────────
+    //
+    // Yukarıdaki dört kural indeksin DOĞRU GÖSTERDİĞİNİ denetliyor; hiçbiri
+    // indeksin YÜKLENDİĞİNİ denetlemiyordu. MEMORY.md 26,7 KB'a çıkınca harness
+    // onu 24,4 KB'lık bütçede kesti ve SON ÜÇ GİRDİ oturum başında hiç gelmedi
+    // (`feedback_contract_in_types_not_comments` · `feedback_global_over_hardcode`
+    // · `feedback_ask_scope_decisions`). Kapı o turda YEŞİL geçti: indeks %100
+    // tutarlıydı, yalnızca teslim edilmiyordu.
+    //
+    // Kusur sessiz — hiçbir şey hata vermez, girdi yalnızca GELMEZ. O yüzden iki
+    // kural birden gerekiyor: toplam SONUCU, satır başına tavan SEBEBİ yakalar.
+    // Tek başına toplam kuralı olsaydı tek bir dev satır yine saklanabilirdi
+    // (o turda `current_focus.md` girdisi 12.323 bayttı — dosyanın %45'i).
+    //
+    // Eşik gerçek uçurumun (24,4 KB) ALTINDA seçildi ki kapı önce yansın.
+    const INDEX_BUDGET = 20 * 1024;
+    const ENTRY_CAP = 400;
+
+    it(`MEMORY.md yükleme bütçesine sığar (< ${INDEX_BUDGET} bayt)`, () => {
+        const bytes = Buffer.byteLength(index, "utf8");
+        expect(bytes, "indeks boş okundu — kural sahte-yeşil olurdu").toBeGreaterThan(500);
+        expect(
+            bytes,
+            `MEMORY.md ${bytes} bayt — bütçeyi aşıyor. Harness fazlasını SESSİZCE keser ` +
+                "ve sondaki girdiler oturuma hiç gelmez. Detayı konu dosyasına taşı; " +
+                "indeks bir YÖNLENDİRİCİ, özet deposu değil.",
+        ).toBeLessThanOrEqual(INDEX_BUDGET);
+    });
+
+    it(`hiçbir indeks girdisi ${ENTRY_CAP} baytı aşmaz`, () => {
+        const entries = index.split("\n").filter((l) => l.startsWith("- ["));
+        expect(entries.length, "hiç indeks girdisi bulunamadı — kural boş kümeyi denetliyor")
+            .toBeGreaterThanOrEqual(20);
+        const over = entries
+            .map((l) => ({ bytes: Buffer.byteLength(l, "utf8"), ad: l.split("](")[0].slice(3) }))
+            .filter((e) => e.bytes > ENTRY_CAP);
+        expect(
+            over,
+            "indeks girdisi çok uzun — tur anlatısı indekse değil konu dosyasına yazılır",
+        ).toEqual([]);
+    });
 });
