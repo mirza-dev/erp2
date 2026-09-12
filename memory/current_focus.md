@@ -5,6 +5,20 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-09-12 — Strix denemesi + `@anthropic-ai/sdk` 0.80→0.81 (MEDIUM CVE kapandı)
+
+Kullanıcı açık kaynak **Strix** (otonom AI pentest) aracını denedi. Güvenli koşum:
+sırlar/backups çıkarılmış **temiz kod export'u** hedeflendi (ham worktree DEĞİL —
+canlı sır sızma riski). **ChatGPT aboneliği çalışmadı**: OpenAI'nin Codex-giriş yolu
+pentest yükünü içerik guardrail'iyle reddediyor ("Trusted Access for Cyber" gerekiyor).
+OpenRouter **Kimi K2.6** ile $5 bütçe tavanı **gerçek kod analizine geçmeden doldu**
+(`surfaces_reviewed: 0`; cache indirimi yok). Tek somut çıktı **iki bağımlılık CVE'si**
+(npm-audit seviyesi) → **`@anthropic-ai/sdk` 0.80.0 → 0.81.0** ile CVE-2026-34451
+(MEDIUM, path-validation sandbox kaçışı) kapatıldı; kalan file-perms uyarısı 0.125.0
+(kırıcı) istiyor, memory-tool kullanılmadığı için bırakıldı. **Ders:** bu araçla derin
+tarama pahalı; iç denetimlerimiz daha kapsamlı. Sonraki: ücretsiz uzun koşu (Gemini).
+tsc 0 · lint 0 · **508/7082** · build 0.
+
 ## 2026-09-11 (3) — "Secure password change" açıldı; Ayarlar'daki şifre değiştirme kırılıyordu
 
 Kullanıcı prod panelinde 12 bulgu turunun kullanıcı-tarafı maddesini kapattı
@@ -994,6 +1008,12 @@ Kalan tek açık `@anthropic-ai/sdk` (orta): iki uyarı da **yerel dosya sistemi
 Memory Tool**'una dair, düzeltmesi kırıcı major. **Ölçüldü: bu projede memory
 tool / betas / dosya-sistemi aracı hiç kullanılmıyor** → kullanılmayan özellik
 için kırıcı major'a atlanmadı. Tetikleyici raporda yazılı.
+
+**2026-09-12 güncellemesi:** Strix taraması iki CVE işaret etti; **0.80.0 → 0.81.0**
+(güvenli patch) **CVE-2026-34451'i (MEDIUM, path-validation sandbox kaçışı) kapattı**
+— `npm audit` artık onu listelemiyor. Kalan tek uyarı dosya-izni (moderate,
+GHSA-p7fg-763f-g4gf); `npm audit` düzeltmeyi **0.125.0**'da (kırıcı major) veriyor →
+memory-tool kullanılmadığı için yine bilerek bırakıldı.
 
 **#19 parola politikası:** kural DÖRT yere kopyalanmıştı ve dördü de yalnız
 `length >= 8`. Kopyalanmış kuralın tehlikesi ayrışmadır — kullanıcı **en gevşek
