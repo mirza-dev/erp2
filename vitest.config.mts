@@ -1,6 +1,12 @@
 import { defineConfig } from "vitest/config";
 import path from "path";
 
+// 2026-09-12: dosya `.ts` iken ESM sözdizimi CommonJS olarak yükleniyordu ve
+// Vite bunu "gelecek major'da desteklenmeyecek" diye uyarıyordu. `.mts`ye
+// alındı — ama `.mts` ESM'dir, yani `__dirname` YOKTUR. Alias sessizce
+// bozulsaydı `@/...` çözülemez ve 7082 testin tamamı düşerdi; ESM karşılığı
+// `import.meta.dirname` (Node >= 20.11) ile değiştirildi.
+
 export default defineConfig({
   test: {
     environment: "node",
@@ -22,7 +28,7 @@ export default defineConfig({
   },
   resolve: {
     alias: {
-      "@": path.resolve(__dirname, "./src"),
+      "@": path.resolve(import.meta.dirname, "./src"),
     },
   },
 });

@@ -5,6 +5,53 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-09-12 (2) — "Açık bulgu kalmadı değil mi?" → ölçüm HAYIR dedi; `npm audit` 9 → 0
+
+Kullanıcı Strix turu bitince sordu, sonra hedefi koydu: **kendi yapacakları
+(env/panel/hukuk/deploy) hariç kapatılabilecek her şey kapansın.** Bu bir kod
+denetimi turu değil, **envanterin gerçekle hizalanması** turuydu — ve envanter
+backlog notlarından değil **kaynaktan** çıkarıldı.
+
+**Kayıtlı iddiaların yarısı yanlıştı.** (a) "Kalan tek açık `@anthropic-ai/sdk`"
+**BAYATTI**: gerçek **9 açık, 3 YÜKSEK** — kayıt yazıldıktan sonra yeni advisory
+yayınlanmıştı (`toml`←react-doctor, `picomatch`+`brace-expansion`←@sentry/nextjs
+zinciri, vitest üçlüsü, esbuild, @humanfs/node). (b) "purchase-copilot + ai/parse
++ ai/score RBAC'siz (düşük)" satırı **açık bulgu DEĞİLdi**: `route-guard-baseline`
+**sıfır `ACIK-BULGU`** taşıyor (19 public / 4 redaction / 6 self-auth) ve satırın
+gövdesi zaten 2026-09-10 kararını kaydetmişti — kusur içerikte değil **başlığın
+açık borç gibi okunmasındaydı.** (c) D bloğunun "8 MANUAL redefine SQL bekliyor"
+kaydı 2026-09-11'de kapanmıştı.
+
+**Kritik ayrım ölçüldü:** 9 uyarının **yalnız 1'i üretimde** (`--omit=dev`),
+8'i build/test zincirinde — yani "3 YÜKSEK" başlığı tek başına yanıltıcıydı.
+
+**Hepsi kırıcı OLMAYAN yoldan kapandı.** `npm audit fix` 9→5'e indirdi ama
+vitest üçlüsünde takıldı; sebep ölçüldü: yamalı sürüm **4.1.11 zaten `^4.1.1`
+aralığının içindeydi**, `audit fix` kendiliğinden bulamamıştı → elle 4.1.11.
+`esbuild` için override ZORLANMADI; `tsx` 4.21→4.23.13'ün (`^4.21.0` içinde)
+`esbuild ~0.28.0` istediği görülüp temiz yoldan 0.28.2 geldi.
+
+**Uzun süre ertelenen SDK kırıcı major'ı da kapandı — erteleme gerekçesi
+ölçümle çürüdü.** Kayıt "kullanılmayan özellik için kırıcı major'a atlamak
+kazançsız risk" diyordu; fizibilite bakılınca yüzey **2 dosya / tek API**
+çıktı (`new Anthropic({…})` + `messages.create`, 14 çağrı), **`.beta.` yok,
+memory tool yok, models API yok** → yani riskin kendisi varsayımdı. 0.81.0 →
+**0.125.0**, kapı yeşil.
+
+**Yükseltmenin kendisi bir uyarı doğurdu ve o da kapatıldı.** Yeni Vite,
+`vitest.config.ts`in ESM sözdizimini CommonJS olarak yüklediğini bildirdi
+(gelecek major'da hata). `.mts`ye alındı — ama **körlemesine rename alias'ı
+sessizce kırardı**: `.mts` ESM'dir, `__dirname` YOKTUR → `@/...` çözülemez,
+7082 testin tamamı düşerdi. `import.meta.dirname` (Node ≥20.11) ile değişti.
+
+**Kullanıcı kararı:** çağıranı sıfır olan iki AI ucuna (`ai/parse`, `ai/score`)
+**dokunulmadı** — ne izin eklendi ne silindi (2026-09-10 kararıyla tutarlı).
+
+`src/` altında **kod değişikliği YOK**; değişen yalnız `package.json` +
+`package-lock.json` + `vitest.config.mts` + kayıtlar. **`npm audit` 0 (üretim
+de 0)** · tsc 0 · lint 0 · **508 dosya / 7082 test** · build **0 uyarı** ·
+**E2E 94/94 retries=0**.
+
 ## 2026-09-12 — Strix denemesi + `@anthropic-ai/sdk` 0.80→0.81 (MEDIUM CVE kapandı)
 
 Kullanıcı açık kaynak **Strix** (otonom AI pentest) aracını denedi. Güvenli koşum:
