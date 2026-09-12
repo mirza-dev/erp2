@@ -53,7 +53,11 @@ const FILES = walk(APP).map(f => ({ path: relative(root, f), code: stripComments
 const HEADER_EXCEPTIONS: Record<string, string> = {
     "src/app/not-found.tsx": "uygulama kabuğu dışında, bağımsız 404 sayfası",
     "src/app/global-error.tsx": "kök hata sınırı — kendi <html>'ini kurar, uygulama bileşeni kullanamaz",
-    "src/app/offline/page.tsx": "service worker'ın döndürdüğü sabit sayfa; kasten istemci mantığı yok",
+    // 2026-09-12: eski gerekçe "kasten istemci mantığı yok" diyordu ve ARTIK
+    // DOĞRU DEĞİL (`OfflineReason` eklendi). Gerekçe asıl sebebi söylüyor:
+    // PageHeader zinciri uygulama kabuğuna bağlı, çevrimdışıyken yüklenemez.
+    "src/app/offline/page.tsx":
+        "service worker'ın döndürdüğü yedek sayfa; PageHeader zinciri uygulama kabuğuna bağlı, ağ ölüyken yüklenemez",
     "src/app/dashboard/settings/product-types/[id]/page.tsx": "detay kahramanı: geri-kırıntı + ikon + durum çipleri",
     "src/app/dashboard/products/[id]/page.tsx": "başlığın SOLUNDA 80px ürün görseli — PageHeader satır düzeni bunu ifade edemez",
     "src/app/dashboard/developer/layout.tsx": "'Console kapalı' uyarı başlığı, sayfa başlığı değil",

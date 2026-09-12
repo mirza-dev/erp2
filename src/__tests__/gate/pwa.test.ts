@@ -36,7 +36,9 @@ const sw = readFileSync(join(root, "public/sw.js"), "utf8");
  * dosyada bir metnin YAZILI olduğunu söyleyen iddialar (KILL SWITCH yordamı)
  * ham `sw`de kalır, çünkü onlar bilerek yorumu ölçer.
  */
-const swCode = sw.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+const stripComments = (src: string) =>
+    src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+const swCode = stripComments(sw);
 const layout = readFileSync(join(root, "src/app/layout.tsx"), "utf8");
 const nextConfig = readFileSync(join(root, "next.config.ts"), "utf8");
 
@@ -138,6 +140,49 @@ describe("GATE — PWA", () => {
         expect(offline).not.toMatch(/from "next\/link"/);
         expect(offline).toMatch(/<a\s/);
         expect(offline).toMatch(/next\/link DEĞİL, bilinçli/); // gerekçe kodda kalsın
+    });
+
+    it("çevrimdışı sayfa SEBEBİ koşulsuz iddia etmiyor", () => {
+        // SW bu sayfayı iki apayrı sebep için döndürüyor: cihaz çevrimdışı, ya da
+        // cihaz çevrimiçi ama SUNUCU/ADRES ölü. 2026-09-12'ye kadar metin koşulsuz
+        // "Bağlantı yok — bağlantı gelince yenileyin" diyordu; ikinci durumda bu
+        // yanlış teşhisti (ölçülen olay: ölmüş `trycloudflare.com` tüneli, telefonda
+        // dört çubuk sinyal, kullanıcı Wi-Fi'sini kurcaladı).
+        //
+        // İddia h1 ve paragrafın KENDİ gövdelerine bağlanıyor: dosyada bir yerde
+        // `<OfflineReason` geçmesi yetmez — metni gerçekten o iki eleman basmalı.
+        // (Bu depoda kaynak iddiaları 6+ kez sınırından kaçıp komşusuna tutundu.)
+        const code = stripComments(readFileSync(join(root, "src/app/offline/page.tsx"), "utf8"));
+        const h1 = code.match(/<h1\b[^>]*>([\s\S]*?)<\/h1>/)?.[1] ?? "";
+        const p = code.match(/<p\b[^>]*>([\s\S]*?)<\/p>/)?.[1] ?? "";
+
+        expect(h1.trim(), "h1 gövdesi okunamadı — kural boş dizeyi denetliyor").not.toBe("");
+        expect(p.trim(), "paragraf gövdesi okunamadı — kural boş dizeyi denetliyor").not.toBe("");
+
+        expect(h1, "başlık metni sabit yazılmış").toContain('<OfflineReason part="title" />');
+        expect(p, "açıklama metni sabit yazılmış").toContain('<OfflineReason part="detail" />');
+        expect(h1, 'koşulsuz "Bağlantı yok" başlığı geri gelmiş').not.toContain("Bağlantı yok");
+    });
+
+    it("teşhisin BAŞLANGIÇ durumu sebep-nötr (precache edilen metin bu)", () => {
+        // Sayfa SW önbelleğinden servis edilir → ekranda SUNUCUDA üretilmiş HTML
+        // durur. Hidratlanması `/_next/static/` chunk'ının da önbellekte olmasına
+        // bağlı ve olmayabilir → `useEffect` HİÇ koşmaz, ekranda sonsuza dek ilk
+        // render kalır. Başlangıç `device-offline` yapılsa telefona "internetin
+        // yok" diyen bir sayfa precache edilirdi — düzelttiğimiz kusurun aynısı.
+        const reason = stripComments(
+            readFileSync(join(root, "src/app/offline/OfflineReason.tsx"), "utf8"),
+        );
+        expect(reason, "üç durumlu teşhis birliği kaybolmuş").toMatch(
+            /"unknown"\s*\|\s*"device-offline"\s*\|\s*"server-unreachable"/,
+        );
+        expect(reason, "başlangıç durumu sebep-nötr DEĞİL").toMatch(
+            /useState<Diagnosis>\("unknown"\)/,
+        );
+        // İki durumlu `useOnlineStatus` burada kullanılamaz: başlangıç değeri
+        // "çevrimiçi", yani hidratlanmayan bir cihazda gerçekten çevrimdışı olan
+        // kullanıcıya "internetin çalışıyor" derdi.
+        expect(reason, "iki durumlu hook geri gelmiş").not.toMatch(/useOnlineStatus/);
     });
 
     it("service worker development'ta kaydolmuyor, mevcut kaydı söküyor", () => {

@@ -135,20 +135,20 @@ birlikte dayatıyor; üçü de kod kusuru değil, bilinçli tasarım:
 ### Adımlar
 
 ```bash
-cp .env.local .env.yerel.local     # yerel yapılandırmayı sakla
-cp .env.canli.local .env.local     # canlı Supabase'e çevir
-npm run build && npm start         # SW yalnız burada kaydolur
-cloudflared tunnel --url http://localhost:3000
+cp .env.canli.local .env.production.local   # YALNIZ üretim modunun okuduğu profil
+npm run build && npx next start -p 3001     # SW yalnız üretimde kaydolur
+cloudflared tunnel --url http://localhost:3001
 ```
 
 `cloudflared` yoksa: `brew install cloudflared`. Hesap gerekmez.
 
-Bittiğinde **geri al** — yoksa `npm run dev` prod hedefi gördüğü için
-`predev` kapısında haklı olarak reddeder:
-
-```bash
-cp .env.yerel.local .env.local
-```
+**`.env.local`e DOKUNULMAZ (2026-09-12'de değişti).** Eski yordam `.env.local`i
+canlıya çeviriyordu; bu hem çalışan `npm run dev`i (yerel Supabase) bozuyor hem
+de geri almayı unutunca `predev` kapısına takılıyordu. Next, `production`
+modunda `.env.production.local`i `.env.local`in ÜSTÜNDE okur ve `next dev`
+o dosyayı HİÇ okumaz — iki sunucu yan yana, birbirinden habersiz çalışır
+(dev :3000 yerel DB, üretim :3001 canlı DB). Dosya `.gitignore`da (`.env*`).
+İş bitince silmek yeterli: `rm .env.production.local`.
 
 ### Telefonda
 
@@ -167,6 +167,16 @@ cp .env.yerel.local .env.local
 - **Canlı veritabanı.** Telefondan yapılan her yazma gerçektir.
 - **`next start` + `output: standalone` uyarısı** beklenen; `public/` ve tüm
   rotalar yine de doğru servis ediliyor (manifest/sw/ikon 200 ile doğrulandı).
-- macOS'un sistem çözümleyicisi yeni `*.trycloudflare.com` adını bazen
-  `ENOTFOUND` döndürür (`dns.resolve4` bulur, `getaddrinfo` bulamaz). Mac'e
-  özgüdür; telefon etkilenmez.
+- Yeni `*.trycloudflare.com` adı ilk dakikalarda klasik DNS'te (1.1.1.1 ve
+  8.8.8.8 dahil) çözülmeyebilir; DoH (`cloudflare-dns.com`) anında çözer. Yani
+  bu Mac'e özgü bir kusur değil, **yayılım gecikmesi** (2026-09-12'de ölçüldü:
+  tünel `Registered` iken UDP DNS 60+ sn boş döndü, DoH `104.16.231.132`
+  verdi). Mac'ten doğrulamak için: `curl --resolve <host>:443:<ip> https://<host>/api/health`.
+  Telefon genelde DoH kullanan bir çözümleyici arkasındadır, etkilenmez.
+- **Tünel kapanınca telefondaki ikon bu ekranı gösterir:** *"Roven'a
+  ulaşılamıyor — ya cihazın bağlantısı koptu ya da bu adres artık yayında
+  değil"*. Bu kusur DEĞİL, tasarım: PWA origin'e bağlıdır ve `trycloudflare`
+  adresi geçicidir. Sayfa 2026-09-12'ye kadar koşulsuz "Bağlantı yok" diyordu
+  ve sinyali tam olan telefonda kullanıcıyı Wi-Fi'ye baktırıyordu; artık
+  `navigator.onLine` ile sebebi ayırt ediyor (`src/app/offline/OfflineReason.tsx`).
+  Yeni tünel = yeni origin = eski ikonu silip yeniden eklemek gerekir.
