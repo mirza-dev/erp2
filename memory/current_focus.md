@@ -15,9 +15,32 @@ OpenRouter **Kimi K2.6** ile $5 bütçe tavanı **gerçek kod analizine geçmede
 (`surfaces_reviewed: 0`; cache indirimi yok). Tek somut çıktı **iki bağımlılık CVE'si**
 (npm-audit seviyesi) → **`@anthropic-ai/sdk` 0.80.0 → 0.81.0** ile CVE-2026-34451
 (MEDIUM, path-validation sandbox kaçışı) kapatıldı; kalan file-perms uyarısı 0.125.0
-(kırıcı) istiyor, memory-tool kullanılmadığı için bırakıldı. **Ders:** bu araçla derin
-tarama pahalı; iç denetimlerimiz daha kapsamlı. Sonraki: ücretsiz uzun koşu (Gemini).
-tsc 0 · lint 0 · **508/7082** · build 0.
+(kırıcı) istiyor, memory-tool kullanılmadığı için bırakıldı.
+
+**Ücretsiz Gemini koşusu da çöktü — ve bu yolun YAPISAL olarak kapalı olduğunu
+gösterdi.** Google AI Studio ücretsiz anahtarıyla `gemini-3.8-flash`: **703 istek /
+53.6M token / 28 dakika**, sonra Google'ın faturalandırma geçidi kesti —
+`403 PERMISSION_DENIED "Lightning dunning decision is deny for project 445932056496"`.
+Hız limiti DEĞİL, **proje seviyesi billing bloğu**: sonrasında 1 token'lık "hi" testi
+bile 403 (iki ayrı modelde doğrulandı) → anahtar kalıcı ölü. **Asıl ders: "ücretsiz VE
+uzun" Strix için kendi kendini yer** — bir koşuyu derin yapan token hacmi, ücretsiz
+kademelerin tam olarak engellemek için var olduğu şeydir; duvar modelden değil
+KOTADAN gelir, başka ücretsiz sağlayıcıda da tekrarlar.
+
+Koşunun çıktısı: **9 yüzey incelendi (hepsi auth/proxy), 0 bulgu dosyalandı**; tek
+"takip gerek" maddesi `src/proxy.ts` demo modu — kodun kendi yorumuyla **zaten
+denetlenmiş by-design** ("Denetim O11 (2026-06) — default FLIP"; demo = viewer,
+`GET /api/*` serbest ki DataProvider çekebilsin, non-GET → 403, ekler → 401). SQLi /
+SSRF / RBAC / secrets ajanlarının hepsi 403 gelince `failed` oldu; o 14 alan hiç
+kapsanmadı.
+
+**KARAR (kullanıcı, 2026-09-12): Strix BIRAKILDI.** Üç backend'in toplam karnesi —
+ChatGPT aboneliği: guardrail, hiç çalışmadı · OpenRouter Kimi ($5): 0 yüzey, 2
+bağımlılık CVE'si · Gemini (ücretsiz): 9 yüzey, 0 bulgu. Aynı dönemde iç
+denetimlerimiz 12 dış-rapor bulgusunu ve 20 maddelik listeyi doğrulayıp kapattı.
+**Yeniden denenecekse:** tam koşu ancak ~$15-20 ücretli bütçeyle biter — ROI iç
+denetimlerden yana. Artıklar (kod export'u, 1.4G `node_modules` kopyası) ve **her iki
+API anahtarı da silindi**. tsc 0 · lint 0 · **508/7082** · build 0.
 
 ## 2026-09-11 (3) — "Secure password change" açıldı; Ayarlar'daki şifre değiştirme kırılıyordu
 
