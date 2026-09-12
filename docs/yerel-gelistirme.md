@@ -167,12 +167,20 @@ o dosyayı HİÇ okumaz — iki sunucu yan yana, birbirinden habersiz çalışı
 - **Canlı veritabanı.** Telefondan yapılan her yazma gerçektir.
 - **`next start` + `output: standalone` uyarısı** beklenen; `public/` ve tüm
   rotalar yine de doğru servis ediliyor (manifest/sw/ikon 200 ile doğrulandı).
-- Yeni `*.trycloudflare.com` adı ilk dakikalarda klasik DNS'te (1.1.1.1 ve
-  8.8.8.8 dahil) çözülmeyebilir; DoH (`cloudflare-dns.com`) anında çözer. Yani
-  bu Mac'e özgü bir kusur değil, **yayılım gecikmesi** (2026-09-12'de ölçüldü:
-  tünel `Registered` iken UDP DNS 60+ sn boş döndü, DoH `104.16.231.132`
-  verdi). Mac'ten doğrulamak için: `curl --resolve <host>:443:<ip> https://<host>/api/health`.
-  Telefon genelde DoH kullanan bir çözümleyici arkasındadır, etkilenmez.
+- **Bu ağda (2026-09-12'de ölçüldü) `*.trycloudflare.com` adı UDP DNS'te
+  çözülmez — sebep Mac değil, ISP'nin port-53'ü ele geçirmesi.** Kanıt:
+  yetkili sunucuya (`kevin.ns.cloudflare.com`) doğrudan sorulan UDP sorgusu
+  `NXDOMAIN` + `flags: qr rd ra` döndü; **yetkili bir sunucu asla `ra`
+  (recursion available) demez** — cevabı araya giren ISP çözücüsü veriyor.
+  Aynı sorgu `+tcp` ile `NOERROR` + `aa` + `104.16.230.132` döndü. Yani kayıt
+  yayında, ama bu Wi-Fi'deki HER cihaz (aynı ağdaki telefon dahil) ISP'nin
+  sahte NXDOMAIN'ini görür; Google DoH'a da bu ağdan erişilemiyor. Eski
+  "Mac'e özgü ENOTFOUND" notu bu kusurun yanlış teşhisiydi (`dns.resolve4`
+  Node'da TCP'ye düşebiliyor, `getaddrinfo` düşmüyor).
+  **Sonuç:** telefonu **mobil veride** (Wi-Fi kapalı) aç — carrier çözücüsü
+  bu ağın dışında. Mac'ten doğrulamak için IP'yi elle ver:
+  `curl --resolve <host>:443:104.16.230.132 https://<host>/api/health`.
+  Uzun vadeli çözüm bu dokümanın işi değil (router'da DoH/DoT ya da ISP).
 - **Tünel kapanınca telefondaki ikon bu ekranı gösterir:** *"Roven'a
   ulaşılamıyor — ya cihazın bağlantısı koptu ya da bu adres artık yayında
   değil"*. Bu kusur DEĞİL, tasarım: PWA origin'e bağlıdır ve `trycloudflare`

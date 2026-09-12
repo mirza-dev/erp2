@@ -39,8 +39,10 @@ modu `.env.production.local`i üstte okur, `next dev` hiç okumaz) → `npm run 
 `next start -p 3001` (dev :3000 yerel DB çalışmaya devam) → `cloudflared tunnel`.
 Ölçüm: tünelden `/api/health` `/sw.js` (`application/javascript`) `/manifest` `/offline`
 (yönlendirmesiz 200) hepsi 200; bundle canlı Supabase'i gömüyor, yerel URL sızmamış; CSP
-`connect-src *.supabase.co`. **"Mac'e özgü ENOTFOUND" notu yanlıştı:** UDP DNS 60+ sn
-boş döndü (1.1.1.1/8.8.8.8 dahil), DoH anında çözdü → yayılım gecikmesi; doküman düzeltildi.
+`connect-src *.supabase.co`. **"Mac'e özgü ENOTFOUND" notu yanlıştı — ve ilk düzeltmem de ("yayılım gecikmesi")
+yanlıştı:** yetkili NS'e UDP sorgu `NXDOMAIN` + `flags: qr rd ra` döndü (**yetkili sunucu asla
+`ra` demez**), aynı sorgu `+tcp` ile `NOERROR aa` + IP → **ISP port-53'ü ele geçiriyor**;
+bu Wi-Fi'deki her cihaz sahte NXDOMAIN görür → telefon MOBİL VERİDE açmalı. Doküman düzeltildi.
 Süreçler: `$CLAUDE_JOB_DIR/tmp/{next-start,cloudflared}.pid`. **Tünel geçicidir**, kapanınca
 ikon yine bu (artık doğru) ekranı gösterir; kalıcı çözüm C3 deploy.
 
