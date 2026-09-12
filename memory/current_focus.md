@@ -5,6 +5,45 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-09-12 (4) — Telefon: "Bağlantı yok" ekranı → yanlış teşhis + tünel kuruldu
+
+**Kullanıcı ekran görüntüsü:** dört çubuk sinyalli telefonda "Bağlantı yok — bağlantı
+gelince yenileyin". **Kodda `/offline`'a giden hiçbir yönlendirme yok** — o sayfayı yalnız
+service worker gösterir (gezinme fetch'i reddedilince). Yani telefonda kayıtlı bir SW var
+ve origin ölü: **ikon ölmüş bir `trycloudflare.com` tüneline bakıyor** (docs'ta yazılı
+sonuç). Prod da ayakta değil: `erp.getmedspace.com` :443 reddediyor, **:80'de başka bir
+WordPress sitesi** (`X-Redirect-By: WordPress`, Hetzner `your-server.de`).
+
+**Asıl kusur — sayfa sebebi koşulsuz iddia ediyordu.** SW `/offline`'ı iki apayrı sebep için
+döndürür (cihaz çevrimdışı / cihaz çevrimiçi ama SUNUCU ölü); metin ikinciyi hiç ayırt
+etmiyor, sinyali tam kullanıcıyı Wi-Fi'ye baktırıyordu. Düzeltme `OfflineReason.tsx`
+(üç durum: `unknown`/`device-offline`/`server-unreachable`, `navigator.onLine`).
+**`unknown` yer tutucu değil, kuralın kendisi:** sayfa SW önbelleğinden gelir,
+hidratlanması `/_next/static/` chunk'ının da önbellekte olmasına bağlı → `useEffect` hiç
+koşmayabilir, ekranda sonsuza dek İLK render kalır → SSR metni sebebi iddia etmez, ikisini
+sayar. `useOnlineStatus` bilerek kullanılmadı (başlangıcı "çevrimiçi" — kusurun aynası).
+Sayfa yapısı yerinde kaldı: dört kapı bu dosyayı ölçüyor.
+
+**Kapı:** pwa +2 kural (h1/p GÖVDESİNE bağlı; başlangıç sebep-nötr) + 6 davranış testi
+(`renderToStaticMarkup` = efekt koşmayan precache HTML'i). **2/2 bağımsız kırmızı-kanıtlı**
+(SHA-256 yedekli). Test yazarken iki tuzak: SSR `'`→`&#x27;`; `online` olayı `act()` dışında
+flush edilmez. **509 dosya / 7092 test** · tsc 0 · lint 0 · build 0.
+
+**React Doctor — 10. yanlış alarm, aynı imza:** 793→812; +18'i gitignore'lu
+`design_handoff_*`/`roven-dashboard 2/` (taban worktree'de yok), +1 `only-export-components`
+(`OFFLINE_TEXT` sabiti bileşenle aynı dosyada; 14 emsal, tek tüketici test — bölünmedi).
+
+**Tünel kuruldu (kullanıcı kararı: Tünel + PWA ikonu):** `.env.production.local` =
+canlı profil → **`.env.local`e DOKUNULMADI** (eski yordam dev'i bozuyordu; Next üretim
+modu `.env.production.local`i üstte okur, `next dev` hiç okumaz) → `npm run build` →
+`next start -p 3001` (dev :3000 yerel DB çalışmaya devam) → `cloudflared tunnel`.
+Ölçüm: tünelden `/api/health` `/sw.js` (`application/javascript`) `/manifest` `/offline`
+(yönlendirmesiz 200) hepsi 200; bundle canlı Supabase'i gömüyor, yerel URL sızmamış; CSP
+`connect-src *.supabase.co`. **"Mac'e özgü ENOTFOUND" notu yanlıştı:** UDP DNS 60+ sn
+boş döndü (1.1.1.1/8.8.8.8 dahil), DoH anında çözdü → yayılım gecikmesi; doküman düzeltildi.
+Süreçler: `$CLAUDE_JOB_DIR/tmp/{next-start,cloudflared}.pid`. **Tünel geçicidir**, kapanınca
+ikon yine bu (artık doğru) ekranı gösterir; kalıcı çözüm C3 deploy.
+
 ## 2026-09-12 (3) — MEMORY.md taştı: üç bellek dosyası sessizce yüklenmiyordu
 
 Oturum açılırken harness uyardı: *"MEMORY.md is 24.8KB (limit 24.4KB) — only
