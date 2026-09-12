@@ -19,7 +19,7 @@
 - [project_backups.md](project_backups.md) — `npm run backup` / `npm run restore`. Yedek 2026-08-30'a kadar HİÇ yoktu; **2026-09-05 geri yükleme PROVA EDİLDİ** (64/64 tablo · 13/13 obje · 0 hata) ve prova dört gerçek kusur çıkardı.
 - [project_delivery.md](project_delivery.md) — **Teslim modeli**: tek kiracılı (`company_settings` singleton index + 0 tenant kolonu) → müşteri başına ayrı Supabase projesi (~$10/ay marjinal); `npm run schema:bundle` (111 mig → 5 parça); prod-koruma kapısı (`predev`+`pretest:e2e*`, E2E ARTIK KİLİTLİ); PWA sabit "Roven" + kasten aptal SW; on-premise reddedildi
 - [project_local_dev_db.md](project_local_dev_db.md) — **Yerel dev DB (colima+Supabase, 2026-08-31)**: E2E kilidi AÇILDI (94 test); Docker Desktop değil colima (GUI+parola ister); kapı kod değişmeden geçti; CSP `connect-src` kusuru bulundu (yerel Supabase `*.supabase.co`'ya uymuyor → sessiz "Failed to fetch"); `docs/yerel-gelistirme.md`
-- [current_focus.md](current_focus.md) — **Aktif sprint, son tamamlanan işler ve sonraki adımlar** — her tur ayrı `##` bölümü. En son (2026-09-12): telefon "Bağlantı yok" = ölü tünel + offline sayfası yanlış teşhis · MEMORY.md taşması · `npm audit` 9→0.
+- [current_focus.md](current_focus.md) — **Aktif sprint, son tamamlanan işler ve sonraki adımlar** — her tur ayrı `##` bölümü. En son (2026-09-12): teklif satırı teslim süresi gün+hafta öneri listesi · telefon "Bağlantı yok" = ölü tünel + offline yanlış teşhis · MEMORY.md taşması · `npm audit` 9→0.
 
 ## Reference
 - [reference_live_demo_redaction.md](reference_live_demo_redaction.md) — Canlı/demo'da null fiyatlar = RBAC redaction (viewer rolü), BUG DEĞİL; auth gate `src/proxy.ts` (middleware.ts değil)

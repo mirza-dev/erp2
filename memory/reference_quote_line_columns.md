@@ -22,6 +22,11 @@ migration yok), yalnız **görüntülenmez**.
 
 **İki eksen — semantik (karıştırma):**
 - **Birim** (`unit`, mig.099) = miktarın ölçüsü ("10 adet"); katalogda neredeyse hep "adet".
+- **Teslim Süresi** (`lead_time`, mig.034) = **serbest metin**, hiçbir katman güne ayrıştırmaz
+  ("Stoktan", "2-3 hafta" meşru). Form `<datalist id="quote-lead-times">` gün+hafta önerir
+  (2026-09-12, kullanıcı: "hafta bazlı da girilebilsin"); yer tutucu "gün / hafta". Sayı+birim
+  seçiciye ÇEVİRME (mevcut serbest kayıtlar ayrışmaz); `products.lead_time_days`'ten
+  doldurma — o TEDARİK süresi, müşteri teslim vaadi değil.
 - **Ölçü** (`size_text`, DN50) = ürün kimliği/spec → ürün adında zaten var → kolon YOK.
 - **Ağırlık** (`weight_kg`) = **kolon TAMAMEN KALDIRILDI** (2026-06-16, kullanıcı): birim
   zaten karşılıyor (kg seçilirse miktar kütle; adet seçilirse ağırlık gereksiz). Toplam

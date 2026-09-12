@@ -1507,6 +1507,19 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                             <option value="m³" /><option value="takım" /><option value="paket" /><option value="kutu" />
                             <option value="ton" /><option value="litre" /><option value="rulo" /><option value="çift" />
                         </datalist>
+                        {/* Teslim süresi önerileri: GÜN ve HAFTA (kullanıcı isteği 2026-09-12).
+                            Alan zaten serbest metindi (`quote_line_items.lead_time text`, hiçbir
+                            yerde güne ayrıştırılmaz) ama yer tutucu yalnız "30 gün" diyordu —
+                            hafta yazılabildiği görünmüyordu. Liste öneridir, kısıt değil:
+                            "Stoktan", "2-3 hafta" gibi ifadeler yazılabilir. */}
+                        <datalist id="quote-lead-times">
+                            <option value="Stoktan" />
+                            <option value="7 gün" /><option value="15 gün" /><option value="30 gün" />
+                            <option value="45 gün" /><option value="60 gün" />
+                            <option value="2 hafta" /><option value="3 hafta" /><option value="4 hafta" />
+                            <option value="6 hafta" /><option value="8 hafta" /><option value="10 hafta" />
+                            <option value="12 hafta" />
+                        </datalist>
                         <div style={{ overflowX: prodOpenRowId !== null ? "visible" : "auto" }}>
                             <table style={{ width: "100%", borderCollapse: "collapse", border: "1px solid var(--border-secondary)" }}>
                                 <thead>
@@ -1600,7 +1613,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                                                     )}
                                                 </td>
                                                 {/* Lead */}
-                                                <td style={tdBase}><input className="q-cell" aria-label={`Satır ${idx + 1} teslim süresi`} style={cellInput} placeholder="30 gün" value={row.lead} onChange={e => updateRow(row.id, "lead", e.target.value)} /></td>
+                                                <td style={tdBase}><input className="q-cell" list="quote-lead-times" aria-label={`Satır ${idx + 1} teslim süresi`} style={cellInput} placeholder="gün / hafta" value={row.lead} onChange={e => updateRow(row.id, "lead", e.target.value)} /></td>
                                                 {/* Ölçü kolonu KALDIRILDI — size_text veri hattı korunur (auto-fill/payload),
                                                     yalnız görüntü kalkar; DN zaten ürün adında/açıklamada. */}
                                                 {/* Desc */}

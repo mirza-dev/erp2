@@ -5,6 +5,55 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-09-12 (5) — Teklif satırı "Teslim Süresi": hafta bazlı giriş GÖRÜNÜR oldu
+
+**İstek:** kullanıcı teklif formunun satır tablosunu gösterdi (boş satırlarda `KOD-001` /
+`30 gün` yer tutucuları): *"lead time hafta bazlı da giriş olabilsin — 3 hafta, 4 hafta vs
+tarzı"*.
+
+**Ölçüm — alan ZATEN serbest metindi, kusur görünürlükteydi.** `quote_line_items.lead_time
+text` (mig.034); altı RPC nesli (035·036·065·069·071·093·098·099) `NULLIF(ln->>'lead_time','')`
+ile ham geçirir; mapper `leadTime: line.lead_time ?? ""`; belge/PDF/arşiv `row.lead || "—"`.
+Hiçbir katman güne ayrıştırmaz — testlerde zaten `"4 hafta"` ve `"2 hafta"` kullanılıyordu.
+Yani "3 hafta" bugün de yazılıp basılabiliyordu; kullanıcı görmüyordu çünkü form yalnız
+`placeholder="30 gün"` veriyor, öneri yoktu. Hemen sağdaki Birim hücresi aynı sorunu 099'da
+`<datalist id="quote-units">` ile çözmüştü.
+
+**Karar (AskUserQuestion): öneri listesi** — sayı+birim seçici DEĞİL (mevcut/olası serbest
+kayıtlar "Stoktan", "2-3 hafta" ayrıştırılamazdı; datalist migration ve belge değişikliği
+istemez).
+
+**Değişiklik — tek dosya:** `QuoteForm.tsx` → `<datalist id="quote-lead-times">` (Stoktan ·
+7/15/30/45/60 gün · 2/3/4/6/8/10/12 hafta) + lead input'una `list=` + yer tutucu `"30 gün"` →
+`"gün / hafta"` (tarayıcıda ölçüldü: 73 px metin / 81 px input → sığıyor; "30 gün / 4 hafta"
+kırpılırdı). Veri yolu, belge, PDF, RPC değişmedi. **Migration YOK.**
+
+**Bilerek yapılmayanlar:** `products.lead_time_days`'ten otomatik doldurma (o alan TEDARİK
+süresi — müşteriye söz verilen teslim süresi değil, sessizce yanlış vaat basardı) · belgede
+iki dilli değer ("4 hafta / 4 weeks" — etiketler iki dilli, değerler yazıldığı gibi; bugünkü
+"30 gün" de yalnız Türkçe) · RFQ/tedarikçi/PO yüzeyleri (`lead_time_days` tamsayı, ayrı model).
+
+**Test:** YENİ `quote-line-lead-time.test.ts` (6 test): input `list=` + `updateRow("lead")`
+aynı etikette · yer tutucu artık yalnız gün demiyor · datalist gövdesinde gün VE hafta, "3 hafta"
++ "4 hafta" birebir, hafta ≥ 3 (anti-vakum) · input serbest kalır (type=number/pattern yok,
+"Stoktan" listede) · davranış: `lead_time: "3 hafta"` → mapper → `buildQuoteDataFromDetail` →
+`QuoteDocument` HTML + arşiv `<td>3 hafta</td>`, güne çevrilmez. Kaynak iddiaları yorum-soyulmuş
+metinde ve **elemanın kendi gövdesine sınırlı** (`[^>]*` KULLANILAMADI — `onChange={e => …}`
+içindeki `=>` etiketi erken keser → `/>` geçmeyen tempered tarama). **5/5 mutasyon yalnız kendi
+kuralını düşürdü** (M5 mapper `hafta→gün` çevirisi zincirin iki testini birden — aynı sözleşme),
+SHA-256 geri yükleme doğrulandı.
+
+**Tarayıcı doğrulaması (dev :3000, yerel DB, E2E hesabı — global-setup akışı):** `input.list`
+→ `quote-lead-times`, 13 seçenek, `type=text`; "3 hafta" yazıldı → Önizle → belgede tam 1
+`<td>` "3 hafta". Hiçbir DB yazması yapılmadı (Kaydet'e basılmadı).
+
+**React Doctor (11. uyarı, kabul):** `--diff 688cf18` → QuoteForm 45 → 59 uyarı; +14'ün tamamı `control-has-associated-label` ve satırları 1515–1521 = yeni datalist + 13 `<option>` — 099'un `quote-units` datalist'ine zaten aynı kuraldan 13 uyarı (1505–1508) kabul edilmişti; `<datalist>` seçenekleri kontrol değil, kural `option` rolünü etkileşimli sayıyor. Bu kez karşılaştırma artefaktı değil, aynı kabul edilmiş sınıfın büyümesi.
+
+**Yan iş:** `:3001` üretim sunucusu yeni build'le yeniden başlatıldı (tünel URL'i aynı,
+`/api/health` yerel + tünel 200) → telefondaki ikon da yeni öneri listesini görür.
+
+tsc 0 · lint 0 · **510 dosya / 7098 test** (+6) · build 0 uyarı · migration YOK.
+
 ## 2026-09-12 (4) — Telefon: "Bağlantı yok" ekranı → yanlış teşhis + tünel kuruldu
 
 **Kullanıcı ekran görüntüsü:** dört çubuk sinyalli telefonda "Bağlantı yok — bağlantı
