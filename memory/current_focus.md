@@ -5,6 +5,16 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-09-16 — Marka turu 1: rehber · isim/domain · logo konseptleri · landing/OG (marka ajanı, dal `worktree-brand-roven`)
+
+**Bağlam:** kullanıcı üç paralel ajan kurdu (ERP mimar · ERP EKSİKLER · marka); bu tur marka ajanının ilk turu. Kararlar (AskUserQuestion): **geniş KOBİ** konumu · Roven ana aday + alternatif isim araştırması · logo konseptleri sunulup **kullanıcı seçer** · dört çıktı da istendi. Detay ve kalıcı kurallar [[project_brand]].
+
+**Yapılan:** `docs/brand/roven-marka-rehberi.md` (tek kaynak; §1.5 vaat≤canlı tablosu ERP ajanının canlı/kapalı ölçümünden) · `docs/brand/isim-arastirmasi.md` (whois+dig: roven.com/.com.tr DOLU, **tekakis.com/.com.tr/.tr MÜSAİT**, rovenerp.com müsait; tescil sorgusu kullanıcı adımı) · logo konsept artifact'ı (A/B/C; **seçim bekliyor**) · landing: metin geniş-KOBİ + dürüst vaatler (AI PDF "anahtar tanımlıysa", Paraşüt "hazır, tek ayarla açılır"), YENİ "Kimler için" (4 sektör) + SSS (6 `<details>`), mock cari adları sektör-nötr · `layout.tsx` metadata: title "Yapay Zeka Destekli ERP", `metadataBase` + openGraph/twitter · **OG statik `public/og.png`** (`npm run og:image` = `scripts/build-og-image.ts`, Playwright + gömülü Geist; dinamik rota proxy kapısına takılırdı) · `scripts/brand-mark.ts` raster tek kaynak · 404'e `RovenLogo`, 500'e inline işaret (uygulama bileşeni import edemez) · e-posta kabuğuna barındırılan PNG işaret · manifest/README konumlandırma satırları. Ölçüm: DNS bir süre ISP tarafından düşürüldü (domain taraması yeniden koşuldu); Chrome eklentisi bağlı değildi → görsel bakış Playwright ile.
+
+**Doğrulama:** tsc 0 · lint 0 · **510 dosya / 7098 test** · build 0. **Açık:** logo seçimi → `RovenLogo`/`icon.svg`/`build-pwa-icons`→brand-mark/`pwa:icons`/test sözleşmesi tek commit'te; e-posta accent'inin Roven mavisine hizalanması; `QuoteDocument` `#0072BC`'nin `company_settings`'e taşınması (ERP ajanı); TÜRKPATENT/TMview taraması + domain alımı (kullanıcı).
+
+---
+
 ## 2026-09-12 (5) — Teklif satırı "Teslim Süresi": hafta bazlı giriş GÖRÜNÜR oldu
 
 **İstek:** kullanıcı teklif formunun satır tablosunu gösterdi (boş satırlarda `KOD-001` /

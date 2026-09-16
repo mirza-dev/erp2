@@ -151,12 +151,18 @@ function toneColors(tone: InternalShellOpts["tone"]): { fg: string; bg: string; 
     }
 }
 
+/**
+ * Kabuk başlığındaki işaret barındırılan PNG'dir (`/icons/icon-192.png`),
+ * inline SVG ya da data-URI DEĞİL: Gmail/Outlook ikisini de siler. Resim
+ * engellenirse `alt=""` + yanındaki "Roven" metni markayı taşımaya devam
+ * eder (ekran okuyucu ikisini üst üste okumasın diye alt boş). Marka rehberi §7.
+ */
 function internalShell(opts: InternalShellOpts): string {
     const tone = toneColors(opts.tone);
     return emailDocument(opts.preheader, `
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse">
         <tr>
-          <td style="padding:0 4px 16px;color:${COLORS.text};font-size:18px;font-weight:800;line-height:24px;letter-spacing:0.2px">Roven</td>
+          <td style="padding:0 4px 16px;color:${COLORS.text};font-size:18px;font-weight:800;line-height:24px;letter-spacing:0.2px"><img src="${escapeAttr(appUrl("/icons/icon-192.png"))}" width="22" height="22" alt="" style="display:inline-block;vertical-align:-5px;border:0;border-radius:6px;margin-right:7px">Roven</td>
           <td align="right" style="padding:0 4px 16px;color:${COLORS.subtle};font-size:11px;font-weight:700;line-height:18px;text-transform:uppercase;letter-spacing:0.8px">Operasyon Bildirimi</td>
         </tr>
       </table>

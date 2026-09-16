@@ -20,10 +20,39 @@ const APPLE_SPLASH = ([
     `and (-webkit-device-pixel-ratio: ${r}) and (orientation: portrait)`,
 }));
 
+/**
+ * Marka metinleri `docs/brand/roven-marka-rehberi.md` §1.3/§2'den gelir:
+ * kategori etiketi "Yapay Zeka Destekli ERP" (kullanıcıya görünen metinde
+ * "AI" değil "yapay zeka"), alt cümle tek akış vaadi. `metadataBase`
+ * olmadan Next OG görselinin URL'ini göreli basar ve paylaşım kartı
+ * (WhatsApp/LinkedIn) görseli çözemez.
+ */
+const SITE_TITLE = "Roven — Yapay Zeka Destekli ERP";
+const SITE_DESCRIPTION =
+  "Teklif, sipariş, stok, üretim ve muhasebe tek akışta. KOBİ'ler için yapay zeka destekli ERP.";
+
 export const metadata: Metadata = {
-  title: "Roven — AI Destekli ERP",
-  description:
-    "AI destekli sipariş ve stok yönetim sistemi — PMT Endüstriyel",
+  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://erp.getmedspace.com"),
+  title: SITE_TITLE,
+  description: SITE_DESCRIPTION,
+  applicationName: "Roven",
+  openGraph: {
+    type: "website",
+    locale: "tr_TR",
+    siteName: "Roven",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    // Statik PNG, dinamik `opengraph-image` rotası DEĞİL: bağlantı tarayıcıları
+    // (WhatsApp/LinkedIn/Slack) oturumsuzdur, dinamik rota `src/proxy.ts`
+    // kapısından `/login`e düşerdi; `.png` matcher'dan muaf. Üretim: `npm run og:image`.
+    images: [{ url: "/og.png", width: 1200, height: 630, alt: SITE_TITLE }],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: SITE_TITLE,
+    description: SITE_DESCRIPTION,
+    images: ["/og.png"],
+  },
   manifest: "/manifest.webmanifest",
   // iOS ana ekrandan açıldığında tarayıcı çubuğu olmadan çalışsın.
   //

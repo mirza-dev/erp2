@@ -13,10 +13,11 @@ import {
 } from "lucide-react";
 import RovenLogo from "@/components/layout/RovenLogo";
 
+// Marka metinleri: docs/brand/roven-marka-rehberi.md §1.3 (vaat ≤ canlı, §1.5).
 export const metadata: Metadata = {
     title: "Roven — Yapay Zeka Destekli ERP",
     description:
-        "Teklif, sipariş, stok, üretim ve muhasebe tek ekranda. Yapay zeka belgelerinizi okur, riskleri önceden söyler. Endüstriyel ve B2B işletmeler için modern ERP.",
+        "Teklif, sipariş, stok, üretim ve muhasebe tek akışta. Küçük ve orta ölçekli işletmeler için yapay zeka destekli ERP — kurulumu bir öğleden sonra.",
 };
 
 const modules = [
@@ -32,8 +33,8 @@ const modules = [
 const features = [
     {
         icon: ScanLine,
-        title: "Yapay Zeka ile İçe Aktarma",
-        desc: "PDF veya Excel’i sürükle bırak — yapay zeka satırları, ürünleri ve fiyatları otomatik çıkarır. Saatlerce süren veri girişi saniyelere iner.",
+        title: "Excel’ini Bırak, Sistem Eşleştirsin",
+        desc: "Ürün, cari ve stok listeni sürükle bırak — kolonlar otomatik eşleşir, eşleşmeyi bir kez onaylarsın, sistem hatırlar. Yapay zeka anahtarı tanımlıysa PDF ve görsel belgeleri de okur.",
     },
     {
         icon: FileText,
@@ -47,18 +48,18 @@ const features = [
     },
     {
         icon: Bell,
-        title: "Akıllı Uyarı Motoru",
-        desc: "Kritik stok, geciken sevkiyat, süresi dolan teklif, vadesi yaklaşan iş — yapay zeka riskleri sen fark etmeden önce söyler.",
+        title: "Uyarı Takvimi",
+        desc: "Kritik stok, geciken sevkiyat, süresi dolan teklif, vadesi gelen satın alma — dokuz uyarı tipi takvimde, sen fark etmeden önce. Kendi notunu ve hatırlatmanı da aynı takvime yazarsın.",
     },
     {
         icon: RefreshCw,
-        title: "Muhasebe Entegrasyonu",
-        desc: "Faturalar otomatik muhasebeye akar. Mutabakat, hata yönetimi ve yeniden deneme dahil — çift veri girişi tarih oluyor.",
+        title: "Paraşüt’e Hazır",
+        desc: "Sevk edilen sipariş faturaya, mal kabul alış faturasına, tahsilat durumu panoya — Paraşüt bağlantısı hazır, tek ayarla açılır. Çift veri girişi biter.",
     },
     {
         icon: Sparkles,
         title: "Satın Alma Önerileri",
-        desc: "Yapay zeka tüketim hızını ve tedarik süresini okur, neyi ne zaman sipariş etmen gerektiğini önerir. Ne stoksuz kal ne fazla bağla.",
+        desc: "Tüketim hızı, tedarik süresi ve açık siparişlerden neyi ne zaman sipariş etmen gerektiği hesaplanır; tedarikçilerden fiyat toplar, kazananı tek tıkla siparişe çevirirsin.",
     },
 ];
 
@@ -66,7 +67,7 @@ const steps = [
     {
         no: "01",
         title: "Belgeni bırak",
-        desc: "Tedarikçi listesini, müşteri siparişini ya da Excel’i sisteme bırak. Yapay zeka geri kalanını halleder.",
+        desc: "Ürün listeni, cari listeni ya da açılış stoğunu Excel olarak bırak. Kolonlar eşleşir, sistem geri kalanını halleder.",
     },
     {
         no: "02",
@@ -83,12 +84,49 @@ const steps = [
 // Hero ürün-mock'unda kullanılan veriler tamamen kurgusaldır (gerçek müşteri DEĞİL).
 const mockOrders = [
     { no: "ORD-2041", name: "Anadolu Makine A.Ş.", status: "Onaylı", tone: "success" },
-    { no: "ORD-2040", name: "Ege Vana Sanayi", status: "Rezerve", tone: "warning" },
-    { no: "ORD-2039", name: "Marmara Endüstri", status: "Sevk", tone: "accent" },
-    { no: "ORD-2038", name: "Toros Akışkan Ltd.", status: "Bekliyor", tone: "muted" },
+    { no: "ORD-2040", name: "Ege Mobilya Sanayi", status: "Rezerve", tone: "warning" },
+    { no: "ORD-2039", name: "Marmara Gıda Dağıtım", status: "Sevk", tone: "accent" },
+    { no: "ORD-2038", name: "Toros Ambalaj Ltd.", status: "Bekliyor", tone: "muted" },
 ];
 
 const mockBars = [38, 54, 41, 67, 49, 72, 60, 84];
+
+// Geniş KOBİ konumlandırması (marka rehberi §0/§1.2): sektör örnekleri
+// vana/endüstri vurgusundan çıkarıldı; her satır ürünün gerçekten kapsadığı bir
+// akışa bağlanır — uydurma vaat yok.
+const sectors = [
+    { title: "Üretim atölyeleri", desc: "Reçeteli üretim, hurda/fire kaydı, bileşen stoğu ve eksik listesi." },
+    { title: "Toptan ve dağıtım", desc: "Çok para birimli teklif, rezervasyonlu sipariş, sevkiyat ve cari takibi." },
+    { title: "İthalat ve tedarik", desc: "Tedarikçi fiyat talepleri, karşılaştırma, satın alma siparişi ve mal kabul." },
+    { title: "Proje bazlı iş", desc: "Revizyonlu teklifler, PDF arşiv, teklif geçerlilik takibi ve kabulde otomatik sipariş." },
+];
+
+const faqs = [
+    {
+        q: "Kurulum ne kadar sürer?",
+        a: "Elinizdeki Excel listeleriyle bir öğleden sonra. Kurulum paneli beş adımı sırayla gösterir: ürün tipleri, ürünler, cariler, tedarikçiler, açılış stoğu. Her adımda şablon indirir, doldurur, yüklersiniz.",
+    },
+    {
+        q: "Verilerimiz nerede tutuluyor?",
+        a: "Her müşteri için ayrı bir veritabanı kurulur; başka bir işletmeyle aynı tabloyu paylaşmazsınız. Yeni kurulumlar Avrupa Birliği bölgesinde (Frankfurt) açılır; yedekleme ve geri yükleme yordamı prova edilmiştir ve verinizin tam yedeği her zaman alınabilir.",
+    },
+    {
+        q: "Muhasebe programımızla çalışır mı?",
+        a: "Paraşüt bağlantısı hazırdır ve tek ayarla açılır: satış faturası, alış faturası, tahsilat durumu ve stok mutabakatı. Başka bir muhasebe programı için hazır bağlantı yoktur.",
+    },
+    {
+        q: "Yapay zeka olmadan çalışır mı?",
+        a: "Evet. Kolon eşleştirme, uyarılar ve satın alma önerileri kural tabanlıdır; yapay zeka anahtarı tanımlı değilse sistem sade modda aynı işi yapar. Anahtar tanımlanınca PDF okuma ve yapay zeka bulguları devreye girer.",
+    },
+    {
+        q: "Telefondan kullanılır mı?",
+        a: "Evet. Ana ekrana eklenen uygulama gibi açılır; koyu ve aydınlık tema, dokunmaya uygun kontroller ve çevrimdışı uyarısı vardır. Sevkiyat, mal kabul ve üretim kaydı sahadan girilebilir.",
+    },
+    {
+        q: "Kim neyi görür?",
+        a: "Altı rol: yönetici, satış, satın alma, üretim, muhasebe, izleyici. Fiyat ve maliyet alanları yetkisi olmayana hiç gönderilmez; her değişiklik kimin yaptığıyla birlikte kayıt altındadır.",
+    },
+];
 
 export default function LandingPage() {
     return (
@@ -107,8 +145,10 @@ export default function LandingPage() {
                 </span>
                 <nav className="rv-nav-links">
                     <a href="#ozellikler">Özellikler</a>
+                    <a href="#kimler">Kimler için</a>
                     <a href="#nasil">Nasıl çalışır</a>
                     <a href="#yapayzeka">Yapay zeka</a>
+                    <a href="#sss">SSS</a>
                 </nav>
                 <div className="rv-nav-cta">
                     {/* 2026-09-10 ölçümü: "Giriş Yap" 55.5×20.3, "Demo Gez"
@@ -266,6 +306,22 @@ export default function LandingPage() {
                 </div>
             </section>
 
+            {/* KİMLER İÇİN — sektör-nötr; her satır ürünün gerçek bir akışına bağlı */}
+            <section id="kimler" className="rv-section rv-section-alt">
+                <div className="rv-sec-head">
+                    <span className="rv-kicker">Kimler için</span>
+                    <h2 className="rv-h2">Ürün satan, üreten ya da tedarik eden her KOBİ</h2>
+                </div>
+                <div className="rv-sectors">
+                    {sectors.map((s) => (
+                        <div key={s.title} className="rv-sector">
+                            <h3 className="rv-sector-t">{s.title}</h3>
+                            <p className="rv-sector-d">{s.desc}</p>
+                        </div>
+                    ))}
+                </div>
+            </section>
+
             {/* NASIL ÇALIŞIR */}
             <section id="nasil" className="rv-section rv-section-alt">
                 <div className="rv-sec-head">
@@ -289,14 +345,31 @@ export default function LandingPage() {
                     <span className="rv-kicker">Yapay zeka, gösteriş için değil</span>
                     <h2 className="rv-h2">Belgeyi okur. Riski söyler. Öneriyi getirir.</h2>
                     <p className="rv-ai-p">
-                        Roven’in yapay zekası tedarikçi listelerini ve müşteri belgelerini
-                        anlar, kritik stok ve gecikmeleri önceden işaretler, ne zaman ne
-                        sipariş edeceğini önerir. Her öneri kaydedilir ve izlenebilir —
-                        kara kutu değil, çalışan bir asistan.
+                        Yapay zeka anahtarı tanımlıyken Roven tedarikçi listelerini ve
+                        müşteri belgelerini okur, stok riskleri için bulgu çıkarır ve satın
+                        alma önerisini zenginleştirir. Her öneri kaydedilir ve izlenebilir —
+                        kara kutu değil, çalışan bir asistan. Anahtar yoksa aynı akış kural
+                        tabanlı sürer; hiçbir ekran yapay zekaya bağımlı değildir.
                     </p>
                     <a href="/api/auth/demo" className="rv-btn rv-btn-primary">
                         Yapay zekayı demoda dene <ArrowRight size={16} />
                     </a>
+                </div>
+            </section>
+
+            {/* SSS — yerel <details>: JS'siz açılır, ekran okuyucu ve klavye hazır */}
+            <section id="sss" className="rv-section rv-section-alt">
+                <div className="rv-sec-head">
+                    <span className="rv-kicker">Sık sorulanlar</span>
+                    <h2 className="rv-h2">Karar vermeden önce bilmek istediklerin</h2>
+                </div>
+                <div className="rv-faq">
+                    {faqs.map((f) => (
+                        <details key={f.q} className="rv-faq-item">
+                            <summary className="rv-faq-q tap-44-v">{f.q}</summary>
+                            <p className="rv-faq-a">{f.a}</p>
+                        </details>
+                    ))}
                 </div>
             </section>
 
@@ -320,7 +393,7 @@ export default function LandingPage() {
                 <span className="rv-brand">
                     <RovenLogo size={16} wordmarkSize={14} />
                 </span>
-                <span className="rv-foot-tag">Yapay zeka destekli ERP — endüstriyel ve B2B işletmeler için</span>
+                <span className="rv-foot-tag">Yapay zeka destekli ERP — küçük ve orta ölçekli işletmeler için</span>
                 <Link href="/gizlilik" className="rv-foot-tag tap-44-v" style={{ color: "inherit", textDecoration: "underline" }}>
                     Gizlilik ve Aydınlatma Metni
                 </Link>
@@ -479,6 +552,23 @@ const css = `
 .rv-step-t{font-size:17px;font-weight:620;margin:10px 0 8px}
 .rv-step-d{font-size:13.5px;line-height:1.6;color:var(--text-secondary);margin:0}
 
+/* SECTORS */
+.rv-sectors{display:grid;grid-template-columns:repeat(4,1fr);gap:0;border:1px solid var(--border-tertiary);border-radius:14px;overflow:hidden;background:var(--bg-primary)}
+.rv-sector{padding:22px 20px;border-left:1px solid var(--border-tertiary);min-width:0}
+.rv-sector:first-child{border-left:0}
+.rv-sector-t{font-size:15px;font-weight:620;margin:0 0 8px;color:var(--text-primary)}
+.rv-sector-d{font-size:13px;line-height:1.6;color:var(--text-secondary);margin:0}
+
+/* FAQ */
+.rv-faq{max-width:760px;display:flex;flex-direction:column;border-top:1px solid var(--border-tertiary)}
+.rv-faq-item{border-bottom:1px solid var(--border-tertiary)}
+.rv-faq-q{position:relative;list-style:none;cursor:pointer;padding:16px 36px 16px 0;font-size:16px;font-weight:600;color:var(--text-primary);line-height:1.4}
+.rv-faq-q::-webkit-details-marker{display:none}
+.rv-faq-q::before{content:"";position:absolute;right:6px;top:50%;width:9px;height:9px;border-right:1.5px solid var(--text-tertiary);border-bottom:1.5px solid var(--text-tertiary);transform:translateY(-70%) rotate(45deg);transition:transform .2s}
+.rv-faq-item[open] .rv-faq-q::before{transform:translateY(-30%) rotate(225deg)}
+.rv-faq-q:focus-visible{outline:2px solid var(--accent-border);outline-offset:2px;border-radius:6px}
+.rv-faq-a{font-size:14.5px;line-height:1.65;color:var(--text-secondary);margin:0;padding:0 36px 18px 0}
+
 /* AI */
 .rv-ai{padding:84px 28px}
 .rv-ai-inner{max-width:760px;margin:0 auto;text-align:center;
@@ -509,12 +599,19 @@ const css = `
   .rv-sub{font-size:15.5px;max-width:none}
   .rv-h2{font-size:27px}
   .rv-grid,.rv-steps{grid-template-columns:1fr}
+  .rv-sectors{grid-template-columns:1fr 1fr}
+  .rv-sector{border-left:0;border-top:1px solid var(--border-tertiary)}
+  .rv-sector:nth-child(-n+2){border-top:0}
+  .rv-sector:nth-child(even){border-left:1px solid var(--border-tertiary)}
   .rv-band-fix{font-size:24px}
   .rv-final-h{font-size:30px}
   .rv-foot-copy{margin-left:0}
 }
 @media (max-width:460px){
   .rv-h1{font-size:31px}
+  .rv-sectors{grid-template-columns:1fr}
+  .rv-sector:nth-child(even){border-left:0}
+  .rv-sector:nth-child(2){border-top:1px solid var(--border-tertiary)}
   .rv-nav{padding:16px 20px;gap:12px}
   .rv-strip,.rv-section,.rv-final,.rv-footer{padding-left:20px;padding-right:20px}
   .rv-ai-inner{padding:38px 24px}

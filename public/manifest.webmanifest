@@ -1,8 +1,8 @@
 {
   "id": "/dashboard",
-  "name": "Roven — AI Destekli ERP",
+  "name": "Roven — Yapay Zeka Destekli ERP",
   "short_name": "Roven",
-  "description": "Sipariş, stok, teklif ve satınalma yönetimi",
+  "description": "Teklif, sipariş, stok, üretim ve muhasebe tek akışta",
   "start_url": "/dashboard",
   "scope": "/",
   "display": "standalone",

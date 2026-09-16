@@ -2,9 +2,9 @@
 
 # ⬢ Roven
 
-### AI Destekli Endüstriyel ERP
+### Yapay Zeka Destekli ERP — KOBİ'ler için
 
-_Endüstriyel vana ticaretinde **teklif → sipariş → stok → muhasebe**, uçtan uca tek sistem._
+_**Teklif → sipariş → stok → üretim → satın alma → muhasebe**, tek akışta. Marka rehberi: `docs/brand/roven-marka-rehberi.md`._
 
 ![Next.js](https://img.shields.io/badge/Next.js-16.1-000000?logo=nextdotjs&logoColor=white)
 ![React](https://img.shields.io/badge/React-19.2-61DAFB?logo=react&logoColor=black)
@@ -21,7 +21,7 @@ _Endüstriyel vana ticaretinde **teklif → sipariş → stok → muhasebe**, u�
 
 ---
 
-> **Roven**, PMT Endüstriyel için geliştirilmiş yapay zeka destekli bir ERP'dir. Endüstriyel vana (B2B) ticaretini kataloglama, teklif, sipariş çift ekseni, stok rezervasyonu, üretim, satın alma önerisi ve muhasebe entegrasyonuna kadar uçtan uca kapsar. AI; belge okuma, kolon eşleştirme, risk skorlama ve satın alma kopilotunda devrede — anahtarsız çalışır, AI yoksa sistem sade modda devam eder.
+> **Roven**, küçük ve orta ölçekli işletmeler için yapay zeka destekli bir ERP'dir; ilk referans müşterisi PMT Endüstriyel (endüstriyel vana, B2B). Kataloglama, teklif, sipariş çift ekseni, stok rezervasyonu, üretim, satın alma önerisi ve muhasebe entegrasyonuna kadar uçtan uca kapsar. AI; belge okuma, kolon eşleştirme, risk skorlama ve satın alma kopilotunda devrede — anahtarsız çalışır, AI yoksa sistem sade modda devam eder.
 
 ## İçindekiler
 
@@ -301,6 +301,6 @@ ruleset'lerini çalıştırıp sonuçları yorumlar. Yalnız **rapor** üretir; 
 
 ---
 
-**Roven** · PMT Endüstriyel · AI Destekli ERP
+**Roven** · Yapay Zeka Destekli ERP · ilk referans: PMT Endüstriyel
 
 </div>
