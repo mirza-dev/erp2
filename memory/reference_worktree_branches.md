@@ -14,6 +14,7 @@ Proje iki git worktree ile çalışır; ikisi `.git`'i paylaşır. Birebir-ayna 
 - **`/Users/mirzasaribiyik/Projects/erp2`** → `main` branch (prod referansı).
 - **`/Users/mirzasaribiyik/Projects/proje-codex`** → `codex-experiment` branch.
 - Ek worktree branch'leri (`worktree-rbac-bulgular-kapatma`, `worktree-satis-siparisleri-tamamlama`) main'in atası = tamamen merge edilmiş, benzersiz iş yok.
+  **2026-09-16 kullanıcı kararı: bu iki worktree + yerel dalları + uzak `origin/save` ve `origin/worktree-satis-siparisleri-tamamlama` SİLİNMİYOR, KALIYOR** (hepsi merge edilmiş, 0 commit ileride, 312–315 geride; worktree'lerdeki tek kirli dosya `.claude/settings.local.json`). Bir daha "artık dal" diye envantere yazma — bilinçli tutuluyor.
 
 ## Birebir-ayna politikası
 

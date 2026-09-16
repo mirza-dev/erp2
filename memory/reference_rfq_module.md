@@ -57,7 +57,7 @@ kazanan seç] + "Seçilenlerden PO Oluştur"). Sidebar "Satın Alma" → "Fiyat 
   rozeti + son fiyat + "Önerilenleri seç".
 - **`rfq_response_due` alert ✅** mig.101 (alerts type CHECK); `dbListRfqsAwaitingResponse`+
   `serviceCheckRfqResponseDue` (po_overdue aynası) + scan + Vadeler + takvim "Talebi Aç" link.
-- **Tek kalan erteleme:** ayrı `[id]/print` sayfası yok — arşiv-view route yeterli.
+- **Ayrı `[id]/print` sayfası: KAPALI (kullanıcı kararı 2026-09-16, erteleme değil)** — "Yazdır" = arşiv-view (`/api/rfqs/[id]/archive?view=1`, gönderilen donmuş belge) yeterli; tekrar açılmayacak.
 
 **Durum:** modül + 4 takip bitti, tsc 0/lint 0/**5461 test**/build 0. mig.100 APPLY ✅;
 **mig.101 APPLY BEKLİYOR** (kullanıcı Studio). İlişkili: [[project_domain]]

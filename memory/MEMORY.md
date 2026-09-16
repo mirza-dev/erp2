@@ -24,14 +24,14 @@
 ## Reference
 - [reference_live_demo_redaction.md](reference_live_demo_redaction.md) — Canlı/demo'da null fiyatlar = RBAC redaction (viewer rolü), BUG DEĞİL; auth gate `src/proxy.ts` (middleware.ts değil)
 - [reference_theming.md](reference_theming.md) — Koyu+aydınlık tema (Cool slate): `data-theme` token sistemi, FOUC bootstrap, ThemeProvider/useTheme/ThemeToggle, tema-muaf yüzeyler (baskı/logo/lightbox); kural: renkte CSS var kullan→otomatik temalanır
-- [reference_worktree_branches.md](reference_worktree_branches.md) — İki worktree (erp2=main, proje-codex=codex-experiment) birebir-ayna; push akışı (commit→ff main→push both→SHA doğrula); `~/.claude/memory`=SYMLINK→erp2/memory (proje-codex ayrı kopya)
-- [reference_rfq_module.md](reference_rfq_module.md) — Tedarikçi Fiyat Talebi (RFQ) modülü (mig.100→103): talep→gönder→fiyat gir→karşılaştır→award→PO; veri modeli, RPC'ler, RBAC, UI, takip işleri ve award integrity (sunucu-otoriter, mükerrer-reddi). Ertelenen v1: ayrı print sayfası (arşiv-view yeterli).
+- [reference_worktree_branches.md](reference_worktree_branches.md) — İki worktree (erp2=main, proje-codex=codex-experiment) birebir-ayna; push akışı (commit→ff main→push both→SHA doğrula); `~/.claude/memory`=SYMLINK→erp2/memory (proje-codex ayrı kopya); artık worktree/dallar kullanıcı kararıyla KALIYOR (2026-09-16)
+- [reference_rfq_module.md](reference_rfq_module.md) — Tedarikçi Fiyat Talebi (RFQ) modülü (mig.100→103): talep→gönder→fiyat gir→karşılaştır→award→PO; veri modeli, RPC'ler, RBAC, UI, takip işleri ve award integrity (sunucu-otoriter, mükerrer-reddi). Ayrı print sayfası KAPALI (kullanıcı kararı 2026-09-16; arşiv-view yeterli).
 - [reference_quote_line_columns.md](reference_quote_line_columns.md) — Teklif satır kolon modeli: **Ölçü (Size) kolonu KALDIRILDI** (kullanıcı kararı 2026-06-16) — ürün adı DN+basınç sınıfını zaten içeriyor, `size_text` redundant; **gelecekte tekrar EKLEME**, `size_text` dormant korunur
 - [reference_review_agent.md](reference_review_agent.md) — `erp2-reviewer` inceleme/güvenlik subagent'ı (`/erp-review`) + Semgrep/gitleaks (`brew install`); Bulgular K/Y/O/D çıktısı; subagent oturum-başında yüklenir (restart gerek)
 
 ## Roadmap
 - [project_voice_input.md](project_voice_input.md) — Sesli üretim girişi V1-V3 ✅ 3657 test; V3: fireNotes→notlar entegrasyonu + Ctrl+M shortcut (input/processing/demo/repeat guard'lı); pure helper voice-note-helpers.ts (client/server boundary korunur)
-- [yuksek_etki_plan.md](yuksek_etki_plan.md) — 4 yüksek etkili stok özelliği: 3/4 tamamlandı; kalan: Tedarikçi Performansı (düşük öncelik)
+- [yuksek_etki_plan.md](yuksek_etki_plan.md) — 4 yüksek etkili stok özelliği: 3/4 tamamlandı; 4. Tedarikçi Performansı kullanıcı kararıyla KAPALI/yapılmayacak (2026-09-16)
 - [project_quotes.md](project_quotes.md) — Teklif modülü — **V7 master plan TAMAMLANDI** (Faz 1–8; mig.073–080 APPLY edildi): accept→sipariş atomik, PDF arşiv, revizyon, not şablonları. Kalan (quotes borcu DEĞİL): audit actor trigger, Paraşüt Sandbox gate.
 - [project_frontend_renewal.md](project_frontend_renewal.md) — Frontend yenileme planı — **Faz B KAPANDI (2026-09-05)**: DataTable/Card/Badge · ortak `Modal`+`Drawer` (`dialog-a11y`) · `PageHeader`/`FilterChips`/`NavLink`/`SectionHeader`/`Stat`; dokunma hedefleri + mobil ölçüm de kapalı.
 
