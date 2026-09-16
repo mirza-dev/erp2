@@ -96,3 +96,27 @@ export async function dbSumPaymentsForInvoice(invoiceId: string): Promise<number
     if (error) return 0;
     return (data ?? []).reduce((sum, p) => sum + (p.amount ?? 0), 0);
 }
+
+// ── Silme ön-kontrolleri (2026-09-16, RBAC Faz 6 refinement) ─────────────────
+// `invoices.customer_id` ve `invoices.order_id` `on delete restrict` (mig.012).
+// Route'lar silmeden ÖNCE sayar → dürüst 500 yerine temiz 409 (dbCountOrdersByCustomer kalıbı).
+
+export async function dbCountInvoicesByCustomer(customerId: string): Promise<number> {
+    const supabase = createServiceClient();
+    const { count, error } = await supabase
+        .from("invoices")
+        .select("id", { count: "exact", head: true })
+        .eq("customer_id", customerId);
+    if (error) throw new Error(error.message);
+    return count ?? 0;
+}
+
+export async function dbCountInvoicesByOrder(orderId: string): Promise<number> {
+    const supabase = createServiceClient();
+    const { count, error } = await supabase
+        .from("invoices")
+        .select("id", { count: "exact", head: true })
+        .eq("order_id", orderId);
+    if (error) throw new Error(error.message);
+    return count ?? 0;
+}

@@ -71,8 +71,19 @@ import { formatPoCurrency, formatPoDate } from "@/lib/po-document-helpers";
 
 // ── Props ─────────────────────────────────────────────────────────────────────
 
+/**
+ * Para alanları `number | null`: redaksiyon (`redactPurchaseOrderForPerms`) bu alanları
+ * null'lar. Tip bunu SÖYLEMELİ — yoksa sözleşme yalnız yorumda yaşar ve bir gün `Number(null)`
+ * ile "₺0,00" basılır. Redakte edilmemiş PO (`PurchaseOrderWithLines`) bu tipe zaten uyar.
+ */
+export type RedactableMoney<T, K extends keyof T> = Omit<T, K> & { [P in K]: T[P] | null };
+export type PrintablePurchaseOrder =
+    RedactableMoney<PurchaseOrderRow, "subtotal" | "vat_total" | "grand_total"> & {
+        lines: RedactableMoney<PurchaseOrderLineRow, "unit_price" | "line_total">[];
+    };
+
 export interface PurchaseOrderDocumentProps {
-    po: PurchaseOrderRow & { lines: PurchaseOrderLineRow[] };
+    po: PrintablePurchaseOrder;
     vendor: VendorRow | null;
     company: CompanySettingsRow | null;
     // Minimal product view: id/sku/name/unit only.

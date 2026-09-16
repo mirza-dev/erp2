@@ -10,6 +10,9 @@ import {
 import { serviceSyncOrderToParasut } from "@/lib/services/parasut-service";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 import { dbGetOrderById, dbHardDeleteOrder, type UpdateOrderInput } from "@/lib/supabase/orders";
+import { dbCountShipmentsByOrder } from "@/lib/supabase/shipments";
+import { dbCountInvoicesByOrder } from "@/lib/supabase/invoices";
+import { dbCountProductionEntriesByOrder } from "@/lib/supabase/production";
 import {
     actorFromAuthContext,
     getCurrentUserPermissions,
@@ -220,6 +223,28 @@ export async function DELETE(
         if (!["draft", "cancelled"].includes(order.commercial_status)) {
             return NextResponse.json(
                 { error: "Yalnızca taslak veya iptal edilmiş siparişler kalıcı silinebilir." },
+                { status: 409 }
+            );
+        }
+        // 2026-09-16 (RBAC Faz 6 refinement): kalıcı silmeyi ÜÇ FK bloklar —
+        // shipments.order_id + invoices.order_id (RESTRICT, mig.012) ve
+        // production_entries.related_order_id (NO ACTION, mig.001; kayıtlı listede yoktu,
+        // FK grafiğinden ölçüldü). Eskiden hepsi 23503 → dürüst 500'dü; artık 409 ve mesaj
+        // neyin bloklandığını sayar. audit-after-success paterni sayesinde zaten yalan audit
+        // yoktu — bu değişiklik doğruluğu değil, yanıtın dürüstlüğünü/iletişimini düzeltir.
+        const [shipmentCount, invoiceCount, productionCount] = await Promise.all([
+            dbCountShipmentsByOrder(id),
+            dbCountInvoicesByOrder(id),
+            dbCountProductionEntriesByOrder(id),
+        ]);
+        const blockers = [
+            shipmentCount > 0 ? `${shipmentCount} sevkiyat` : null,
+            invoiceCount > 0 ? `${invoiceCount} fatura` : null,
+            productionCount > 0 ? `${productionCount} üretim kaydı` : null,
+        ].filter((b): b is string => b !== null);
+        if (blockers.length > 0) {
+            return NextResponse.json(
+                { error: `Bu siparişe bağlı ${blockers.join(" · ")} var; kalıcı silinemez. Sipariş iptal edilmiş olarak kalabilir.` },
                 { status: 409 }
             );
         }

@@ -38,6 +38,14 @@ vi.mock("@/lib/supabase/orders", () => ({
     dbCountOrdersByCustomer: (...args: unknown[]) => mockDbCountOrdersByCustomer(...args),
 }));
 
+// 2026-09-16: DELETE artık `invoices.customer_id` RESTRICT FK'sini de sayar (409 ön-kontrol).
+// Bu dosyanın DELETE testleri "fatura yok" varsayımıyla koşar; fatura senaryoları
+// delete-fk-precheck-routes.test.ts'te.
+const mockDbCountInvoicesByCustomer = vi.fn().mockResolvedValue(0);
+vi.mock("@/lib/supabase/invoices", () => ({
+    dbCountInvoicesByCustomer: (...args: unknown[]) => mockDbCountInvoicesByCustomer(...args),
+}));
+
 import { PATCH, DELETE } from "@/app/api/customers/[id]/route";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

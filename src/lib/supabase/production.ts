@@ -144,3 +144,17 @@ export async function dbCompleteProduction(input: CompleteProductionInput): Prom
     if (error) throw new Error(error.message);
     return data as CompleteProductionResult;
 }
+
+// ── Silme ön-kontrolü (2026-09-16) ──────────────────────────────────────────
+// `production_entries.related_order_id references sales_orders(id)` (mig.001) — ON DELETE
+// yazılmadığı için NO ACTION: bağlı üretim kaydı varken sipariş silinemez (23503).
+// Kayıtlı FK listesinde yalnız shipments/invoices vardı; bu üçüncü blokaj ölçümle bulundu.
+export async function dbCountProductionEntriesByOrder(orderId: string): Promise<number> {
+    const supabase = createServiceClient();
+    const { count, error } = await supabase
+        .from("production_entries")
+        .select("id", { count: "exact", head: true })
+        .eq("related_order_id", orderId);
+    if (error) throw new Error(error.message);
+    return count ?? 0;
+}

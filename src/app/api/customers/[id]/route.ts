@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { dbDeleteCustomer, dbUpdateCustomer } from "@/lib/supabase/customers";
 import { dbCountOrdersByCustomer } from "@/lib/supabase/orders";
+import { dbCountInvoicesByCustomer } from "@/lib/supabase/invoices";
 import { handleApiError, safeParseJson, validateStringLengths } from "@/lib/api-error";
 import { requirePermission, getCurrentUserId } from "@/lib/auth/role-guard";
 import { broadcastDataChange } from "@/lib/realtime/broadcast";
@@ -65,6 +66,15 @@ export async function DELETE(
         if (orderCount > 0) {
             return NextResponse.json(
                 { error: `Bu müşteriye ait ${orderCount} sipariş var. Önce siparişleri silin.` },
+                { status: 409 }
+            );
+        }
+        // 2026-09-16 (RBAC Faz 6 refinement): `invoices.customer_id` on delete RESTRICT
+        // (mig.012). Sayılmazsa silme 23503 ile düşer → dürüst 500; şimdi temiz 409.
+        const invoiceCount = await dbCountInvoicesByCustomer(id);
+        if (invoiceCount > 0) {
+            return NextResponse.json(
+                { error: `Bu müşteriye ait ${invoiceCount} fatura var. Faturası olan cari silinemez — pasife alın.` },
                 { status: 409 }
             );
         }

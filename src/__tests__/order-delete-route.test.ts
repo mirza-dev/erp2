@@ -45,6 +45,19 @@ vi.mock("@/lib/services/parasut-service", () => ({
     serviceSyncOrderToParasut: vi.fn().mockResolvedValue(undefined),
 }));
 
+// 2026-09-16: kalıcı silme ÜÇ RESTRICT/NO ACTION FK'yi sayar (shipments/invoices/
+// production_entries) → 409 ön-kontrol. Buradaki testler "bağlı kayıt yok" varsayar;
+// blokaj senaryoları delete-fk-precheck-routes.test.ts'te.
+vi.mock("@/lib/supabase/shipments", () => ({
+    dbCountShipmentsByOrder: vi.fn().mockResolvedValue(0),
+}));
+vi.mock("@/lib/supabase/invoices", () => ({
+    dbCountInvoicesByOrder: vi.fn().mockResolvedValue(0),
+}));
+vi.mock("@/lib/supabase/production", () => ({
+    dbCountProductionEntriesByOrder: vi.fn().mockResolvedValue(0),
+}));
+
 import { DELETE } from "@/app/api/orders/[id]/route";
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────

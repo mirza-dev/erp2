@@ -4,7 +4,14 @@
  * (React Fast Refresh requirement).
  */
 
-export function formatPoCurrency(amount: number, currency: string): string {
+/**
+ * `amount` null/undefined → "—". RBAC redaksiyonu (`redactPurchaseOrderForPerms`) maliyet
+ * alanlarını null'lar; `Intl.NumberFormat.format(null)` sessizce `₺0,00` basardı — yani
+ * "görme yetkin yok" yerine "sıfır" gösterilirdi (`Number(null ?? 0)` tuzağı, RBAC F2/A3
+ * dersi). Sıfır ise ölçülmüş bir değerdir ve "₺0,00" olarak basılır.
+ */
+export function formatPoCurrency(amount: number | null | undefined, currency: string): string {
+    if (amount === null || amount === undefined) return "—";
     try {
         return new Intl.NumberFormat("tr-TR", {
             style: "currency",

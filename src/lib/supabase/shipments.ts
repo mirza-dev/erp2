@@ -40,3 +40,14 @@ export async function dbListShipments(orderId?: string): Promise<ShipmentRow[]> 
     if (error) throw new Error(error.message);
     return data ?? [];
 }
+
+// ── Silme ön-kontrolü (2026-09-16) — `shipments.order_id` `on delete restrict` (mig.012) ──
+export async function dbCountShipmentsByOrder(orderId: string): Promise<number> {
+    const supabase = createServiceClient();
+    const { count, error } = await supabase
+        .from("shipments")
+        .select("id", { count: "exact", head: true })
+        .eq("order_id", orderId);
+    if (error) throw new Error(error.message);
+    return count ?? 0;
+}

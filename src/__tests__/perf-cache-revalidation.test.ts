@@ -84,12 +84,18 @@ vi.mock("@/lib/supabase/orders", () => ({
     dbHardDeleteOrder: (...args: unknown[]) => mockDbHardDeleteOrder(...args),
 }));
 
+// 2026-09-16: kalıcı silme FK ön-kontrolü (shipments/invoices/production_entries) → 0 = engel yok.
+vi.mock("@/lib/supabase/shipments", () => ({ dbCountShipmentsByOrder: vi.fn().mockResolvedValue(0) }));
+vi.mock("@/lib/supabase/invoices", () => ({ dbCountInvoicesByOrder: vi.fn().mockResolvedValue(0), dbCountInvoicesByCustomer: vi.fn().mockResolvedValue(0) }));
+
 // @/lib/supabase/production
 const mockDbReverseProduction = vi.fn();
 
 vi.mock("@/lib/supabase/production", () => ({
     dbReverseProduction:     (...args: unknown[]) => mockDbReverseProduction(...args),
     dbListProductionEntries: vi.fn().mockResolvedValue([]),
+    // 2026-09-16: sipariş kalıcı silme FK ön-kontrolü (production_entries.related_order_id)
+    dbCountProductionEntriesByOrder: vi.fn().mockResolvedValue(0),
 }));
 
 // @/lib/services/order-service
