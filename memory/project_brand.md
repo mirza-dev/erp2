@@ -7,7 +7,7 @@ metadata:
 
 # Roven marka çalışması (marka ajanı, dal `worktree-brand-roven`)
 
-**Kullanıcı kararları (2026-09-15):** konumlandırma **GENİŞ — her sektörden KOBİ** (PMT ilk referans; "vana/endüstriyel" pazarlama dilinden çıktı) · isim: **Roven ana aday + alternatif araştırması** · logo: **konseptler sunulur, kullanıcı seçer** · çıktılar: rehber + logo + landing/OG + isim/domain/tescil.
+**Kullanıcı kararları (2026-09-15/16):** konumlandırma **GENİŞ — her sektörden KOBİ** (PMT ilk referans; "vana/endüstriyel" pazarlama dilinden çıktı) · **isim: Roven KALIR, domain `rovenerp.com`** (16 Eyl; alternatifler elendi; rehber §9 geçiş listesi — DNS/Coolify/`NEXT_PUBLIC_APP_URL`/Supabase redirect/Resend; **kod fallback'i `erp.getmedspace.com` domain canlıya alınana kadar bilerek değişmez**, `app.` alt alanı AÇILMAZ) · logo: **A Akış Altıgeni** · çıktılar: rehber + logo + landing/OG + isim/domain/tescil.
 
 **Tek kaynak:** `docs/brand/roven-marka-rehberi.md` (§1.5 **dürüstlük tablosu: vaat ≤ canlı** — AI/Paraşüt koşullu yazılır; §2 "yapay zeka" ≠ "AI" kuralı; §4.4 üç ayrı mavi: UI accent `#58a6ff/#123f73`, e-posta `#2563eb` [sapma], belge `#0072BC` = **müşterinin** rengi, Roven'ın değil) · `docs/brand/isim-arastirmasi.md` (roven.com/.com.tr DOLU — .com.tr Roven Çikolata; **`tekakis.com/.com.tr/.tr` MÜSAİT**, "tek akış"; `rovenerp.com` müsait; "Raven Software Lab" sesteş ERP satıcısı; TÜRKPATENT/TMview sorgusu **kullanıcı adımı**).
 

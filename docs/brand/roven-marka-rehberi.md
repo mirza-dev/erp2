@@ -13,7 +13,7 @@ Sahibi: marka ajanı · Kaynak kararlar: kullanıcı (2026-09-15) — bkz. §0
 
 | Konu | Karar |
 |---|---|
-| İsim | **Roven** ana aday; alternatifler araştırılır (`docs/brand/isim-arastirmasi.md`), karar kullanıcının |
+| İsim | **Roven KALIR** (karar 2026-09-16); alternatifler araştırıldı ve elendi (`docs/brand/isim-arastirmasi.md`). Domain: **`rovenerp.com`** — bkz. §9 |
 | Konumlandırma | **Geniş: her sektörden KOBİ.** PMT Endüstriyel ilk referans müşteri; "vana/endüstriyel" vurgusu pazarlama dilinden çıkar |
 | Teslim modeli | Tek kiracılı, müşteri başına ayrı kurulum (`docs/musteri-kurulum.md`) — pazarlamada "verileriniz size ait, ayrı veritabanı" olarak söylenir |
 | Logo | 3 konsept sunuldu; **A — Akış Altıgeni seçildi (2026-09-16)** ve uygulandı (§6.3) |
@@ -200,7 +200,30 @@ Kaynak: `src/app/globals.css` (`:root` koyu, `[data-theme="light"]` aydınlık).
 
 ---
 
-## 9. Bu rehber nasıl değişir
+## 9. Domain: `rovenerp.com` (karar: kullanıcı, 2026-09-16)
+
+`roven.com` ve `roven.com.tr` başkasında (ikincisi Roven Çikolata) → ürünün adresi **`rovenerp.com`**. Pazarlamada isim yine yalnız **Roven**; "ERP" eki yalnız domainde ve arama sonuçlarında ("Roven ERP") görünür.
+
+**Alınacaklar (aynı gün, kullanıcı):** `rovenerp.com` (birincil) · `rovenerp.com.tr` (Türk müşteri yazımı; `.com`'a yönlendirir) · isteğe bağlı `rovenerp.tr`, `rovenerp.io` (savunma). Whois 2026-09-16 18:50: dördü de müsait.
+
+**Alt alan planı:**
+| Alan | Ne |
+|---|---|
+| `rovenerp.com` | landing (`/`) + uygulama (`/dashboard`) — tek Next uygulaması, ayrı host gerekmez |
+| `www.rovenerp.com` | → apex'e 301 |
+| `app.rovenerp.com` | **açılmaz** — uygulama apex'te; ikinci host PWA `id`/çerez/OAuth allowlist'ini ikiye bölerdi |
+| `mail`/`send` alt alanı | Resend'in DKIM/SPF kayıtları için Resend'in verdiği alt alan (ör. `send.rovenerp.com`) |
+
+**Geçiş listesi (domain alındıktan sonra; hepsi env/panel, kod DEĞİŞMEZ):**
+1. DNS: apex A/AAAA veya CNAME → Coolify; `www` → apex.
+2. Coolify: domain `rovenerp.com`, TLS.
+3. Env (`docs/deploy-env-matrix.md`): `NEXT_PUBLIC_APP_URL=https://rovenerp.com` — e-posta bağlantıları, OG `metadataBase`, teklif paylaşım linkleri buradan üretilir; **kod fallback'i `erp.getmedspace.com` bilerek değiştirilmedi** (env yokken ölü hosta link üretmesin diye eski canlı adres kalır; domain canlıya alınınca fallback da güncellenir — tek satır × 3: `layout.tsx`, `email/templates.ts`, `.env.example`).
+4. Supabase → Auth → URL Configuration: Site URL + Redirect URLs'e `https://rovenerp.com/auth/callback` (Google girişi ve parola kurtarma buna bağlı — `memory/project_auth.md`).
+5. Resend: `rovenerp.com` domain doğrulaması → `EMAIL_FROM=Roven <bildirim@rovenerp.com>`.
+6. Sentry `SENTRY_ENVIRONMENT`/allowed origins; CSP'de `connect-src` Supabase'e bakıyor, domain'den bağımsız.
+7. Eski adres (`erp.getmedspace.com`) 6 ay 301 → yeni; kurulu PWA'lar `start_url` ile eski hosta bakar — kullanıcı ana ekrana yeniden ekler (manifest `id` değişmez, yalnız host).
+
+## 10. Bu rehber nasıl değişir
 - Vaat eklemek → önce §1.5 tablosu.
 - Renk/tipografi eklemek → önce `globals.css` token'ı, sonra buraya satır.
 - Logo değişmek → §6.3 listesi + test sözleşmesi aynı commit'te.

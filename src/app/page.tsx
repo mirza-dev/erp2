@@ -201,7 +201,7 @@ export default function LandingPage() {
                     <div className="rv-window">
                         <div className="rv-win-bar">
                             <i /><i /><i />
-                            <span className="rv-win-url">app.roven · Genel Bakış</span>
+                            <span className="rv-win-url">rovenerp.com/dashboard · Genel Bakış</span>
                         </div>
                         <div className="rv-win-body">
                             <aside className="rv-mock-side">

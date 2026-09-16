@@ -94,3 +94,9 @@ Kısa (≤6 harf) Türkçe kelimelerin tamamı `.com`/`.com.tr`'de dolu — bu s
 |---|---|
 | Roven kalır | hiçbir şey; `NEXT_PUBLIC_APP_URL` yeni domain'e |
 | İsim değişir | `RovenLogo` wordmark · `manifest` `name/short_name` (**`id` sabit kalır**, yoksa kurulu PWA'lar kopar) · `layout.tsx` metadata · e-posta `[Roven]` öneki + kabuk · `roven_remember` çerezi (**değişmez**, kullanıcıya görünmez) · README/CLAUDE.md · `roven-logo.test.tsx` + `topbar-title` kilitleri · `docs/brand/*`. Tahmini ~20 dosya, migration YOK. ERP ajanı ile koordineli tek commit. |
+
+---
+
+## 6. KARAR (kullanıcı, 2026-09-16)
+
+**Roven kalır; domain `rovenerp.com`.** Whois 18:50 yeniden ölçüldü: `rovenerp.com` · `.com.tr` · `.tr` · `.io` müsait. Kullanıcı adımı: `rovenerp.com` + `rovenerp.com.tr` aynı gün alınır (isteğe bağlı `.tr`/`.io`); ardından §4 tescil taraması (sınıf 9/42, "roven" + sesteş "raven") ve TÜRKPATENT başvurusu (kelime + Akış Altıgeni şekli). Geçiş listesi: marka rehberi §9. Kod fallback'leri (`erp.getmedspace.com`) domain canlıya alınana kadar bilerek değişmez.
