@@ -230,7 +230,9 @@ export async function dbListFailedEmailsForRetry(
         .not("html_body", "is", null)
         .not("text_body", "is", null)
         .is("outbox_id", null)
-        .or("entity_type.is.null,entity_type.neq.quote")
+        // quote: PDF eki yeniden üretilemez; user_invite: bağlantı tek kullanımlık
+        // ve süreli — cron'la tekrar göndermek ya ölü link ya da yinelenen davet.
+        .or("entity_type.is.null,entity_type.not.in.(quote,user_invite)")
         .order("last_attempt_at", { ascending: true })
         .limit(50);
     if (error) throw new Error(error.message);

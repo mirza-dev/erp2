@@ -221,11 +221,13 @@ describe("dbListFailedEmailsForRetry", () => {
         expect(failed.length).toBe(0);
     });
 
-    it("entity_type='quote' kayıtlarını NULL-safe dışlar (.or filtresi)", async () => {
+    it("entity_type='quote' ve 'user_invite' kayıtlarını NULL-safe dışlar (.or filtresi)", async () => {
         await dbListFailedEmailsForRetry(3, 24);
-        // quote'u dışla AMA entity_type=NULL iç bildirimleri retry'da tut:
-        // PostgREST düz .neq NULL satırlarını da yutardı → .or kullanılır.
-        expect(orCalls).toContain("entity_type.is.null,entity_type.neq.quote");
+        // quote/user_invite'ı dışla AMA entity_type=NULL iç bildirimleri retry'da tut:
+        // PostgREST düz .neq/.not.in NULL satırlarını da yutardı → .or kullanılır.
+        // user_invite (2026-09-16): bağlantı tek kullanımlık + süreli — cron'la
+        // tekrar göndermek ya ölü link ya da yinelenen davet olurdu.
+        expect(orCalls).toContain("entity_type.is.null,entity_type.not.in.(quote,user_invite)");
     });
 });
 

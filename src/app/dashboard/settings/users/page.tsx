@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 import PageHeader from "@/components/ui/PageHeader";
 import { useToast } from "@/components/ui/Toast";
 import { useIsDemo, DEMO_DISABLED_TOOLTIP, DEMO_BLOCK_TOAST } from "@/lib/demo-utils";
@@ -8,7 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 import { ROLES, ROLE_LABELS, type Role } from "@/lib/auth/permissions";
 import Button from "@/components/ui/Button";
 import DataTable, { type DataTableColumn } from "@/components/ui/DataTable";
-import { KeyRound, Pencil, Plus, Trash2 } from "lucide-react";
+import { KeyRound, Pencil, Plus, Send, Trash2 } from "lucide-react";
 import { fieldStyle, labelStyle as sharedLabelStyle } from "@/components/ui/Input";
 import { MIN_PASSWORD_LENGTH, checkPasswordPolicy } from "@/lib/auth/password-policy";
 import Modal from "@/components/ui/Modal";
@@ -99,6 +100,11 @@ export default function UsersPage() {
     const [newPassword, setNewPassword] = useState("");
     const [newRoles, setNewRoles] = useState<Role[]>(["viewer"]);
     const [submitting, setSubmitting] = useState(false);
+    // Davet (onboarding 2026-09-16): e-posta yapılandırılmışsa varsayılan mod;
+    // değilse parola modu tek yol ve nedeni görünür (domain-rules §14.1).
+    const [inviteAvailable, setInviteAvailable] = useState<boolean>(false);
+    const [createMode, setCreateMode] = useState<"invite" | "password">("password");
+    const [resendingId, setResendingId] = useState<string | null>(null);
     const [currentEmail, setCurrentEmail] = useState<string | null>(null);
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [editingRolesId, setEditingRolesId] = useState<string | null>(null);
@@ -149,8 +155,11 @@ export default function UsersPage() {
         try {
             const res = await fetch("/api/admin/users");
             if (res.ok) {
-                const data = await res.json();
-                setUsers(data);
+                const data = await res.json() as { users: User[]; inviteAvailable?: boolean };
+                setUsers(data.users);
+                const canInvite = data.inviteAvailable === true;
+                setInviteAvailable(canInvite);
+                setCreateMode(canInvite ? "invite" : "password");
             } else {
                 toast({ type: "error", message: "Kullanıcılar yüklenemedi." });
             }
@@ -175,14 +184,22 @@ export default function UsersPage() {
         if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
         setSubmitting(true);
         try {
+            const invite = createMode === "invite" && inviteAvailable;
             const res = await fetch("/api/admin/users", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ email: newEmail, password: newPassword, roles: newRoles }),
+                body: JSON.stringify(invite
+                    ? { email: newEmail, roles: newRoles, mode: "invite" }
+                    : { email: newEmail, password: newPassword, roles: newRoles, mode: "password" }),
             });
             const data = await res.json();
             if (res.ok) {
-                toast({ type: "success", message: `Kullanıcı oluşturuldu: ${data.email}` });
+                toast({
+                    type: "success",
+                    message: invite
+                        ? `Davet gönderildi: ${data.email} — parolasını e-postadaki bağlantıyla belirleyecek.`
+                        : `Kullanıcı oluşturuldu: ${data.email}`,
+                });
                 setNewEmail("");
                 setNewPassword("");
                 setNewRoles(["viewer"]);
@@ -232,6 +249,25 @@ export default function UsersPage() {
             setResetError("Beklenmeyen bir hata oluştu.");
         } finally {
             setResetting(false);
+        }
+    };
+
+    // Hiç giriş yapmamış kullanıcıya daveti yeniden gönder (bağlantı süreli/tek kullanımlık).
+    const handleResendInvite = async (user: User) => {
+        if (isDemo) { toast({ type: "info", message: DEMO_BLOCK_TOAST }); return; }
+        setResendingId(user.id);
+        try {
+            const res = await fetch(`/api/admin/users/${user.id}/invite`, { method: "POST" });
+            const data = await res.json().catch(() => null);
+            if (res.ok) {
+                toast({ type: "success", message: `Davet yeniden gönderildi: ${user.email}` });
+            } else {
+                toast({ type: "error", message: data?.error || "Davet gönderilemedi." });
+            }
+        } catch {
+            toast({ type: "error", message: "Beklenmeyen bir hata oluştu." });
+        } finally {
+            setResendingId(null);
         }
     };
 
@@ -355,6 +391,19 @@ export default function UsersPage() {
                 const isSelf = user.email === currentEmail;
                 return (
                     <div style={{ display: "flex", gap: "6px", justifyContent: "flex-end" }}>
+                        {inviteAvailable && !user.last_sign_in_at && (
+                            <Button
+                                variant="secondary"
+                                size="xs"
+                                leftIcon={<Send size={13} />}
+                                onClick={() => handleResendInvite(user)}
+                                disabled={isDemo || resendingId === user.id}
+                                loading={resendingId === user.id}
+                                title={isDemo ? DEMO_DISABLED_TOOLTIP : "Henüz giriş yapmadı — parola belirleme bağlantısını yeniden gönder"}
+                            >
+                                Daveti yeniden gönder
+                            </Button>
+                        )}
                         <Button
                             variant="secondary"
                             size="xs"
@@ -414,6 +463,40 @@ export default function UsersPage() {
                     <div style={{ fontSize: "13px", fontWeight: 500, color: "var(--text-primary)" }}>
                         Yeni Kullanıcı
                     </div>
+                    {/* Mod: davet (kişi kendi parolasını belirler) / parola (admin yazar, elden iletir). */}
+                    <fieldset style={{ border: "none", padding: 0, margin: 0, display: "flex", flexDirection: "column", gap: "6px" }}>
+                        <legend style={labelStyle}>Parola nasıl belirlensin?</legend>
+                        <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", color: inviteAvailable ? "var(--text-primary)" : "var(--text-tertiary)" }}>
+                            <input
+                                type="radio"
+                                className="tap-44"
+                                name="create-mode"
+                                value="invite"
+                                checked={createMode === "invite"}
+                                onChange={() => setCreateMode("invite")}
+                                disabled={!inviteAvailable || isDemo}
+                            />
+                            Davet e-postası gönder — kişi parolasını kendisi belirler{inviteAvailable ? " (önerilen)" : ""}
+                        </label>
+                        {!inviteAvailable && (
+                            <div role="note" style={{ fontSize: "11px", color: "var(--text-tertiary)", marginLeft: "24px", lineHeight: 1.5 }}>
+                                E-posta gönderimi yapılandırılmamış; davet gönderilemiyor.{" "}
+                                <Link href="/dashboard/settings?tab=sistem" style={{ color: "var(--accent-text)" }}>Ayarlar › Sistem Durumu</Link>
+                            </div>
+                        )}
+                        <label style={{ display: "flex", alignItems: "center", gap: "8px", fontSize: "13px", color: "var(--text-primary)" }}>
+                            <input
+                                type="radio"
+                                className="tap-44"
+                                name="create-mode"
+                                value="password"
+                                checked={createMode === "password"}
+                                onChange={() => setCreateMode("password")}
+                                disabled={isDemo}
+                            />
+                            Parolayı ben belirleyeyim — kişiye elden iletirim
+                        </label>
+                    </fieldset>
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "12px" }}>
                         <label>
                             <span style={labelStyle}>E-posta</span>
@@ -426,18 +509,20 @@ export default function UsersPage() {
                                 style={inputStyle}
                             />
                         </label>
-                        <label>
-                            <span style={labelStyle}>Şifre (min. {MIN_PASSWORD_LENGTH} karakter)</span>
-                            <input
-                                type="password"
-                                required
-                                minLength={MIN_PASSWORD_LENGTH}
-                                value={newPassword}
-                                onChange={(e) => setNewPassword(e.target.value)}
-                                placeholder="••••••••"
-                                style={inputStyle}
-                            />
-                        </label>
+                        {createMode === "password" && (
+                            <label>
+                                <span style={labelStyle}>Şifre (min. {MIN_PASSWORD_LENGTH} karakter)</span>
+                                <input
+                                    type="password"
+                                    required
+                                    minLength={MIN_PASSWORD_LENGTH}
+                                    value={newPassword}
+                                    onChange={(e) => setNewPassword(e.target.value)}
+                                    placeholder="••••••••"
+                                    style={inputStyle}
+                                />
+                            </label>
+                        )}
                     </div>
                     <div>
                         <span style={labelStyle}>Roller</span>
@@ -449,7 +534,7 @@ export default function UsersPage() {
                             disabled={submitting}
                             loading={submitting}
                         >
-                            Oluştur
+                            {createMode === "invite" && inviteAvailable ? "Davet gönder" : "Oluştur"}
                         </Button>
                     </div>
                 </form>

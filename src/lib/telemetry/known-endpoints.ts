@@ -19,6 +19,7 @@
 export const KNOWN_ENDPOINTS: ReadonlySet<string> = new Set([
     "/api/admin/users",
     "/api/admin/users/[id]",
+    "/api/admin/users/[id]/invite",
     "/api/ai/health",
     "/api/ai/observability",
     "/api/ai/ops-summary",

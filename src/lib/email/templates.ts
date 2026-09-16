@@ -472,3 +472,67 @@ export type ContextForType<K extends NotificationTypeKey> =
     K extends "sync_error" ? SyncErrorCtx :
     K extends "order_shipped" ? OrderShippedCtx :
     never;
+
+/* ============================================================
+ * Kullanıcı daveti (onboarding, 2026-09-16)
+ *
+ * Admin kullanıcıyı parolasız açar; bu e-posta kişiyi kendi parolasını
+ * belirlemeye götürür (Supabase recovery bağlantısı → /auth/callback →
+ * /sifre-yenile). `renderEmail` anahtarına BAĞLANMAZ — bildirim tercihi
+ * değil, tek seferlik işlem e-postası; `renderQuoteToCustomer` gibi doğrudan
+ * `emailDocument` kullanır (tercih footer'ı yok).
+ * ============================================================ */
+export interface UserInviteCtx {
+    /** Davet edilen kişinin e-postası (selamlama için). */
+    email: string;
+    /** Atanan rollerin kullanıcı dilindeki etiketleri ("Satış", "Satın Alma"). */
+    roleLabels: string[];
+    /** Daveti gönderen admin (şeffaflık: "kim ekledi"). */
+    inviterEmail: string | null;
+    /** Supabase recovery action link — tek kullanımlık, süreli. */
+    actionLink: string;
+    /** Firma adı (Ayarlar › Firma Profili); boşsa "Roven". */
+    companyName?: string | null;
+    /** Bağlantı geçerlilik süresi (dakika) — GoTrue `otp_expiry`. */
+    expiresInMinutes?: number;
+}
+
+export function renderUserInvite(ctx: UserInviteCtx): EmailContent {
+    const company = ctx.companyName?.trim() || "Roven";
+    const subject = `${company} | Hesabınız hazır — parolanızı belirleyin`;
+    const expires = ctx.expiresInMinutes ?? 60;
+    const rows: DetailRow[] = [["Hesap", ctx.email]];
+    if (ctx.roleLabels.length > 0) rows.push(["Rol", ctx.roleLabels.join(", ")]);
+    if (ctx.inviterEmail) rows.push(["Davet eden", ctx.inviterEmail]);
+
+    const html = emailDocument(
+        `${company} hesabınız hazır — parolanızı belirleyin.`,
+        `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${COLORS.surface}" style="width:100%;border-collapse:separate;background:${COLORS.surface};border:1px solid ${COLORS.borderStrong};border-radius:8px">
+          <tr>
+            <td style="padding:26px 28px 20px;border-bottom:1px solid ${COLORS.border};color:${COLORS.text};font-size:19px;font-weight:800;line-height:26px">${escapeHtml(company)}</td>
+          </tr>
+          <tr>
+            <td style="padding:28px 28px 0;color:${COLORS.text};font-size:22px;font-weight:800;line-height:30px">Hesabınız hazır</td>
+          </tr>
+          <tr>
+            <td style="padding:13px 28px 22px;color:${COLORS.muted};font-size:14px;line-height:23px">${escapeHtml(company)} sistemine davet edildiniz. Giriş yapabilmek için önce kendi parolanızı belirlemeniz gerekiyor.</td>
+          </tr>
+          <tr>
+            <td style="padding:0 28px 22px">${detailsTable(rows)}</td>
+          </tr>
+          <tr>
+            <td style="padding:0 28px 22px">${ctaButton("Parolamı belirle", ctx.actionLink)}</td>
+          </tr>
+          <tr>
+            <td style="padding:0 28px 28px;color:${COLORS.muted};font-size:12px;line-height:19px">Bağlantı ${expires} dakika geçerlidir ve tek kullanımlıktır. Süresi dolarsa yöneticinizden daveti yeniden göndermesini isteyin. Bu daveti siz beklemiyorsanız e-postayı yok sayabilirsiniz.</td>
+          </tr>
+        </table>`,
+    );
+
+    const text = `${company} sistemine davet edildiniz.\n\nHesap: ${ctx.email}\n` +
+        (ctx.roleLabels.length ? `Rol: ${ctx.roleLabels.join(", ")}\n` : "") +
+        (ctx.inviterEmail ? `Davet eden: ${ctx.inviterEmail}\n` : "") +
+        `\nParolanızı belirlemek için: ${ctx.actionLink}\n\nBağlantı ${expires} dakika geçerlidir ve tek kullanımlıktır.`;
+
+    return { subject, html, text };
+}

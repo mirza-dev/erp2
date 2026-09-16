@@ -29,6 +29,16 @@ vi.mock("@/lib/supabase/service", () => ({
     ConfigError: class ConfigError extends Error {},
 }));
 
+// Davet servisi (onboarding 2026-09-16) — route testleri gönderimi taklit eder;
+// servisin kendisi user-invite.test.ts'te ayrıca test edilir.
+const mockInviteAvailable = vi.fn(() => false);
+const mockSendUserInvite = vi.fn();
+vi.mock("@/lib/services/user-invite-service", () => ({
+    inviteAvailable: () => mockInviteAvailable(),
+    sendUserInvite: (...a: unknown[]) => mockSendUserInvite(...a),
+    randomInvitePassword: () => "Rv1!rastgele-ve-yeterince-uzun-parola-0123456789",
+}));
+
 import { GET, POST } from "@/app/api/admin/users/route";
 import { PATCH, DELETE } from "@/app/api/admin/users/[id]/route";
 
@@ -92,9 +102,75 @@ describe("GET — roller döner", () => {
         const res = await GET();
         expect(res.status).toBe(200);
         const body = await res.json();
-        expect(body[0].roles).toEqual(["admin"]);
-        expect(body[1].roles).toEqual(["purchasing"]); // legacy → normalize
-        expect(body[2].roles).toEqual(["viewer"]);      // no role → viewer
+        // 2026-09-16: yanıt { users, inviteAvailable } — UI davet seçeneğini bu bayrakla açar.
+        expect(body.users[0].roles).toEqual(["admin"]);
+        expect(body.users[1].roles).toEqual(["purchasing"]); // legacy → normalize
+        expect(body.users[2].roles).toEqual(["viewer"]);      // no role → viewer
+        expect(body.inviteAvailable).toBe(false);
+    });
+
+    it("e-posta yapılandırılmışsa inviteAvailable=true", async () => {
+        mockGetUser.mockResolvedValue(ADMIN);
+        mockInviteAvailable.mockReturnValue(true);
+        mockListUsers.mockResolvedValue({ data: { users: [] }, error: null });
+        const body = await (await GET()).json();
+        expect(body.inviteAvailable).toBe(true);
+        mockInviteAvailable.mockReturnValue(false);
+    });
+});
+
+describe("POST — davet modu (parolasız; onboarding 2026-09-16)", () => {
+    beforeEach(() => {
+        mockGetUser.mockResolvedValue(ADMIN);
+        mockInviteAvailable.mockReturnValue(true);
+        mockSendUserInvite.mockResolvedValue({ ok: true, logId: "log-1" });
+    });
+
+    it("e-posta yapılandırılmamışsa 400 email_not_configured — kullanıcı HİÇ yaratılmaz", async () => {
+        mockInviteAvailable.mockReturnValue(false);
+        const res = await POST(jsonReq({ email: "d@pmt.com", roles: ["sales"], mode: "invite" }));
+        expect(res.status).toBe(400);
+        expect((await res.json()).code).toBe("email_not_configured");
+        expect(mockCreateUser).not.toHaveBeenCalled();
+        expect(mockSendUserInvite).not.toHaveBeenCalled();
+    });
+
+    it("davet: rastgele parola + roller + davet gönderimi (actor + origin) → 201 invited", async () => {
+        mockCreateUser.mockResolvedValue({ data: { user: { id: "new-9", email: "d@pmt.com" } }, error: null });
+        const res = await POST(jsonReq({ email: "d@pmt.com", roles: ["sales"], mode: "invite" }));
+        expect(res.status).toBe(201);
+        const body = await res.json();
+        expect(body).toMatchObject({ id: "new-9", email: "d@pmt.com", roles: ["sales"], invited: true });
+        // Parola istemciden GELMEDİ ama yaratma çağrısı yine parola taşır (rastgele, politikayı aşan).
+        const createArg = mockCreateUser.mock.calls[0][0] as { password: string; app_metadata: unknown };
+        expect(createArg.password.length).toBeGreaterThan(20);
+        expect(createArg.app_metadata).toEqual({ roles: ["sales"] });
+        expect(mockSendUserInvite).toHaveBeenCalledWith(expect.objectContaining({
+            userId: "new-9",
+            email: "d@pmt.com",
+            roles: ["sales"],
+            inviter: { id: "admin-1", email: "a@pmt.com" },
+            origin: "http://localhost",
+        }));
+        expect(mockDeleteUser).not.toHaveBeenCalled();
+    });
+
+    it("davet gönderimi düşerse hesap GERİ ALINIR (deleteUser) → 502 invite_send_failed", async () => {
+        mockCreateUser.mockResolvedValue({ data: { user: { id: "new-10", email: "d@pmt.com" } }, error: null });
+        mockSendUserInvite.mockResolvedValue({ ok: false, error: "resend 500" });
+        mockDeleteUser.mockResolvedValue({ error: null });
+        const res = await POST(jsonReq({ email: "d@pmt.com", mode: "invite" }));
+        expect(res.status).toBe(502);
+        expect((await res.json()).code).toBe("invite_send_failed");
+        expect(mockDeleteUser).toHaveBeenCalledWith("new-10");
+    });
+
+    it("mode verilmezse eski parola yolu aynen (davet servisi çağrılmaz)", async () => {
+        mockCreateUser.mockResolvedValue({ data: { user: { id: "new-11", email: "p@pmt.com" } }, error: null });
+        const res = await POST(jsonReq({ email: "p@pmt.com", password: "mavi-liman-77-defter" }));
+        expect(res.status).toBe(201);
+        expect((await res.json()).invited).toBe(false);
+        expect(mockSendUserInvite).not.toHaveBeenCalled();
     });
 });
 
