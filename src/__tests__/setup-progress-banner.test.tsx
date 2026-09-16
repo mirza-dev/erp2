@@ -70,6 +70,36 @@ describe("kurulum ilerleme bandı", () => {
         expect(await screen.findByText(/Kurulum 3\/5/)).toBeTruthy();
     });
 
+    it("onboarding sayaçları geldiğinde SEKİZ adım sayar ve ilk eksik adıma 'Sıradaki' linki verir", async () => {
+        // Admin görünümü: firma + kullanıcılar + ilk belge alanları dolu geliyor.
+        mockFetch(200, {
+            ...COMPLETE,
+            company: { nameFilled: false, taxNoFilled: false, addressFilled: false, hasLogo: false },
+            users: { total: 1 },
+            documents: { quotes: 0, salesOrders: 0 },
+        });
+        render(<SetupProgressBanner />);
+        expect(await screen.findByText(/Kurulum 5\/8/)).toBeTruthy();
+        // İlk eksik adım "Firma bilgileri" → link doğrudan Firma Profili'ne.
+        const next = screen.getByRole("link", { name: /Sıradaki adım: Firma bilgileri/ });
+        expect(next.getAttribute("href")).toBe("/dashboard/settings?tab=firma");
+        // Hub linki de yerinde: kurulum aracının kendisi hâlâ tek tıkla.
+        expect(screen.getByRole("link", { name: /Veri Aktarım Merkezi/ })).toBeTruthy();
+    });
+
+    it("yalnız onboarding adımı eksikse (veri tamam) bant HÂLÂ görünür — ilk teklife kadar taşır", async () => {
+        mockFetch(200, {
+            ...COMPLETE,
+            company: { nameFilled: true, taxNoFilled: true, addressFilled: true, hasLogo: true },
+            users: { total: 3 },
+            documents: { quotes: 0, salesOrders: 0 },
+        });
+        render(<SetupProgressBanner />);
+        expect(await screen.findByText(/Kurulum 7\/8/)).toBeTruthy();
+        expect(screen.getByRole("link", { name: /Sıradaki adım: İlk teklif veya sipariş/ }).getAttribute("href"))
+            .toBe("/dashboard/quotes/new");
+    });
+
     it("yetkisiz rolde (403) SESSİZ — hata göstermez", async () => {
         mockFetch(403, { error: "Yetkisiz." });
         const { container } = render(<SetupProgressBanner />);

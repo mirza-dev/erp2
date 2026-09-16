@@ -27,6 +27,7 @@ const API_ROOT = join(process.cwd(), "src/app/api");
 const GUARD_PATTERNS = [
     "requirePermission(",
     "requireRole(",
+    "requireAnyRole(",      // rol-listesi guard'ı (role-guard.ts:141); setup-status "oturumu olan her rol"
     "requirePermissionFor(",
     "requireRoleFor(",
     "requireInternalOperator(",
