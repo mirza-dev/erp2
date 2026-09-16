@@ -19,9 +19,23 @@ describe("settings-tabs", () => {
             "firma",
             "dosyalar",
             "not-sablonlari",
+            "sistem",
             "kullanici",
             "bildirimler",
         ]);
+    });
+
+    it("sistem durumu sekmesi SİSTEM kapsamında (admin görür, bakım/internal-operator şart değil)", () => {
+        // 2026-09-16 onboarding: e-posta/AI/Paraşüt sağlığı yalnız internal-operator'a
+        // açıktı; müşterinin admin'i "bildirim neden gitmiyor"u kendisi görsün.
+        const visible = getVisibleSettingsTabs(true, false);
+        const tab = visible.find(t => t.key === "sistem");
+        expect(tab).toBeDefined();
+        expect(tab!.scope).toBe("system");
+        expect(tab!.label).toBe("Sistem Durumu");
+        expect(visible.findIndex(t => t.key === "sistem"))
+            .toBe(visible.findIndex(t => t.key === "not-sablonlari") + 1);
+        expect(getVisibleSettingsTabs(false, false).some(t => t.key === "sistem")).toBe(false);
     });
 
     it("dosyalar sekmesi sistem kapsamında, firma'dan hemen sonra", () => {
@@ -56,6 +70,7 @@ describe("settings-tabs", () => {
             "Firma Profili",
             "Dosyalar",
             "Not Şablonları",
+            "Sistem Durumu",
             "API Anahtarları",
             "Yapay Zeka",
             "Kullanıcı Profili",

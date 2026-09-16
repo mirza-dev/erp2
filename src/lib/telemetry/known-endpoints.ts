@@ -169,6 +169,7 @@ export const KNOWN_ENDPOINTS: ReadonlySet<string> = new Set([
     "/api/settings/files",
     "/api/settings/files/[id]",
     "/api/settings/files/[id]/download",
+    "/api/settings/system-status",
     "/api/settings/user/avatar",
     "/api/settings/user/notifications/test",
     "/api/settings/user/password",

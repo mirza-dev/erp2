@@ -4,6 +4,7 @@ export type SettingsTab =
     | "firma"
     | "dosyalar"
     | "not-sablonlari"
+    | "sistem"
     | "kullanici"
     | "bildirimler"
     | "api"
@@ -40,6 +41,16 @@ export const SETTINGS_TABS: SettingsTabDefinition[] = [
         label: "Not Şablonları",
         scope: "system",
         description: "Teklif formunda Notlar, Teslimat ve Ödeme alanlarına tek tıkla eklenen hazır metinler.",
+    },
+    {
+        // 2026-09-16 (onboarding) — e-posta / AI / Paraşüt / Sentry sağlığı üç
+        // ayrı yerde ve yalnız internal-operator'a açıktı. Müşterinin admin'i
+        // "bildirim neden gitmiyor"u kendisi görsün (kullanıcı kararı). Yalnız
+        // var/yok gösterir; anahtar DEĞERİ taşımaz.
+        key: "sistem",
+        label: "Sistem Durumu",
+        scope: "system",
+        description: "E-posta, yapay zeka, entegrasyon ve izleme servislerinin durumu — hangisi çalışıyor, hangisi eksik.",
     },
     {
         key: "api",
