@@ -571,6 +571,10 @@ export default function CustomersClient(props: CustomersClientProps) {
                         onRowClick={c => setSelectedCustomer(c)}
                         minWidth="700px"
                         emptyMessage={search ? "Arama kriterine uyan müşteri bulunamadı." : "Henüz müşteri yok."}
+                        // Gerçek boş durumda (arama yok) yetkili kullanıcıya eylem — demo/yetkisiz görmez.
+                        emptyAction={!search && !isDemo && has("manage_customers")
+                            ? { label: "İlk müşterini ekle", onClick: () => setShowAddModal(true) }
+                            : undefined}
                         footer={displayTotal > 0 ? (
                             <Pagination
                                 currentPage={page}

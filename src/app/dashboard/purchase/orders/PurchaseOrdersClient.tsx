@@ -340,6 +340,10 @@ export default function PurchaseOrdersClient(props: PurchaseOrdersClientProps) {
                     rowKey={o => o.id}
                     onRowClick={o => router.push(`/dashboard/purchase/orders/${o.id}`)}
                     emptyMessage={search ? "Arama kriterine uyan sipariş bulunamadı." : "Henüz sipariş yok."}
+                    // Gerçek boş durum: arama yok + "Tümü" sekmesi; yetkili ve demo dışı kullanıcıya eylem.
+                    emptyAction={!search && tab === "all" && !isDemo && has("manage_purchase_orders")
+                        ? { label: "İlk satın alma siparişini oluştur", href: "/dashboard/purchase/orders/new" }
+                        : undefined}
                     footer={displayTotal > 0 ? (
                         <Pagination
                             currentPage={page}

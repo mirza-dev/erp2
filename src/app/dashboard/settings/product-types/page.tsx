@@ -352,6 +352,8 @@ export default function TechnicalTemplatesPage() {
                         rowKey={t => t.id}
                         rowStyle={t => ({ opacity: t.is_active ? 1 : 0.55 })}
                         emptyMessage="Teknik şablon yok."
+                        // Kurulumun ilk adımı burası: boş ekran ilk tipi açtırsın (blocked = demo/yetkisiz).
+                        emptyAction={!blocked ? { label: "İlk ürün tipini oluştur", onClick: openCreate } : undefined}
                     />
                 )}
             </Card>

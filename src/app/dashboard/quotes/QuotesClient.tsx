@@ -77,6 +77,8 @@ export default function QuotesClient(props: QuotesClientProps) {
     const { toast } = useToast();
     const isDemo = useIsDemo();
     const { has, canViewSalesPrices } = usePermissions();
+    // Hiç filtre yok + "Tümü" sekmesi = sistemde gerçekten teklif yok (boş-durum CTA'sı için).
+    const quotesTrulyEmpty = !search && tab === "ALL" && !currency && !dateFrom && !dateTo;
 
     const [displayQuotes, setDisplayQuotes] = useState<QuoteSummary[]>(quotes);
     const [displayCounts, setDisplayCounts] = useState<Record<QuoteTab, number>>(counts);
@@ -478,7 +480,10 @@ export default function QuotesClient(props: QuotesClientProps) {
                     rowKey={q => q.id}
                     onRowClick={q => router.push(`/dashboard/quotes/${q.id}`)}
                     minWidth="740px"
+                    // Hiç filtre yokken "Filtreleri Temizle" anlamsız: sistem gerçekten boş →
+                    // sade mesaj + ilk teklife giden eylem (onboarding). Filtre varken eski durum.
                     emptyMessage={
+                        quotesTrulyEmpty ? "Henüz teklif yok." : (
                         <EmptyState
                             title={
                                 search
@@ -491,7 +496,11 @@ export default function QuotesClient(props: QuotesClientProps) {
                                 onClick: () => navigate({ search: "", tab: "ALL", currency: "", dateFrom: "", dateTo: "", page: 1 }),
                             }}
                         />
+                        )
                     }
+                    emptyAction={quotesTrulyEmpty && !isDemo && has("manage_quotes")
+                        ? { label: "İlk teklifini oluştur", href: "/dashboard/quotes/new" }
+                        : undefined}
                     footer={displayTotal > 0 ? (
                         <Pagination
                             currentPage={page}
