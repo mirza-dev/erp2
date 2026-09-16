@@ -250,9 +250,10 @@ supabase/
 ## 🧪 Test & Komutlar
 
 ```bash
-npm test              # Vitest — 319 dosya / ~4650 test
-npm run test:coverage # kapsam raporu
-npm run test:e2e      # Playwright E2E
+npm test                 # Vitest (mock'lu) — 512 dosya / 7100+ test
+npm run test:coverage    # kapsam raporu
+npm run test:integration # GERÇEK yerel Supabase'e karşı RLS/RPC/Storage kapısı (colima + supabase start ister; canlıya asla gitmez)
+npm run test:e2e         # Playwright E2E (yerel yığın)
 npm run lint          # ESLint (0 hata hedefi)
 npm run smoke         # production smoke kontrolü
 npm run doctor        # react-doctor tarama

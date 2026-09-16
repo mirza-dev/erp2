@@ -26,6 +26,7 @@ Artık tüm yığın **yerelde** çalışıyor. Maliyeti yok, internet gerekmiyo
 colima start                 # VM (4 CPU / 6 GB / 30 GB, Apple Virtualization)
 supabase start               # 10 konteyner; migration'lar otomatik uygulanır
 npm run dev                  # kapı artık DURDURMAZ
+npm run test:integration     # gerçek-DB kapısı (aşağıda) — yığın ayakta değilse tek mesajla durur
 ```
 
 Kapatmak: `supabase stop && colima stop`
@@ -188,3 +189,22 @@ o dosyayı HİÇ okumaz — iki sunucu yan yana, birbirinden habersiz çalışı
   ve sinyali tam olan telefonda kullanıcıyı Wi-Fi'ye baktırıyordu; artık
   `navigator.onLine` ile sebebi ayırt ediyor (`src/app/offline/OfflineReason.tsx`).
   Yeni tünel = yeni origin = eski ikonu silip yeniden eklemek gerekir.
+
+## Gerçek-DB entegrasyon kapısı (`npm run test:integration`, 2026-09-16)
+
+`npm test` tamamen mock'ludur; RLS/RPC sözleşmesi canlıda yalnız **elle** ölçülmüştü
+(2026-09-11: anon ile 64 tablo → 0 satır). Bu kapı o ölçümü **tekrarlanabilir** yapar ve
+yalnız yerel yığına karşı koşar (`tests/integration/setup.ts` hedef yerel değilse
+**fail-closed** patlar — `preflight:env`in tersine, bilinmeyen hedef de reddedilir, çünkü
+testler satır yazar/siler).
+
+| Dosya | Ne ölçer |
+|---|---|
+| `tests/integration/rls-gate.test.ts` | `pg_class.relrowsecurity` (64/64, tablo sayısı TAM 64 — kayma görünür olsun) · `pg_policies` ≥ 29 · anon key ile her tablo 0 satır + anti-vakum (service key migration tohumlarını görür) · 6 kova, anon listeleyemez (service ile geçici obje yüklenip anon'a görünmediği kanıtlanır) · mig.110'un 5 SECURITY DEFINER RPC'si + kontrol RPC anon'a **401/42501** (404/PGRST202 kabul edilmez — parametre uyuşmazlığı izin kanıtı değildir) |
+| `tests/integration/quote-reservation-rpc.test.ts` | 088 zinciri gerçek Postgres'te: gönder → `reserved` 0→6 / `available_now` 10→4 + bağlı `pending_approval` sipariş · idempotent ikinci gönderim · ikinci teklif fazlası → kısmi 4 + `shortages` satırı 2 · reddet → 6'ya döner · kabul → sipariş `approved`, rezerv korunur. Kendi verisini yaratır ve FK sırasıyla siler (`inventory_movements` → ürün) |
+
+SQL katmanı `supabase db query --local` ile okunur (psql/pg bağımlılığı yok). Kırmızı-kanıt
+(2026-09-16): `disable row level security` → 2 kural kırmızı · anon'a `select` policy → anon
+probu kırmızı · `grant execute … to anon` → DEFINER kuralı kırmızı; üçü de geri alındı, 17/17.
+
+`supabase db advisors --local --type security` ayrıca rapor üretir (kapı değil).
