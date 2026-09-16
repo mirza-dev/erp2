@@ -11,7 +11,7 @@ import {
     Check,
     ShieldCheck,
 } from "lucide-react";
-import RovenLogo from "@/components/layout/RovenLogo";
+import RovenLogo, { RovenMark } from "@/components/layout/RovenLogo";
 
 // Marka metinleri: docs/brand/roven-marka-rehberi.md §1.3 (vaat ≤ canlı, §1.5).
 export const metadata: Metadata = {
@@ -261,12 +261,7 @@ export default function LandingPage() {
                 <div className="rv-strip-chips">
                     {modules.map((m) => (
                         <span key={m} className="rv-chip">
-                            <svg width="9" height="10" viewBox="0 0 24 24" aria-hidden>
-                                <polygon
-                                    points="12,2.8 19.97,7.4 19.97,16.6 12,21.2 4.03,16.6 4.03,7.4"
-                                    fill="currentColor"
-                                />
-                            </svg>
+                            <RovenMark size={11} decorative />
                             {m}
                         </span>
                     ))}

@@ -1,7 +1,7 @@
 # Roven — Marka Rehberi
 
 Status: Accepted (v1)
-Last Updated: 2026-09-16
+Last Updated: 2026-09-16 (2)
 Applies To: Roven — tüm kullanıcıya görünür yüzeyler (landing, uygulama kabuğu, e-posta, belge, PWA, hata sayfaları, dış yazışma)
 Sahibi: marka ajanı · Kaynak kararlar: kullanıcı (2026-09-15) — bkz. §0
 
@@ -16,7 +16,7 @@ Sahibi: marka ajanı · Kaynak kararlar: kullanıcı (2026-09-15) — bkz. §0
 | İsim | **Roven** ana aday; alternatifler araştırılır (`docs/brand/isim-arastirmasi.md`), karar kullanıcının |
 | Konumlandırma | **Geniş: her sektörden KOBİ.** PMT Endüstriyel ilk referans müşteri; "vana/endüstriyel" vurgusu pazarlama dilinden çıkar |
 | Teslim modeli | Tek kiracılı, müşteri başına ayrı kurulum (`docs/musteri-kurulum.md`) — pazarlamada "verileriniz size ait, ayrı veritabanı" olarak söylenir |
-| Logo | 3 konsept sunuldu; seçim kullanıcının. Seçilene kadar mevcut altıgen geçerli |
+| Logo | 3 konsept sunuldu; **A — Akış Altıgeni seçildi (2026-09-16)** ve uygulandı (§6.3) |
 | Çıktılar | Bu rehber · logo yenileme · landing + OG görseli · isim/domain/tescil araştırması |
 
 ---
@@ -162,8 +162,14 @@ Kaynak: `src/app/globals.css` (`:root` koyu, `[data-theme="light"]` aydınlık).
 - **Yapma:** gölge, degrade, dış çizgi, döndürme, yatay/dikey sıkıştırma, wordmark'ı ayrı fontla yazma, "Roven" kelimesini düz metin olarak işaretin yanına elle yazma (test kırar: `>\s*Roven\s*<` yasak).
 - **Koyu/aydınlık:** ayrı varlık yok — tek SVG, renk miras. Tema-muaf yüzeylerde (e-posta, PDF, OG) sabit `#e6edf3` üzerine `#1a1d23` zemin (koyu) veya `#172033` üzerine beyaz (aydınlık).
 
-### 6.3 Yenileme (seçim bekliyor)
-Üç konsept — **A Akış Altıgeni** (mevcut altıgen + içinden geçen tek akış kanalı; önerilen), **B Geometrik R**, **C Tek Akış**. Karar gelince: `RovenLogo.tsx` mark'ı · `icon.svg` · `build-pwa-icons.ts` `HEX`/path sabiti · `roven-logo.test.tsx` sözleşmesi · `page.tsx` strip çiplerindeki inline polygon değişir. Manifest, SW, layout metadata **değişmez**.
+### 6.3 İşaret: Akış Altıgeni (karar: kullanıcı, 2026-09-16)
+Üç konsept sunuldu (`docs/brand/logo-konseptleri.html` / `.png`: A Akış Altıgeni · B Geometrik R · C Tek Akış); **A seçildi ve uygulandı.**
+
+- **Anlam:** altıgen = işletmenin hücresi (teklif, sipariş, stok, üretim); içinden sol→sağ geçen ve ortada bir kademe atlayan kanal = "Roven hepsini tek akışa bağlar". Kademe, akışın ERP'de bir dönüşümden geçtiğini söyler.
+- **Geometri (24×24):** köşeler `12,2.8 19.97,7.4 19.97,16.6 12,21.2 4.03,16.6 4.03,7.4`, stroke 2.6 round-join; kanal `M1.5 9.6 H10.2 L13.8 14.4 H22.5`, genişlik 2.4, round cap/join, **negatif alan** (`<mask>`: beyaz zemin + siyah yol) → işaret tek renkle çalışır.
+- **Dört kaynak, aynı sayılar** (test `roven-logo.test.tsx` kilitler): `RovenLogo.tsx` (React; mask id `useId`'den, sayfada birden çok logo olabilir) · `src/app/icon.svg` · `scripts/brand-mark.ts` (raster tek kaynak → `pwa:icons` + `og:image`) · `src/app/global-error.tsx` (inline kopya; uygulama bileşeni import edemez).
+- **Alt sınır:** 16 px (sekme ikonu); altında kanal kapanır. Uygulama ikonu %16, maskable %26 kenar payı.
+- `RovenMark` (dekoratif, `aria-hidden`) landing modül çiplerinde kullanılır; `RovenLogo showWordmark={false}` erişilebilir ad taşır.
 
 ---
 

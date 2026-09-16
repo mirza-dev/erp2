@@ -1,5 +1,5 @@
 /**
- * PWA ikonlarını `src/app/icon.svg`'deki altıgen markadan üretir.
+ * PWA ikonlarını Akış Altıgeni işaretinden (`scripts/brand-mark.ts`) üretir.
  *
  * Neden script: `icon.svg` içinde `prefers-color-scheme` medya sorgusu var —
  * marka açık temada koyu, koyu temada açık boyanıyor. Rasterleştirmede medya
@@ -15,13 +15,16 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import sharp from "sharp";
+import { BRAND_DARK_BG, BRAND_DARK_INK, markSvgInner } from "./brand-mark";
 
-/** globals.css `:root` (varsayılan koyu tema) `--bg-primary` ve marka rengi. */
-const BG = "#1a1d23";
-const MARK = "#e6edf3";
-
-/** icon.svg'deki altıgen — 24×24 viewBox'taki noktalar birebir. */
-const HEX = "12,2.6 20.2,7.3 20.2,16.7 12,21.4 3.8,16.7 3.8,7.3";
+/**
+ * Marka rehberi §4.4 tema-muaf sabitleri ve işaretin geometrisi TEK kaynaktan
+ * (`scripts/brand-mark.ts`). Eskiden bu dosya kendi `HEX` sabitini taşıyordu
+ * (2.6/21.4 + 3.8/20.2 — bileşenden ~%3 büyük); Akış Altıgeni'ne geçişte
+ * (2026-09-16) bileşenin sayılarına bağlandı.
+ */
+const BG = BRAND_DARK_BG;
+const MARK = BRAND_DARK_INK;
 
 /**
  * @param padding markanın kenara oranı. Maskable ikonlarda launcher köşeleri
@@ -35,7 +38,7 @@ function svg(size: number, padding: number, rounded: boolean): string {
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${size}" height="${size}" viewBox="0 0 ${size} ${size}">
   <rect width="${size}" height="${size}" rx="${r}" fill="${BG}"/>
   <g transform="translate(${offset} ${offset}) scale(${scale})">
-    <polygon points="${HEX}" fill="${MARK}" stroke="${MARK}" stroke-width="2.4" stroke-linejoin="round"/>
+    ${markSvgInner(MARK)}
   </g>
 </svg>`;
 }
@@ -78,7 +81,7 @@ function splashSvg(w: number, h: number): string {
     return `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}" viewBox="0 0 ${w} ${h}">
   <rect width="${w}" height="${h}" fill="${BG}"/>
   <g transform="translate(${(w - mark) / 2} ${(h - mark) / 2}) scale(${scale})">
-    <polygon points="${HEX}" fill="${MARK}" stroke="${MARK}" stroke-width="2.4" stroke-linejoin="round"/>
+    ${markSvgInner(MARK)}
   </g>
 </svg>`;
 }

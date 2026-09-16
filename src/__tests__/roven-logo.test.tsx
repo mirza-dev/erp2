@@ -72,3 +72,76 @@ describe("RovenLogo entegrasyon (source-regression)", () => {
         expect(svg).toContain("<svg");
     });
 });
+
+/**
+ * Akış Altıgeni (kullanıcı kararı 2026-09-16) — işaret DÖRT yerde yaşar ve
+ * bileşen import edemeyen ikisi geometriyi kopyalamak zorunda:
+ *   · RovenLogo.tsx (React, currentColor)
+ *   · src/app/icon.svg (favicon; React yok)
+ *   · scripts/brand-mark.ts (raster: PWA ikonları + OG görseli; React yok)
+ *   · src/app/global-error.tsx (kök hata sınırı uygulama bileşeni import EDEMEZ)
+ * Sayılar birinde değişip diğerlerinde kalırsa favicon ile launcher ikonu
+ * farklı işaret gösterir — 2026-09-16'ya kadar tam olarak bu durumdaydı
+ * (ikon scripti bileşenden ~%3 büyük kendi altıgenini taşıyordu). Bu blok
+ * dördünü birbirine kilitler; iddia yorumda değil ölçümde yaşar.
+ */
+describe("RovenLogo — Akış Altıgeni geometrisi dört kaynakta birebir", () => {
+    const POINTS = "12,2.8 19.97,7.4 19.97,16.6 12,21.2 4.03,16.6 4.03,7.4";
+    const CHANNEL = "M1.5 9.6 H10.2 L13.8 14.4 H22.5";
+    const SOURCES = [
+        "src/components/layout/RovenLogo.tsx",
+        "src/app/icon.svg",
+        "scripts/brand-mark.ts",
+        "src/app/global-error.tsx",
+    ];
+
+    it("altıgen köşeleri ve kanal yolu dört dosyada aynı dize", () => {
+        for (const rel of SOURCES) {
+            const src = read(rel);
+            expect(src, `${rel}: altıgen köşeleri`).toContain(POINTS);
+            expect(src, `${rel}: akış kanalı`).toContain(CHANNEL);
+        }
+    });
+
+    it("kanal NEGATİF alan: mask beyaz zemin + siyah yol, altıgen mask'a bağlı", () => {
+        for (const rel of SOURCES) {
+            const src = read(rel);
+            expect(src, `${rel}: mask`).toMatch(/<mask\b/);
+            expect(src, `${rel}: mask zemini`).toMatch(/fill=["']?white/);
+            expect(src, `${rel}: kanal rengi`).toMatch(/stroke=["']?black/);
+            expect(src, `${rel}: polygon mask'a bağlı`).toMatch(/mask=["{]?`?url\(#/);
+        }
+    });
+
+    it("render: mask + kanal path çıktıda var, mask id url ile eşleşiyor, tek renk kuralı korunur", () => {
+        const html = renderToStaticMarkup(<RovenLogo />);
+        expect(html).toContain("<mask");
+        expect(html).toContain(`d="${CHANNEL}"`);
+        const id = html.match(/<mask id="([^"]+)"/)?.[1];
+        expect(id).toBeTruthy();
+        expect(html).toContain(`mask="url(#${id})"`);
+        // useId ayraçları temizlenmiş olmalı — url(#…) parçası yalnız güvenli karakter taşır.
+        expect(id).toMatch(/^[A-Za-z0-9_-]+$/);
+        // Mask'ın white/black'i luminance'tır, tema rengi değil; sabit HEX yine YOK.
+        expect(html).not.toMatch(/#[0-9a-fA-F]{6}/);
+    });
+
+    it("aynı sayfada iki logo → iki FARKLI mask id (ilk tanım ikinciyi ezmesin)", () => {
+        const html = renderToStaticMarkup(
+            <>
+                <RovenLogo />
+                <RovenLogo size={16} />
+            </>,
+        );
+        const ids = [...html.matchAll(/<mask id="([^"]+)"/g)].map((m) => m[1]);
+        expect(ids).toHaveLength(2);
+        expect(new Set(ids).size).toBe(2);
+    });
+
+    it("PWA ikon scripti kendi altıgenini taşımaz — tek kaynağa bağlı", () => {
+        const src = read("scripts/build-pwa-icons.ts");
+        expect(src).toMatch(/from "\.\/brand-mark"/);
+        expect(src).toContain("markSvgInner(");
+        expect(src).not.toMatch(/const HEX\s*=/);
+    });
+});
