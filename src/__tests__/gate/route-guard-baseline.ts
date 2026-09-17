@@ -74,6 +74,17 @@ export const GUARDLESS_BASELINE: GuardlessRoute[] = [
     // ── bilinçli public ────────────────────────────────────────────────
     { path: "auth/me", methods: ["GET"], cls: "public", reason: "Oturum kendi kimliğini okur" },
     { path: "auth/demo", methods: ["GET"], cls: "public", reason: "Demo giriş ucu (cookie set)" },
+    {
+        path: "contact",
+        methods: ["POST"],
+        cls: "public",
+        reason:
+            "Pazarlama sayfasının kurulum görüşmesi formu — oturumsuz ziyaretçi doldurur, " +
+            "guard kavramsal olarak uygulanamaz. Veritabanına YAZMAZ, veri OKUMAZ; tek yan " +
+            "etkisi sabit bir adrese e-posta göndermek (alıcı gövdeden okunmaz, env'den gelir " +
+            "→ keyfi adrese relay yapısal olarak imkânsız). Kötüye kullanım üç katmanla " +
+            "sınırlı: bal küpü alanı + POLICIES.CONTACT (3/15 dk/IP) + alan uzunluk tavanları.",
+    },
     { path: "auth/logout", methods: ["POST"], cls: "public", reason: "Oturum kapatma — yan etkisi yalnız kendi session'ı" },
     { path: "exchange-rates", methods: ["GET"], cls: "public", reason: "TCMB kuru — kamusal veri" },
     { path: "email/webhooks/resend", methods: ["POST"], cls: "public", reason: "Public provider callback; Resend Svix imzası route içinde fail-closed doğrulanır" },

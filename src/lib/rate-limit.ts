@@ -147,6 +147,11 @@ export const POLICIES = {
     API_AUTH:     { name: "auth",  points: 300, duration: 60 },                        // 300 / dk
     // Anon (login öncesi public read)
     API_ANON:     { name: "anon",  points: 30,  duration: 60 },                        // 30 / dk
+    /** Pazarlama iletişim formu — oturumsuz ve e-posta GÖNDERİR (spam relay riski).
+     *  API_ANON'un 30/dk'sı burada fazla cömert: gerçek kullanıcı formu bir kez
+     *  doldurur, iki kez düzeltir. Bal küpü botların çoğunu zaten eler; bu tavan
+     *  eleyemediğinin maliyetini sınırlar. */
+    CONTACT:      { name: "contact", points: 3, duration: 900, blockDuration: 900 },    // 3 / 15 dk + 15 dk block
 } as const satisfies Record<string, RatePolicy>;
 
 /**
@@ -271,6 +276,7 @@ export function selectPolicy(pathname: string, method: string, isAuthenticated: 
     if (pathname.startsWith("/api/ai/"))                                           return POLICIES.AI;
     if (pathname.startsWith("/api/parasut/") && method !== "GET")                  return POLICIES.PARASUT_SYNC;
     if (pathname === "/api/developer/rum")                                         return POLICIES.RUM;
+    if (pathname === "/api/contact")                                               return POLICIES.CONTACT;
     if (pathname.startsWith("/api/"))                                              return isAuthenticated ? POLICIES.API_AUTH : POLICIES.API_ANON;
     return POLICIES.API_AUTH;  // /dashboard/** vb — practical olarak hit etmez (middleware /api ve auth path filter)
 }

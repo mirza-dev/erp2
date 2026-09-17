@@ -3,6 +3,7 @@ import { GeistSans } from "geist/font/sans";
 import { GeistMono } from "geist/font/mono";
 import "./globals.css";
 import { ServiceWorkerRegister } from "@/components/ServiceWorkerRegister";
+import { SITE_URL } from "@/lib/marketing/site";
 
 /**
  * iOS açılış ekranları — `scripts/build-pwa-icons.ts` içindeki SPLASH listesiyle
@@ -32,7 +33,9 @@ const SITE_DESCRIPTION =
   "Teklif, sipariş, stok, üretim ve muhasebe tek akışta. KOBİ'ler için yapay zeka destekli ERP.";
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.NEXT_PUBLIC_APP_URL ?? "https://erp.getmedspace.com"),
+  // Tek kaynak `lib/marketing/site.ts` — robots.ts, sitemap.ts ve JSON-LD aynı
+  // adresi kullanır. Ayrışırsa Google iki ayrı site görür, kanonik adres bölünür.
+  metadataBase: new URL(SITE_URL),
   title: SITE_TITLE,
   description: SITE_DESCRIPTION,
   applicationName: "Roven",

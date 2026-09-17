@@ -12,12 +12,17 @@ import {
     ShieldCheck,
 } from "lucide-react";
 import RovenLogo, { RovenMark } from "@/components/layout/RovenLogo";
+import ContactForm from "@/components/marketing/ContactForm";
+import { SITE_URL } from "@/lib/marketing/site";
 
 // Marka metinleri: docs/brand/roven-marka-rehberi.md §1.3 (vaat ≤ canlı, §1.5).
 export const metadata: Metadata = {
     title: "Roven — Yapay Zeka Destekli ERP",
     description:
         "Teklif, sipariş, stok, üretim ve muhasebe tek akışta. Küçük ve orta ölçekli işletmeler için yapay zeka destekli ERP — kurulumu bir öğleden sonra.",
+    // Kanonik adres: aynı sayfaya `?utm_*` ile gelen bağlantılar ayrı sayfa
+    // sayılmasın (Google sıralamayı böler ve hangisini göstereceğini şaşırır).
+    alternates: { canonical: "/" },
 };
 
 const modules = [
@@ -128,10 +133,129 @@ const faqs = [
     },
 ];
 
+/* Fiyat modeli: docs/brand/fiyatlandirma-modeli.md §4. Rakamlar oradan gelir —
+   değişirse İKİ yerde birden değişmeli (belge iç kullanım, burası vitrin). */
+const plans = [
+    {
+        name: "Hızlı Kurulum",
+        price: "45.000",
+        forWho: "Verisi düzenli, hemen başlamak isteyen",
+        featured: false,
+        items: [
+            "Sistem kurulumu ve devreye alma",
+            "Ürün + cari aktarımı (1 Excel)",
+            "Logo ve antet",
+            "3 saat uzaktan eğitim",
+            "30 gün yakın destek",
+        ],
+    },
+    {
+        name: "Anahtar Teslim",
+        price: "85.000",
+        forWho: "Çoğu işletme için doğru başlangıç",
+        featured: true,
+        items: [
+            "Tüm verilerin aktarımı — ürün, cari, tedarikçi, tedarikçi fiyatları, açılış stoğu",
+            "Ürün tipleri ve teknik alanlar kurulumu",
+            "Teklif ve PDF şablonu firmanıza göre",
+            "Rol ve yetki haritası çıkarımı",
+            "1 gün yerinde eğitim",
+            "90 gün yakın destek",
+        ],
+    },
+    {
+        name: "Dönüşüm",
+        price: "150.000",
+        priceSuffix: "’den",
+        forWho: "Mevcut ERP’den geçen, süreci karmaşık",
+        featured: false,
+        items: [
+            "Anahtar Teslim’in tamamı",
+            "Mevcut sistemden geçmiş veri göçü",
+            "Süreç analizi atölyesi",
+            "Özel alan ve rapor tasarımı",
+            "2 gün yerinde eğitim",
+            "6 ay yakın destek",
+        ],
+    },
+];
+
+/**
+ * Yapılandırılmış veri (JSON-LD).
+ *
+ * Google'ın sayfayı "bir yazılım ürünü" olarak tanıması ve SSS'lerin arama
+ * sonucunda açılır madde olarak çıkması için. İçerik SAYFANIN KENDİ
+ * dizilerinden türetilir (`faqs`, `plans`) — ikinci bir metin kopyası tutulsaydı
+ * sayfa değişince yapılandırılmış veri sessizce yalan söylemeye başlardı ve
+ * Google bunu "uyumsuz içerik" olarak cezalandırır.
+ *
+ * Fiyat `lowPrice` olarak veriliyor: paketler hizmet kapsamına göre değişiyor,
+ * tek bir fiyat iddiası yanlış olurdu.
+ */
+function buildJsonLd(siteUrl: string) {
+    return {
+        "@context": "https://schema.org",
+        "@graph": [
+            {
+                "@type": "SoftwareApplication",
+                "@id": `${siteUrl}/#software`,
+                name: "Roven",
+                applicationCategory: "BusinessApplication",
+                applicationSubCategory: "ERP",
+                operatingSystem: "Web",
+                inLanguage: "tr-TR",
+                description:
+                    "Küçük ve orta ölçekli işletmeler için yapay zeka destekli ERP. " +
+                    "Teklif, sipariş, stok, üretim ve satın alma tek akışta.",
+                url: siteUrl,
+                offers: {
+                    "@type": "AggregateOffer",
+                    priceCurrency: "TRY",
+                    lowPrice: plans[0].price.replace(".", ""),
+                    offerCount: plans.length,
+                },
+                featureList: modules,
+            },
+            {
+                "@type": "Organization",
+                "@id": `${siteUrl}/#org`,
+                name: "Roven",
+                url: siteUrl,
+                logo: `${siteUrl}/icons/icon-512.png`,
+            },
+            {
+                "@type": "FAQPage",
+                "@id": `${siteUrl}/#faq`,
+                mainEntity: faqs.map((f) => ({
+                    "@type": "Question",
+                    name: f.q,
+                    acceptedAnswer: { "@type": "Answer", text: f.a },
+                })),
+            },
+        ],
+    };
+}
+
+const carePlans = [
+    { name: "Temel", price: "24.000", desc: "Barındırma, günlük yedek, güncellemeler, e-posta desteği (2 iş günü)." },
+    { name: "Öncelikli", price: "42.000", desc: "Telefon ve WhatsApp desteği, aynı iş günü yanıt, aylık 4 saat uzaktan destek, çeyreklik sağlık kontrolü." },
+    { name: "Ortak", price: "72.000", desc: "4 saat yanıt, aylık 8 saat geliştirme kotası, yeni özelliklerde öncelik." },
+];
+
 export default function LandingPage() {
     return (
         <div className="rv-root">
             <style>{css}</style>
+            {/* Yapılandırılmış veri — içerik sayfanın kendi dizilerinden türetilir,
+                kullanıcı girdisi YOKTUR; `JSON.stringify` çıktısı script bağlamına
+                girdiği için `<` kaçırılır (aksi hâlde bir metin `</script>` içerse
+                etiketi erkenden kapatırdı). */}
+            <script
+                type="application/ld+json"
+                dangerouslySetInnerHTML={{
+                    __html: JSON.stringify(buildJsonLd(SITE_URL)).replace(/</g, "\\u003c"),
+                }}
+            />
 
             {/* atmosfer katmanları */}
             <div className="rv-bg-mesh" aria-hidden />
@@ -148,7 +272,9 @@ export default function LandingPage() {
                     <a href="#kimler">Kimler için</a>
                     <a href="#nasil">Nasıl çalışır</a>
                     <a href="#yapayzeka">Yapay zeka</a>
+                    <a href="#fiyat">Fiyat</a>
                     <a href="#sss">SSS</a>
+                    <a href="#iletisim">İletişim</a>
                 </nav>
                 <div className="rv-nav-cta">
                     {/* 2026-09-10 ölçümü: "Giriş Yap" 55.5×20.3, "Demo Gez"
@@ -352,6 +478,70 @@ export default function LandingPage() {
                 </div>
             </section>
 
+            {/* FİYAT — rakam gösterilir, "teklif alın" arkasına saklanmaz.
+                Gerekçe: docs/brand/fiyatlandirma-modeli.md §8 — bu segmentteki alıcı
+                bayiden fiyat alamamanın yorgunluğuyla geliyor; saklamak güven kaybettirir. */}
+            <section id="fiyat" className="rv-section">
+                <div className="rv-sec-head">
+                    <span className="rv-kicker">Fiyat</span>
+                    <h2 className="rv-h2">Bir kez kurulur, yılda bir yenilenir.</h2>
+                    <p className="rv-sec-p">
+                        Kullanıcı başına ücret yok. Modül başına ücret yok. Barındırma dahil.
+                        Ne ödeyeceğinizi ilk gün bilirsiniz.
+                    </p>
+                </div>
+
+                <div className="rv-plans">
+                    {plans.map((p) => (
+                        <div key={p.name} className={p.featured ? "rv-plan rv-plan-hi" : "rv-plan"}>
+                            {p.featured && <span className="rv-plan-tag">En çok tercih edilen</span>}
+                            <h3 className="rv-plan-n">{p.name}</h3>
+                            <p className="rv-plan-for">{p.forWho}</p>
+                            <p className="rv-plan-p">
+                                <span className="rv-plan-num">{p.price}</span>
+                                <span className="rv-plan-cur">TL{p.priceSuffix ?? ""}</span>
+                            </p>
+                            <p className="rv-plan-once">tek seferlik · KDV hariç</p>
+                            <ul className="rv-plan-list">
+                                {p.items.map((i) => (
+                                    <li key={i}><Check size={14} /> <span>{i}</span></li>
+                                ))}
+                            </ul>
+                            <a
+                                href="#iletisim"
+                                className={p.featured ? "rv-btn rv-btn-primary rv-plan-cta" : "rv-btn rv-btn-ghost rv-plan-cta"}
+                            >
+                                Görüşme iste
+                            </a>
+                        </div>
+                    ))}
+                </div>
+
+                <div className="rv-care">
+                    <div className="rv-care-head">
+                        <h3 className="rv-care-h">Yıllık bakım</h3>
+                        <p className="rv-care-p">
+                            Barındırma, günlük yedek, sürüm güncellemeleri ve destek.
+                            <strong> İlk yıl kurulum bedeline dahildir</strong>, 13. aydan itibaren başlar.
+                        </p>
+                    </div>
+                    <div className="rv-care-grid">
+                        {carePlans.map((c) => (
+                            <div key={c.name} className="rv-care-item">
+                                <span className="rv-care-n">{c.name}</span>
+                                <span className="rv-care-price">{c.price} TL<span className="rv-care-per">/yıl</span></span>
+                                <span className="rv-care-d">{c.desc}</span>
+                            </div>
+                        ))}
+                    </div>
+                </div>
+
+                <p className="rv-price-foot">
+                    Dönüşüm paketi projeye göre fiyatlanır. Tüm bedeller KDV hariçtir.
+                    İki ayrı firması olan işletmeler için ikinci kurulumda %50 indirim uygulanır.
+                </p>
+            </section>
+
             {/* SSS — yerel <details>: JS'siz açılır, ekran okuyucu ve klavye hazır */}
             <section id="sss" className="rv-section rv-section-alt">
                 <div className="rv-sec-head">
@@ -368,18 +558,36 @@ export default function LandingPage() {
                 </div>
             </section>
 
-            {/* SON CTA */}
-            <section className="rv-final">
-                <h2 className="rv-final-h">
-                    İşletmeni tek ekrandan yönetmeye<br />bugün başla.
-                </h2>
-                <div className="rv-hero-cta" style={{ justifyContent: "center" }}>
-                    <a href="/api/auth/demo" className="rv-btn rv-btn-primary rv-btn-lg">
-                        Demoyu gez <ArrowRight size={16} />
-                    </a>
-                    <Link href="/login" className="rv-btn rv-btn-ghost rv-btn-lg">
-                        Giriş Yap
-                    </Link>
+            {/* SON CTA — İLETİŞİM.
+                Eskiden burada üçüncü bir "Demoyu gez" bloğu vardı; demo bağlantısı
+                sayfada zaten dört kez geçiyor. Ziyaretçi buraya kadar okuduysa
+                eksik olan bilgi değil, KONUŞMA — o yüzden son blok formdur. */}
+            <section id="iletisim" className="rv-final">
+                <div className="rv-final-inner">
+                    <div className="rv-final-copy">
+                        <span className="rv-kicker">İletişim</span>
+                        <h2 className="rv-final-h">
+                            Önce sizi dinleyelim,<br />sonra ekranı gösterelim.
+                        </h2>
+                        <p className="rv-final-p">
+                            Kurulum görüşmesi 30 dakikadır ve ücretsizdir. Bugün neyi hangi
+                            dosyada tuttuğunuzu anlatırsınız; biz aynı işin Roven’da nasıl
+                            yürüdüğünü canlı sistemde gösteririz. Uymuyorsa açıkça söyleriz.
+                        </p>
+                        <ul className="rv-final-list">
+                            <li><Check size={14} /> <span>Sunum yok — doğrudan çalışan sistem</span></li>
+                            <li><Check size={14} /> <span>Kendi verinizle örnek bir akış kurarız</span></li>
+                            <li><Check size={14} /> <span>Fiyat ve süre görüşmede netleşir</span></li>
+                        </ul>
+                        <p className="rv-final-alt">
+                            Önce kendiniz bakmak isterseniz{" "}
+                            <a href="/api/auth/demo" className="rv-final-link">canlı demoyu gezin</a> —
+                            kayıt gerekmez.
+                        </p>
+                    </div>
+                    <div className="rv-final-form">
+                        <ContactForm fallbackEmail={process.env.NEXT_PUBLIC_CONTACT_EMAIL} />
+                    </div>
                 </div>
             </section>
 
@@ -572,8 +780,74 @@ const css = `
 .rv-ai-p{font-size:16px;line-height:1.65;color:var(--text-secondary);margin:16px auto 28px;max-width:46em}
 
 /* FINAL */
-.rv-final{max-width:1140px;margin:0 auto;padding:40px 28px 92px;text-align:center}
-.rv-final-h{font-size:40px;line-height:1.12;letter-spacing:-.03em;font-weight:680;margin:0 0 30px}
+/* FİYAT */
+.rv-sec-p{font-size:15.5px;line-height:1.65;color:var(--text-secondary);margin:14px 0 0}
+.rv-plans{display:grid;grid-template-columns:repeat(3,1fr);gap:16px;align-items:stretch}
+.rv-plan{display:flex;flex-direction:column;position:relative;padding:24px 22px;border-radius:14px;
+  border:1px solid var(--border-tertiary);background:var(--bg-primary)}
+.rv-plan-hi{border-color:var(--accent-border);box-shadow:0 0 0 1px var(--accent-border),0 14px 40px -22px var(--accent-glow)}
+.rv-plan-tag{position:absolute;top:-10px;left:22px;padding:3px 10px;border-radius:999px;
+  background:var(--accent-border);color:#fff;font-size:11px;font-weight:650;letter-spacing:.01em}
+.rv-plan-n{font-size:17px;font-weight:650;margin:0;color:var(--text-primary)}
+.rv-plan-for{font-size:13px;color:var(--text-tertiary);margin:5px 0 0;min-height:34px}
+.rv-plan-p{margin:14px 0 0;display:flex;align-items:baseline;gap:6px}
+.rv-plan-num{font-size:34px;font-weight:700;letter-spacing:-.02em;color:var(--text-primary);font-variant-numeric:tabular-nums}
+.rv-plan-cur{font-size:15px;font-weight:600;color:var(--text-secondary)}
+.rv-plan-once{font-size:12px;color:var(--text-tertiary);margin:3px 0 0}
+.rv-plan-list{list-style:none;padding:0;margin:18px 0 22px;display:flex;flex-direction:column;gap:9px;flex:1}
+.rv-plan-list li{display:flex;gap:9px;font-size:13.5px;line-height:1.5;color:var(--text-secondary)}
+.rv-plan-list svg{flex-shrink:0;margin-top:3px;color:var(--success-text)}
+.rv-plan-cta{width:100%;justify-content:center}
+
+.rv-care{margin-top:26px;padding:22px;border-radius:14px;border:1px solid var(--border-tertiary);background:var(--bg-primary)}
+.rv-care-head{max-width:620px}
+.rv-care-h{font-size:16px;font-weight:650;margin:0;color:var(--text-primary)}
+.rv-care-p{font-size:13.5px;line-height:1.6;color:var(--text-secondary);margin:6px 0 0}
+.rv-care-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:18px}
+.rv-care-item{display:flex;flex-direction:column;gap:5px;padding:14px 16px;border-radius:11px;background:var(--bg-tertiary)}
+.rv-care-n{font-size:13px;font-weight:650;color:var(--text-primary)}
+.rv-care-price{font-size:19px;font-weight:700;color:var(--accent-text);font-variant-numeric:tabular-nums}
+.rv-care-per{font-size:12px;font-weight:500;color:var(--text-tertiary)}
+.rv-care-d{font-size:12.5px;line-height:1.55;color:var(--text-secondary)}
+.rv-price-foot{font-size:12.5px;line-height:1.6;color:var(--text-tertiary);margin:18px 0 0;max-width:760px}
+
+/* SON CTA — İLETİŞİM */
+.rv-final{max-width:1140px;margin:0 auto;padding:40px 28px 92px}
+.rv-final-inner{display:grid;grid-template-columns:1fr 1fr;gap:44px;align-items:start;
+  border-top:1px solid var(--border-tertiary);padding-top:44px}
+.rv-final-h{font-size:34px;line-height:1.14;letter-spacing:-.028em;font-weight:680;margin:14px 0 0}
+.rv-final-p{font-size:15px;line-height:1.7;color:var(--text-secondary);margin:16px 0 0}
+.rv-final-list{list-style:none;padding:0;margin:18px 0 0;display:flex;flex-direction:column;gap:8px}
+.rv-final-list li{display:flex;gap:9px;font-size:13.5px;color:var(--text-secondary)}
+.rv-final-list svg{flex-shrink:0;margin-top:3px;color:var(--success-text)}
+.rv-final-alt{font-size:13px;color:var(--text-tertiary);margin:20px 0 0}
+.rv-final-link{color:var(--accent-text);text-decoration:underline}
+.rv-final-form{padding:24px;border-radius:14px;border:1px solid var(--border-tertiary);background:var(--bg-primary)}
+
+/* FORM */
+.rv-form-grid{display:grid;grid-template-columns:1fr 1fr;gap:13px}
+.rv-field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.rv-field-wide{grid-column:1/-1}
+.rv-lbl{font-size:11px;font-weight:600;letter-spacing:.02em;color:var(--text-secondary)}
+.rv-input{width:100%;padding:9px 11px;border-radius:9px;font-size:14px;font-family:inherit;
+  background:var(--bg-tertiary);border:1px solid var(--border-tertiary);color:var(--text-primary)}
+.rv-input:focus{outline:none;border-color:var(--accent-border);box-shadow:0 0 0 3px var(--accent-bg)}
+.rv-input[aria-invalid="true"]{border-color:var(--danger-border)}
+.rv-textarea{resize:vertical;min-height:88px;line-height:1.55}
+/* Bal küpü: ekranda yok ama display:none DEĞİL — bazı botlar gizli alanı atlar.
+   (Bu blok bir template literal içindedir: ters tırnak KULLANMA.) */
+.rv-honey{position:absolute;left:-9999px;width:1px;height:1px;overflow:hidden}
+.rv-form-err{margin:12px 0 0;padding:9px 12px;border-radius:9px;font-size:13px;
+  background:var(--danger-bg,rgba(218,54,51,.13));border:1px solid var(--danger-border);color:var(--text-primary)}
+.rv-form-foot{margin-top:16px;display:flex;flex-direction:column;gap:10px}
+.rv-form-foot .rv-btn{width:100%;justify-content:center}
+.rv-form-note{font-size:12px;line-height:1.55;color:var(--text-tertiary)}
+.rv-form-note a{color:var(--accent-text);text-decoration:underline}
+.rv-form-done{text-align:center;padding:12px 4px}
+.rv-form-done-i{display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;
+  border-radius:50%;background:var(--success-bg);color:var(--success-text);border:1px solid var(--success-border)}
+.rv-form-done-h{font-size:18px;font-weight:650;margin:14px 0 0;color:var(--text-primary)}
+.rv-form-done-p{font-size:13.5px;line-height:1.6;color:var(--text-secondary);margin:8px 0 18px}
 
 /* FOOTER */
 .rv-footer{max-width:1140px;margin:0 auto;padding:26px 28px;display:flex;align-items:center;gap:16px;flex-wrap:wrap;
@@ -601,6 +875,10 @@ const css = `
   .rv-band-fix{font-size:24px}
   .rv-final-h{font-size:30px}
   .rv-foot-copy{margin-left:0}
+  .rv-plans{grid-template-columns:1fr}
+  .rv-plan-for{min-height:0}
+  .rv-care-grid{grid-template-columns:1fr}
+  .rv-final-inner{grid-template-columns:1fr;gap:32px}
 }
 @media (max-width:460px){
   .rv-h1{font-size:31px}
@@ -610,6 +888,10 @@ const css = `
   .rv-nav{padding:16px 20px;gap:12px}
   .rv-strip,.rv-section,.rv-final,.rv-footer{padding-left:20px;padding-right:20px}
   .rv-ai-inner{padding:38px 24px}
+  .rv-form-grid{grid-template-columns:1fr}
+  .rv-final-form{padding:18px}
+  .rv-plan{padding:20px 18px}
+  .rv-plan-num{font-size:30px}
 }
 .rv-h1,.rv-h2,.rv-sub,.rv-band-fix,.rv-final-h{overflow-wrap:break-word}
 @media (prefers-reduced-motion:reduce){.rv-rise{animation:none;opacity:1}}
