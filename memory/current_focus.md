@@ -5,6 +5,16 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-09-18 — İç e-posta vurgu rengi → Roven mavisi (marka notu b, kullanıcı kararı)
+
+Marka oturumunun kullanıcıya bıraktığı iki renk notundan (b) kapandı: `src/lib/email/templates.ts`
+`COLORS.accent #2563eb → #123f73` (globals.css `--accent` ile aynı), `accentSoft #eaf2ff → #e7ecf1`
+(%10 navy beyaz üstünde, düz hex — e-posta istemcileri rgba'yı güvenilir işlemez). Etki yalnız Roven
+markalı **iç** bildirimler (CTA düğmesi + "Bilgilendirme" tonu); müşteri teklif e-postası accent
+kullanmaz. Kilit: `email-internal-templates.test.ts` (kırmızı-kanıt ✓). (a) `QuoteDocument`
+`C.brand #0072BC` kararı AÇIK — `deferred_backlog.md` B bloğunda açıklandı. Gate: tsc 0 · lint 0 ·
+ilgili 3 dosya 50/50 · memory-index 7/7.
+
 ## 2026-09-17 — Kapanış envanteri A1–A7: hepsi kapandı (4 dilim)
 
 **İstek:** ERP EKSİKLER oturumu 2026-09-15 envanterini kaynaktan ölçüp devretti; kullanıcı:

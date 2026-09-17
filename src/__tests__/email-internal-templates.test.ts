@@ -74,6 +74,20 @@ describe("premium iç operasyon e-posta şablonları", () => {
         expect(content.html).toContain("&lt;script&gt;");
     });
 
+    it("iç bildirim vurgu rengi Roven mavisidir (globals.css --accent ile aynı; eski #2563eb dönmez)", () => {
+        // Kullanıcı kararı 2026-09-18: Roven markalı iç e-postalar uygulama accent'ini (#123f73) kullanır.
+        const content = renderStockCritical({
+            productId: "p-1",
+            productName: "Vana",
+            sku: "V-1",
+            available: 2,
+            min: 10,
+        });
+        expect(content.html).toContain('bgcolor="#123f73"');
+        expect(content.html.toLowerCase()).not.toContain("#2563eb");
+        expect(content.html.toLowerCase()).not.toContain("#eaf2ff");
+    });
+
     it("bildirim tercihleri linki doğrudan Bildirimler sekmesini açar", () => {
         const content = renderOrderShipped({
             orderId: "o-1",

@@ -25,8 +25,10 @@ const COLORS = {
     text: "#172033",
     muted: "#64748b",
     subtle: "#94a3b8",
-    accent: "#2563eb",
-    accentSoft: "#eaf2ff",
+    // Roven mavisi — globals.css `--accent` (#123f73) ile aynı; soft ton = %10 navy beyaz üstünde
+    // düz hex (e-posta istemcileri rgba'yı güvenilir işlemez). Kullanıcı kararı 2026-09-18.
+    accent: "#123f73",
+    accentSoft: "#e7ecf1",
     danger: "#dc2626",
     dangerSoft: "#fff1f2",
     warning: "#b45309",

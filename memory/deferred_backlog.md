@@ -228,7 +228,11 @@ Dört dilim: `98a755c` → `7f95ff8` → `8b9453f` → Dilim 3 (E2E + cache fix)
 - Supabase panel: signups OFF · Redirect URLs (parola sıfırlama + OAuth callback) · Google provider.
 - Paraşüt: API başvurusu · `parasut:gate --write` · go-live ilk hafta iki sayaç.
 - `/gizlilik` 3 köşeli parantez + hukuk onayı · teklif e-posta smoke (Gmail/Outlook) · PMT pilot haftası.
-- Marka oturumunun kararı bekleyen iki notu: `QuoteDocument` `C.brand = "#0072BC"` PMT rengi →
-  `company_settings`e taşınmalı mı · e-posta `COLORS.accent #2563eb` vs Roven mavisi.
+- Marka oturumunun iki notu: (b) e-posta `COLORS.accent` → **Roven mavisi `#123f73` ✅ (kullanıcı
+  kararı 2026-09-18**; `accentSoft #e7ecf1`; kilit `email-internal-templates.test.ts`; yalnız
+  Roven markalı iç bildirimler etkilenir — müşteri teklif e-postası accent kullanmaz). (a)
+  `QuoteDocument` `C.brand = "#0072BC"` (teklif belgesindeki PMT mavisi; 4 yerde sabit:
+  `QuoteDocument.tsx` ×3 · `QuoteForm.tsx` ×2 · `globals.css` ×3 baskı) → ikinci müşteri
+  gelirse `company_settings` kolonu + Ayarlar renk alanı gerekir; **karar AÇIK** (PMT tek müşteriyken sabit kalabilir).
 - Yerel: `colima`/`supabase` işi bitince `supabase stop && colima stop`; Playwright cache'ini
   silen dış süreç bulunmalı (`~/Library/Caches/ms-playwright` iki kez silindi).
