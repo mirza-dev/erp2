@@ -61,6 +61,7 @@ Pazarlama metni **yalnız canlı olanı** düz cümleyle vaat eder; anahtara/ent
 | Teklif PDF e-postası | CANLI (`EMAIL_FROM` ister) | düz vaat |
 | Paraşüt entegrasyonu | kod tamam, teslim KAPALI | "hazır, isteğe bağlı açılır" — asla "otomatik akar" deme |
 | PWA, koyu/aydınlık tema, 6 rol, yedek/geri yükleme | CANLI | düz vaat |
+| Davetle kullanıcı açma · 8 adımlı kurulum rehberi + pano bandı · Ayarlar › Sistem Durumu kartı | **DALDA** (`worktree-onboarding`, ERP EKSİKLER ajanı, 2026-09-17) — main'e girmedi | **henüz yazılmaz**; merge olunca "düz vaat"e çekilir ve SSS "Kurulum ne kadar sürer?" cevabı 5 → 8 adıma güncellenir |
 
 Yeni bir vaat eklemeden önce bu tablo güncellenir; tablo yoksa vaat de yoktur.
 
