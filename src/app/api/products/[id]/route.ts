@@ -78,7 +78,7 @@ export async function PATCH(
         const validationErr = validateProductInput(body, { requireCore: false });
         if (validationErr) return NextResponse.json({ error: validationErr }, { status: 400 });
         const product = await dbUpdateProduct(id, body);
-        revalidateTag("products", "max");
+        revalidateTag("products", "immediate");
         void broadcastDataChange(["products"]);
         // Ürün deaktif edildiyse ilgili aktif uyarıları ve önerileri kapat
         if (body.is_active === false) {
@@ -108,7 +108,7 @@ export async function DELETE(
         // Silinen ürünün aktif uyarılarını ve önerilerini hemen kapat
         await resolveProductAlerts(id, "product_deleted");
         await dbExpireEntityRecommendations(id, "product").catch(() => {});
-        revalidateTag("products", "max");
+        revalidateTag("products", "immediate");
         void broadcastDataChange(["products"]);
         return NextResponse.json({ ok: true });
     } catch (err) {

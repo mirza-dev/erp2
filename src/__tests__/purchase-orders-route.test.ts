@@ -411,8 +411,8 @@ describe("POST /api/purchase-orders/[id]/confirm", () => {
         const body = await res.json();
         expect(body.status).toBe("confirmed");
         // confirm_po commitment seed eder → incoming/forecasted etkilenir
-        expect(mockRevalidateTag).toHaveBeenCalledWith("purchase-orders", "max");
-        expect(mockRevalidateTag).toHaveBeenCalledWith("products", "max");
+        expect(mockRevalidateTag).toHaveBeenCalledWith("purchase-orders", "immediate");
+        expect(mockRevalidateTag).toHaveBeenCalledWith("products", "immediate");
     });
 });
 
@@ -446,8 +446,8 @@ describe("POST /api/purchase-orders/[id]/cancel", () => {
         const body = await res.json();
         expect(body.status).toBe("cancelled");
         // cancel_po pending commitment cancel → incoming etkilenir
-        expect(mockRevalidateTag).toHaveBeenCalledWith("purchase-orders", "max");
-        expect(mockRevalidateTag).toHaveBeenCalledWith("products", "max");
+        expect(mockRevalidateTag).toHaveBeenCalledWith("purchase-orders", "immediate");
+        expect(mockRevalidateTag).toHaveBeenCalledWith("products", "immediate");
     });
 });
 
@@ -476,7 +476,7 @@ describe("POST /api/purchase-orders/[id]/revise", () => {
         expect(res.status).toBe(200);
         const body = await res.json();
         expect(body.status).toBe("draft");
-        expect(mockRevalidateTag).toHaveBeenCalledWith("purchase-orders", "max");
+        expect(mockRevalidateTag).toHaveBeenCalledWith("purchase-orders", "immediate");
     });
 });
 

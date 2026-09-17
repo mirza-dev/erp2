@@ -172,7 +172,7 @@ export async function POST(req: NextRequest) {
         if (validationErr) return NextResponse.json({ error: validationErr }, { status: 400 });
 
         const product = await dbCreateProduct(body);
-        revalidateTag("products", "max");
+        revalidateTag("products", "immediate");
 
         // Audit 6. tur Fix 5: response'u quoted/promisable/incoming/forecasted/
         // stockoutDate/orderDeadline ile enrich et — DataContext POST sonrası

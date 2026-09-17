@@ -43,7 +43,7 @@ export async function PATCH(
             actorFromAuthContext(ctx).label ?? "system",
         );
 
-        revalidateTag("rfqs", "max");
+        revalidateTag("rfqs", "immediate");
         void broadcastDataChange(["rfqs"]);
         return NextResponse.json({ ok: true });
     } catch (err) {

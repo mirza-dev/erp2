@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
             createdBy: actorFromAuthContext(ctx).label,
         });
 
-        revalidateTag("rfqs", "max");
+        revalidateTag("rfqs", "immediate");
         void broadcastDataChange(["rfqs"]);
         return NextResponse.json(result, { status: 201 });
     } catch (err) {

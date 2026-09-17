@@ -63,7 +63,7 @@ export async function PATCH(
             is_active: body.is_active !== undefined ? Boolean(body.is_active) : undefined,
         });
 
-        revalidateTag("product-types", "max");
+        revalidateTag("product-types", "immediate");
         return NextResponse.json(updated);
     } catch (err) {
         if (err instanceof Error && (
@@ -97,7 +97,7 @@ export async function DELETE(
         if (!existing) return NextResponse.json({ error: "Tip bulunamadı." }, { status: 404 });
 
         await dbDeleteProductType(id);
-        revalidateTag("product-types", "max");
+        revalidateTag("product-types", "immediate");
         return NextResponse.json({ success: true });
     } catch (err) {
         if (err instanceof Error && err.message.includes("bulunamadı")) {

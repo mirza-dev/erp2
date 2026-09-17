@@ -227,8 +227,8 @@ describe("POST /api/purchase-orders/[id]/receive", () => {
         mockDbGetPurchaseOrderById.mockResolvedValueOnce(makePO("confirmed"));
         mockServiceReceivePOLines.mockResolvedValueOnce({ id: VALID_PO_ID, status: "received" });
         await POST(makeRequest({ lines: [{ line_id: VALID_LINE_ID, qty: 10 }] }), makeParams());
-        expect(mockRevalidateTag).toHaveBeenCalledWith("purchase-orders", "max");
-        expect(mockRevalidateTag).toHaveBeenCalledWith("products", "max");
+        expect(mockRevalidateTag).toHaveBeenCalledWith("purchase-orders", "immediate");
+        expect(mockRevalidateTag).toHaveBeenCalledWith("products", "immediate");
     });
 
     it("O1: actor oturum kullanıcısıdır, istemci body.actor görmezden gelinir", async () => {

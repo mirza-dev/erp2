@@ -11,7 +11,7 @@ export const dynamic = "force-dynamic";
 // Perf Faz 5: aylık COGS RPC'si (mig.087) ~1.7s sürüyordu ve her dashboard
 // açılışında cache'siz koşuyordu. COGS = order_lines × cost_price → sipariş ve
 // ürün maliyeti değişiminde oynar; order/quote/production mutasyonları zaten
-// revalidateTag("products") atıyor → "products" tag'i pratik invalidasyonu
+// revalidateTag("products", "immediate") atıyor → "products" tag'i pratik invalidasyonu
 // sağlar ("finance-cogs" ileride hassas invalidasyon için rezerve).
 // RBAC DİKKAT: canViewCosts ve reportingCurrency cache DIŞINDA — redaction
 // per-request kalır (customers route kalıbı), cache key'ine perms sızmaz.

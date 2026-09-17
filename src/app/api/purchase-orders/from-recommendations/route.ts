@@ -93,8 +93,8 @@ export async function POST(req: NextRequest) {
             (await getCurrentUserId()) ?? undefined,
         );
 
-        revalidateTag("purchase-orders", "max");
-        revalidateTag("products", "max");
+        revalidateTag("purchase-orders", "immediate");
+        revalidateTag("products", "immediate");
         void broadcastDataChange(["purchase_orders"]);
         return NextResponse.json(result, { status: 201 });
     } catch (err) {

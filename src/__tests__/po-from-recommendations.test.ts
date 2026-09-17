@@ -13,7 +13,7 @@
  *     - qty=metadata.suggestQty → 201, accepted patch yapılır (best-effort)
  *     - qty≠metadata.suggestQty → 201, edited patch yapılır
  *     - vendor pasif (RPC bubble) → 400
- *     - başarı → revalidateTag("purchase-orders","max") + revalidateTag("products","max")
+ *     - başarı → revalidateTag("purchase-orders","immediate") + revalidateTag("products","immediate")
  */
 import { describe, it, expect, vi, beforeEach, beforeAll } from "vitest";
 
@@ -245,8 +245,8 @@ describe("POST /api/purchase-orders/from-recommendations", () => {
 
     it("başarılı PO → revalidateTag('purchase-orders','max') + revalidateTag('products','max') çağrılır", async () => {
         await POST(makeRequest(validBody));
-        expect(mockRevalidateTag).toHaveBeenCalledWith("purchase-orders", "max");
-        expect(mockRevalidateTag).toHaveBeenCalledWith("products", "max");
+        expect(mockRevalidateTag).toHaveBeenCalledWith("purchase-orders", "immediate");
+        expect(mockRevalidateTag).toHaveBeenCalledWith("products", "immediate");
     });
 
     it("serviceCreatePOFromRecommendations'a doğru satırlar iletilir", async () => {

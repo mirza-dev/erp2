@@ -61,10 +61,10 @@ describe("POST /api/quotes/[id]/accept", () => {
     it("başarılı → revalidateTag (quotes/quote-id/orders/products)", async () => {
         mockAccept.mockResolvedValue({ success: true, orderId: "ord-1", orderNumber: "SIP-2026-001" });
         await POST(makeReq(), idCtx());
-        expect(revalidateTag).toHaveBeenCalledWith("quotes", "max");
-        expect(revalidateTag).toHaveBeenCalledWith(`quote-${QID}`, "max");
-        expect(revalidateTag).toHaveBeenCalledWith("orders", "max");
-        expect(revalidateTag).toHaveBeenCalledWith("products", "max");
+        expect(revalidateTag).toHaveBeenCalledWith("quotes", "immediate");
+        expect(revalidateTag).toHaveBeenCalledWith(`quote-${QID}`, "immediate");
+        expect(revalidateTag).toHaveBeenCalledWith("orders", "immediate");
+        expect(revalidateTag).toHaveBeenCalledWith("products", "immediate");
     });
 
     it("already:true → 201 already döner", async () => {

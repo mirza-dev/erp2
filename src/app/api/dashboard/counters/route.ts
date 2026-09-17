@@ -21,7 +21,7 @@ export const dynamic = "force-dynamic";
  *  - pendingOrders: commercial_status='pending_approval' head+count
  *  - activeAlerts:  status IN (open, acknowledged) head+count (data-context tanımı)
  *  - reorderCount:  isReorderCandidateRow (copilot ile TEK kaynak) — products
- *    tag'li 60sn cache (order/production/quote mutasyonları revalidateTag("products")
+ *    tag'li 60sn cache (order/production/quote mutasyonları revalidateTag("products", "immediate")
  *    attığı için tazelik garantili; head+count'a göre pahalı tek sayaç bu).
  */
 const getCachedReorderCount = unstable_cache(

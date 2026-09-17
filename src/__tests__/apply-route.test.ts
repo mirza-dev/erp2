@@ -79,7 +79,7 @@ describe("POST /api/import/documents/[id]/apply", () => {
         const body = await res.json();
         expect(body.ok).toBe(true);
         expect(body.result.products_created).toBe(2);
-        expect(mockRevalidate).toHaveBeenCalledWith("products", "max");
+        expect(mockRevalidate).toHaveBeenCalledWith("products", "immediate");
     });
 
     it("service throw 'bulunamadı' → 400 (pre-check)", async () => {

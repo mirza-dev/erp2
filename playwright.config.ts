@@ -2,15 +2,12 @@ import { defineConfig, devices } from "@playwright/test";
 import path from "path";
 import fs from "fs";
 import dotenv from "dotenv";
+import { BASE_URL, E2E_PORT } from "./tests/helpers/base-url";
 
 // Playwright doesn't auto-load .env.local — do it explicitly
 dotenv.config({ path: path.join(__dirname, ".env.local") });
 
 export const STORAGE_STATE = path.join(__dirname, "tests/.auth/user.json");
-// 2026-09-17: port 3000 başka bir süreçte olabilir → E2E_BASE_URL=http://localhost:3200 +
-// E2E_PORT=3200 ile suite taşınır; global-setup aynı değişkeni okur. Varsayılan aynı.
-const BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
-const DEV_PORT = process.env.E2E_PORT ?? "3000";
 
 // Pre-create the auth directory so global-setup can write the file
 fs.mkdirSync(path.dirname(STORAGE_STATE), { recursive: true });
@@ -74,7 +71,9 @@ export default defineConfig({
     ],
 
     webServer: {
-        command: `npm run dev -- -p ${DEV_PORT}`,
+        // `-p` ile port SABİTLENİR: dolu portta `next dev` kendiliğinden 3001'e kayar ve
+        // `url` kontrolü portu tutan YABANCI sunucuyu bizim sanır (2026-09-16 ölçümü).
+        command: `npm run dev -- -p ${E2E_PORT}`,
         url: BASE_URL,
         reuseExistingServer: true,
         timeout: 60_000,

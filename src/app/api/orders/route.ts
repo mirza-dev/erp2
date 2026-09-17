@@ -113,7 +113,7 @@ export async function POST(req: NextRequest) {
             console.error("[AI Score] fire-and-forget:", err)
         );
 
-        revalidateTag("products", "max");
+        revalidateTag("products", "immediate");
         // Diğer kullanıcıların ekranları anında tazelensin (ateşle-unut).
         void broadcastDataChange(["orders", "products"]);
         return NextResponse.json(

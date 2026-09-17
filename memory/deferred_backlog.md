@@ -188,6 +188,51 @@ kararıyla aynı) · login'in iki input'u (kullanıcının `input`/`select` kara
 
 Rapor: `docs/audit/2026-09-10-oturumsuz-yuzeyler-ve-kapinin-kor-noktasi.md`.
 
+### 2026-09-15 → 2026-09-17 — Kapanış envanteri A1–A7 ✅ KAPANDI
+
+ERP EKSİKLER oturumu 2026-09-15'te envanteri kaynaktan ölçtü (main `9167434` · tsc 0 ·
+lint 0 · 7098 test · audit 0) ve kullanıcı kararıyla ("bunlar açık, planla ve hepsini
+kapat") bu oturuma devretti. Rapor: `docs/audit/2026-09-17-a1-a7-kapanis.md`.
+Dört dilim: `98a755c` → `7f95ff8` → `8b9453f` → Dilim 3 (E2E + cache fix).
+
+**A. Kodla kapatılanlar:**
+1. ✅ **E2E boşluğu** — 8 yeni spec (+29 test, 94 → 123): quotes (liste/new/preview +
+   rezervasyon smoke a + Kaydet-sonra-Gönder smoke b) · vendors · purchase/rfqs ·
+   purchase/orders/[id] (+print) · orders/[id]/edit · settings/product-types ·
+   settings/note-templates (redirect) + email-deliveries · developer/* (6). CLAUDE.md'nin
+   iki elle-smoke borcu otomatikleşti. `gate/e2e-coverage` her dashboard rotasını ister.
+   **E2E iki ürün kusuru buldu:** `revalidateTag(…, "max")` = stale-while-revalidate
+   (bayat okuma; `cacheLife.immediate` + 48 dosya `"immediate"`, `gate/cache-invalidation-profile`)
+   ve preview sayfası hidrasyon uyuşmazlığı (`typeof window` state başlangıcı → effect).
+2. ✅ **Gerçek-DB entegrasyon kapısı** — `npm run test:integration` (yerel Supabase,
+   fail-closed host denetimi): RLS 64/64 · anon 0 sızıntı · 6 kova · 5 DEFINER RPC ·
+   088 zinciri (17 test). ROADMAP.md silindi.
+3. ✅ **RBAC named artıklar** — 409 FK ön-kontrolleri (customers→invoices;
+   orders→shipments/invoices/**production_entries**) · PO print guard + redaksiyon +
+   `formatPoCurrency(null)` → "—" · teklif preview: sunucu fetch'i YOK, konusuz (kilitli).
+4. ✅ erp2 `npm ci` (vitest 4.1.11 / tsx 4.23.13 / esbuild 0.28.2).
+5. ✅ Bayat kayıtlar — `EMAIL_FROM` iddiası **bayat değil eksikti**: iki env profili
+   ayrışmış (proje-codex yerel · erp2 CANLI). ROADMAP notu dosyayla birlikte gitti.
+6. ✅ Artık dallar — **kullanıcı kararı: KALIYOR** (merge edilmiş, 0 ileri); yalnız
+   ROADMAP.md silindi.
+7. ✅ Ertelenen özellikler — Tedarikçi Performansı **yapılmayacak** · RFQ ayrı print
+   **kapalı** (arşiv-view yeterli). Kullanıcı kararı 2026-09-16.
+
+**B. Yalnız kullanıcı (env/panel/dış servis) — deploy günü listesi, AÇIK:**
+- C3 Coolify/Hetzner deploy: prod ayakta değil (443 reddediyor); açılış `check-migrations`
+  + `preflight:auth`.
+- Env: `EMAIL_FROM` (canlı profilde YOK) · `RESEND_WEBHOOK_SECRET` · `NEXT_PUBLIC_APP_URL` ·
+  `ADMIN_EMAILS` (brick) · `REDIS_URL` · `SENTRY_ENVIRONMENT=production` · `QUOTE_SHARE_SECRET`
+  · Traefik X-Real-IP.
+- `ANTHROPIC_API_KEY` 401 → AI eşleştirme/copilot/ops-summary/sesli giriş ölü.
+- Supabase panel: signups OFF · Redirect URLs (parola sıfırlama + OAuth callback) · Google provider.
+- Paraşüt: API başvurusu · `parasut:gate --write` · go-live ilk hafta iki sayaç.
+- `/gizlilik` 3 köşeli parantez + hukuk onayı · teklif e-posta smoke (Gmail/Outlook) · PMT pilot haftası.
+- Marka oturumunun kararı bekleyen iki notu: `QuoteDocument` `C.brand = "#0072BC"` PMT rengi →
+  `company_settings`e taşınmalı mı · e-posta `COLORS.accent #2563eb` vs Roven mavisi.
+- Yerel: `colima`/`supabase` işi bitince `supabase stop && colima stop`; Playwright cache'ini
+  silen dış süreç bulunmalı (`~/Library/Caches/ms-playwright` iki kez silindi).
+
 ### 2026-09-17 — Onboarding turu KAPANDI (dal `worktree-onboarding`, 5 dilim)
 Kurulum rehberi 5→8 adım (rol filtreli, herkes görür) · `DataTable.emptyAction` (6 liste
 "İlk … ekle") · Ayarlar › Sistem Durumu (admin; env değeri sızmaz) · davetle kullanıcı açma

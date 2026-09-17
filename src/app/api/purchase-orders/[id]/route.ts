@@ -93,7 +93,7 @@ export async function PATCH(
                 vendor_invoice_no:   typeof rawNo   === "string" ? rawNo.trim() : rawNo as null | undefined,
                 vendor_invoice_date: typeof rawDate === "string" ? (rawDate || null) : rawDate as null | undefined,
             });
-            revalidateTag("purchase-orders", "max");
+            revalidateTag("purchase-orders", "immediate");
             void broadcastDataChange(["purchase_orders"]);
             const refreshed = await dbGetPurchaseOrderById(id);
             return NextResponse.json(refreshed ?? { ok: true });
@@ -122,7 +122,7 @@ export async function PATCH(
             currency:      body.currency as string | undefined,
         });
 
-        revalidateTag("purchase-orders", "max");
+        revalidateTag("purchase-orders", "immediate");
         void broadcastDataChange(["purchase_orders"]);
         return NextResponse.json(updated);
     } catch (err) {

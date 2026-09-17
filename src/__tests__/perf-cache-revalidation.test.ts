@@ -1,7 +1,7 @@
 /**
  * Performans Faz 1 — cache invalidation davranış testleri.
  *
- * Tüm write path'lerin başarı → revalidateTag("products","max") çağrıldığını,
+ * Tüm write path'lerin başarı → revalidateTag("products","immediate") çağrıldığını,
  * hata durumlarında ise çağrılmadığını doğrular.
  *
  * next/cache setup.ts'de global mock'lanmış:
@@ -236,7 +236,7 @@ describe("POST /api/products — cache invalidation", () => {
             makeReq("http://localhost/api/products", "POST", { name: "Vana", sku: "VN-001", unit: "adet" })
         );
         expect(res.status).toBe(201);
-        expect(revalidateTag).toHaveBeenCalledWith("products", "max");
+        expect(revalidateTag).toHaveBeenCalledWith("products", "immediate");
     });
 
     it("name boş → 400, revalidateTag çağrılmaz", async () => {
@@ -266,7 +266,7 @@ describe("PATCH /api/products/[id] — cache invalidation", () => {
             idCtx("prod-1")
         );
         expect(res.status).toBe(200);
-        expect(revalidateTag).toHaveBeenCalledWith("products", "max");
+        expect(revalidateTag).toHaveBeenCalledWith("products", "immediate");
     });
 
     it("DB hatası → 500, revalidateTag çağrılmaz", async () => {
@@ -289,7 +289,7 @@ describe("DELETE /api/products/[id] — cache invalidation", () => {
             idCtx("prod-1")
         );
         expect(res.status).toBe(200);
-        expect(revalidateTag).toHaveBeenCalledWith("products", "max");
+        expect(revalidateTag).toHaveBeenCalledWith("products", "immediate");
     });
 });
 
@@ -301,7 +301,7 @@ describe("POST /api/orders — cache invalidation", () => {
             makeReq("http://localhost/api/orders", "POST", VALID_ORDER)
         );
         expect(res.status).toBe(201);
-        expect(revalidateTag).toHaveBeenCalledWith("products", "max");
+        expect(revalidateTag).toHaveBeenCalledWith("products", "immediate");
     });
 
     it("validation hatası → 400, revalidateTag çağrılmaz", async () => {
@@ -323,7 +323,7 @@ describe("PATCH /api/orders/[id] — cache invalidation", () => {
             idCtx("ord-1")
         );
         expect(res.status).toBe(200);
-        expect(revalidateTag).toHaveBeenCalledWith("products", "max");
+        expect(revalidateTag).toHaveBeenCalledWith("products", "immediate");
     });
 
     it("başarısız geçiş (stok yok) → 400, revalidateTag çağrılmaz", async () => {
@@ -346,7 +346,7 @@ describe("DELETE /api/orders/[id] soft cancel — cache invalidation", () => {
             idCtx("ord-1")
         );
         expect(res.status).toBe(200);
-        expect(revalidateTag).toHaveBeenCalledWith("products", "max");
+        expect(revalidateTag).toHaveBeenCalledWith("products", "immediate");
     });
 
     it("iptal başarısız → 400, revalidateTag çağrılmaz", async () => {
@@ -370,7 +370,7 @@ describe("DELETE /api/orders/[id] hard delete — cache invalidation", () => {
             idCtx("ord-1")
         );
         expect(res.status).toBe(200);
-        expect(revalidateTag).toHaveBeenCalledWith("products", "max");
+        expect(revalidateTag).toHaveBeenCalledWith("products", "immediate");
     });
 
     it("approved sipariş kalıcı silinemez → 409, revalidateTag çağrılmaz", async () => {
@@ -392,7 +392,7 @@ describe("POST /api/production — cache invalidation", () => {
             makeReq("http://localhost/api/production", "POST", { product_id: "prod-1", produced_qty: 10 })
         );
         expect(res.status).toBe(201);
-        expect(revalidateTag).toHaveBeenCalledWith("products", "max");
+        expect(revalidateTag).toHaveBeenCalledWith("products", "immediate");
     });
 
     it("produced_qty sıfır → 400, revalidateTag çağrılmaz", async () => {
@@ -422,7 +422,7 @@ describe("DELETE /api/production/[id] — cache invalidation", () => {
             idCtx("entry-1")
         );
         expect(res.status).toBe(200);
-        expect(revalidateTag).toHaveBeenCalledWith("products", "max");
+        expect(revalidateTag).toHaveBeenCalledWith("products", "immediate");
     });
 
     it("geri alma başarısız (success:false) → 409, revalidateTag çağrılmaz", async () => {
@@ -445,7 +445,7 @@ describe("POST /api/import/[batchId]/confirm — cache invalidation", () => {
             batchCtx("batch-1")
         );
         expect(res.status).toBe(200);
-        expect(revalidateTag).toHaveBeenCalledWith("products", "max");
+        expect(revalidateTag).toHaveBeenCalledWith("products", "immediate");
     });
 
     it("serviceConfirmBatch hata fırlatırsa → 500, revalidateTag çağrılmaz", async () => {
@@ -468,7 +468,7 @@ describe("PATCH /api/purchase-commitments/[id] — cache invalidation", () => {
             idCtx("commit-1")
         );
         expect(res.status).toBe(200);
-        expect(revalidateTag).toHaveBeenCalledWith("products", "max");
+        expect(revalidateTag).toHaveBeenCalledWith("products", "immediate");
     });
 
     it("action=cancel → revalidateTag çağrılır", async () => {
@@ -477,7 +477,7 @@ describe("PATCH /api/purchase-commitments/[id] — cache invalidation", () => {
             idCtx("commit-1")
         );
         expect(res.status).toBe(200);
-        expect(revalidateTag).toHaveBeenCalledWith("products", "max");
+        expect(revalidateTag).toHaveBeenCalledWith("products", "immediate");
     });
 
     it("CommitmentConflictError → 409, revalidateTag çağrılmaz", async () => {

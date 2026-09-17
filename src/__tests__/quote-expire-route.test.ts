@@ -40,9 +40,9 @@ describe("POST /api/quotes/expire", () => {
     it("expired > 0 → liste ve per-quote revalidateTag çağrılır", async () => {
         mockServiceExpireQuotes.mockResolvedValue({ expired: 2, expiredIds: ["id1", "id2"] });
         await POST();
-        expect(revalidateTag).toHaveBeenCalledWith("quotes", "max");
-        expect(revalidateTag).toHaveBeenCalledWith("quote-id1", "max");
-        expect(revalidateTag).toHaveBeenCalledWith("quote-id2", "max");
+        expect(revalidateTag).toHaveBeenCalledWith("quotes", "immediate");
+        expect(revalidateTag).toHaveBeenCalledWith("quote-id1", "immediate");
+        expect(revalidateTag).toHaveBeenCalledWith("quote-id2", "immediate");
     });
 
     it("expired === 0 → revalidateTag çağrılmaz", async () => {

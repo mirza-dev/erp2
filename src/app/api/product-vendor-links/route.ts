@@ -100,7 +100,7 @@ export async function POST(req: NextRequest) {
             actor:          await getCurrentUserId(),
         });
 
-        revalidateTag("products", "max");
+        revalidateTag("products", "immediate");
         void broadcastDataChange(["products", "vendors"]);
         return NextResponse.json(link, { status: 201 });
     } catch (err) {

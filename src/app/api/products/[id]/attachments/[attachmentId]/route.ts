@@ -45,7 +45,7 @@ export async function PATCH(
                 );
             }
             await dbSetPrimaryImage(id, attachmentId);
-            revalidateTag("products", "max");
+            revalidateTag("products", "immediate");
             void broadcastDataChange(["products"]);
             return NextResponse.json({ ok: true });
         }
@@ -77,7 +77,7 @@ export async function DELETE(
         }
 
         await dbDeleteAttachment(attachmentId);
-        revalidateTag("products", "max");
+        revalidateTag("products", "immediate");
         void broadcastDataChange(["products"]);
         return new NextResponse(null, { status: 204 });
     } catch (err) {

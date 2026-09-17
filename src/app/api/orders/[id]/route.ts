@@ -85,7 +85,7 @@ export async function PATCH(
             if (!linked.success) {
                 return NextResponse.json({ error: linked.error }, { status: 400 });
             }
-            revalidateTag("customers", "max");
+            revalidateTag("customers", "immediate");
             void broadcastDataChange(["orders", "customers"]);
             const relinked = await serviceGetOrder(id);
             return NextResponse.json(
@@ -134,7 +134,7 @@ export async function PATCH(
         // Return updated order with shortage info if partial allocation occurred
         const updated = await serviceGetOrder(id);
 
-        revalidateTag("products", "max");
+        revalidateTag("products", "immediate");
         void broadcastDataChange(["orders", "products"]);
         // RBAC R3/F3b: production (ship_sales_orders var, view_sales_prices yok)
         // PATCH ship response'unda satış finansallarını GÖRMESİN (per-request).
@@ -179,7 +179,7 @@ export async function PUT(
             return NextResponse.json({ error: msg }, { status });
         }
 
-        revalidateTag("products", "max");
+        revalidateTag("products", "immediate");
         void broadcastDataChange(["orders", "products"]);
         const updated = await serviceGetOrder(id);
         const perms = await getCurrentUserPermissions(req);
@@ -206,7 +206,7 @@ export async function DELETE(
             if (!result.success) {
                 return NextResponse.json({ error: result.error }, { status: 400 });
             }
-            revalidateTag("products", "max");
+            revalidateTag("products", "immediate");
             void broadcastDataChange(["orders", "products"]);
             return NextResponse.json({ ok: true });
         } catch (err) {
@@ -250,7 +250,7 @@ export async function DELETE(
         }
         const actor = await getCurrentUserId();
         await dbHardDeleteOrder(id, actor);
-        revalidateTag("products", "max");
+        revalidateTag("products", "immediate");
         void broadcastDataChange(["orders", "products"]);
         return NextResponse.json({ success: true });
     } catch (err) {

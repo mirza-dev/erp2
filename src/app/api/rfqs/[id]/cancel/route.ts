@@ -18,7 +18,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
         await dbCancelRfq(id, reason, actorFromAuthContext(ctx).label ?? "system");
 
-        revalidateTag("rfqs", "max");
+        revalidateTag("rfqs", "immediate");
         void broadcastDataChange(["rfqs"]);
         return NextResponse.json({ ok: true });
     } catch (err) {

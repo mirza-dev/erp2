@@ -47,7 +47,7 @@ export async function PUT(
             actor,
         );
 
-        revalidateTag("purchase-orders", "max");
+        revalidateTag("purchase-orders", "immediate");
         void broadcastDataChange(["purchase_orders", "products"]);
         const updated = await dbGetPurchaseOrderById(id);
         return NextResponse.json(updated);

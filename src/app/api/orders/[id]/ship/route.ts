@@ -94,7 +94,7 @@ export async function POST(
 
         const updated = await serviceGetOrder(id);
 
-        revalidateTag("products", "max");
+        revalidateTag("products", "immediate");
         void broadcastDataChange(["orders", "products"]);
         // RBAC R3/F3a: ship_sales_orders tutan production view_sales_prices tutmaz
         // → ship response'undaki satış finansalları redakte edilir (per-request).

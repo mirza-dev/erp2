@@ -130,7 +130,7 @@ export async function POST(
             uploadedBy: ctx.userId,
         });
 
-        revalidateTag("products", "max");
+        revalidateTag("products", "immediate");
         void broadcastDataChange(["products"]);
         return NextResponse.json(row, { status: 201 });
     } catch (err) {

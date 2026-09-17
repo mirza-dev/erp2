@@ -30,8 +30,8 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             actorFromAuthContext(ctx).label ?? "system",
         );
 
-        revalidateTag("rfqs", "max");
-        revalidateTag("purchase-orders", "max");
+        revalidateTag("rfqs", "immediate");
+        revalidateTag("purchase-orders", "immediate");
         void broadcastDataChange(["rfqs", "purchase_orders"]);
         return NextResponse.json({ pos }, { status: 201 });
     } catch (err) {

@@ -15,7 +15,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         const { id } = await params;
         const result = await serviceSendRfq(id, actorFromAuthContext(ctx).label ?? "system");
 
-        revalidateTag("rfqs", "max");
+        revalidateTag("rfqs", "immediate");
         void broadcastDataChange(["rfqs"]);
         return NextResponse.json(result);
     } catch (err) {

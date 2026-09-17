@@ -1,13 +1,13 @@
 import { Page, APIRequestContext } from "@playwright/test";
 import { waitForApp } from "./nav";
+import { BASE_URL } from "./base-url";
 
 /**
  * Helpers to create / delete test data via the app's REST API.
  * Uses the page's auth cookies so no separate auth is needed.
  */
 
-// 2026-09-17: playwright.config / global-setup ile aynı override (port 3000 dolu olabilir).
-const BASE = process.env.E2E_BASE_URL ?? "http://localhost:3000";
+const BASE = BASE_URL;
 
 // ── Products ─────────────────────────────────────────────────────────────���──
 
@@ -158,4 +158,139 @@ export async function waitForInList<T>(
  */
 export async function waitForDataLoad(page: Page): Promise<void> {
     await waitForApp(page);
+}
+
+// ── Vendors (2026-09-16, A1 kapsama) ────────────────────────────────────────
+// E-POSTASIZ yaratılır: RFQ "Gönder" e-postası olan tedarikçiye GERÇEK Resend çağrısı
+// yapar (yerelde RESEND_API_KEY dolu). E-postası olmayan tedarikçi için servis yalnız
+// arşivler + "elle iletilmeli" uyarısı üretir — dış dünyaya sıfır etki.
+
+export async function createTestVendor(
+    request: APIRequestContext,
+    overrides: Record<string, unknown> = {},
+): Promise<{ id: string; name: string }> {
+    const ts = Date.now();
+    const name = `Test Tedarikçi ${ts}`;
+    const res = await request.post(`${BASE}/api/vendors`, {
+        data: { name, contact_person: "E2E Kişi", currency: "TRY", lead_time_days: 7, ...overrides },
+    });
+    if (!res.ok()) throw new Error(`createTestVendor failed: ${res.status()} ${await res.text()}`);
+    const body = await res.json();
+    return { id: body.id ?? body.vendor?.id, name };
+}
+
+/** Tedarikçi silme = pasife alma (aktif PO varsa 409 — temizlikte yutulur). */
+export async function deleteTestVendor(request: APIRequestContext, id: string): Promise<void> {
+    await request.delete(`${BASE}/api/vendors/${id}`);
+}
+
+// ── Quotes ──────────────────────────────────────────────────────────────────
+// Gönderilebilir taslak: cari id + adres + ürüne bağlı satır (validateQuoteForSend şartları).
+
+export async function createTestQuote(
+    request: APIRequestContext,
+    input: { customerId: string; customerName: string; productId: string; productSku: string; quantity: number; unitPrice?: number },
+): Promise<{ id: string; quoteNumber: string }> {
+    const unitPrice = input.unitPrice ?? 100;
+    const subtotal = input.quantity * unitPrice;
+    const res = await request.post(`${BASE}/api/quotes`, {
+        data: {
+            customer_id: input.customerId,
+            customer_name: input.customerName,
+            customer_address: "E2E Mah. Test Cad. No:1, İstanbul",
+            currency: "TRY",
+            vat_rate: 20,
+            subtotal,
+            vat_total: subtotal * 0.2,
+            grand_total: subtotal * 1.2,
+            discount_amount: 0,
+            lines: [{
+                position: 1,
+                product_id: input.productId,
+                product_code: input.productSku,
+                description: "E2E teklif kalemi",
+                quantity: input.quantity,
+                unit_price: unitPrice,
+                line_total: subtotal,
+            }],
+        },
+    });
+    if (!res.ok()) throw new Error(`createTestQuote failed: ${res.status()} ${await res.text()}`);
+    const body = await res.json();
+    return { id: body.id, quoteNumber: body.quoteNumber ?? body.quote_number };
+}
+
+/** Yalnız TASLAK silinebilir (409 aksi hâlde); gönderilmiş teklifler reddedilerek kapatılır. */
+export async function deleteTestQuote(request: APIRequestContext, id: string): Promise<void> {
+    await request.delete(`${BASE}/api/quotes/${id}`);
+}
+
+// ── Purchase orders ─────────────────────────────────────────────────────────
+
+export async function createTestPurchaseOrder(
+    request: APIRequestContext,
+    input: { vendorId: string; productId: string; quantity?: number; unitPrice?: number },
+): Promise<{ id: string; poNumber: string }> {
+    const res = await request.post(`${BASE}/api/purchase-orders`, {
+        data: {
+            vendor_id: input.vendorId,
+            currency: "TRY",
+            expected_date: new Date(Date.now() + 14 * 86_400_000).toISOString().slice(0, 10),
+            lines: [{ product_id: input.productId, quantity: input.quantity ?? 5, unit_price: input.unitPrice ?? 40, discount_pct: 0 }],
+        },
+    });
+    if (!res.ok()) throw new Error(`createTestPurchaseOrder failed: ${res.status()} ${await res.text()}`);
+    const body = await res.json();
+    const po = body.po ?? body;
+    return { id: po.id, poNumber: po.po_number };
+}
+
+/** Temizlik: admin iptali (gerekçe zorunlu); tamamlanmış PO iptal edilemez → yutulur. */
+export async function cancelTestPurchaseOrder(request: APIRequestContext, id: string): Promise<void> {
+    await request.post(`${BASE}/api/purchase-orders/${id}/cancel`, { data: { reason: "E2E temizlik" } });
+}
+
+// ── RFQs ────────────────────────────────────────────────────────────────────
+
+export async function createTestRfq(
+    request: APIRequestContext,
+    input: { productId: string; vendorIds: string[]; title?: string },
+): Promise<{ id: string; rfqNumber: string }> {
+    const res = await request.post(`${BASE}/api/rfqs`, {
+        data: {
+            title: input.title ?? `E2E Fiyat Talebi ${Date.now()}`,
+            currency: "TRY",
+            lines: [{ product_id: input.productId, quantity: 10, unit: "adet" }],
+            vendor_ids: input.vendorIds,
+        },
+    });
+    if (!res.ok()) throw new Error(`createTestRfq failed: ${res.status()} ${await res.text()}`);
+    const body = await res.json();
+    const rfq = body.rfq ?? body;
+    return { id: rfq.id, rfqNumber: rfq.rfq_number };
+}
+
+export async function cancelTestRfq(request: APIRequestContext, id: string): Promise<void> {
+    await request.post(`${BASE}/api/rfqs/${id}/cancel`, { data: { reason: "E2E temizlik" } });
+}
+
+// ── JSON GET (yeniden denemeli) ─────────────────────────────────────────────
+/**
+ * Dev sunucusu (Turbopack) bir rotayı derlerken/HMR anında bağlantıyı sıfırlayabiliyor
+ * (2026-09-16 ölçümü: navigasyonun hemen ardından `GET /api/purchase-orders/<id>` → ECONNRESET).
+ * Bu bir ürün kusuru değil, dev sunucusunun yaşam döngüsü; iddia yeniden denenir, sonuç
+ * sonra değerlendirilir. 2xx dışı yanıt yeniden denenmez — o gerçek bir sonuçtur.
+ */
+export async function getJson<T>(request: APIRequestContext, url: string, tries = 3): Promise<{ status: number; body: T }> {
+    let lastErr: unknown;
+    for (let i = 0; i < tries; i++) {
+        try {
+            const res = await request.get(url);
+            return { status: res.status(), body: (await res.json()) as T };
+        } catch (err) {
+            lastErr = err;
+            await new Promise(r => setTimeout(r, 500 * (i + 1)));
+        }
+    }
+    throw lastErr;
 }

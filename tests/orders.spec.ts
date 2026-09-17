@@ -3,6 +3,7 @@
  */
 import { test, expect } from "@playwright/test";
 import { gotoApp, waitForApp } from "./helpers/nav";
+import { BASE_URL } from "./helpers/base-url";
 import {
     createTestCustomer, deleteTestCustomer,
     createTestProduct, deleteTestProduct,
@@ -173,4 +174,29 @@ test("müşteri filtresi dropdown çalışıyor", async ({ page }) => {
         await page.waitForTimeout(400);
     }
     expect(page.url()).toContain("/orders");
+});
+
+// ── Düzenleme (2026-09-16, A1 kapsama: orders/[id]/edit) ──────────────────────
+
+test("taslak sipariş düzenleme: /edit formu ön-dolu gelir, not değişir → Değişiklikleri Kaydet → detayda görünür", async ({ page, request }) => {
+    const order = await createTestOrder(request, customerId, productId, customerName);
+    const note = `E2E düzenleme notu ${Date.now()}`;
+    try {
+        await gotoApp(page, `/dashboard/orders/${order.id}/edit`);
+        await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+        // Ön-dolum: müşteri adı ekranda, satırda test ürünü seçili
+        await expect(page.getByText(customerName).first()).toBeVisible({ timeout: 15_000 });
+        await expect(page.locator("tbody select").first()).toHaveValue(productId, { timeout: 15_000 });
+
+        await page.getByLabel("Sipariş notu").fill(note);
+        // Form aynı butonu iki yerde basar (üst aksiyon çubuğu + form altı) — ilki yeter.
+        await page.getByRole("button", { name: /değişiklikleri kaydet/i }).first().click();
+        await page.waitForURL(`**/dashboard/orders/${order.id}`, { timeout: 20_000 });
+        await expect(page.getByText(note)).toBeVisible({ timeout: 15_000 });
+
+        const detail = await request.get(`${BASE_URL}/api/orders/${order.id}`).then(r => r.json()) as { notes: string | null };
+        expect(detail.notes).toBe(note);
+    } finally {
+        await deleteTestOrder(request, order.id).catch(() => {});
+    }
 });

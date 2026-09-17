@@ -74,7 +74,7 @@ describe("PUT /api/orders/[id]", () => {
         const res = await PUT(putReq(VALID_BODY), ctx);
         expect(res.status).toBe(200);
         expect(mockServiceUpdateOrderLines).toHaveBeenCalledWith(ORDER_ID, expect.objectContaining({ customer_name: "Test AŞ" }), "user-1");
-        expect(mockRevalidateTag).toHaveBeenCalledWith("products", "max");
+        expect(mockRevalidateTag).toHaveBeenCalledWith("products", "immediate");
     });
 
     it("taslak değil → 409", async () => {

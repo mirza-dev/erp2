@@ -73,3 +73,23 @@ bütçesinden çıkarılması gerekiyor → `globalSetup` 16 rotayı ısıtıyor
 anahtarı yok (~2,5 sn sonra var); o pencerede yapılan `setInputFiles`/`fill`
 sessizce kayboluyor. `tests/helpers/nav.ts` → `waitForHydration`.
 
+
+**2026-09-17 — E2E 94 → 123 (8 yeni spec) + gerçek-DB entegrasyon kapısı.**
+- `npm run test:integration` (`vitest.integration.config.mts`, `tests/integration/**`,
+  `npm test`in DIŞINDA): `supabase db query --local` ile `pg_class.relrowsecurity` 64/64 ·
+  PostgREST anon probu 0 satır (anti-vakum: service key ile tohumlu tablolarda satır var) ·
+  6 kova · mig.110 DEFINER RPC'leri **gerçek imzayla** anon → 401/42501 (boş `{}` PGRST202
+  verir — imza uyuşmazlığı, izin kanıtı DEĞİL) · 088 rezervasyon zinciri. Runner
+  **fail-closed**: `NEXT_PUBLIC_SUPABASE_URL` host yerel değilse hiç koşmaz (`preflight:env`
+  yalnız canlı ref'i tanır; bu test canlıya ASLA gitmemeli).
+- `E2E_PORT` (`tests/helpers/base-url.ts`, varsayılan 3000): bu makinede `:3000` yabancı bir
+  `vinext dev` süreci tarafından tutuluyor → `E2E_PORT=3100`. `warmRoutes` 39 rota.
+- **`~/Library/Caches/ms-playwright` iki kez dışarıdan silindi** (başka oturum/araç) →
+  `PLAYWRIGHT_BROWSERS_PATH=$CLAUDE_JOB_DIR/tmp/pw-browsers` + `npx playwright install chromium
+  chromium-headless-shell` (ikisi ayrı hedef; yalnız `chromium` headless-shell'i getirmedi).
+- Test yazımı dersleri: JS regex `i` bayrağı Türkçe **İ**'yi eşlemez → literal ad + `exact` ·
+  `getByLabel` alt-dize eşler · URL-durumlu checkbox `.check()` düşer (`click`+`toBeChecked`) ·
+  debounce'lu arama sonrası satır tıklaması: önce `waitForURL(/[?&]search=/)` (gecikmiş
+  `replace` `push`u ezer) · 3 sn'lik toast'a iddia bağlanmaz.
+- E2E'nin bulduğu ürün kusurları: `revalidateTag(…, "max")` SWR (bkz. [[project_stack]]) ve
+  preview sayfası hidrasyon uyuşmazlığı. Rapor: `docs/audit/2026-09-17-a1-a7-kapanis.md`.

@@ -69,7 +69,7 @@ export async function POST(
             sort_order: body.sort_order != null ? Number(body.sort_order) : undefined,
         });
 
-        revalidateTag("product-types", "max");
+        revalidateTag("product-types", "immediate");
         return NextResponse.json(field, { status: 201 });
     } catch (err) {
         if (err instanceof Error && (
@@ -117,7 +117,7 @@ export async function PUT(
         }
 
         await dbReorderProductTypeFields(id, ids as string[]);
-        revalidateTag("product-types", "max");
+        revalidateTag("product-types", "immediate");
         return NextResponse.json({ success: true });
     } catch (err) {
         if (err instanceof Error && err.message.includes("geçersiz")) {

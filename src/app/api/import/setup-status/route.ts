@@ -19,7 +19,8 @@ import { handleApiError } from "@/lib/api-error";
  * istemcide yetkiyle süzülür (`buildSetupSteps(status, perms)`). Import
  * SAYFASININ yetkisi değişmedi.
  *
- * Cache: `dashboard/counters` emsali. `products` etiketi ürün mutasyonlarında,
+ * Cache: `dashboard/counters` emsali. `products` etiketi ürün mutasyonlarında
+ * (`revalidateTag("products", "immediate")` — "max" profili bayat okurdu, 2026-09-17),
  * `company-settings` etiketi firma profili PATCH'inde atılıyor; cari/tedarikçi/
  * teklif/sipariş sayıları en geç 60 sn içinde tazelenir (realtime kanalı da
  * bu anahtarı orders/quotes/customers/vendors domain'lerinde geçersiz kılar).
