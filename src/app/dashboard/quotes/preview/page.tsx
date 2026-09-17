@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Printer } from "lucide-react";
 import Button from "@/components/ui/Button";
@@ -11,15 +11,20 @@ import type { QuoteData } from "../components/quote-types";
 export default function QuotePreviewPage() {
     const router = useRouter();
     const [printing, setPrinting] = useState(false);
-    const [data] = useState<QuoteData | null>(() => {
-        if (typeof window === "undefined") return null;
+    // `undefined` = henüz okunmadı. Veri localStorage'da olduğu için SUNUCU onu bilemez;
+    // state başlangıcında `typeof window` dalı SSR'ı "bulunamadı" ekranına, istemciyi belgeye
+    // düşürüyor ve React hidrasyon uyuşmazlığı fırlatıp ağacı yeniden kuruyordu (E2E ile
+    // ölçüldü, 2026-09-17). İlk istemci render'ı SSR ile AYNI ("Yükleniyor…") olmalı; okuma
+    // effect'te — `ThemeToggle`/login `mounted` deseninin aynısı.
+    const [data, setData] = useState<QuoteData | null | undefined>(undefined);
+    useEffect(() => {
         try {
             const raw = localStorage.getItem("teklif_v3_full");
-            return raw ? (JSON.parse(raw) as QuoteData) : null;
+            setData(raw ? (JSON.parse(raw) as QuoteData) : null);
         } catch {
-            return null;
+            setData(null);
         }
-    });
+    }, []);
     const notFound = data === null;
 
     // "Yazdır / PDF": e-postadaki ile BİREBİR aynı react-pdf belgesini üretir
@@ -72,6 +77,15 @@ export default function QuotePreviewPage() {
         boxShadow: "0 2px 12px rgba(0,0,0,0.3)",
     };
 
+    if (data === undefined) {
+        // SSR ve hidrasyon anındaki tek ortak yüzey — localStorage okunana kadar.
+        return (
+            <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "var(--bg-primary)", display: "grid", placeItems: "center" }}>
+                <div style={{ color: "var(--text-secondary)", fontSize: "13px" }}>Yükleniyor…</div>
+            </div>
+        );
+    }
+
     if (notFound) {
         return (
             <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "var(--bg-primary)", display: "grid", placeItems: "center" }}>
@@ -82,14 +96,6 @@ export default function QuotePreviewPage() {
                     <div style={{ fontSize: "12px", marginBottom: "20px" }}>Formu doldurup tekrar deneyin.</div>
                     <Button leftIcon={<ArrowLeft size={14} />} onClick={() => router.push("/dashboard/quotes/new")}>Forma Dön</Button>
                 </div>
-            </div>
-        );
-    }
-
-    if (!data) {
-        return (
-            <div style={{ position: "fixed", inset: 0, zIndex: 9999, background: "var(--bg-primary)", display: "grid", placeItems: "center" }}>
-                <div style={{ color: "var(--text-secondary)", fontSize: "13px" }}>Yükleniyor…</div>
             </div>
         );
     }

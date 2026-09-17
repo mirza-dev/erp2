@@ -107,4 +107,19 @@ describe("Teklif preview sayfası — sunucu fetch'i YOK, redaksiyon konusu doğ
         expect(PREVIEW).not.toMatch(/@\/lib\/supabase\//);
         expect(PREVIEW).not.toMatch(/useSearchParams|useParams/);
     });
+
+    it("localStorage EFFECT'te okunur — SSR ile ilk istemci render'ı aynı (hidrasyon uyuşmazlığı yok)", () => {
+        // 2026-09-17: state başlangıcı `typeof window` ile dallanıyordu → sunucu "bulunamadı",
+        // istemci belge → React hidrasyon hatası + ağaç yeniden kuruluyordu (E2E logunda ölçüldü).
+        expect(PREVIEW).not.toMatch(/useState[^;]*typeof window/);
+        const effect = PREVIEW.match(/useEffect\(\(\) => \{([\s\S]*?)\}, \[\]\)/);
+        expect(effect, "boş bağımlılıklı useEffect olmalı").not.toBeNull();
+        expect(effect![1]).toMatch(/localStorage\.getItem\("teklif_v3_full"\)/);
+        // Üç durum: undefined (okunmadı) → null (yok) → veri; `undefined` dalı notFound'dan ÖNCE döner.
+        expect(PREVIEW).toMatch(/useState<QuoteData \| null \| undefined>\(undefined\)/);
+        const iUndef = PREVIEW.indexOf("if (data === undefined)");
+        const iNotFound = PREVIEW.indexOf("if (notFound)");
+        expect(iUndef).toBeGreaterThan(0);
+        expect(iUndef).toBeLessThan(iNotFound);
+    });
 });
