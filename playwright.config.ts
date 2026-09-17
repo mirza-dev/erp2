@@ -7,6 +7,10 @@ import dotenv from "dotenv";
 dotenv.config({ path: path.join(__dirname, ".env.local") });
 
 export const STORAGE_STATE = path.join(__dirname, "tests/.auth/user.json");
+// 2026-09-17: port 3000 başka bir süreçte olabilir → E2E_BASE_URL=http://localhost:3200 +
+// E2E_PORT=3200 ile suite taşınır; global-setup aynı değişkeni okur. Varsayılan aynı.
+const BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
+const DEV_PORT = process.env.E2E_PORT ?? "3000";
 
 // Pre-create the auth directory so global-setup can write the file
 fs.mkdirSync(path.dirname(STORAGE_STATE), { recursive: true });
@@ -32,7 +36,7 @@ export default defineConfig({
     reporter: process.env.CI ? "github" : [["list"], ["html", { open: "never" }]],
 
     use: {
-        baseURL: "http://localhost:3000",
+        baseURL: BASE_URL,
         trace: "on-first-retry",
         screenshot: "only-on-failure",
         video: "on-first-retry",
@@ -70,8 +74,8 @@ export default defineConfig({
     ],
 
     webServer: {
-        command: "npm run dev",
-        url: "http://localhost:3000",
+        command: `npm run dev -- -p ${DEV_PORT}`,
+        url: BASE_URL,
         reuseExistingServer: true,
         timeout: 60_000,
         stdout: "ignore",

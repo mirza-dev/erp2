@@ -3,6 +3,8 @@ import fs from "fs";
 import path from "path";
 
 const STORAGE_STATE = path.join(__dirname, ".auth/user.json");
+// 2026-09-17: port 3000 başka bir süreçte olabilir → E2E_BASE_URL ile taşınır (varsayılan aynı).
+const BASE_URL = process.env.E2E_BASE_URL ?? "http://localhost:3000";
 
 export default async function globalSetup() {
     const email    = process.env.E2E_USER_EMAIL    ?? "";
@@ -20,7 +22,7 @@ export default async function globalSetup() {
     const browser = await chromium.launch();
     const page    = await browser.newPage();
 
-    await page.goto("http://localhost:3000/login");
+    await page.goto(`${BASE_URL}/login`);
 
     await page.getByLabel(/e-posta/i).fill(email);
     await page.getByLabel(/şifre/i).fill(password);
@@ -87,7 +89,7 @@ async function warmRoutes(page: import("@playwright/test").Page) {
     let failed = 0;
     for (const route of routes) {
         try {
-            await page.goto(`http://localhost:3000${route}`, {
+            await page.goto(`${BASE_URL}${route}`, {
                 waitUntil: "domcontentloaded",
                 timeout: 120_000,
             });

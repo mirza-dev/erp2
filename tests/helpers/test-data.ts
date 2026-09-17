@@ -6,7 +6,8 @@ import { waitForApp } from "./nav";
  * Uses the page's auth cookies so no separate auth is needed.
  */
 
-const BASE = "http://localhost:3000";
+// 2026-09-17: playwright.config / global-setup ile aynı override (port 3000 dolu olabilir).
+const BASE = process.env.E2E_BASE_URL ?? "http://localhost:3000";
 
 // ── Products ─────────────────────────────────────────────────────────────���──
 

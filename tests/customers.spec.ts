@@ -47,7 +47,7 @@ test("müşteri ekleme modalı açılıyor ve müşteri oluşturuluyor", async (
     }
 
     // Cleanup
-    const res  = await request.get("http://localhost:3000/api/customers");
+    const res  = await request.get("/api/customers");
     const body = await res.json() as Array<{ id: string; name: string }>;
     const created = body.find((c) => c.name === name);
     if (created) await deleteTestCustomer(request, created.id).catch(() => {});

@@ -19,6 +19,7 @@
     "create-admin": "tsx scripts/create-admin.ts",
     "preflight:auth": "tsx scripts/check-auth-preflight.ts",
     "preflight:env": "tsx scripts/check-env-target.ts",
+    "kurulum:dogrula": "npm run preflight:auth && tsx scripts/check-migrations.ts && tsx scripts/check-env-matrix.ts",
     "backup": "tsx scripts/backup.ts",
     "schema:bundle": "tsx scripts/build-schema-bundle.ts",
     "pwa:icons": "tsx scripts/build-pwa-icons.ts",

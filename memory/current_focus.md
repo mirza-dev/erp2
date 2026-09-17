@@ -5,6 +5,60 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-09-17 — Onboarding turu (dal `worktree-onboarding`, 5 dilim + E2E altyapısı)
+
+**Bağlam:** kullanıcı onboarding sorumluluğunu bu oturuma verdi ("çakışma olmasın" — ERP
+oturumu A1–A7, marka oturumu `templates.ts` başlığı). Ölçüm: kurulum aracı vardı ama firma
+bilgilerinden önce başlamıyor, kullanıcı açma elden parola, "ilk teklif" anına gitmiyor, boş
+listeler eylem sunmuyor, sistem sağlığı üç yerde ve yalnız internal-operator'a açık.
+
+**Dilim 1 (`0b759dc`) — 8 adım, veriden türer, rol filtreli.** `ImportSetupStatus` opsiyonel
+`company/documents/users`; `users.total` yalnız admin ve `unstable_cache` DIŞINDA (anahtar
+global). `buildSetupSteps(s, perms?)` rolün açamayacağı sayfaya link vermez; sayaç görünen
+adımlar üzerinden; viewer 0 adım → bant yok. Uç `requireAnyRole(ROLES)` (kullanıcı kararı:
+herkes görsün) → `route-guard-matrix` GUARD_PATTERNS'e `requireAnyRole(` eklendi (gerçek guard).
+Realtime `orders`/`quotes` alanlarına setup-status eklendi. Bant "Sıradaki: <adım>" linki.
+
+**Dilim 3 (`bfd2d10`) — `DataTable.emptyAction`** tek yerde (`ButtonLink`/`Button`); 6 liste
+yalnız GERÇEK boş durumda (arama/filtre yok, yetki var, demo değil). Quotes/Orders'ta
+`*TrulyEmpty` bayrakları (sekme+filtre+tarih+döviz hepsi boş).
+
+**Dilim 4 (`1056a1c`) — Sistem Durumu.** `src/lib/system-status.ts` `buildSystemStatus(env, ai)`
+→ 13 kalem, 3 sınıf (zorunlu / sessizce kapanan / doğru değer), yalnız ad+durum (tek açık değer
+`NEXT_PUBLIC_APP_URL`). `GET /api/settings/system-status` (view_settings) + `SistemDurumuTab`
+(`?tab=sistem`). RUM allowlist güncellendi.
+
+**Dilim 2 (`2df1ffa`) — davet.** Ayrıntı `project_auth.md`. Kritik seçimler: Supabase
+`inviteUserByEmail` DEĞİL (SMTP kapaklı) → recovery link + Resend; parola politikası davet
+modunda atlanır (sunucu sırrı; ilk mock-parola testleri "ardışık karakter" kuralına takılınca
+gerçek kusur anlaşıldı); gönderim düşerse `deleteUser` rollback; retry cron dışı.
+
+**Dilim 5 (bu commit) — pilot + tek komut + E2E.** `docs/pilot-haftasi.md` (Gün 0 biz / Gün 1
+birlikte / Gün 2–5 gözlem / çıkış kriterleri / bilinen sınırlar; `sim/is-emirleri.md` birebir
+pilot senaryosu), `musteri-kurulum.md` §3/§6, `deploy-env-matrix.md` → `npm run kurulum:dogrula`
+(= preflight:auth → check-migrations → **yeni** `scripts/check-env-matrix.ts`, aynı
+`buildSystemStatus`; zorunlu ❌ → exit 1). `tests/onboarding.spec.ts` 4 test **gerçek
+tarayıcıda 4/4** (8 adım + "Firma bilgileri" ilk sırada · Sistem Durumu 3 bölge + anon
+anahtarı sayfada YOK · davet modu iki dal · pano bandı "Sıradaki adım: Kullanıcılar").
+
+**E2E altyapı — üç engel, üçü ölçüldü:** (1) `:3000` yabancı `vinext dev` (DuoDo) → `E2E_BASE_URL`
++ `E2E_PORT` override'ı; **helper'lardaki mutlak URL'ler 7 testi sessizce yabancı uygulamaya
+gönderiyordu** (404 HTML) → göreli yol (`request` fixture baseURL'i çözer). (2) Turbopack
+worktree symlink `node_modules`'ı reddeder → `next dev --webpack`; soğuk derleme yavaş → tam
+suite 63/86 · 2,5 saat (düşenler zaman aşımı + o 7 URL; yeniden koşum yapıldı). (3) Sandbox
+`~/Library/Caches`e yazamıyor → `PLAYWRIGHT_BROWSERS_PATH` job tmp. İlk `isVisible({timeout})`
+yazımı beklemiyordu (anında false) → `waitFor` (kendi testim de "kabuk boyandı ≠ veri geldi"
+dersini tekrarladı). Locator çakışması: Sidebar'da aynı adlı link → `main` kapsamı.
+
+**Doğrulama:** tsc 0 (yalnız `.next/dev/types`ta main'den gelen `previewQuoteNumber` export
+hatası — bu daldan değil) · lint 0 · **516 dosya / 7174 test** · `check-env-matrix` çalışıyor.
+React Doctor uyarıları önceden kabul edilmiş sınıflar (`only-export-components`,
+`control-has-associated-label`).
+
+**Kalan (kullanıcı):** canlıda `EMAIL_FROM` girilince davet uçtan uca elle; PMT pilot haftası.
+
+---
+
 ## 2026-09-12 (5) — Teklif satırı "Teslim Süresi": hafta bazlı giriş GÖRÜNÜR oldu
 
 **İstek:** kullanıcı teklif formunun satır tablosunu gösterdi (boş satırlarda `KOD-001` /

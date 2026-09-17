@@ -126,7 +126,7 @@ test.describe("Ürün Ekleme Modal", () => {
         // ve birkaç saniyede kendiliğinden kayboluyor. Yavaş bir yenilemede
         // iddia toast'ı hiç göremiyordu — oysa ürün oluşmuştu.
         const created = await waitForInList<{ id?: string; sku: string }>(
-            request, "http://localhost:3000/api/products?all=1", (p) => p.sku === sku,
+            request, "/api/products?all=1", (p) => p.sku === sku,
         );
         expect(created, `${sku} oluşturulmuş olmalıydı`).toBeDefined();
 
@@ -199,7 +199,7 @@ test.describe("Ürün Ekleme Modal", () => {
         // ~1 sn sonra listede YOK, ~7 sn sonra VAR (ölçüldü). Tek seferlik GET
         // bu pencereye düşüp "oluşmadı" sanıyordu.
         const created = await waitForInList<{ id?: string; sku: string; on_hand?: number }>(
-            request, "http://localhost:3000/api/products?all=1", (p) => p.sku === sku,
+            request, "/api/products?all=1", (p) => p.sku === sku,
         );
         expect(created).toBeDefined();
 
@@ -272,7 +272,7 @@ test.describe("Ürün Ekleme Modal", () => {
 
         // Verify via API
         const created = await waitForInList<{ sku: string; on_hand?: number; id?: string }>(
-            request, "http://localhost:3000/api/products?all=1", (p) => p.sku === sku,
+            request, "/api/products?all=1", (p) => p.sku === sku,
         );
         if (created?.on_hand !== undefined) {
             expect(created.on_hand).toBe(99);
