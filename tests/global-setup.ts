@@ -1,6 +1,7 @@
 import { chromium } from "@playwright/test";
 import fs from "fs";
 import path from "path";
+import { BASE_URL } from "./helpers/base-url";
 
 const STORAGE_STATE = path.join(__dirname, ".auth/user.json");
 
@@ -20,7 +21,7 @@ export default async function globalSetup() {
     const browser = await chromium.launch();
     const page    = await browser.newPage();
 
-    await page.goto("http://localhost:3000/login");
+    await page.goto(`${BASE_URL}/login`);
 
     await page.getByLabel(/e-posta/i).fill(email);
     await page.getByLabel(/şifre/i).fill(password);
@@ -81,13 +82,37 @@ async function warmRoutes(page: import("@playwright/test").Page) {
         "/dashboard/purchase/suggested",
         "/dashboard/settings",
         "/dashboard/settings/users",
+        // 2026-09-16 (A1 kapsama): yeni spec'lerin dokunduğu rotalar.
+        "/dashboard/quotes",
+        "/dashboard/quotes/new",
+        `/dashboard/quotes/${FAKE_ID}`,
+        "/dashboard/quotes/preview",
+        "/dashboard/vendors",
+        "/dashboard/purchase/rfqs",
+        "/dashboard/purchase/rfqs/new",
+        `/dashboard/purchase/rfqs/${FAKE_ID}`,
+        "/dashboard/purchase/orders",
+        "/dashboard/purchase/orders/new",
+        `/dashboard/purchase/orders/${FAKE_ID}`,
+        `/dashboard/purchase/orders/${FAKE_ID}/print`,
+        `/dashboard/orders/${FAKE_ID}/edit`,
+        "/dashboard/settings/product-types",
+        `/dashboard/settings/product-types/${FAKE_ID}`,
+        "/dashboard/settings/email-deliveries",
+        "/dashboard/settings/note-templates",
+        "/dashboard/developer",
+        "/dashboard/developer/errors",
+        "/dashboard/developer/logs",
+        "/dashboard/developer/bugs",
+        "/dashboard/developer/performance",
+        "/dashboard/developer/diagnostics",
     ];
 
     const started = Date.now();
     let failed = 0;
     for (const route of routes) {
         try {
-            await page.goto(`http://localhost:3000${route}`, {
+            await page.goto(`${BASE_URL}${route}`, {
                 waitUntil: "domcontentloaded",
                 timeout: 120_000,
             });

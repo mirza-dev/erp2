@@ -26,6 +26,7 @@ originSessionId: f81399bb-e89a-4404-bdd5-9b4a0afc0d53
 - Renk: `var(--text-primary/secondary/tertiary)`, `var(--bg-primary/secondary/tertiary)`, `var(--border-primary/secondary/tertiary)`, `var(--accent/success/warning/danger)` + `-bg/-text/-border` varyantları + tint tokenları `--highlight-inset`/`--accent-bg-strong`/`--success/danger-bg-strong`/`--accent-glow`
 - **Tema: koyu + aydınlık (`data-theme`, 2026-06-05).** Renkte HER ZAMAN `var(--...)` kullan → otomatik temalanır. Sabit hex/rgba ekleme. `#fff` metin yalnız doygun yüzeyde (`var(--accent)`/dark-scrim) güvenli, `var(--bg-*)` üstünde YASAK (aydınlıkta görünmez). **TEMA-MUAF** (sabit hex kasıtlı): baskı belgeleri (QuoteDocument/PurchaseOrderDocument), settings logo kutusu, products lightbox. Detay: [[reference_theming]]
 - CSS `animation` ve `transition` sadece gerekli yerde (hover, progress bar); `prefers-reduced-motion: reduce` global guard `globals.css`'te var
+- **Cache invalidation (Next 16.3.3, 2026-09-17): `revalidateTag(tag, "immediate")` — `"max"` YASAK.** `"max"` = stale-while-revalidate (`tagsManifest.stale=now, expired=now+expire`; `areTagsExpired` false → bayat girdi bir kez daha servis edilir → mutasyon sonrası teklif "Taslak", PO eski durum). Tek argümanlı çağrı deprecated; `updateTag` route handler'da fırlatır. `next.config.ts` `cacheLife.immediate = {stale:0, revalidate:0, expire:0}` profili; `gate/cache-invalidation-profile` her çağrıyı kilitler. Ders: "eventual consistency" diye workaround yazmadan önce cache profilini oku.
 
 ---
 

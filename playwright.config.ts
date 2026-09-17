@@ -2,6 +2,7 @@ import { defineConfig, devices } from "@playwright/test";
 import path from "path";
 import fs from "fs";
 import dotenv from "dotenv";
+import { BASE_URL, E2E_PORT } from "./tests/helpers/base-url";
 
 // Playwright doesn't auto-load .env.local — do it explicitly
 dotenv.config({ path: path.join(__dirname, ".env.local") });
@@ -32,7 +33,7 @@ export default defineConfig({
     reporter: process.env.CI ? "github" : [["list"], ["html", { open: "never" }]],
 
     use: {
-        baseURL: "http://localhost:3000",
+        baseURL: BASE_URL,
         trace: "on-first-retry",
         screenshot: "only-on-failure",
         video: "on-first-retry",
@@ -70,8 +71,10 @@ export default defineConfig({
     ],
 
     webServer: {
-        command: "npm run dev",
-        url: "http://localhost:3000",
+        // `-p` ile port SABİTLENİR: dolu portta `next dev` kendiliğinden 3001'e kayar ve
+        // `url` kontrolü portu tutan YABANCI sunucuyu bizim sanır (2026-09-16 ölçümü).
+        command: `npm run dev -- -p ${E2E_PORT}`,
+        url: BASE_URL,
         reuseExistingServer: true,
         timeout: 60_000,
         stdout: "ignore",

@@ -5,6 +5,57 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-09-17 — Kapanış envanteri A1–A7: hepsi kapandı (4 dilim)
+
+**İstek:** ERP EKSİKLER oturumu 2026-09-15 envanterini kaynaktan ölçüp devretti; kullanıcı:
+*"bunlar açık, planla ve hepsini kapat."* Kararlar (AskUserQuestion): dallar KALIR (yalnız
+ROADMAP.md silinir) · Tedarikçi Performansı yapılmayacak · RFQ print kapalı (arşiv-view).
+Rapor: `docs/audit/2026-09-17-a1-a7-kapanis.md`. Commit'ler: `98a755c` · `7f95ff8` ·
+`8b9453f` · Dilim 3.
+
+**Envanterin üç iddiası kaynakla çelişti (koddan önce ölçüldü):** A5 `EMAIL_FROM` "bayat"
+değil **eksikti** — proje-codex `.env.local` yerel profil ve değişkeni taşıyor, erp2
+`.env.local` CANLI profil ve taşımıyor · A3 teklif preview "server-side redaction" **konusuz**
+(sayfa yalnız localStorage okur, tek fetch `preview-pdf` POST) · A3 FK grafiği eksikti
+(`production_entries.related_order_id` de sipariş silmeyi bloklar).
+
+**Dilim 1 — RBAC artıkları:** 409 FK ön-kontrolleri (customers→invoices; orders→shipments ·
+invoices · production_entries, mesaj sayar) · PO print `resolveAuthContext` + redaksiyon
+(bugün sızmıyordu: matris tesadüfü, üç rol de `view_purchase_costs` taşıyor) ·
+`formatPoCurrency(null)` → "—" (`Number(null)` tuzağı), `0` → "0,00".
+
+**Dilim 2 — gerçek-DB kapısı:** `npm run test:integration` (fail-closed: host yerel değilse
+koşmaz) — RLS 64/64 tam eşitlik · anon 0 satır + anti-vakum · 6 kova · 5 DEFINER RPC
+**gerçek imzayla** (boş `{}` PGRST202 verir, o izin kanıtı DEĞİL) · 088 zinciri gerçek
+DB'de (reserved 6/4 → shortage 2 → cancel → accept `already:true`). Temizlik hata denetimli
+(PostgREST fırlatmaz, döndürür; `inventory_movements` RESTRICT). ROADMAP.md silindi.
+
+**Dilim 3 — E2E:** 8 spec / +29 test (94 → **123**, retries=0, iki ardışık koşum).
+CLAUDE.md'nin iki elle-smoke borcu (rezervasyon zinciri · Kaydet-sonra-Gönder) otomatikleşti.
+`E2E_PORT` (bu makinede `:3000` yabancı `vinext dev`) · `warmRoutes` 39 rota ·
+`gate/e2e-coverage`.
+
+**E2E'NİN BULDUĞU İKİ ÜRÜN KUSURU:** (1) **`revalidateTag(tag, "max")` = stale-while-
+revalidate** — Next 16.3.3 kaynağından okundu: manifest `stale=now, expired=now+expire`,
+`areTagsExpired` false → bayat girdi bir kez daha servis edilir. Gönderdikten sonra teklif
+"Taslak"+"Gönder", onaydan sonra PO "Onaylandı" göstermiyordu; 2026-08-30'un `waitForInList`
+workaround'u da bunun ürünüydü. Düzeltme: `next.config.ts` `cacheLife.immediate`
+(0/0/0) + 48 dosya `revalidateTag(x, "immediate")` + `gate/cache-invalidation-profile`.
+(2) preview sayfası `typeof window` state başlangıcı → **hidrasyon uyuşmazlığı** (SSR
+"bulunamadı", istemci belge) → okuma effect'e, üç durum; kilit kırmızı-kanıtlı.
+
+**Test yazımı dersleri (spec yorumlarında):** JS regex `i` bayrağı Türkçe **İ**'yi eşlemez
+(`/^iptal et$/i` "İptal Et"i bulmaz — 4 test) · `getByLabel("Ara")` "K-ara-ra Bağlandı"ya
+çarpar · URL-durumlu checkbox'ta `.check()` düşer · debounce'lu arama + satır tıklaması:
+gecikmiş `replace(?search=)` detay `push`unu ezer (izole geçiyor, tam koşumda düşüyor) ·
+3 sn'lik toast'a iddia bağlanmaz.
+
+**Ortam:** `~/Library/Caches/ms-playwright` iki kez dışarıdan silindi → tarayıcılar
+`$CLAUDE_JOB_DIR/tmp/pw-browsers`. React Doctor: print sayfasında sıralı `await` kabul
+(authz DB'den önce).
+
+**Gate:** tsc 0 · lint 0 · **514 dosya / 7159 test** · build 0 · E2E 123/123 ×2 · integration 17/17.
+
 ## 2026-09-12 (5) — Teklif satırı "Teslim Süresi": hafta bazlı giriş GÖRÜNÜR oldu
 
 **İstek:** kullanıcı teklif formunun satır tablosunu gösterdi (boş satırlarda `KOD-001` /

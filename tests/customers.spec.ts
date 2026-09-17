@@ -2,6 +2,7 @@
  * Customers E2E Tests
  */
 import { test, expect } from "@playwright/test";
+import { BASE_URL } from "./helpers/base-url";
 import { gotoApp, waitForApp } from "./helpers/nav";
 import { createTestCustomer, deleteTestCustomer } from "./helpers/test-data";
 
@@ -47,7 +48,7 @@ test("müşteri ekleme modalı açılıyor ve müşteri oluşturuluyor", async (
     }
 
     // Cleanup
-    const res  = await request.get("http://localhost:3000/api/customers");
+    const res  = await request.get(`${BASE_URL}/api/customers`);
     const body = await res.json() as Array<{ id: string; name: string }>;
     const created = body.find((c) => c.name === name);
     if (created) await deleteTestCustomer(request, created.id).catch(() => {});
