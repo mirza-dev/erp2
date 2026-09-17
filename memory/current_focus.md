@@ -5,6 +5,24 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-09-18 — Marka turu 2: PAZARLAMA — fiyat modeli · landing satış hunisi · SEO + `/rehber` · satış kiti
+
+**İstek:** *"bu ürünümün marketing ajanı olduğun için neler yapabiliriz"* → tartışma. Ölçüm şunu gösterdi: **marka kimliği bitmişti ama satış hunisi yoktu** — fiyat yok, iletişim yolu yok, ekran görüntüsü yok, robots/sitemap/JSON-LD yok, analytics yok, canlı site yok. Kullanıcı dört odağı da seçti; fiyat modeli **tek seferlik kurulum + yıllık bakım**.
+
+**Fiyat (`docs/brand/fiyatlandirma-modeli.md`, commit `a27f150`):** maliyet tabanı ölçüldü (~$16-18/ay/müşteri) + pazar tarandı (Netsis 5 kullanıcı ~25k TL/yıl · Enterprise 10 kullanıcı ~60k · Wolvox 45k'dan · Paraşüt 940 TL/ay · Netsis Wings 300-500 TL/**kullanıcı**/ay). Boşluk net: **Paraşüt'ün üstü, Netsis'in altı.** Kurulum 45/85/150 bin, bakım 24/42/72 bin TL/yıl, ilk yıl dahil, zam TÜFE+%5. **Paketler modüle göre ayrılamadı** — kodda müşteri bazlı özellik kapısı YOK, tüm kurulumlar aynı kodu çalıştırıyor; modül bazlı paket vaadi yalan olurdu (§1.5). Kısıt **farka çevrildi**: kullanıcı/modül başına ücret yok, barındırma dahil. Paketler hizmet seviyesine göre ayrışıyor.
+
+**Landing huni (`1394e79`):** `#fiyat` rakamları açık gösterir (saklamak bu segmentte güven kaybettiriyor) · `#iletisim` son blok artık ÜÇÜNCÜ "Demoyu gez" değil **form** (demo bağlantısı sayfada zaten 4 kez). YENİ `POST /api/contact` + `ContactForm`: DB'ye yazmaz/okumaz (KVKK), **alıcı env'den** (`CONTACT_EMAIL`) — gövdeden değil, relay yapısal olarak imkânsız; bal küpü + YENİ `POLICIES.CONTACT` (3/15dk/IP) + alan tavanları; alıcı yoksa **503, sessizce yutmaz**. Kapılar: route-guard-baseline'a gerekçeli public kaydı + RUM allowlist.
+
+**SEO (`1394e79`) + içerik (`3b8eff3`):** `robots.ts` · `sitemap.ts` · JSON-LD (SoftwareApplication+Organization+FAQPage, **sayfanın kendi dizilerinden** türetilir) · `SITE_URL` tek kaynak. YENİ **`/rehber`** — üç arama-niyetli Türkçe yazı (ERP fiyatları · Excel'den geçiş · stok rezervasyonu), statik üretiliyor. İçerik **VERİ**, MDX değil; vurgu `**…**` → `<strong>` React elemanı, `dangerouslySetInnerHTML` YOK → **içerik dosyası etiket üretemez** (testle kilitli). `page.tsx`in CSS'i `lib/marketing/marketing-css.ts`e taşındı (Next route-segment kuralı page'den sabit export ettirmiyor); token kopyası testle yasak.
+
+**Satış kiti (`abde482`):** ICP 5-50 kişi **teklif veren** işletme (alt/üst sınırın gerekçesi yazılı) · **asıl rakip Excel** (demo bu yüzden Excel yüklemesiyle başlıyor) · 30 dk demo senaryosu, vurucu an 14-18 dk (teklif gönderilince satılabilir stok düşer) · AI/Paraşüt ekranları demoda GÖSTERİLMEZ · itiraz karşılama ("ya bırakırsanız" en meşru; **escrow maddesi sözleşmede henüz YOK** → o cümle kullanılmamalı) · kanal sırası **mali müşavir birinci**.
+
+**Doğrulama:** tsc 0 · lint 0 · **512 dosya / 7153 test** (+50) · build 0 uyarı · migration YOK · 5/5 kırmızı-kanıtlı (bal küpü · HTML kaçışı · fiyat sürüklenmesi · içerikte HTML etiketi · token kopyası).
+
+**Açık (kullanıcı):** fiyat rakamlarının onayı · `CONTACT_EMAIL` ayarı · domain alımı + deploy · PMT vaka hikâyesi izni · sözleşme/escrow. **Açık (marka ajanı, ortam gerektirir):** gerçek ekran görüntüleri (landing + tanıtım PDF'i), analytics seçimi.
+
+---
+
 ## 2026-09-16 — Marka turu 1: rehber · isim/domain · logo konseptleri · landing/OG (marka ajanı, dal `worktree-brand-roven`)
 
 **Bağlam:** kullanıcı üç paralel ajan kurdu (ERP mimar · ERP EKSİKLER · marka); bu tur marka ajanının ilk turu. Kararlar (AskUserQuestion): **geniş KOBİ** konumu · Roven ana aday + alternatif isim araştırması · logo konseptleri sunulup **kullanıcı seçer** · dört çıktı da istendi. Detay ve kalıcı kurallar [[project_brand]].
