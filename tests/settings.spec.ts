@@ -42,8 +42,10 @@ test("kullanıcı ekleme formu görünür", async ({ page }) => {
     const addBtn = page.getByRole("button", { name: /kullanıcı ekle|yeni kullanıcı/i });
     if (await addBtn.isVisible({ timeout: 5_000 }).catch(() => false)) {
         await addBtn.click();
+        // 2026-09-17: formda artık "Davet e-postası gönder" radyosu da var → /e-posta/i
+        // iki kontrole eşleşiyordu; iddia METİN KUTUSUNA bağlandı (rol + tam ad).
         await expect(
-            page.getByLabel(/e-posta/i).or(page.locator("input[type='email']"))
+            page.getByRole("textbox", { name: /^e-posta$/i }).or(page.locator("input[type='email']"))
         ).toBeVisible({ timeout: 5_000 });
     }
 });

@@ -37,6 +37,28 @@ type: project
 
 ---
 
+## Davetle kullanıcı açma (2026-09-17, onboarding turu)
+
+- `POST /api/admin/users` body `{ email, roles, mode: "invite" | "password", password? }`.
+  `invite`: sunucu rastgele parolayla (`randomInvitePassword`, politika kontrolü ATLANIR —
+  sunucu sırrı, kullanıcı görmez) hesabı yaratır → `auth.admin.generateLink({type:"recovery",
+  redirectTo: <origin>/auth/callback?next=/sifre-yenile})` → **kendi Resend kanalımızla**
+  `renderUserInvite` e-postası (`templates.ts` SONU; Supabase SMTP 2–4/saat kapaklı, o yüzden
+  `inviteUserByEmail` KULLANILMADI) → `email_logs` `entity_type=user_invite` → audit
+  `user_invited`. Gönderim düşerse `deleteUser` ile geri alınır → 502 `invite_send_failed`
+  (yarım hesap kalmaz). E-posta yapılandırılmamışsa (`RESEND_API_KEY ∧ EMAIL_FROM`) 400
+  `email_not_configured`; GET `{ users, inviteAvailable }` döner (**yanıt şekli değişti**).
+- `POST /api/admin/users/[id]/invite` — daveti yeniden gönder; `last_sign_in_at` doluysa 409
+  `already_signed_in` ("Şifre sıfırla" kullanılır).
+- Retry cron'u davet e-postasını ALMAZ (`email-logs.ts` filtresi `not.in.(quote,user_invite)`;
+  kurtarma linki tek kullanımlık).
+- UI (`settings/users`): radyo mod "Davet e-postası gönder (önerilen)" / "Parolayı ben
+  belirleyeyim"; davet kapalıysa gerekçe + `Ayarlar › Sistem Durumu` (`?tab=sistem`) linki.
+  Yerel profilde Resend yoksa parola modu varsayılan (E2E `onboarding.spec` iki dalı da kabul eder).
+- Sistem sağlığı tek yerde: `src/lib/system-status.ts` (`buildSystemStatus(env, aiProbe)`) →
+  `GET /api/settings/system-status` (view_settings) + `SistemDurumuTab`; aynı fonksiyon
+  `scripts/check-env-matrix.ts` → `npm run kurulum:dogrula` (preflight:auth → migrations → env).
+
 ## Landing Page
 
 - `src/app/page.tsx` — herkese açık (hero, 6 feature card, stack footer, GitHub linki)

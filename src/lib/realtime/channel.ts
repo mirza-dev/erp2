@@ -63,12 +63,13 @@ export interface DataChangePayload {
  */
 export const DOMAIN_KEY_PREFIXES: Record<RealtimeDomain, string[]> = {
     products: ["/api/products", "/api/dashboard/counters", "/api/import/setup-status"],
-    orders: ["/api/orders", "/api/dashboard/counters"],
+    // setup-status: kurulum rehberinin "ilk teklif/sipariş" adımı (2026-09-16)
+    orders: ["/api/orders", "/api/dashboard/counters", "/api/import/setup-status"],
     customers: ["/api/customers", "/api/import/setup-status"],
     vendors: ["/api/vendors", "/api/product-vendor-links", "/api/import/setup-status"],
     production: ["/api/production", "/api/products", "/api/dashboard/counters"],
     alerts: ["/api/alerts", "/api/dashboard/counters"],
-    quotes: ["/api/quotes"],
+    quotes: ["/api/quotes", "/api/import/setup-status"],
     purchase_orders: ["/api/purchase-orders", "/api/products", "/api/dashboard/counters"],
     rfqs: ["/api/rfqs"],
 };

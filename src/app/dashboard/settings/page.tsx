@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import {
     Bell,
     BrainCircuit,
+    Activity,
     Building2,
     CheckCircle2,
     FolderOpen,
@@ -24,6 +25,7 @@ import { useToast } from "@/components/ui/Toast";
 import DemoBanner from "@/components/ui/DemoBanner";
 import DosyalarTab from "@/components/settings/DosyalarTab";
 import NoteTemplatesTab from "@/components/settings/NoteTemplatesTab";
+import SistemDurumuTab from "@/components/settings/SistemDurumuTab";
 import { useIsDemo, DEMO_BLOCK_TOAST, DEMO_DISABLED_TOOLTIP } from "@/lib/demo-utils";
 import ResetDemoSection from "@/components/settings/ResetDemoSection";
 import { isValidEmail, isValidTaxNumber, isValidUrl } from "@/lib/validation";
@@ -49,6 +51,7 @@ const settingsTabIcons: Record<SettingsTab, LucideIcon> = {
     api: KeyRound,
     "yapay-zeka": BrainCircuit,
     "not-sablonlari": NotebookText,
+    sistem: Activity,
     kullanici: UserRound,
     bildirimler: Bell,
 };
@@ -1607,6 +1610,7 @@ function SettingsPageInner() {
                                     {key === "firma" && <FirmaTab onDirtyChange={(d) => handleDirtyChange("firma", d)} />}
                                     {key === "dosyalar" && <DosyalarTab />}
                                     {key === "not-sablonlari" && <NoteTemplatesTab />}
+                                    {key === "sistem" && <SistemDurumuTab />}
                                     {key === "kullanici" && <KullaniciTab onDirtyChange={(d) => handleDirtyChange("kullanici", d)} />}
                                     {key === "bildirimler" && <BildirimlerTab onDirtyChange={(d) => handleDirtyChange("bildirimler", d)} />}
                                     {key === "api" && <ApiTab />}

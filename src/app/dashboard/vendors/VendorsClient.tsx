@@ -519,6 +519,10 @@ export default function VendorsClient(props: VendorsClientProps) {
                     onRowClick={v => setSelectedVendor(v)}
                     rowAriaLabel={v => `${v.name} detayını gör`}
                     emptyMessage={search ? "Arama kriterine uyan tedarikçi bulunamadı." : "Henüz tedarikçi eklenmemiş."}
+                    // Gerçek boş durumda yetkili kullanıcıya eylem; openCreate demo'yu kendi bloklar.
+                    emptyAction={!search && !isDemo && has("manage_vendors")
+                        ? { label: "İlk tedarikçini ekle", onClick: openCreate }
+                        : undefined}
                     footer={displayTotal > 0 ? (
                         <Pagination
                             currentPage={page}

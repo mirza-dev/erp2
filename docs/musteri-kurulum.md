@@ -58,6 +58,21 @@ npm run preflight:auth     # 0 kalıcı admin → exit 1 = BRICK
 `preflight:auth` **exit 1 verirse devam etmeyin.** Kalıcı admin yoksa kullanıcı
 yönetimine kimse erişemez ve sistem kurtarılamaz hale gelir.
 
+Diğer kullanıcılar `create-admin` ile DEĞİL, uygulamadan açılır: Ayarlar ›
+Kullanıcılar › **Davet e-postası gönder** (rol seçilir, parola yazılmaz; kişi
+e-postadaki bağlantıyla kendi parolasını belirler). Bunun için `EMAIL_FROM` +
+`RESEND_API_KEY` ve Supabase Redirect URL'i (`<domain>/auth/callback`) gerekir;
+e-posta yoksa aynı ekran "parolayı ben belirleyeyim" moduna düşer ve nedenini yazar.
+
+Deploy gününün tek komutu — üçünü sırayla koşturur:
+
+```bash
+npm run kurulum:dogrula   # preflight:auth → check-migrations → env matrisi
+```
+
+Env matrisi Ayarlar › **Sistem Durumu** kartıyla aynı kaynağı okur
+(`src/lib/system-status.ts`); zorunlu sınıfta eksik varsa exit 1.
+
 ## 4. Deployment
 
 Coolify'da yeni deployment + alt alan adı: `<musteri>.<sizin-domain>`. Özel domain
@@ -82,8 +97,15 @@ Pro'da bile Storage yedeğe girmiyor. Yordam: [`backup-restore.md`](backup-resto
 
 ## 6. Müşteri verisi
 
-**Veri Aktarım Merkezi** üzerinden — 5 adımlı kurulum aracı olarak tasarlandı
-(ürünler, cariler, tedarikçiler, stok). Ayrı bir onboarding akışı yazmaya gerek yok.
+**Veri Aktarım Merkezi** üzerinden — **8 adımlı** kurulum aracı (2026-09-16):
+firma bilgileri → ürün tipleri → ürünler → cariler → tedarikçiler → açılış
+stokları → kullanıcılar → **ilk teklif veya sipariş**. Adımlar gerçek veriden
+türer (elle işaretlenen liste değil); pano bandı "Kurulum n/8" ilk eksik adıma
+bağlantı verir ve 8/8 olunca kendiliğinden kaybolur. Boş listeler de
+"İlk … ekle/oluştur" eylemi sunar. Ayrı bir onboarding akışı yazmaya gerek yok.
+
+İnsan tarafı (kim, hangi gün, ne yapar; çıkış kriterleri):
+[`pilot-haftasi.md`](pilot-haftasi.md).
 
 ## 7. Geliştirme ortamı
 

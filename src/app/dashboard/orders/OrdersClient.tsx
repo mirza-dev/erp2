@@ -98,6 +98,8 @@ export default function OrdersClient(props: OrdersClientProps) {
     const { toast } = useToast();
     const isDemo = useIsDemo();
     const { has, canViewSalesPrices } = usePermissions();
+    // Hiç filtre yok + "Tümü" sekmesi = sistemde gerçekten sipariş yok (boş-durum CTA'sı için).
+    const ordersTrulyEmpty = !search && tab === "ALL" && !customerId && !dateFrom && !dateTo && !currency;
 
     const [displayOrders, setDisplayOrders] = useState<Order[]>(orders);
     const [displayCounts, setDisplayCounts] = useState<Record<OrderTab, number>>(counts);
@@ -539,7 +541,10 @@ export default function OrdersClient(props: OrdersClientProps) {
                     rowKey={o => o.id}
                     onRowClick={o => router.push(`/dashboard/orders/${o.id}`)}
                     minWidth="740px"
+                    // Hiç filtre yokken "Filtreleri Temizle" anlamsız: sistem gerçekten boş →
+                    // sade mesaj + ilk siparişe giden eylem (onboarding). Filtre varken eski durum.
                     emptyMessage={
+                        ordersTrulyEmpty ? "Henüz sipariş yok." : (
                         <EmptyState
                             title={
                                 search
@@ -552,7 +557,11 @@ export default function OrdersClient(props: OrdersClientProps) {
                                 onClick: () => navigate({ search: "", tab: "ALL", customerId: "", dateFrom: "", dateTo: "", currency: "", page: 1 }),
                             }}
                         />
+                        )
                     }
+                    emptyAction={ordersTrulyEmpty && !isDemo && has("manage_sales_orders")
+                        ? { label: "İlk siparişini oluştur", href: "/dashboard/orders/new" }
+                        : undefined}
                     footer={displayTotal > 0 ? (
                         <Pagination
                             currentPage={page}

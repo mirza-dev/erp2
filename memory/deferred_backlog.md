@@ -232,3 +232,18 @@ Dört dilim: `98a755c` → `7f95ff8` → `8b9453f` → Dilim 3 (E2E + cache fix)
   `company_settings`e taşınmalı mı · e-posta `COLORS.accent #2563eb` vs Roven mavisi.
 - Yerel: `colima`/`supabase` işi bitince `supabase stop && colima stop`; Playwright cache'ini
   silen dış süreç bulunmalı (`~/Library/Caches/ms-playwright` iki kez silindi).
+
+### 2026-09-17 — Onboarding turu KAPANDI (dal `worktree-onboarding`, 5 dilim)
+Kurulum rehberi 5→8 adım (rol filtreli, herkes görür) · `DataTable.emptyAction` (6 liste
+"İlk … ekle") · Ayarlar › Sistem Durumu (admin; env değeri sızmaz) · davetle kullanıcı açma
+(Resend, rollback'li) · `docs/pilot-haftasi.md` + `npm run kurulum:dogrula` + `tests/onboarding.spec.ts`.
+**E2E altyapı dersi:** `localhost:3000` yabancı bir sürecin (`vinext dev`, DuoDo) olabiliyor →
+`E2E_BASE_URL`/`E2E_PORT` override'ı (config + global-setup + `helpers/test-data.ts` +
+customers/products spec'lerindeki mutlak URL'ler göreli yapıldı — **7 test sessizce yabancı
+uygulamaya gidip 404 HTML alıyordu**). Worktree'de Turbopack symlink `node_modules`'ı reddeder
+→ dev sunucusu `next dev --webpack` ile açılır ama soğuk derleme 60 sn bütçeyi aşar (tam suite
+2,5 saat, 63/86; onboarding 4/4). Playwright tarayıcı indirmesi sandbox'ta `~/Library/Caches`e
+yazılamıyor → `PLAYWRIGHT_BROWSERS_PATH=$CLAUDE_JOB_DIR/tmp/pw-browsers`.
+**Kalan (kullanıcı):** davet e-postası canlıda `EMAIL_FROM` girilince elle uçtan uca (kendi
+adresine davet → `/sifre-yenile` → pano); pilot haftası PMT ile (`docs/pilot-haftasi.md`).
+

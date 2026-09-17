@@ -85,6 +85,7 @@ describe("SettingsPage tab access", () => {
             "Firma Profili",
             "Dosyalar",
             "Not Şablonları",
+            "Sistem Durumu",
             "Kullanıcı Profili",
             "Bildirimler",
         ]);
@@ -103,6 +104,7 @@ describe("SettingsPage tab access", () => {
             "Firma Profili",
             "Dosyalar",
             "Not Şablonları",
+            "Sistem Durumu",
             "API Anahtarları",
             "Yapay Zeka",
             "Kullanıcı Profili",

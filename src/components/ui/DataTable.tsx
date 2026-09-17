@@ -1,4 +1,15 @@
 import type { CSSProperties, KeyboardEvent, ReactNode } from "react";
+import Button, { ButtonLink } from "./Button";
+
+/**
+ * Boş durumda mesajın altında sunulan tek eylem ("İlk müşterini ekle").
+ * `href` verilirse bağlantı (`ButtonLink`), yoksa `onClick`'li `Button`.
+ */
+export interface DataTableEmptyAction {
+    label: string;
+    href?: string;
+    onClick?: () => void;
+}
 
 export interface DataTableColumn<T> {
     key: string;
@@ -20,6 +31,13 @@ export interface DataTableProps<T> {
     rowKey: (row: T) => string;
     /** rows boşken gösterilecek içerik. */
     emptyMessage?: ReactNode;
+    /**
+     * Boş durumda mesajın altına konan eylem (onboarding, 2026-09-16). Boş ekran
+     * yalnız "kayıt yok" dememeli, ne yapılacağını söylemeli. ÇAĞIRAN yalnız
+     * GERÇEK boş durumda geçmeli: arama/filtre boşken, mutasyon yetkisi varken
+     * ve demo modu dışında — "arama sonucu yok"a "ilk kaydını ekle" demek yanlış.
+     */
+    emptyAction?: DataTableEmptyAction;
     /** Tablonun altına (kart içinde) render edilir — örn. <Pagination/>. */
     footer?: ReactNode;
     /**
@@ -78,6 +96,7 @@ export default function DataTable<T>({
     rows,
     rowKey,
     emptyMessage,
+    emptyAction,
     footer,
     onRowClick,
     rowAriaLabel,
@@ -95,7 +114,20 @@ export default function DataTable<T>({
                         fontSize: "13px",
                     }}
                 >
-                    {emptyMessage ?? "Kayıt bulunamadı."}
+                    <div>{emptyMessage ?? "Kayıt bulunamadı."}</div>
+                    {emptyAction && (
+                        <div style={{ marginTop: "12px" }}>
+                            {emptyAction.href ? (
+                                <ButtonLink href={emptyAction.href} variant="primary" size="sm" onClick={emptyAction.onClick}>
+                                    {emptyAction.label}
+                                </ButtonLink>
+                            ) : (
+                                <Button type="button" variant="primary" size="sm" onClick={emptyAction.onClick}>
+                                    {emptyAction.label}
+                                </Button>
+                            )}
+                        </div>
+                    )}
                 </div>
                 {footer}
             </>

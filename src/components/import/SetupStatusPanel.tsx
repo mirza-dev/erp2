@@ -8,10 +8,11 @@
  * açan kişiye ne yapabileceğini hiçbir yer söylemiyordu — 5 günlük çalışan
  * simülasyonunda dört kişiden hiçbiri bu sayfayı açmadı bile.
  *
- * Panel sırayı kullanıcı adına düşünür: ürün tipleri → ürünler → cariler →
- * tedarikçiler → açılış stoğu. Sıra keyfî değil; ürünler tiplerden ÖNCE
- * yüklenirse teknik alanlar boş kalır, tedarikçi-ürün bağı ürünlerden önce
- * kurulamaz.
+ * Panel sırayı kullanıcı adına düşünür: firma bilgileri → ürün tipleri →
+ * ürünler → cariler → tedarikçiler → açılış stoğu → kullanıcılar → ilk
+ * teklif/sipariş. Sıra keyfî değil; ürünler tiplerden ÖNCE yüklenirse teknik
+ * alanlar boş kalır, tedarikçi-ürün bağı ürünlerden önce kurulamaz, firma
+ * bilgisi olmadan basılan ilk teklif unvansız çıkar.
  *
  * Sayılar GERÇEK veriden gelir (`/api/import/setup-status`) — elle
  * işaretlenebilen bir kontrol listesi DEĞİLDİR.
@@ -20,6 +21,8 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CheckCircle2, ChevronDown, ChevronRight, Circle, Download, Upload } from "lucide-react";
 import Button from "@/components/ui/Button";
+import { usePermissions } from "@/lib/auth/use-permissions";
+import type { Permission } from "@/lib/auth/permissions";
 import type { ImportSetupStatus } from "@/lib/supabase/import-setup-status";
 import type { ExcelImportTemplateKind } from "@/lib/import-center";
 
@@ -40,15 +43,50 @@ export interface SetupStep {
     href: string;
     /** Bu adımı sihirbazda açan bağlantı (şablonu olmayan adımda yok). */
     wizardKind?: ExcelImportTemplateKind;
+    /**
+     * Adımın hedef sayfasını açabilmek için gereken yetkilerden EN AZ BİRİ.
+     * `buildSetupSteps`e `perms` verilirse bunu tutmayan role adım hiç
+     * üretilmez — rolün açamayacağı sayfaya link verilmez.
+     */
+    permission: Permission[];
+}
+
+/** `usePermissions().has` ile aynı şekil; saf fonksiyon hook'a bağlanmaz. */
+export interface SetupPerms {
+    has: (perm: Permission) => boolean;
 }
 
 /**
  * Sayaçlardan adımları türetir. Saf fonksiyon — test edilebilir, UI'dan bağımsız.
+ *
+ * 2026-09-16: 5 → 8 adım. Sıra "ilk değer anına" kadar gider: firma bilgileri
+ * (belgeler bunsuz unvansız basılır) → veri adımları → kullanıcılar → ilk
+ * teklif/sipariş. `company`/`users`/`documents` sayaçları yoksa (eski API,
+ * fixture) o adım ÜRETİLMEZ; `perms` verilirse rolün göremeyeceği adımlar
+ * süzülür, sayaç görünen adımlar üzerinden hesaplanır.
  */
-export function buildSetupSteps(s: ImportSetupStatus): SetupStep[] {
-    const { productTypes, products, customers, vendors, stock } = s;
+export function buildSetupSteps(s: ImportSetupStatus, perms?: SetupPerms): SetupStep[] {
+    const { productTypes, products, customers, vendors, stock, company, users, documents } = s;
 
-    return [
+    const steps: SetupStep[] = [];
+
+    if (company) {
+        const filledCount = [company.nameFilled, company.taxNoFilled, company.addressFilled].filter(Boolean).length;
+        steps.push({
+            id: "company",
+            title: "Firma bilgileri",
+            hint: "Unvan, vergi no, adres ve logo. Teklif ve satın alma belgeleri bu bilgilerle basılır.",
+            done: company.nameFilled && company.taxNoFilled && company.addressFilled,
+            summary: `${filledCount}/3 zorunlu alan dolu${company.hasLogo ? " · logo var" : ""}`,
+            warning: !company.hasLogo
+                ? "Logo yüklenmedi — teklif ve PO belgeleri logosuz basılır."
+                : undefined,
+            href: "/dashboard/settings?tab=firma",
+            permission: ["manage_settings"],
+        });
+    }
+
+    steps.push(
         {
             id: "product_types",
             title: "Ürün tipleri",
@@ -59,6 +97,7 @@ export function buildSetupSteps(s: ImportSetupStatus): SetupStep[] {
                 ? "Hiçbir tipte teknik alan tanımlı değil — ürünlerin teknik verisi tutulamaz."
                 : undefined,
             href: "/dashboard/settings/product-types",
+            permission: ["manage_settings"],
         },
         {
             id: "products",
@@ -74,6 +113,7 @@ export function buildSetupSteps(s: ImportSetupStatus): SetupStep[] {
             template: "product",
             wizardKind: "product",
             href: "/dashboard/products",
+            permission: ["view_products"],
         },
         {
             id: "customers",
@@ -84,6 +124,7 @@ export function buildSetupSteps(s: ImportSetupStatus): SetupStep[] {
             template: "customer",
             wizardKind: "customer",
             href: "/dashboard/customers",
+            permission: ["view_customers"],
         },
         {
             id: "vendors",
@@ -101,6 +142,7 @@ export function buildSetupSteps(s: ImportSetupStatus): SetupStep[] {
             template: "vendor_product_relation",
             wizardKind: "vendor_product_relation",
             href: "/dashboard/vendors",
+            permission: ["view_vendors"],
         },
         {
             id: "stock",
@@ -114,8 +156,38 @@ export function buildSetupSteps(s: ImportSetupStatus): SetupStep[] {
             template: "stock_count",
             wizardKind: "stock_count",
             href: "/dashboard/products",
+            permission: ["view_products"],
         },
-    ];
+    );
+
+    if (users) {
+        steps.push({
+            id: "users",
+            title: "Kullanıcılar",
+            hint: "Ekibini davet et — satış, satın alma, üretim, muhasebe rolleriyle. Tek kişilik sistem ekip sistemi değildir.",
+            done: users.total >= 2,
+            summary: `${users.total} kullanıcı`,
+            href: "/dashboard/settings/users",
+            permission: ["manage_users"],
+        });
+    }
+
+    if (documents) {
+        // Teklif açabilen teklife, yalnız sipariş açabilen siparişe yönlenir.
+        const canQuote = !perms || perms.has("manage_quotes");
+        steps.push({
+            id: "first_document",
+            title: "İlk teklif veya sipariş",
+            hint: "İlk teklifini oluştur ve gönder — stok rezervi, belge arşivi ve e-posta akışı burada görünür olur.",
+            done: documents.quotes + documents.salesOrders > 0,
+            summary: `${documents.quotes} teklif · ${documents.salesOrders} sipariş`,
+            href: canQuote ? "/dashboard/quotes/new" : "/dashboard/orders/new",
+            permission: ["manage_quotes", "manage_sales_orders"],
+        });
+    }
+
+    if (!perms) return steps;
+    return steps.filter(step => step.permission.some(p => perms.has(p)));
 }
 
 export interface SetupStatusPanelProps {
@@ -128,6 +200,9 @@ export interface SetupStatusPanelProps {
 export default function SetupStatusPanel({ onOpenStep, disabled, disabledTooltip }: SetupStatusPanelProps) {
     const [status, setStatus] = useState<ImportSetupStatus | null>(null);
     const [loadFailed, setLoadFailed] = useState(false);
+    // Rolün açamayacağı sayfaya adım gösterilmez. Yüklenirken `has()` true
+    // döner → önce tam liste, izin gelince süzülür (server gate zaten korur).
+    const perms = usePermissions();
     // Kullanıcının açma/kapama tercihi; null = henüz karar vermedi, o zaman
     // "hepsi tamam mı" belirler (tamamsa katlanır).
     const [expandedOverride, setExpandedOverride] = useState<boolean | null>(null);
@@ -150,7 +225,8 @@ export default function SetupStatusPanel({ onOpenStep, disabled, disabledTooltip
     // daha doğru; dropzone ve şablonlar zaten çalışıyor.
     if (loadFailed || !status) return null;
 
-    const steps = buildSetupSteps(status);
+    const steps = buildSetupSteps(status, perms);
+    if (steps.length === 0) return null;
     const doneCount = steps.filter(s => s.done).length;
     const allDone = doneCount === steps.length;
     const expanded = expandedOverride ?? !allDone;

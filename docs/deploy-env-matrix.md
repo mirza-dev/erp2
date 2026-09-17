@@ -67,8 +67,18 @@ koşumları için. `SEED_DEMO_PASSWORD` prod'a konursa seed demo kullanıcılar�
 ## Deploy günü açılış hamlesi
 
 ```bash
+npm run kurulum:dogrula   # = preflight:auth → check-migrations → check-env-matrix (2026-09-17)
+```
+
+Üçüncü halka bu matrisin **kod hâli**: `scripts/check-env-matrix.ts` →
+`src/lib/system-status.ts` (Ayarlar › Sistem Durumu kartıyla aynı kaynak).
+Zorunlu sınıfta (§1) eksik varsa exit 1; §2/§3 uyarı olarak listelenir.
+Tek tek koşturmak gerekirse:
+
+```bash
 npx tsx scripts/check-migrations.ts   # otomatik probe + manuel liste
 npm run preflight:auth                # 0 kalıcı admin → exit 1 = BRICK
+npx tsx scripts/check-env-matrix.ts   # env → özellik tablosu
 ```
 
 Ardından Studio'da [`audit/manual-migration-checks.sql`](audit/manual-migration-checks.sql)

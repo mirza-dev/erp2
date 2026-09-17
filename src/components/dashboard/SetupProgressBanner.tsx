@@ -20,6 +20,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, ClipboardList, X } from "lucide-react";
 import { buildSetupSteps } from "@/components/import/SetupStatusPanel";
+import { usePermissions } from "@/lib/auth/use-permissions";
 import type { ImportSetupStatus } from "@/lib/supabase/import-setup-status";
 
 const DISMISS_KEY = "roven-setup-banner-dismissed";
@@ -27,6 +28,9 @@ const DISMISS_KEY = "roven-setup-banner-dismissed";
 export default function SetupProgressBanner() {
     const [status, setStatus] = useState<ImportSetupStatus | null>(null);
     const [dismissed, setDismissed] = useState(true); // varsayılan gizli — yanıp sönmesin
+    // Adımlar role göre süzülür (2026-09-16 "herkes görsün"): satışçı cariler /
+    // ürünler / ilk teklif görür; hiç adımı olmayan rolde bant hiç çizilmez.
+    const perms = usePermissions();
 
     useEffect(() => {
         try { setDismissed(localStorage.getItem(DISMISS_KEY) === "1"); } catch { setDismissed(false); }
@@ -37,9 +41,9 @@ export default function SetupProgressBanner() {
         void (async () => {
             try {
                 const res = await fetch("/api/import/setup-status");
-                // 403 = `view_import` yok (yalnız admin + satınalma). Aktarımı
-                // yapamayacak kişiye "kurulumu tamamla" demek anlamsız — SESSİZCE
-                // hiçbir şey çizilmez, hata gösterilmez.
+                // Uç oturumu olan her role açık; yine de 403/5xx gelirse (demo
+                // dışı anon, geçici hata) SESSİZCE hiçbir şey çizilmez — bant
+                // bir bilgi katmanı, panoyu bozmamalı.
                 if (!res.ok || cancelled) return;
                 setStatus(await res.json() as ImportSetupStatus);
             } catch {
@@ -51,11 +55,14 @@ export default function SetupProgressBanner() {
 
     if (dismissed || !status) return null;
 
-    const steps = buildSetupSteps(status);
+    const steps = buildSetupSteps(status, perms);
     const done = steps.filter(s => s.done).length;
-    if (done === steps.length) return null; // kurulum bitti → bant kendiliğinden gider
+    if (done === steps.length) return null; // kurulum bitti (veya role adım yok) → bant gider
 
-    const missing = steps.filter(s => !s.done).map(s => s.title);
+    const pending = steps.filter(s => !s.done);
+    const missing = pending.map(s => s.title);
+    // Kullanıcı ilk eksik adıma tek tıkla gitsin; hub linki yine durur.
+    const next = pending[0];
 
     const handleDismiss = () => {
         setDismissed(true);
@@ -84,6 +91,23 @@ export default function SetupProgressBanner() {
                 {" — eksik: "}
                 {missing.join(", ")}.
             </span>
+            <Link
+                href={next.href}
+                className="tap-44-v"
+                aria-label={`Sıradaki adım: ${next.title}`}
+                style={{
+                    display: "inline-flex",
+                    alignItems: "center",
+                    gap: "4px",
+                    color: "var(--accent-text)",
+                    fontWeight: 600,
+                    textDecoration: "underline",
+                    flexShrink: 0,
+                }}
+            >
+                Sıradaki: {next.title}
+                <ArrowRight size={12} strokeWidth={2} aria-hidden="true" />
+            </Link>
             <Link
                 href="/dashboard/import"
                 className="tap-44-v"

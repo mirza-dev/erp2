@@ -12,10 +12,14 @@ metadata:
 
 **Konumlandırma (2026-08-29 kullanıcı kararı): KURULUM ARACI.** Sayfa dosya
 BİÇİMİNE göre kurgulanmıştı (Excel mi PDF mi), kullanıcı İŞE göre düşünüyor
-("ürün listemi yükleyeyim"). Üstte **Kurulum Durumu paneli**: 5 adım sırayla
-(ürün tipleri → ürünler → cariler → tedarikçiler+ürün kodları → açılış stoğu),
-canlı sayı + eksik uyarısı + "Şablon"/"Yükle". **Sıra zorunlu:** tipler
-ürünlerden önce gelmezse teknik alanlar boş kalır.
+("ürün listemi yükleyeyim"). Üstte **Kurulum Durumu paneli**: **8 adım** sırayla
+(2026-09-17 onboarding turu; eskiden 5): firma bilgileri → ürün tipleri → ürünler →
+cariler → tedarikçiler+ürün kodları → açılış stoğu → kullanıcılar (≥2) → ilk teklif
+veya sipariş. Her adım VERİDEN türer (`buildSetupSteps(status, perms?)`,
+`SetupStatusPanel.tsx`), elle işaretlenmez; `perms` verilirse rolün açamayacağı
+sayfaya link verilmez (satışçı 4 adım görür, viewer 0 → bant render edilmez).
+Panodaki `SetupProgressBanner` "Sıradaki: <adım>" linki verir. **Sıra zorunlu:**
+tipler ürünlerden önce gelmezse teknik alanlar boş kalır.
 
 **EN ÖNEMLİ DERS — AI deterministik bir kusuru örtüyordu.** Eşleştirme sırası:
 hafıza → alias tablosu → **AI** → "Atla". Sistemin KENDİ şablonunun 56
@@ -44,8 +48,11 @@ eklenince mandal kendiliğinden çalışır). `GET /api/ai/health` → `no_key` 
 (şemada alan yok). Yanlış eşleştirmek eşleştirmemekten KÖTÜ — sessizce yanlış
 veri yazar; eşleşmeyen sütun ise görünür uyarı üretir.
 
-**Yetki:** `view_import`/`manage_import` yalnız admin+satınalma. Muhasebe cari,
-üretim stok yükleyemiyor — **açık soru, karar bekliyor**.
+**Yetki:** `view_import`/`manage_import` yalnız admin+satınalma (import SAYFASI
+değişmedi). **Durum ucu ayrıştı (kullanıcı kararı 2026-09-16 "herkes görsün"):**
+`GET /api/import/setup-status` artık `requireAnyRole(ROLES)` — oturumu olan her rol
+sayaçları okur (PII yok); `users.total` yalnız admin için ve `unstable_cache` DIŞINDA
+(anahtar global). Muhasebe/üretimin yükleme yetkisi hâlâ yok — bilinçli.
 
 **Kapsam dışı:** geçmiş veri göçü (sipariş/teklif/fatura). `SHEET_ENTITY_MAP`'te
 `Siparisler`/`Faturalar`/`Teklifler` girdileri var ama şablonu/tespiti yok —
