@@ -7,6 +7,15 @@ originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 
 ## 2026-09-17 — Onboarding turu (dal `worktree-onboarding`, 5 dilim + E2E altyapısı)
 
+**Dal durumu (2026-09-17, son):** 5 dilim commit + `origin/main` (2450c9e, A1–A7 kapanışı)
+merge edildi → `f8b6202`, push edildi, **PR #1 draft/MERGEABLE**
+(https://github.com/mirza-dev/erp2/pull/1). Merge'de E2E port altyapısı main'in
+`tests/helpers/base-url.ts` tek kaynağına geçti (bu dalın `E2E_BASE_URL` override'ı kalktı;
+koşum `E2E_PORT=3200`). Birleşik ağaç: tsc 0 · lint 0 · 518 dosya / 7221 test · 4 gate 57/57.
+**AÇIK:** birleşik ağaçta tam E2E (127) uçtan uca koşmadı (bellek/disk yüzünden kesildi;
+merge öncesi 98/98) — PR merge'inden önce bir kez koşulmalı. PR merge olunca marka
+oturumuna tek satır ("merge oldu" → landing/SSS "5 adımlı" → "8 adımlı").
+
 **Bağlam:** kullanıcı onboarding sorumluluğunu bu oturuma verdi ("çakışma olmasın" — ERP
 oturumu A1–A7, marka oturumu `templates.ts` başlığı). Ölçüm: kurulum aracı vardı ama firma
 bilgilerinden önce başlamıyor, kullanıcı açma elden parola, "ilk teklif" anına gitmiyor, boş
