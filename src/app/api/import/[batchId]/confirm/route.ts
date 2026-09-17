@@ -28,7 +28,7 @@ export async function POST(
             getCurrentUserPermissions(_req),
         ]);
         const result = await serviceConfirmBatch(batchId, { actorUserId, permissions, overwrite });
-        revalidateTag("products", "max");
+        revalidateTag("products", "immediate");
         void broadcastDataChange(["products", "customers", "vendors"]);
         return NextResponse.json(result);
     } catch (err) {

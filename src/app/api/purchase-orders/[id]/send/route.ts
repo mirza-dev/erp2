@@ -24,7 +24,7 @@ export async function POST(
         const actor = (await getCurrentUserId()) ?? undefined;
 
         const result = await serviceSendPO(id, actor);
-        revalidateTag("purchase-orders", "max");
+        revalidateTag("purchase-orders", "immediate");
         void broadcastDataChange(["purchase_orders"]);
         return NextResponse.json(result);
     } catch (err) {

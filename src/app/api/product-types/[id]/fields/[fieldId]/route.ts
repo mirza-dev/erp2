@@ -44,7 +44,7 @@ export async function PATCH(
             sort_order: body.sort_order != null ? Number(body.sort_order) : undefined,
         }, id);
 
-        revalidateTag("product-types", "max");
+        revalidateTag("product-types", "immediate");
         return NextResponse.json(field);
     } catch (err) {
         if (err instanceof Error && (
@@ -83,7 +83,7 @@ export async function DELETE(
         const { id, fieldId } = await params;
 
         await dbDeleteProductTypeField(fieldId, id);
-        revalidateTag("product-types", "max");
+        revalidateTag("product-types", "immediate");
         return NextResponse.json({ success: true });
     } catch (err) {
         if (err instanceof Error && (

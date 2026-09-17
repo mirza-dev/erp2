@@ -69,7 +69,7 @@ export async function POST(req: NextRequest) {
         body.discount_amount = discountAmount;
 
         const row = await dbCreateQuote(body);
-        revalidateTag("quotes", "max");
+        revalidateTag("quotes", "immediate");
         void broadcastDataChange(["quotes"]);
         return NextResponse.json(mapQuoteDetail(row), { status: 201 });
     } catch (err) {

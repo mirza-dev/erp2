@@ -145,8 +145,8 @@ describe("PATCH /api/quotes/[id]", () => {
 
     it("başarılı güncelleme → revalidateTag çağrılır", async () => {
         await PATCH(makeReq("PATCH", validPatchBody), idCtx());
-        expect(revalidateTag).toHaveBeenCalledWith("quotes", "max");
-        expect(revalidateTag).toHaveBeenCalledWith(`quote-${QUOTE_ID}`, "max");
+        expect(revalidateTag).toHaveBeenCalledWith("quotes", "immediate");
+        expect(revalidateTag).toHaveBeenCalledWith(`quote-${QUOTE_ID}`, "immediate");
     });
 
     it("DB hatası → 500, revalidateTag çağrılmaz", async () => {
@@ -202,8 +202,8 @@ describe("PATCH /api/quotes/[id] — status transitions", () => {
         mockServiceTransitionQuote.mockResolvedValue({ success: true });
         mockDbGetQuote.mockResolvedValue({ ...stubQuote, status: "sent" });
         await PATCH(makeReq("PATCH", { transition: "sent" }), idCtx());
-        expect(revalidateTag).toHaveBeenCalledWith("quotes", "max");
-        expect(revalidateTag).toHaveBeenCalledWith(`quote-${QUOTE_ID}`, "max");
+        expect(revalidateTag).toHaveBeenCalledWith("quotes", "immediate");
+        expect(revalidateTag).toHaveBeenCalledWith(`quote-${QUOTE_ID}`, "immediate");
     });
 
     it("başarısız transition → revalidateTag çağrılmaz", async () => {
@@ -299,7 +299,7 @@ describe("DELETE /api/quotes/[id]", () => {
 
     it("başarılı silme → revalidateTag çağrılır", async () => {
         await DELETE(makeReq("DELETE"), idCtx());
-        expect(revalidateTag).toHaveBeenCalledWith("quotes", "max");
-        expect(revalidateTag).toHaveBeenCalledWith(`quote-${QUOTE_ID}`, "max");
+        expect(revalidateTag).toHaveBeenCalledWith("quotes", "immediate");
+        expect(revalidateTag).toHaveBeenCalledWith(`quote-${QUOTE_ID}`, "immediate");
     });
 });

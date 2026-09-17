@@ -63,7 +63,7 @@ export async function POST(req: NextRequest) {
             notes: body.notes as string | null | undefined,
         }, await getCurrentUserId());
 
-        revalidateTag("vendors", "max");
+        revalidateTag("vendors", "immediate");
         // Diğer kullanıcıların ekranları anında tazelensin (ateşle-unut).
         void broadcastDataChange(["vendors"]);
         return NextResponse.json(vendor, { status: 201 });

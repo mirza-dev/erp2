@@ -19,9 +19,9 @@ export async function POST(req?: NextRequest) {
     try {
         const result = await serviceExpireQuotes();
         if (result.expired > 0) {
-            revalidateTag("quotes", "max");
+            revalidateTag("quotes", "immediate");
             for (const id of result.expiredIds) {
-                revalidateTag(`quote-${id}`, "max");
+                revalidateTag(`quote-${id}`, "immediate");
             }
             // Yayın DÖNGÜNÜN DIŞINDA: koşum başına TEK sinyal. İçeride olsaydı
             // 40 süresi dolmuş teklif 40 yayın üretirdi ve her istemci 40 kez

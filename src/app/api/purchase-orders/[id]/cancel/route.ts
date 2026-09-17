@@ -39,8 +39,8 @@ export async function POST(
         // O1: actor sunucu-otoriter (oturum kullanıcısı) — istemci gövdesi DEĞİL.
         const actor = (await getCurrentUserId()) ?? "system";
         const result = await serviceCancelPO(id, reason, actor);
-        revalidateTag("purchase-orders", "max");
-        revalidateTag("products", "max");  // pending commitment cancel → incoming etkilenir
+        revalidateTag("purchase-orders", "immediate");
+        revalidateTag("products", "immediate");  // pending commitment cancel → incoming etkilenir
         void broadcastDataChange(["purchase_orders", "products"]);
         return NextResponse.json(result);
     } catch (err) {

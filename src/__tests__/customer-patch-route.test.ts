@@ -246,6 +246,6 @@ describe("DELETE /api/customers/[id]", () => {
         const res = await DELETE(makeDeleteRequest(), makeDeleteParams());
         expect(res.status).toBe(200);
         expect(mockDbDeleteCustomer).toHaveBeenCalledWith(CUSTOMER_ID, "user-1");
-        expect(mockRevalidateTag).toHaveBeenCalledWith("customers", "max");
+        expect(mockRevalidateTag).toHaveBeenCalledWith("customers", "immediate");
     });
 });

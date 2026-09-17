@@ -44,7 +44,7 @@ export async function PATCH(
         const customer = await dbUpdateCustomer(id, body);
         // POST/DELETE paritesi: düzenleme de unstable_cache("customers", 30s)'i
         // tazelemeli — yoksa düzenlenen müşteri ≤30s bayat görünüyordu.
-        revalidateTag("customers", "max");
+        revalidateTag("customers", "immediate");
         void broadcastDataChange(["customers"]);
         return NextResponse.json(customer);
     } catch (err) {
@@ -80,7 +80,7 @@ export async function DELETE(
         }
         const actor = await getCurrentUserId();
         await dbDeleteCustomer(id, actor);
-        revalidateTag("customers", "max");
+        revalidateTag("customers", "immediate");
         void broadcastDataChange(["customers"]);
         return NextResponse.json({ ok: true });
     } catch (err) {

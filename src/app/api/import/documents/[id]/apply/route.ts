@@ -62,7 +62,7 @@ export async function POST(req: NextRequest, ctx: { params: Promise<{ id: string
 
         const result = await serviceApplyImportDocument(id, auth.userId, options);
 
-        revalidateTag("products", "max");
+        revalidateTag("products", "immediate");
         void broadcastDataChange(["products", "customers", "vendors"]);
         return NextResponse.json({ ok: true, result }, { status: 200 });
     } catch (err) {

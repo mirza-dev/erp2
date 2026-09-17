@@ -50,7 +50,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Ülke kodu en fazla 2 karakter olabilir (ISO 3166-1 alpha-2)" }, { status: 400 });
         }
         const customer = await dbCreateCustomer(body);
-        revalidateTag("customers", "max");
+        revalidateTag("customers", "immediate");
         // Diğer kullanıcıların ekranları anında tazelensin (ateşle-unut).
         void broadcastDataChange(["customers"]);
         return NextResponse.json(customer, { status: 201 });

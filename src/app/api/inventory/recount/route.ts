@@ -76,7 +76,7 @@ export async function POST(req: NextRequest) {
             }
         }
 
-        revalidateTag("products", "max");
+        revalidateTag("products", "immediate");
         // Diğer kullanıcıların ekranları anında tazelensin (ateşle-unut).
         void broadcastDataChange(["products"]);
         return NextResponse.json({

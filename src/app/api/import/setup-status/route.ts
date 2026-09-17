@@ -10,7 +10,7 @@ import { handleApiError } from "@/lib/api-error";
  * Panel "neyi taşıdın, neyi taşımadın" sorusunu GERÇEK veriden cevaplar;
  * kullanıcının elle işaretlediği bir kontrol listesi değildir.
  *
- * Cache: `dashboard/counters` emsali. Repoda fiilen YALNIZ `revalidateTag("products")`
+ * Cache: `dashboard/counters` emsali. Repoda fiilen YALNIZ `revalidateTag("products", "immediate")`
  * atılıyor (cari/tedarikçi/tip mutasyonları etiket atmıyor) — o yüzden ürün
  * sayıları anında, diğerleri en geç 60 sn içinde tazelenir. Kurulum paneli için
  * bu kabul edilebilir: sayılar bir aktarımın hemen ardından okunuyor ve aktarım

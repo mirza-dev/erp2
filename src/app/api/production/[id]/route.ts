@@ -19,7 +19,7 @@ export async function DELETE(
         if (!result.success) {
             return NextResponse.json({ error: result.error }, { status: 409 });
         }
-        revalidateTag("products", "max");
+        revalidateTag("products", "immediate");
         void broadcastDataChange(["production", "products"]);
         return NextResponse.json({ ok: true });
     } catch (err) {

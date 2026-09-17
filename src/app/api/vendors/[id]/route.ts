@@ -66,7 +66,7 @@ export async function PATCH(
             is_active: body.is_active !== undefined ? Boolean(body.is_active) : undefined,
         }, await getCurrentUserId());
 
-        revalidateTag("vendors", "max");
+        revalidateTag("vendors", "immediate");
         void broadcastDataChange(["vendors"]);
         return NextResponse.json(updated);
     } catch (err) {
@@ -99,7 +99,7 @@ export async function DELETE(
         // RBAC F6 — Faz 6 disiplini: deaktivasyon audit'i actor yazsın (diğer
         // delete'lerle tutarlı; vendor soft-delete bilinçli — PO FK koruması).
         await dbDeactivateVendor(id, await getCurrentUserId());
-        revalidateTag("vendors", "max");
+        revalidateTag("vendors", "immediate");
         void broadcastDataChange(["vendors"]);
         return NextResponse.json({ success: true });
     } catch (err) {

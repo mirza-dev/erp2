@@ -135,7 +135,7 @@ export async function PATCH(req: NextRequest) {
             return NextResponse.json({ error: validationError }, { status: 400 });
         }
         const updated = await dbUpdateCompanySettings(patch);
-        revalidateTag("company-settings", "max");
+        revalidateTag("company-settings", "immediate");
         return NextResponse.json(updated);
     } catch (err) {
         return handleApiError(err, "PATCH /api/settings/company");

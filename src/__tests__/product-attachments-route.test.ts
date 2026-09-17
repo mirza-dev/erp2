@@ -165,7 +165,7 @@ describe("POST /api/products/[id]/attachments", () => {
             { params: Promise.resolve({ id: PRODUCT_ID }) },
         );
         expect(res.status).toBe(201);
-        expect(mockRevalidateTag).toHaveBeenCalledWith("products", "max");
+        expect(mockRevalidateTag).toHaveBeenCalledWith("products", "immediate");
     });
 });
 
@@ -209,6 +209,6 @@ describe("DELETE /api/products/[id]/attachments/[attachmentId]", () => {
             { params: Promise.resolve({ id: PRODUCT_ID, attachmentId: ATTACH_ID }) },
         );
         expect(res.status).toBe(204);
-        expect(mockRevalidateTag).toHaveBeenCalledWith("products", "max");
+        expect(mockRevalidateTag).toHaveBeenCalledWith("products", "immediate");
     });
 });

@@ -58,7 +58,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
             actorFromAuthContext(ctx).label ?? "system",
         );
 
-        revalidateTag("rfqs", "max");
+        revalidateTag("rfqs", "immediate");
         void broadcastDataChange(["rfqs"]);
         return NextResponse.json({ ok: true });
     } catch (err) {
@@ -78,7 +78,7 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
 
         const { id } = await params;
         await dbDeleteRfq(id);
-        revalidateTag("rfqs", "max");
+        revalidateTag("rfqs", "immediate");
         void broadcastDataChange(["rfqs"]);
         return NextResponse.json({ ok: true });
     } catch (err) {

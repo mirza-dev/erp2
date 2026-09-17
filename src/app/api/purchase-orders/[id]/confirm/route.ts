@@ -24,8 +24,8 @@ export async function POST(
         const actor = (await getCurrentUserId()) ?? undefined;
 
         const result = await serviceConfirmPO(id, actor);
-        revalidateTag("purchase-orders", "max");
-        revalidateTag("products", "max");  // commitment seed → incoming/forecasted etkilenir
+        revalidateTag("purchase-orders", "immediate");
+        revalidateTag("products", "immediate");  // commitment seed → incoming/forecasted etkilenir
         void broadcastDataChange(["purchase_orders", "products"]);
         return NextResponse.json(result);
     } catch (err) {

@@ -31,6 +31,19 @@ const nextConfig: NextConfig = {
     allowedDevOrigins: devOrigins,
     // Coolify/Docker self-hosting için minimal Node server üretir (.next/standalone/)
     output: "standalone",
+    // 2026-09-16 — mutasyon sonrası "kendi yazdığını oku" (read-your-own-writes).
+    // Next 16'da `revalidateTag(tag, "max")` STALE-WHILE-REVALIDATE'tir: etiket "bayat"
+    // işaretlenir ama `expire` çok uzak → bir sonraki okuma ESKİ önbelleği sunar, tazeleme
+    // arkada koşar. E2E ölçtü (quotes.spec smoke a): teklif gönderildikten sonra detay
+    // sayfası "Taslak" + "Gönder" gösterdi. `updateTag` route handler'da kullanılamaz
+    // (yalnız Server Action). Çözüm: `expire: 0` profili → etiket ANINDA süresi dolmuş
+    // sayılır, sonraki okuma DB'ye gider (dosya-sistemi önbelleğinde areTagsExpired:
+    // expiredAt <= now). Kaynak: node_modules/next/dist/server/revalidation-utils.js +
+    // lib/incremental-cache/file-system-cache.js. Tek profil, 75 çağrı yeri onu kullanır;
+    // `gate/cache-invalidation-profile` "max"/tek-argüman kullanımını yasaklar.
+    cacheLife: {
+        immediate: { stale: 0, revalidate: 0, expire: 0 },
+    },
     // Faz D — mupdf'i bundle'a ALMA (external bırak). Loader wasm'ı
     // `new URL("mupdf-wasm.wasm", import.meta.url)` ile yükler; chunk'a
     // bundle edilirse import.meta.url chunk konumunu gösterir ve wasm

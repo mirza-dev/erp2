@@ -60,7 +60,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: result.error, shortages: result.shortages }, { status });
         }
 
-        revalidateTag("products", "max");
+        revalidateTag("products", "immediate");
         // Diğer kullanıcıların ekranları anında tazelensin (ateşle-unut).
         void broadcastDataChange(["production", "products"]);
         return NextResponse.json({ entry_id: result.entry_id }, { status: 201 });

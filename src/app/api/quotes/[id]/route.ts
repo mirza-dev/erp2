@@ -115,8 +115,8 @@ export async function PATCH(
                 return NextResponse.json({ error: result.error }, { status: httpStatus });
             }
             const updated = await dbGetQuote(id);
-            revalidateTag("quotes", "max");
-            revalidateTag(`quote-${id}`, "max");
+            revalidateTag("quotes", "immediate");
+            revalidateTag(`quote-${id}`, "immediate");
             void broadcastDataChange(["quotes", "orders", "products"]);
             // Faz 4: send'te arşiv üretilemezse archiveWarning (UI warning toast).
             // 088: send'te bağlı bekleyen sipariş + rezervasyon sonucu (shortage/uyarı) taşınır.
@@ -160,8 +160,8 @@ export async function PATCH(
         body.discount_amount = discountAmount;
 
         const row = await dbUpdateQuote(id, body as unknown as CreateQuoteInput);
-        revalidateTag("quotes", "max");
-        revalidateTag(`quote-${id}`, "max");
+        revalidateTag("quotes", "immediate");
+        revalidateTag(`quote-${id}`, "immediate");
         void broadcastDataChange(["quotes"]);
         return NextResponse.json(mapQuoteDetail(row));
     } catch (err) {
@@ -190,8 +190,8 @@ export async function DELETE(
         }
         const actor = await getCurrentUserId();
         await dbDeleteQuote(id, actor);
-        revalidateTag("quotes", "max");
-        revalidateTag(`quote-${id}`, "max");
+        revalidateTag("quotes", "immediate");
+        revalidateTag(`quote-${id}`, "immediate");
         void broadcastDataChange(["quotes"]);
         return NextResponse.json({ ok: true });
     } catch (err) {

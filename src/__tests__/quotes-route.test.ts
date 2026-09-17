@@ -151,7 +151,7 @@ describe("POST /api/quotes", () => {
 
     it("başarılı kayıt → revalidateTag('quotes') çağrılır", async () => {
         await POST(makePost(validPostBody));
-        expect(revalidateTag).toHaveBeenCalledWith("quotes", "max");
+        expect(revalidateTag).toHaveBeenCalledWith("quotes", "immediate");
     });
 
     it("DB hatası → 500, revalidateTag çağrılmaz", async () => {

@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
         const logo_url = `${publicUrl}?t=${Date.now()}`;
 
         await dbUpdateCompanySettings({ logo_url });
-        revalidateTag("company-settings", "max");
+        revalidateTag("company-settings", "immediate");
 
         return NextResponse.json({ logo_url });
     } catch (err) {

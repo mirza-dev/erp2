@@ -9,7 +9,7 @@
  *     - trackingNumber 101 karakter → 400 (length validation)
  *     - sipariş yok (service error pass-through) → 400
  *     - sipariş approved değil → 400
- *     - happy path → 200, revalidateTag("products","max") çağrıldı
+ *     - happy path → 200, revalidateTag("products","immediate") çağrıldı
  *     - happy path → dbBatchResolveAlerts overdue_shipment fire-and-forget (P3 fix)
  *
  *   source-regression:
@@ -212,7 +212,7 @@ describe("POST /api/orders/[id]/ship", () => {
         );
 
         // Cache invalidation
-        expect(mockRevalidateTag).toHaveBeenCalledWith("products", "max");
+        expect(mockRevalidateTag).toHaveBeenCalledWith("products", "immediate");
     });
 
     it("happy path boş tracking/carrier → shipMeta'da null iletilir", async () => {

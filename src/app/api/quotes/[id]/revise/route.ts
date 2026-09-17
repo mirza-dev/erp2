@@ -27,8 +27,8 @@ export async function POST(
             return NextResponse.json({ error: result.error }, { status });
         }
 
-        revalidateTag("quotes", "max");
-        revalidateTag(`quote-${id}`, "max");
+        revalidateTag("quotes", "immediate");
+        revalidateTag(`quote-${id}`, "immediate");
         void broadcastDataChange(["quotes"]);
 
         return NextResponse.json({

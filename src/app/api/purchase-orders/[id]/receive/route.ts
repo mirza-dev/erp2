@@ -91,8 +91,8 @@ export async function POST(
         const actor = (await getCurrentUserId()) ?? "system";
         const result = await serviceReceivePOLines(id, lines, actor, invoice);
 
-        revalidateTag("purchase-orders", "max");
-        revalidateTag("products", "max");  // on_hand artar → stok hesapları etkilenir
+        revalidateTag("purchase-orders", "immediate");
+        revalidateTag("products", "immediate");  // on_hand artar → stok hesapları etkilenir
         void broadcastDataChange(["purchase_orders", "products", "alerts"]);
 
         return NextResponse.json(result);

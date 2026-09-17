@@ -22,7 +22,7 @@ export async function POST(
         const { id } = await params;
         const result = await serviceReallocateOrder(id);
 
-        revalidateTag("products", "max");
+        revalidateTag("products", "immediate");
         void broadcastDataChange(["orders", "products"]);
 
         const updated = await serviceGetOrder(id);

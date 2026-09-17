@@ -52,14 +52,14 @@ export async function PATCH(
 
         if (action === "receive") {
             await dbReceiveCommitment(id);
-            revalidateTag("products", "max");
+            revalidateTag("products", "immediate");
             void broadcastDataChange(["products"]);
             return NextResponse.json({ success: true });
         }
 
         if (action === "cancel") {
             await dbCancelCommitment(id);
-            revalidateTag("products", "max");
+            revalidateTag("products", "immediate");
             void broadcastDataChange(["products"]);
             return NextResponse.json({ success: true });
         }
