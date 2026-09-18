@@ -5,6 +5,63 @@ type: project
 originSessionId: 51d75dba-8151-4d4a-b842-f092a8ea93c9
 ---
 
+## 2026-09-18 — Belge vurgu rengi firma ayarına taşındı (marka notu a) + marka dalı main'e birleşti
+
+**İki iş, aynı tur.** (1) Kullanıcı *"logo güncellemesini göremiyorum, pushlamadın mı"* dedi —
+ölçüm: push edilmişti ama **`worktree-brand-roven` dalı main'e hiç MERGE EDİLMEMİŞTİ**; çalışan
+sunucular main'deydi, o yüzden yeni logo/pazarlama turu görünmüyordu. 10 commit `codex-experiment`e
+birleştirildi (`2b67cf2`; üç belge/bellek çakışması iki tarafı da koruyarak çözüldü), erp2 main
+ff-lendi, iki uzak ref aynı SHA. Onboarding PR #1 **hâlâ DRAFT** — bilerek merge edilmedi.
+(2) Aynı mesajın *"şimdi yap"* kısmı marka notu (a)'ydı: teklif/PO/RFQ belgelerindeki sabit PMT
+mavisi.
+
+**Ölçüm:** `#0072BC` **8 dosyada** sabitti (QuoteDocument · quote PDF · PurchaseOrderDocument ·
+RfqDocument · rfq PDF · QuoteForm ikizi · globals.css baskı · arşiv HTML). Teslim modeli müşteri
+başına ayrı kurulum olduğu için **ikinci müşterinin teklifleri de PMT mavisiyle** çıkacaktı.
+
+**Çözüm:** `company_settings.document_accent_color` (**mig.112**, CHECK `^#[0-9A-Fa-f]{6}$`) +
+Ayarlar › Firma › **Belge Rengi** (renk seçici + hex + canlı belge önizlemesi + kontrast uyarısı +
+"Varsayılana dön"). Tek kaynak YENİ `src/lib/document-accent.ts`
+(`resolveDocumentAccent`/`accentRgba`/`accentTint`/`contrastWithWhite`/`validateDocumentAccent`).
+
+**Üç tasarım kararı, üçü de ölçümden:**
+1. **Varsayılan bilerek AYNI renk** — `accentRgba("#0072BC",0.2) === "rgba(0,114,188,0.2)"` ve
+   `accentTint("#0072BC",0.2) === "#cce3f2"` (PDF'teki eski sabit) → PMT'nin belgelerinde tek
+   piksel değişmez; testle kilitli.
+2. **Canlı DB'de kolon YOKKEN de kırılmaz** — `select("*")` sonucunda anahtar yoksa GET onu hiç
+   döndürmez → form alanı kilitli + "112 uygulanınca açılır" mesajı; PATCH ise 500 değil **409**
+   (`CompanySettingsColumnMissingError` → migration numarasını söyler).
+3. **Baskı CSS'i DB okuyamaz** → renk `.q-card` kökünden `--q-accent` / `--q-accent-border` custom
+   property'siyle iniyor; `globals.css` kuralları `var(--q-accent, #0072BC)` ile varsayılana düşer.
+   Arşiv HTML'i ise **somut hex** taşır (donmuş belge CSS değişkenine bağlanamaz).
+
+**react-pdf tuzağı:** modül seviyesindeki stil nesneleri prop okuyamaz → renge bağlı stiller
+`brandStyles(accent)` / `rfqBrandStyles(accent)` fabrikalarına çıkarıldı, alt bileşenlere prop
+olarak geçiyor. **Okunabilirlik:** beyaz yazı vurgu zemininde ≥ 3:1 (WCAG büyük metin) — `#FF0000`
+geçer (4.0), `#FF6600` (2.9) ve `#FFE600` (1.3) reddedilir; aynı kural formda, API'de ve DB
+CHECK'inde (biçim) koşar. **Renk `<style>` metnine ve PDF stiline gömüldüğü için** dışarıdan gelen
+her değer `resolveDocumentAccent`ten geçer (CSS/HTML enjeksiyon kapısı; testte enjeksiyon yükü var).
+
+**Kapı:** YENİ `gate/document-accent-single-source` — `src/**` içinde `#0072BC`/`0,114,188`
+yalnız `document-accent.ts`te ve baskı fallback'lerinde olabilir (yorumlar soyulur). Ayrıca
+`document-accent.test.ts` (20) · `document-accent-wiring.test.ts` (11) · `migration-112-…` (6) ·
+`company-settings-column-guard` (4) · `settings-company-route` +9 · E2E `settings.spec` +1.
+**3/3 kırmızı-kanıtlı** (renk yeniden sabitlenince gate, `--q-accent` silinince kablolama, 409
+kolu silinince route testi düştü; SHA-256 ile geri yüklendi).
+
+**Gate:** tsc 0 · lint 0 · **521 dosya / 7273 test** · build 0 uyarı · `test:integration` 17/17 ·
+**E2E 124/124 (retries=0, 3,3 dk)** · mig.112 **yerelde uygulandı** (kolon + CHECK doğrulandı) ·
+`check-migrations` OK. **Kullanıcı tarafı:** canlıda **yalnız 112'yi** Studio'dan uygula
+(`supabase db push` KOŞMA).
+
+**E2E ortam dersi (ürün kusuru DEĞİL):** ilk koşum 69 düşüş verdi — hepsi `ERR_CONNECTION_REFUSED`;
+koşu sırasında **disk dolmuş** (`No space left on device`, eşzamanlı başka bir iş) ve dev sunucusu
+çökmüş. Sonraki açılışta Turbopack **yarım yazılmış kalıcı önbellekten** panik verdi
+(`Every task must have a task type`) → `.next` silinince düzeldi. Soğuk önbellekle tek düşüş PO
+iptali oldu (ekran: "Compiling…", ilk derleme 15 sn'yi aştı; ısınınca 2,7 sn) → ısınmış tam koşum
+124/124. Ayrıca `npm run build` çalışan `next dev`in `.next`ine yazıp onu öldürüyor — E2E'den önce
+build koşulduysa sunucu yeniden başlatılmalı.
+
 ## 2026-09-18 — İç e-posta vurgu rengi → Roven mavisi (marka notu b, kullanıcı kararı)
 
 Marka oturumunun kullanıcıya bıraktığı iki renk notundan (b) kapandı: `src/lib/email/templates.ts`

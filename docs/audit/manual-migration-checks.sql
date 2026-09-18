@@ -160,6 +160,19 @@ select '106', 'company_settings.quote_validity_days (teklif geçerlilik varsayı
                  where table_name = 'company_settings' and column_name = 'quote_validity_days')
             then '✅ VAR' else '❌ YOK — 106 uygulanmamış' end
 
+-- 112 (2026-09-18, henüz canlıda koşulmadı): kolon otomatik probe'da da görünür
+-- ama biçim CHECK'i OpenAPI'de GÖRÜNMEZ — renk `<style>` metnine gömüldüğü için
+-- asıl güvence o. İkisi birlikte aranır.
+union all
+select '112', 'company_settings.document_accent_color + #RRGGBB CHECK (belge vurgu rengi)',
+       case when exists (
+                select 1 from information_schema.columns
+                 where table_name = 'company_settings' and column_name = 'document_accent_color')
+             and exists (
+                select 1 from pg_constraint
+                 where conname = 'company_settings_document_accent_color_check')
+            then '✅ VAR' else '❌ YOK — 112 uygulanmamış' end
+
 -- 110 + 017/029: yetki ve RLS değişiklikleri. Hiçbiri OpenAPI'de görünmez →
 -- `check-migrations.ts` bunları probe EDEMEZ, tek doğrulama yolu burası.
 union all

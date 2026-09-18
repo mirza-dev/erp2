@@ -1954,9 +1954,10 @@ select:focus-visible {
   .q-form-header { background: #f0f5fb !important; border-bottom: 1px solid #bbb !important; padding: 8px 12px !important; }
   .q-info-inp { color: #111 !important; background: transparent !important; border: none !important; border-bottom: 0.5px solid #bbb !important; font-size: 8.5px !important; padding: 1px 0 !important; }
 
-  /* Title band — marka mavisi */
+  /* Title band — belge vurgu rengi. `--q-accent` QuoteForm'un `.q-card` kökünde
+     firma ayarından (mig.112) set edilir; fallback eski sabit = varsayılan renk. */
   .q-title-band { border-bottom: 1px solid #bbb !important; padding: 5px 12px !important; }
-  .q-title-band span { color: #0072BC !important; }
+  .q-title-band span { color: var(--q-accent, #0072BC) !important; }
 
   /* Meta grid */
   .q-meta-grid { border-bottom: 1px solid #bbb !important; }
@@ -1972,8 +1973,8 @@ select:focus-visible {
      varsayamaz. */
   /* Alan satırı alt çizgisi */
   .q-meta-col > :not(:first-child) { border-bottom: 0.5px solid #e8e8e8 !important; padding-bottom: 4px !important; }
-  /* Bölüm başlığı — marka mavisi */
-  .q-meta-col > :first-child { font-size: 7.5px !important; padding-bottom: 3px !important; letter-spacing: 0.04em !important; color: #0072BC !important; border-bottom-color: rgba(0,114,188,0.2) !important; }
+  /* Bölüm başlığı — belge vurgu rengi (`--q-accent`, bkz. .q-title-band) */
+  .q-meta-col > :first-child { font-size: 7.5px !important; padding-bottom: 3px !important; letter-spacing: 0.04em !important; color: var(--q-accent, #0072BC) !important; border-bottom-color: var(--q-accent-border, rgba(0,114,188,0.2)) !important; }
   /* Alan satırları — label + input grid gap */
   .q-meta-col > :not(:first-child) { gap: 4px !important; }
   /* Alan etiketi (COMPANY, CONTACT…) — bold, koyu */
@@ -1998,7 +1999,7 @@ select:focus-visible {
   .q-card table { table-layout: auto !important; width: 100% !important; border-collapse: collapse !important; border: 1px solid #bbb !important; }
   .q-card table th, .q-card table td { width: auto !important; min-width: 0 !important; overflow: hidden !important; border: 0.5px solid #ccc !important; }
   .q-th {
-    background: #0072BC !important;
+    background: var(--q-accent, #0072BC) !important;
     -webkit-print-color-adjust: exact !important;
     print-color-adjust: exact !important;
     color: white !important;

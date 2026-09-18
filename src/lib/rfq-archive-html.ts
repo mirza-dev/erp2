@@ -4,7 +4,8 @@
  * (inlineLogoAsDataUri) ile yeniden kullanılır.
  */
 import { createElement } from "react";
-import RfqDocument, { RFQ_PAGE_CSS } from "@/app/dashboard/purchase/rfqs/components/RfqDocument";
+import RfqDocument, { rfqPageCss } from "@/app/dashboard/purchase/rfqs/components/RfqDocument";
+import { resolveDocumentAccent } from "@/lib/document-accent";
 import { inlineLogoAsDataUri } from "@/lib/quote-archive-html";
 import type { RfqDocData } from "@/lib/rfq-document-helpers";
 import type { RfqDetail, RfqVendorWithPrices } from "@/lib/supabase/supplier-rfqs";
@@ -30,6 +31,7 @@ export function buildRfqDocData(
         sellerTaxId: company?.tax_no ?? "",
         sellerWeb: company?.website ?? "",
         logoSrc: company?.logo_url ?? null,
+        accentColor: resolveDocumentAccent(company?.document_accent_color),
 
         vendorName: vendor.vendor_name,
         vendorContact: "",
@@ -68,7 +70,7 @@ export async function renderRfqArchiveHtml(data: RfqDocData): Promise<string> {
 <style>
 :root { --font-doc-heading: 'Montserrat'; --font-doc-body: 'Inter'; }
 html, body { margin: 0; padding: 0; background: #d0d5dd; }
-${RFQ_PAGE_CSS}
+${rfqPageCss(resolveDocumentAccent(data.accentColor))}
 </style>
 </head>
 <body>

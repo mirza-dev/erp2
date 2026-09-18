@@ -87,6 +87,12 @@ sessizce kayboluyor. `tests/helpers/nav.ts` → `waitForHydration`.
 - **`~/Library/Caches/ms-playwright` iki kez dışarıdan silindi** (başka oturum/araç) →
   `PLAYWRIGHT_BROWSERS_PATH=$CLAUDE_JOB_DIR/tmp/pw-browsers` + `npx playwright install chromium
   chromium-headless-shell` (ikisi ayrı hedef; yalnız `chromium` headless-shell'i getirmedi).
+- **2026-09-18 — ortam kaynaklı toplu düşüş** (69/100, hepsi `ERR_CONNECTION_REFUSED`): koşu
+  sırasında **disk doldu** (`No space left on device`; eşzamanlı başka iş) → dev sunucusu çöktü;
+  sonraki açılışta Turbopack **yarım yazılmış kalıcı önbellekten** panik verdi (`Every task must
+  have a task type`) → **`rm -rf .next`**. Ayrıca `npm run build` çalışan `next dev`in `.next`ine
+  yazıp onu öldürür. Toplu `CONNECTION_REFUSED` = ürün kusuru değil; önce `df` + sunucuya bak.
+  Soğuk `.next`te ilk derleme 15 sn'lik iddiaları aşabilir → karar ısınmış ikinci koşumla verilir.
 - Test yazımı dersleri: JS regex `i` bayrağı Türkçe **İ**'yi eşlemez → literal ad + `exact` ·
   `getByLabel` alt-dize eşler · URL-durumlu checkbox `.check()` düşer (`click`+`toBeChecked`) ·
   debounce'lu arama sonrası satır tıklaması: önce `waitForURL(/[?&]search=/)` (gecikmiş

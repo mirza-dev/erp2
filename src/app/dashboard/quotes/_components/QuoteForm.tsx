@@ -22,6 +22,7 @@ import type { NoteTemplate, NoteTemplateKind } from "@/lib/mock-data";
 import { addDaysToISODate, normalizeValidityDays } from "../_utils/quote-display";
 import { stockHintForLine, stockHintColor } from "@/lib/stock-availability";
 import BackLink from "@/components/ui/BackLink";
+import { DEFAULT_DOCUMENT_ACCENT, accentRgba, resolveDocumentAccent } from "@/lib/document-accent";
 
 // ── Types ──────────────────────────────────────────────────────────────────────
 
@@ -138,6 +139,9 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
     const [currency, setCurrency] = useState<Currency>("TRY");
     const [vatRate, setVatRate] = useState(20);
     const [logoSrc, setLogoSrc] = useState<string | null>(null);
+    // mig.112 — belge vurgu rengi: ekran ikizi + baskı CSS'i (`--q-accent`) + önizleme/PDF
+    // yükü (`accentColor`) bunu okur. Firma ayarı gelene kadar varsayılan.
+    const [docAccent, setDocAccent] = useState(DEFAULT_DOCUMENT_ACCENT);
 
     // DB persistence state
     const [quoteId, setQuoteId] = useState<string | null>(initialData?.id ?? null);
@@ -387,6 +391,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
             .then(r => r.ok ? r.json() : null)
             .then(s => {
                 if (!s) return;
+                setDocAccent(resolveDocumentAccent(s.document_accent_color));
                 setSellerName(prev => (prev === "" || prev === "PMT Endüstri A.Ş.") && s.name ? s.name : prev);
                 setSellerTel(prev => prev === "" && s.phone ? s.phone : prev);
                 setSellerEmail(prev => prev === "" && s.email ? s.email : prev);
@@ -415,6 +420,18 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
             })
             .catch(() => {/* ağ hatası — form çalışmaya devam eder */});
     }, [hasSellerSnapshot, initialData]);
+
+    // Belge rengi SNAPSHOT'LANMAZ (renk içerik değil sunum; gönderilmiş hâlin rengi
+    // arşiv HTML'inde donar) → satıcısı donmuş teklif de güncel firma rengiyle
+    // görünür. Yukarıdaki effect o durumda hiç istek atmaz (freeze gate) → renk için
+    // yalnız snapshot'lı teklifte ayrı istek; iki effect birbirini dışlar.
+    useEffect(() => {
+        if (!hasSellerSnapshot) return;
+        fetch("/api/settings/company")
+            .then(r => r.ok ? r.json() : null)
+            .then(s => { if (s) setDocAccent(resolveDocumentAccent(s.document_accent_color)); })
+            .catch(() => {/* ağ hatası — varsayılan renkle devam */});
+    }, [hasSellerSnapshot]);
 
     // ── Customer autocomplete ─────────────────────────────────────────────────
     const handleCustCompanyChange = (value: string) => {
@@ -641,6 +658,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
             }));
             const fullData: QuoteData = {
                 sellerName, sellerTel, sellerEmail, sellerAddr, sellerTaxId, sellerWeb, logoSrc,
+                accentColor: docAccent,
                 custCompany, custContact, custPhone, custEmail, custAddress,
                 quoteNo, quoteDate, validUntil, salesRep, salesPhone, salesEmail,
                 currency, vatRate, rows,
@@ -676,7 +694,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
             };
             localStorage.setItem("teklif_v3_full", JSON.stringify(fullData));
         } catch { /* noop */ }
-    }, [readOnly, currency, rows, sellerName, sellerTel, sellerEmail, sellerAddr, sellerTaxId, sellerWeb, logoSrc,
+    }, [readOnly, currency, rows, sellerName, sellerTel, sellerEmail, sellerAddr, sellerTaxId, sellerWeb, logoSrc, docAccent,
         custCompany, custContact, custPhone, custEmail, custAddress, quoteNo, quoteDate, validUntil,
         salesRep, salesPhone, salesEmail, vatRate, ovSub, ovVat, ovGrand, discount,
         notes, deliveryMethod, paymentMethod, sig1, sig1Title, sig2, sig2Title, sig3, sig3Title,
@@ -688,6 +706,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
         try {
             const fullData: QuoteData = {
                 sellerName, sellerTel, sellerEmail, sellerAddr, sellerTaxId, sellerWeb, logoSrc,
+                accentColor: docAccent,
                 custCompany, custContact, custPhone, custEmail, custAddress,
                 quoteNo, quoteDate, validUntil, salesRep, salesPhone, salesEmail,
                 currency, vatRate, rows,
@@ -723,7 +742,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
             };
             localStorage.setItem("teklif_v3_full", JSON.stringify(fullData));
         } catch { /* noop */ }
-    }, [status, currency, rows, sellerName, sellerTel, sellerEmail, sellerAddr, sellerTaxId, sellerWeb, logoSrc,
+    }, [status, currency, rows, sellerName, sellerTel, sellerEmail, sellerAddr, sellerTaxId, sellerWeb, logoSrc, docAccent,
         custCompany, custContact, custPhone, custEmail, custAddress, quoteNo, quoteDate, validUntil,
         salesRep, salesPhone, salesEmail, vatRate, ovSub, ovVat, ovGrand, discount,
         notes, deliveryMethod, paymentMethod, sig1, sig1Title, sig2, sig2Title, sig3, sig3Title, quoteId]);
@@ -1023,7 +1042,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
     const th: React.CSSProperties = {
         padding: "7px 8px", fontSize: "10px", fontWeight: 600,
         color: "white", textTransform: "uppercase", letterSpacing: "0.06em",
-        border: "0.5px solid rgba(255,255,255,0.18)", background: "#0072BC",
+        border: "0.5px solid rgba(255,255,255,0.18)", background: docAccent,
         whiteSpace: "nowrap",
     };
     const tdBase: React.CSSProperties = {
@@ -1212,13 +1231,16 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                     background: "var(--bg-primary)", border: "1px solid var(--border-secondary)",
                     ...(readOnly ? { pointerEvents: "none" as const } : {}),
                     borderRadius: "6px", overflow: "hidden", maxWidth: "1100px", margin: "0 auto",
+                    // globals.css `@media print` kuralları (.q-title-band / .q-meta-col / .q-th)
+                    // vurgu rengini buradan okur — stil sayfası firma ayarını bilemez.
+                    ...({ "--q-accent": docAccent, "--q-accent-border": accentRgba(docAccent, 0.2) } as React.CSSProperties),
                 }}>
 
                     {/* ── Form Header: Logo + Seller info ── */}
                     <div className="q-form-header" style={{
                         display: "grid", gridTemplateColumns: "auto 1fr", gap: "28px",
                         padding: "24px 28px 22px", borderBottom: "1px solid var(--border-secondary)",
-                        background: "rgba(0,114,188,0.04)", alignItems: "start",
+                        background: accentRgba(docAccent, 0.04), alignItems: "start",
                     }}>
                         {/* Logo */}
                         <div>
@@ -1276,9 +1298,9 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                         background: "var(--bg-primary)", textAlign: "center",
                     }}>
                         <div style={{ fontSize: "22px", fontWeight: 700, letterSpacing: "-0.01em" }}>
-                            <span style={{ color: "#0072BC" }}>TEKLİF</span>
-                            <span style={{ color: "rgba(0,114,188,0.35)", margin: "0 10px", fontWeight: 300 }}>|</span>
-                            <span style={{ color: "#0072BC", fontStyle: "italic", fontWeight: 600 }}>QUOTATION</span>
+                            <span style={{ color: docAccent }}>TEKLİF</span>
+                            <span style={{ color: accentRgba(docAccent, 0.35), margin: "0 10px", fontWeight: 300 }}>|</span>
+                            <span style={{ color: docAccent, fontStyle: "italic", fontWeight: 600 }}>QUOTATION</span>
                         </div>
                     </div>
 
@@ -1289,7 +1311,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                     }}>
                         {/* Left: Customer */}
                         <div className="q-meta-col" style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: "9px" }}>
-                            <h2 style={{ fontSize: "10px", fontWeight: 700, color: "#0072BC", textTransform: "uppercase", letterSpacing: "0.07em", paddingBottom: "4px", borderBottom: "1px solid rgba(0,114,188,0.25)", margin: 0 }}>
+                            <h2 style={{ fontSize: "10px", fontWeight: 700, color: docAccent, textTransform: "uppercase", letterSpacing: "0.07em", paddingBottom: "4px", borderBottom: `1px solid ${accentRgba(docAccent, 0.25)}`, margin: 0 }}>
                                 Müşteri / Customer
                             </h2>
                             {/* Company — autocomplete */}
@@ -1425,7 +1447,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
 
                         {/* Right: Quote details */}
                         <div className="q-meta-col" style={{ padding: "16px 24px", display: "flex", flexDirection: "column", gap: "9px", borderLeft: "1px solid var(--border-secondary)" }}>
-                            <h2 style={{ fontSize: "10px", fontWeight: 700, color: "#0072BC", textTransform: "uppercase", letterSpacing: "0.07em", paddingBottom: "4px", borderBottom: "1px solid rgba(0,114,188,0.25)", margin: 0 }}>
+                            <h2 style={{ fontSize: "10px", fontWeight: 700, color: docAccent, textTransform: "uppercase", letterSpacing: "0.07em", paddingBottom: "4px", borderBottom: `1px solid ${accentRgba(docAccent, 0.25)}`, margin: 0 }}>
                                 Teklif Detayları / Quote Details
                             </h2>
                             {/* Quote No — read-only, DB'de otomatik üretilir */}

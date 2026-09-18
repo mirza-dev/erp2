@@ -70,3 +70,23 @@ test("kendi e-posta satırında silme butonu disabled veya yok", async ({ page }
     // Always passes — page loaded, user row found
     await expect(page.locator("main")).toBeVisible();
 });
+
+/**
+ * Belge Rengi alanı (mig.112) — kaydetmez, yalnız alanın canlı davranışını ölçer:
+ * kolon uygulanmış yerel veritabanında alan AÇIK olmalı, okunmaz renk anında
+ * uyarmalı, "Varsayılana dön" değeri PMT mavisine döndürmeli.
+ */
+test("Firma sekmesi: Belge Rengi alanı açık, okunmaz renk uyarır, varsayılana döner", async ({ page }) => {
+    const hex = page.locator("#document-accent-hex");
+    await expect(hex).toBeVisible({ timeout: 8_000 });
+    await expect(hex).toBeEnabled();
+    await expect(hex).toHaveValue(/^#[0-9A-F]{6}$/);
+
+    // Açık sarı: biçim geçerli ama beyaz yazı okunmaz → anında uyarı.
+    await hex.fill("#FFE600");
+    await expect(page.getByRole("alert").filter({ hasText: /çok açık/i })).toBeVisible({ timeout: 5_000 });
+
+    await page.getByRole("button", { name: /varsayılana dön/i }).click();
+    await expect(hex).toHaveValue("#0072BC");
+    await expect(page.getByRole("alert").filter({ hasText: /çok açık/i })).toHaveCount(0);
+});

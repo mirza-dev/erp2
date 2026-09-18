@@ -36,6 +36,11 @@ export interface QuoteData {
     sellerTaxId: string;
     sellerWeb: string;
     logoSrc: string | null;
+    // mig.112 — belge vurgu rengi (company_settings.document_accent_color). Opsiyonel:
+    // eski localStorage önizleme yükleri ve migration'sız DB bu alanı taşımaz →
+    // belge `resolveDocumentAccent()` ile varsayılana düşer. Teklife SNAPSHOT'LANMAZ
+    // (renk içerik değil sunum): gönderilmiş teklifin rengi arşiv HTML'inde donar.
+    accentColor?: string;
 
     // Customer
     custCompany: string;

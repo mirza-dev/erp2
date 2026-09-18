@@ -2,11 +2,12 @@
  * RFQ belgesi — @react-pdf/renderer (gerçek PDF eki). QuotePdfDocument deseni ama
  * FİYATSIZ (talep): satıcı + tedarikçi blok + kalem tablosu (fiyat YOK) + "fiyat
  * bildiriniz" notu. Fontlar quote-pdf register'ı ile paylaşılır (Montserrat/Inter).
+ * Marka rengi `data.accentColor`dan (mig.112) → `rfqBrandStyles`.
  */
 import { Document, Page, View, Text, Image } from "@react-pdf/renderer";
 import { RFQ_LABELS, fmtRfqDate, type RfqDocData } from "@/lib/rfq-document-helpers";
+import { resolveDocumentAccent } from "@/lib/document-accent";
 
-const BRAND = "#0072BC";
 const INK = "#1a2230";
 const MUTED = "#5b6573";
 const BORDER = "#d0d5dd";
@@ -14,17 +15,25 @@ const BORDER = "#d0d5dd";
 const s = {
     page: { padding: 34, fontFamily: "Inter", fontSize: 9, color: INK } as const,
     headerRow: { flexDirection: "row" as const, justifyContent: "space-between" as const, marginBottom: 16 },
-    sellerName: { fontFamily: "Montserrat", fontWeight: 800 as const, fontSize: 15, color: BRAND, marginBottom: 4 },
     muted: { color: MUTED, fontSize: 8, lineHeight: 1.4 },
-    title: { fontFamily: "Montserrat", fontWeight: 700 as const, fontSize: 14, color: BRAND, textAlign: "right" as const, marginBottom: 6 },
     metaRow: { flexDirection: "row" as const, justifyContent: "flex-end" as const, gap: 6 },
     vendorBox: { backgroundColor: "#f6f8fb", borderWidth: 1, borderColor: BORDER, borderRadius: 4, padding: 8, marginBottom: 14 },
-    th: { backgroundColor: BRAND, color: "#ffffff", fontWeight: 600 as const, padding: 5, fontSize: 8 },
     td: { borderWidth: 0.5, borderColor: BORDER, padding: 5, fontSize: 8 },
     ask: { marginTop: 14, fontSize: 9, lineHeight: 1.5, color: INK },
 };
 
+/** Marka rengine bağlı stiller — çıkarıldıkları `s` girdileriyle birebir. */
+export function rfqBrandStyles(accent: string) {
+    const brand = resolveDocumentAccent(accent);
+    return {
+        sellerName: { fontFamily: "Montserrat", fontWeight: 800 as const, fontSize: 15, color: brand, marginBottom: 4 },
+        title: { fontFamily: "Montserrat", fontWeight: 700 as const, fontSize: 14, color: brand, textAlign: "right" as const, marginBottom: 6 },
+        th: { backgroundColor: brand, color: "#ffffff", fontWeight: 600 as const, padding: 5, fontSize: 8 },
+    };
+}
+
 export default function RfqPdfDocument({ data }: { data: RfqDocData }) {
+    const b = rfqBrandStyles(resolveDocumentAccent(data.accentColor));
     return (
         <Document>
             <Page size="A4" style={s.page}>
@@ -35,7 +44,7 @@ export default function RfqPdfDocument({ data }: { data: RfqDocData }) {
                             // eslint-disable-next-line jsx-a11y/alt-text
                             <Image src={data.logoSrc} style={{ maxHeight: 40, marginBottom: 4 }} />
                         ) : (
-                            <Text style={s.sellerName}>{data.sellerName || "—"}</Text>
+                            <Text style={b.sellerName}>{data.sellerName || "—"}</Text>
                         )}
                         {!!data.sellerAddr && <Text style={s.muted}>{data.sellerAddr}</Text>}
                         {!!data.sellerTel && <Text style={s.muted}>Tel: {data.sellerTel}</Text>}
@@ -43,7 +52,7 @@ export default function RfqPdfDocument({ data }: { data: RfqDocData }) {
                         {!!data.sellerTaxId && <Text style={s.muted}>VKN: {data.sellerTaxId}</Text>}
                     </View>
                     <View>
-                        <Text style={s.title}>{RFQ_LABELS.title}</Text>
+                        <Text style={b.title}>{RFQ_LABELS.title}</Text>
                         <View style={s.metaRow}><Text style={s.muted}>{RFQ_LABELS.no}: </Text><Text style={{ fontSize: 8, fontWeight: 600 }}>{data.rfqNo}</Text></View>
                         <View style={s.metaRow}><Text style={s.muted}>{RFQ_LABELS.date}: </Text><Text style={{ fontSize: 8 }}>{fmtRfqDate(data.rfqDate)}</Text></View>
                         {!!data.dueDate && <View style={s.metaRow}><Text style={s.muted}>{RFQ_LABELS.due}: </Text><Text style={{ fontSize: 8, fontWeight: 600 }}>{fmtRfqDate(data.dueDate)}</Text></View>}
@@ -58,11 +67,11 @@ export default function RfqPdfDocument({ data }: { data: RfqDocData }) {
                 </View>
 
                 <View style={{ flexDirection: "row" }}>
-                    <Text style={[s.th, { width: 24 }]}>{RFQ_LABELS.pos}</Text>
-                    <Text style={[s.th, { width: 90 }]}>{RFQ_LABELS.code}</Text>
-                    <Text style={[s.th, { flexGrow: 1 }]}>{RFQ_LABELS.desc}</Text>
-                    <Text style={[s.th, { width: 80 }]}>{RFQ_LABELS.qty}</Text>
-                    <Text style={[s.th, { width: 80 }]}>{RFQ_LABELS.target}</Text>
+                    <Text style={[b.th, { width: 24 }]}>{RFQ_LABELS.pos}</Text>
+                    <Text style={[b.th, { width: 90 }]}>{RFQ_LABELS.code}</Text>
+                    <Text style={[b.th, { flexGrow: 1 }]}>{RFQ_LABELS.desc}</Text>
+                    <Text style={[b.th, { width: 80 }]}>{RFQ_LABELS.qty}</Text>
+                    <Text style={[b.th, { width: 80 }]}>{RFQ_LABELS.target}</Text>
                 </View>
                 {data.lines.map((l, i) => (
                     <View key={i} style={{ flexDirection: "row" }} wrap={false}>

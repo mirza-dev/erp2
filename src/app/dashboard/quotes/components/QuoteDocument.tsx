@@ -7,10 +7,13 @@
 
 import { Fragment } from "react";
 import type { QuoteData } from "./quote-types";
+import { DEFAULT_DOCUMENT_ACCENT, accentRgba, resolveDocumentAccent } from "@/lib/document-accent";
 
-// TEMA-MUAF: bu belge beyaz kağıda baskı + PMT marka kimliği içindir; sabit hex
-// renkler (marka mavisi vb.) kasıtlıdır ve tema (koyu/aydınlık) değişkenlerine
-// BAĞLANMAMALIDIR — her iki temada da beyaz kağıt görünümü korunur.
+// TEMA-MUAF: bu belge beyaz kağıda baskı + firma marka kimliği içindir; renkler
+// concrete hex/rgba'dır ve tema (koyu/aydınlık) değişkenlerine BAĞLANMAMALIDIR —
+// her iki temada da beyaz kağıt görünümü korunur. Marka rengi 2026-09-18'den beri
+// sabit değil: `data.accentColor` (company_settings.document_accent_color, mig.112)
+// → `resolveDocumentAccent` → yine concrete hex (arşiv HTML'i CSS var'ına bağlanmaz).
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -20,10 +23,8 @@ const FONT = {
     mono: "'JetBrains Mono', 'Geist Mono', monospace",
 };
 
-const C = {
-    brand: "#0072BC",
-    brandLight: "rgba(0,114,188,0.08)",
-    brandBorder: "rgba(0,114,188,0.2)",
+/** Marka dışı sabit palet; marka üçlüsü `documentPalette(accent)` ile eklenir. */
+const BASE = {
     text: "#1a1a2e",
     muted: "#64748b",
     subtle: "#94a3b8",
@@ -33,6 +34,16 @@ const C = {
     footerBg: "#f0f4f8",
     white: "#ffffff",
 };
+
+/** Vurgu rengi → belgenin tam paleti. Varsayılanda 2026-09-18 öncesi sabitlerle birebir. */
+function documentPalette(accent: string) {
+    return {
+        ...BASE,
+        brand: accent,
+        brandLight: accentRgba(accent, 0.08),
+        brandBorder: accentRgba(accent, 0.2),
+    };
+}
 
 // PDF eki turu (2026-06): SYM/fmt/fmtDate quote-document-helpers'a taşındı —
 // HTML belge ve PDF belge (QuotePdfDocument) aynı formatları tek kaynaktan okur.
@@ -56,8 +67,12 @@ export const PAGE_CSS = `
 `;
 
 // ── Print CSS (scoped to #quote-document) ────────────────────────────────────
+// Vurgu rengi metne GÖMÜLÜR (CSS var DEĞİL): arşiv HTML'i uygulamanın stil
+// sayfası olmadan açılır. `accent` yalnız `resolveDocumentAccent` çıktısıdır
+// (#RRGGBB) → `<style>` metnine güvenle girer.
 
-export const PRINT_CSS = `
+export function quotePrintCss(accent: string = DEFAULT_DOCUMENT_ACCENT): string {
+    return `
 @media print {
     #quote-document, #quote-document * {
         -webkit-print-color-adjust: exact !important;
@@ -87,13 +102,13 @@ export const PRINT_CSS = `
     }
     #quote-document .doc-brand-bg,
     #quote-document .doc-brand-bg * {
-        background: #0072BC !important;
+        background: ${accent} !important;
         color: white !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
     }
     #quote-document .doc-brand-text {
-        color: #0072BC !important;
+        color: ${accent} !important;
     }
     #quote-document .doc-zebra-even td {
         background: #f6f8fa !important;
@@ -106,12 +121,16 @@ export const PRINT_CSS = `
         page-break-inside: avoid;
     }
     #quote-document .doc-watermark {
-        color: rgba(0,114,188,0.05) !important;
+        color: ${accentRgba(accent, 0.05)} !important;
         -webkit-print-color-adjust: exact !important;
         print-color-adjust: exact !important;
     }
 }
 `;
+}
+
+/** Varsayılan renkli baskı CSS'i — geriye dönük dışa aktarım (bileşen `quotePrintCss(accent)` kullanır). */
+export const PRINT_CSS = quotePrintCss();
 
 // ── Component ─────────────────────────────────────────────────────────────────
 
@@ -140,6 +159,8 @@ const enSectionSuffixStyle: React.CSSProperties = {
 };
 
 export default function QuoteDocument({ data }: Props) {
+    const accent = resolveDocumentAccent(data.accentColor);
+    const C = documentPalette(accent);
     const sym = SYM[data.currency] ?? "₺";
 
     // Ölçü (size_text) ve Ağırlık (Kg) kolonları KALDIRILDI. Ölçü: DN/sınıf zaten
@@ -398,7 +419,7 @@ export default function QuoteDocument({ data }: Props) {
     return (
         <>
             <style dangerouslySetInnerHTML={{ __html: PAGE_CSS }} />
-            <style dangerouslySetInnerHTML={{ __html: PRINT_CSS }} />
+            <style dangerouslySetInnerHTML={{ __html: quotePrintCss(accent) }} />
 
             <div id="quote-document" style={docStyle}>
 

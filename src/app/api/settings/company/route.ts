@@ -4,6 +4,8 @@ import { handleApiError, safeParseJson } from "@/lib/api-error";
 import { isValidEmail, isValidTaxNumber, isValidUrl } from "@/lib/validation";
 import { requirePermission } from "@/lib/auth/role-guard";
 import { unstable_cache, revalidateTag } from "next/cache";
+import { validateDocumentAccent } from "@/lib/document-accent";
+import { CompanySettingsColumnMissingError, columnMissingMessage } from "@/lib/company-settings-schema";
 
 const getCachedCompanySettings = unstable_cache(
     async () => {
@@ -24,6 +26,10 @@ const SAFE_COMPANY_FIELDS = [
     // için Ayarlar formu değerleri hiç yükleyemiyordu (dolayısıyla UI de yoktu).
     "quote_number_prefix",
     "quote_number_separator",
+    // mig.112 — belge vurgu rengi; Ayarlar formu ve QuoteForm'un belge ikizi okur.
+    // Migration uygulanmadıysa anahtar HİÇ dönmez (`key in settings` false) →
+    // Ayarlar bunu "kolon yok" diye okur ve alanı kilitler.
+    "document_accent_color",
     "updated_at",
 ] as const;
 
@@ -111,6 +117,13 @@ function validateCompanyPatch(patch: Record<string, unknown>): string | null {
             return "Teklif numarası ayracı tek karakter olmalı: - . _ /";
         }
     }
+    // mig.112 — biçim DB CHECK'iyle birebir (#RRGGBB); OKUNABİLİRLİK (belge
+    // başlıklarındaki beyaz yazının kontrastı) yalnız burada ve formda denetlenir.
+    const accent = patch.document_accent_color;
+    if (accent !== undefined) {
+        const accentError = validateDocumentAccent(accent);
+        if (accentError) return accentError;
+    }
     return null;
 }
 
@@ -125,7 +138,7 @@ export async function PATCH(req: NextRequest) {
         const body = parsed.data as Record<string, unknown>;
         // Sadece izin verilen alanları al
         // logo_url burada intentionally yok — logo değişimi için /logo endpoint kullanılmalı (MIME/size doğrulama)
-        const allowed = ["name", "tax_office", "tax_no", "address", "phone", "email", "website", "currency", "quote_validity_days", "quote_number_prefix", "quote_number_separator"] as const;
+        const allowed = ["name", "tax_office", "tax_no", "address", "phone", "email", "website", "currency", "quote_validity_days", "quote_number_prefix", "quote_number_separator", "document_accent_color"] as const;
         const patch: Record<string, unknown> = {};
         for (const key of allowed) {
             if (key in body) patch[key] = body[key];
@@ -134,10 +147,19 @@ export async function PATCH(req: NextRequest) {
         if (validationError) {
             return NextResponse.json({ error: validationError }, { status: 400 });
         }
+        // Tek biçim saklanır: `<input type="color">` küçük harf verir, varsayılan büyük.
+        if (typeof patch.document_accent_color === "string") {
+            patch.document_accent_color = patch.document_accent_color.toUpperCase();
+        }
         const updated = await dbUpdateCompanySettings(patch);
         revalidateTag("company-settings", "immediate");
         return NextResponse.json(updated);
     } catch (err) {
+        // Migration'ı uygulanmamış kolon (ör. canlıda 112 yokken belge rengi) —
+        // 500 değil: kullanıcıya hangi migration'ın eksik olduğu söylenir.
+        if (err instanceof CompanySettingsColumnMissingError) {
+            return NextResponse.json({ error: columnMissingMessage(err.columns) }, { status: 409 });
+        }
         return handleApiError(err, "PATCH /api/settings/company");
     }
 }

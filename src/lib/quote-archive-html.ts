@@ -16,6 +16,7 @@ import QuoteDocument, { PAGE_CSS } from "@/app/dashboard/quotes/components/Quote
 import type { QuoteData, Currency } from "@/app/dashboard/quotes/components/quote-types";
 import type { QuoteDetail } from "@/lib/mock-data";
 import type { CompanySettingsRow } from "@/lib/database.types";
+import { resolveDocumentAccent } from "@/lib/document-accent";
 
 const QD_CURRENCIES: Currency[] = ["TRY", "USD", "EUR"];
 // QuoteData.status union "revised" içermez (QuoteStatus içerir). Arşiv send anında
@@ -58,6 +59,8 @@ export function buildQuoteDataFromDetail(detail: QuoteDetail, company?: CompanyS
         sellerTaxId: detail.sellerTaxId || company?.tax_no || "",
         sellerWeb: detail.sellerWebsite || company?.website || "",
         logoSrc: detail.sellerLogoUrl || company?.logo_url || null,
+        // mig.112 — snapshot'lanmaz: gönderim anındaki firma rengi arşiv HTML'inde donar.
+        accentColor: resolveDocumentAccent(company?.document_accent_color),
 
         // Customer
         custCompany: detail.customerName ?? "",
@@ -154,8 +157,9 @@ function escapeHtml(s: string): string {
 /**
  * `QuoteData` → bağımsız açılabilir/yazdırılabilir self-contained HTML.
  *
- * Self-containment: QuoteDocument print renkleri concrete hex (gömülü); PAGE_CSS +
- * PRINT_CSS component markup'ında zaten `<style>` ile var. Wrapper EK olarak font
+ * Self-containment: QuoteDocument print renkleri concrete hex (gömülü; vurgu rengi
+ * `data.accentColor`dan, mig.112); PAGE_CSS + baskı CSS'i component markup'ında
+ * zaten `<style>` ile var. Wrapper EK olarak font
  * CSS var tanımı (`:root --font-doc-*`) + Google Fonts link sağlar (standalone HTML'de
  * uygulama font değişkenleri çözülmez). NOT: Google Fonts link view-time external
  * bağımlılık — arşiv "tam offline self-contained" DEĞİL (kullanıcı byte-exact-olmayan

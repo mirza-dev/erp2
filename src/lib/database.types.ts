@@ -964,6 +964,9 @@ export interface CompanySettingsRow {
     // mig.106: yeni teklifte "Geçerlilik" varsayılanı (quote_date + N gün).
     // Migration uygulanmadan önce PostgREST bu alanı DÖNDÜRMEZ → opsiyonel.
     quote_validity_days?: number
+    // mig.112: belge vurgu rengi (#RRGGBB) — `resolveDocumentAccent()` üzerinden okunur.
+    // Migration uygulanmadan önce PostgREST bu alanı DÖNDÜRMEZ → opsiyonel.
+    document_accent_color?: string
     updated_at: string
 }
 

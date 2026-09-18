@@ -231,9 +231,11 @@ describe("QuotePdfDocument — not View'ı wrap=false DEĞİL (sayfalara akar)",
         "utf8",
     );
     it("not View'ında wrap={false} yok (ürün satırı S.row'da wrap={false} kalır)", () => {
-        // noteRow View'ı backgroundColor ile açılır ve wrap={false} İÇERMEZ
-        expect(PDF_SOURCE).toMatch(/\.\.\.S\.noteRow,\s*backgroundColor:\s*bg\s*\}\}>/);
-        expect(PDF_SOURCE).not.toMatch(/\.\.\.S\.noteRow[\s\S]{0,40}wrap=\{false\}/);
+        // noteRow View'ı backgroundColor ile açılır ve wrap={false} İÇERMEZ.
+        // 2026-09-18: noteRow marka rengine bağlandı (mig.112) → `S`den `brandStyles`
+        // çıktısına (`b`) taşındı; iddia aynı, iki desen de yeni adı arar (vakum olmasın).
+        expect(PDF_SOURCE).toMatch(/\.\.\.b\.noteRow,\s*backgroundColor:\s*bg\s*\}\}>/);
+        expect(PDF_SOURCE).not.toMatch(/\.\.\.[Sb]\.noteRow[\s\S]{0,40}wrap=\{false\}/);
     });
 });
 

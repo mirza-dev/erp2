@@ -2,6 +2,7 @@
 
 // TEMA-MUAF: bu belge beyaz kağıda baskı içindir; sabit hex renkler kasıtlıdır ve
 // tema (koyu/aydınlık) değişkenlerine BAĞLANMAMALIDIR — her iki temada beyaz kağıt.
+// Marka rengi sabit DEĞİL: `company.document_accent_color` (mig.112) → `brand`.
 
 import Link from "next/link";
 import type {
@@ -12,6 +13,7 @@ import type {
     CompanySettingsRow,
 } from "@/lib/database.types";
 import type { ProductRef } from "@/lib/supabase/products";
+import { resolveDocumentAccent } from "@/lib/document-accent";
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
@@ -23,7 +25,6 @@ const C = {
     borderLight: "#e8ecf0",
     headerBg: "#f6f8fa",
     white: "#ffffff",
-    brand: "#0072BC",
     cancelledBg: "#fee2e2",
     cancelledText: "#991b1b",
     cancelledBorder: "#fca5a5",
@@ -100,6 +101,8 @@ export default function PurchaseOrderDocument({ po, vendor, company, products }:
 
     const isCancelled = po.status === "cancelled";
     const statusLabel = STATUS_LABEL[po.status];
+    // Belge vurgu rengi (mig.112): migration yoksa alan gelmez → varsayılan.
+    const brand = resolveDocumentAccent(company?.document_accent_color);
 
     return (
         <div style={{ minHeight: "100vh", background: "#eee", padding: "16px 0" }}>
@@ -126,7 +129,7 @@ export default function PurchaseOrderDocument({ po, vendor, company, products }:
                     style={{
                         fontSize: "13px", fontWeight: 500, color: "#fff",
                         padding: "6px 14px", border: "none", borderRadius: "6px",
-                        background: C.brand, cursor: "pointer",
+                        background: brand, cursor: "pointer",
                     }}
                     aria-label="Sipariş belgesini yazdır veya PDF olarak kaydet"
                 >📄 Yazdır / PDF Olarak Kaydet</button>
@@ -199,7 +202,7 @@ export default function PurchaseOrderDocument({ po, vendor, company, products }:
                 }}>
                     <div style={{
                         fontSize: "20px", fontWeight: 800, letterSpacing: "0.1em",
-                        color: C.brand, textTransform: "uppercase",
+                        color: brand, textTransform: "uppercase",
                     }}>SATIN ALMA SİPARİŞİ</div>
                     {isCancelled && (
                         <div style={{
@@ -225,7 +228,7 @@ export default function PurchaseOrderDocument({ po, vendor, company, products }:
                     {/* Left: PO meta */}
                     <div style={{ padding: "12px 14px", borderRight: `1px solid ${C.border}` }}>
                         <div style={{
-                            fontSize: "9px", fontWeight: 700, color: C.brand,
+                            fontSize: "9px", fontWeight: 700, color: brand,
                             textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "8px",
                             paddingBottom: "4px", borderBottom: `1px solid ${C.borderLight}`,
                         }}>Sipariş Bilgisi</div>
@@ -238,7 +241,7 @@ export default function PurchaseOrderDocument({ po, vendor, company, products }:
                     {/* Right: Vendor */}
                     <div style={{ padding: "12px 14px" }}>
                         <div style={{
-                            fontSize: "9px", fontWeight: 700, color: C.brand,
+                            fontSize: "9px", fontWeight: 700, color: brand,
                             textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "8px",
                             paddingBottom: "4px", borderBottom: `1px solid ${C.borderLight}`,
                         }}>Tedarikçi</div>
@@ -348,10 +351,10 @@ export default function PurchaseOrderDocument({ po, vendor, company, products }:
                                 <td style={totalValueCell(C)}>{formatPoCurrency(po.vat_total, po.currency)}</td>
                             </tr>
                             <tr>
-                                <td style={{ ...totalLabelCell(C), background: C.brand, color: C.white, fontWeight: 700 }}>
+                                <td style={{ ...totalLabelCell(C), background: brand, color: C.white, fontWeight: 700 }}>
                                     Genel Toplam
                                 </td>
-                                <td style={{ ...totalValueCell(C), background: C.brand, color: C.white, fontWeight: 700, fontSize: "12px" }}>
+                                <td style={{ ...totalValueCell(C), background: brand, color: C.white, fontWeight: 700, fontSize: "12px" }}>
                                     {formatPoCurrency(po.grand_total, po.currency)}
                                 </td>
                             </tr>
@@ -363,7 +366,7 @@ export default function PurchaseOrderDocument({ po, vendor, company, products }:
                 {po.notes && (
                     <div className="po-no-break" style={{ marginBottom: "16px" }}>
                         <div style={{
-                            fontSize: "9px", fontWeight: 700, color: C.brand,
+                            fontSize: "9px", fontWeight: 700, color: brand,
                             textTransform: "uppercase", letterSpacing: "0.1em", marginBottom: "6px",
                         }}>Notlar</div>
                         <div style={{

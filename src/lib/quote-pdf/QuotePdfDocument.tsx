@@ -10,7 +10,9 @@
  *  - İtalik TTF gömülmedi → EN alt-etiketler eğiksiz (register-fonts notu).
  *  - Sayfalama @page yerine react-pdf akışıyla; satırlar wrap={false} ile bölünmez.
  *
- * TEMA-MUAF: beyaz kağıt + PMT marka kimliği; sabit hex kasıtlı (QuoteDocument kuralı).
+ * TEMA-MUAF: beyaz kağıt + firma marka kimliği; renkler concrete hex (QuoteDocument
+ * kuralı). Marka rengi `data.accentColor`dan (mig.112) → `brandStyles(accent)`; modül
+ * düzeyindeki `S` markadan BAĞIMSIZ kalır.
  * Ölçek: HTML şablon px değerleri × 0.75 = pt (96dpi→72dpi); 210mm ≈ 595pt korunur.
  */
 import { Fragment } from "react";
@@ -23,6 +25,7 @@ import {
     formatQuoteAmount as fmt,
     formatQuoteDate as fmtDate,
 } from "@/lib/quote-document-helpers";
+import { accentTint, resolveDocumentAccent } from "@/lib/document-accent";
 
 const L = BILINGUAL_LABELS;
 
@@ -36,9 +39,8 @@ const px = (n: number) => n * 0.75;
  */
 const trUpper = (s: string) => s.toLocaleUpperCase("tr-TR");
 
+/** Marka dışı sabit palet; marka renkleri `brandStyles(accent)`ta. */
 const C = {
-    brand: "#0072BC",
-    brandBorder: "#cce3f2",
     text: "#1a1a2e",
     muted: "#64748b",
     subtle: "#94a3b8",
@@ -71,14 +73,6 @@ const S: Record<string, Style> = {
         backgroundColor: C.white,
     },
     // ── Header band ──
-    headerBand: {
-        flexDirection: "row",
-        alignItems: "center",
-        gap: px(20),
-        padding: `${px(20)} ${px(28)}`,
-        backgroundColor: C.brand,
-        color: C.white,
-    },
     logo: { width: px(96), height: px(96), objectFit: "contain", backgroundColor: C.white, borderRadius: px(6), padding: px(4) },
     logoPlaceholder: { width: px(96), height: px(96), backgroundColor: "rgba(255,255,255,0.15)", borderRadius: px(6) },
     sellerName: { fontFamily: FONT.heading, fontSize: px(17), fontWeight: 800, marginBottom: px(6), color: C.white },
@@ -87,32 +81,25 @@ const S: Record<string, Style> = {
     quoteNoChip: { fontSize: px(12), fontWeight: 600, backgroundColor: "rgba(255,255,255,0.15)", padding: `${px(4)} ${px(10)}`, borderRadius: px(4), letterSpacing: 0.4, color: C.white },
     // ── Title band ──
     titleBand: { paddingTop: px(14), paddingBottom: px(12), paddingHorizontal: px(28), alignItems: "center", borderBottomWidth: 1, borderBottomColor: C.border },
-    titleText: { fontFamily: FONT.heading, fontSize: px(20), fontWeight: 800, letterSpacing: 1.2, color: C.brand },
-    titleRule: { marginTop: px(8), height: px(2), width: "55%", backgroundColor: C.brand, borderRadius: 1, opacity: 0.55 },
     // ── Meta grid ──
     metaGrid: { flexDirection: "row", borderBottomWidth: 1, borderBottomColor: C.border },
     metaCol: { flex: 1, padding: `${px(14)} ${px(20)}` },
     metaColRight: { borderLeftWidth: 1, borderLeftColor: C.border },
-    metaSectionHead: { fontFamily: FONT.heading, fontSize: px(8), fontWeight: 700, color: C.brand, letterSpacing: 0.8, paddingBottom: px(6), borderBottomWidth: 1, borderBottomColor: C.brandBorder, marginBottom: px(8) },
     metaRow: { flexDirection: "row", gap: px(6), paddingBottom: px(5), borderBottomWidth: 0.5, borderBottomColor: C.borderLight, marginBottom: px(4) },
     metaLabelWrap: { width: px(110) },
     metaLabel: { fontSize: px(8.5), fontWeight: 600, color: C.muted, letterSpacing: 0.4 },
     metaLabelEn: { fontSize: px(7), fontWeight: 400, color: C.subtle, fontStyle: "italic" },
     metaValue: { flex: 1, fontSize: px(10), fontWeight: 500, color: C.text },
     // ── Items table ──
-    tableLabel: { padding: `${px(8)} ${px(20)} ${px(6)}`, fontFamily: FONT.heading, fontSize: px(8), fontWeight: 700, color: C.brand, letterSpacing: 0.8, backgroundColor: C.zebraEven, borderBottomWidth: 1, borderBottomColor: C.border },
     // Kenarlık YOK: ince beyaz kenarlık mavi band üzerinde react-pdf'te yeşil/cyan
     // antialiasing saçağı veriyordu. Header düz mavi band + ortalı başlık.
     th: { padding: `${px(7)} ${px(6)}`, fontSize: px(8.5), fontFamily: FONT.heading, fontWeight: 700, color: C.white, letterSpacing: 0.4, justifyContent: "center" },
     thEn: { fontSize: px(7.5), opacity: 0.65, fontStyle: "italic", fontWeight: 400, marginTop: 1, textTransform: "none" },
-    headRow: { flexDirection: "row", backgroundColor: C.brand },
     row: { flexDirection: "row" },
     td: { padding: `${px(5)} ${px(8)}`, fontSize: px(10), borderWidth: 0.5, borderColor: C.border, justifyContent: "center" },
     tableBottom: { borderBottomWidth: 1, borderBottomColor: C.border },
     // 098: satır bazlı not (ürün satırının altında tam genişlik)
-    noteRow: { borderWidth: 0.5, borderTopWidth: 0, borderColor: C.border, borderLeftWidth: 2, borderLeftColor: C.brand, paddingVertical: px(3), paddingHorizontal: px(10) },
     noteText: { fontSize: px(9), color: C.muted, lineHeight: 1.4 },
-    noteLabel: { fontWeight: 700, color: C.brand },
     // ── Totals ──
     totalsSection: { flexDirection: "row", justifyContent: "flex-end", padding: `${px(12)} ${px(20)}`, borderBottomWidth: 1, borderBottomColor: C.border },
     totalsTable: { width: px(300), borderWidth: 1, borderColor: C.border },
@@ -122,7 +109,6 @@ const S: Record<string, Style> = {
     totalValueTd: { width: px(120), padding: `${px(6)} ${px(12)}`, fontSize: px(10), fontWeight: 500, color: C.text, alignItems: "flex-end", justifyContent: "center", borderWidth: 0.5, borderColor: C.border },
     // ── Sections ──
     section: { padding: `${px(14)} ${px(20)}`, borderBottomWidth: 1, borderBottomColor: C.border },
-    sectionHead: { fontFamily: FONT.heading, fontSize: px(8), fontWeight: 700, color: C.brand, letterSpacing: 0.8, marginBottom: px(10) },
     sectionHeadEn: { fontWeight: 400, fontStyle: "italic", opacity: 0.7, textTransform: "none" },
     termsGrid: { flexDirection: "row", borderWidth: 0.5, borderColor: C.border, backgroundColor: C.zebraEven },
     termsCol: { flex: 1, padding: `${px(10)} ${px(12)}` },
@@ -139,6 +125,38 @@ const S: Record<string, Style> = {
     footerInfo: { flexDirection: "row", flexWrap: "wrap", gap: `${px(4)} ${px(14)}`, fontSize: px(8.5), color: C.muted },
     footerMeta: { flexDirection: "row", justifyContent: "space-between", marginTop: px(6), fontSize: px(7.5), color: C.subtle },
 };
+
+/**
+ * Marka rengine bağlı stiller (mig.112). Değerler, çıkarıldıkları `S` girdileriyle
+ * birebir; varsayılan renkte (#0072BC) PDF 2026-09-18 öncesiyle aynı çıkar
+ * (`accentTint(#0072BC, 0.2)` = eski `#cce3f2` sabiti).
+ */
+export function brandStyles(accent: string) {
+    const brand = resolveDocumentAccent(accent);
+    const brandBorder = accentTint(brand, 0.2);
+    return {
+        brand,
+        headerBand: {
+            flexDirection: "row",
+            alignItems: "center",
+            gap: px(20),
+            padding: `${px(20)} ${px(28)}`,
+            backgroundColor: brand,
+            color: C.white,
+        },
+        titleText: { fontFamily: FONT.heading, fontSize: px(20), fontWeight: 800, letterSpacing: 1.2, color: brand },
+        titleRule: { marginTop: px(8), height: px(2), width: "55%", backgroundColor: brand, borderRadius: 1, opacity: 0.55 },
+        metaSectionHead: { fontFamily: FONT.heading, fontSize: px(8), fontWeight: 700, color: brand, letterSpacing: 0.8, paddingBottom: px(6), borderBottomWidth: 1, borderBottomColor: brandBorder, marginBottom: px(8) },
+        tableLabel: { padding: `${px(8)} ${px(20)} ${px(6)}`, fontFamily: FONT.heading, fontSize: px(8), fontWeight: 700, color: brand, letterSpacing: 0.8, backgroundColor: C.zebraEven, borderBottomWidth: 1, borderBottomColor: C.border },
+        headRow: { flexDirection: "row", backgroundColor: brand },
+        // 098: satır bazlı not (ürün satırının altında tam genişlik)
+        noteRow: { borderWidth: 0.5, borderTopWidth: 0, borderColor: C.border, borderLeftWidth: 2, borderLeftColor: brand, paddingVertical: px(3), paddingHorizontal: px(10) },
+        noteLabel: { fontWeight: 700, color: brand },
+        sectionHead: { fontFamily: FONT.heading, fontSize: px(8), fontWeight: 700, color: brand, letterSpacing: 0.8, marginBottom: px(10) },
+    } satisfies Record<string, Style | string>;
+}
+
+type BrandStyles = ReturnType<typeof brandStyles>;
 
 function MetaRow({ label, value }: { label: { tr: string; en: string }; value: string }) {
     if (!value) return null;
@@ -175,7 +193,7 @@ function Td({ children, width, align, grow, bg, style }: {
     );
 }
 
-function ItemRow({ row, idx, sym }: { row: QuoteRow; idx: number; sym: string }) {
+function ItemRow({ row, idx, sym, b }: { row: QuoteRow; idx: number; sym: string; b: BrandStyles }) {
     const qty = parseFloat(row.qty) || 0;
     const price = parseFloat(row.price) || 0;
     const lineTotal = qty * price;
@@ -201,9 +219,9 @@ function ItemRow({ row, idx, sym }: { row: QuoteRow; idx: number; sym: string })
         {!!lineNote && (
             // 098: wrap=false YOK → uzun not sayfalara akar (kırpılmaz). Ürün
             // satırı (S.row) wrap={false} kalır = ürün satırı bütün durur.
-            <View style={{ ...S.noteRow, backgroundColor: bg }}>
+            <View style={{ ...b.noteRow, backgroundColor: bg }}>
                 <Text style={S.noteText}>
-                    <Text style={S.noteLabel}>{L.lineNote.tr} / {L.lineNote.en}: </Text>
+                    <Text style={b.noteLabel}>{L.lineNote.tr} / {L.lineNote.en}: </Text>
                     {lineNote}
                 </Text>
             </View>
@@ -212,15 +230,17 @@ function ItemRow({ row, idx, sym }: { row: QuoteRow; idx: number; sym: string })
     );
 }
 
-function TotalRow({ label, value, mutedLabel, grand }: {
+function TotalRow({ label, value, mutedLabel, grand, brand }: {
     label: { tr: string; en: string }; value: string; mutedLabel?: boolean; grand?: boolean;
+    /** Vurgu rengi — yalnız `grand` satırının zemini (mig.112). */
+    brand: string;
 }) {
     return (
         <View style={S.totalRow} wrap={false}>
             <View style={{
                 ...S.totalLabelTd,
                 ...(mutedLabel ? { color: C.subtle, fontWeight: 400 } : {}),
-                ...(grand ? { backgroundColor: C.brand, color: C.white, fontFamily: FONT.heading, fontWeight: 700, fontSize: px(11), letterSpacing: 0.3 } : {}),
+                ...(grand ? { backgroundColor: brand, color: C.white, fontFamily: FONT.heading, fontWeight: 700, fontSize: px(11), letterSpacing: 0.3 } : {}),
             }}>
                 <Text>{label.tr}</Text>
                 <Text style={{ ...S.totalLabelEn, ...(grand ? { color: C.whiteFaint } : {}) }}>{label.en}</Text>
@@ -228,7 +248,7 @@ function TotalRow({ label, value, mutedLabel, grand }: {
             <View style={{
                 ...S.totalValueTd,
                 ...(mutedLabel ? { color: C.muted } : {}),
-                ...(grand ? { backgroundColor: C.brand, color: C.white, fontSize: px(13), fontWeight: 700 } : {}),
+                ...(grand ? { backgroundColor: brand, color: C.white, fontSize: px(13), fontWeight: 700 } : {}),
             }}>
                 <Text>{value}</Text>
             </View>
@@ -237,6 +257,7 @@ function TotalRow({ label, value, mutedLabel, grand }: {
 }
 
 export default function QuotePdfDocument({ data }: { data: QuoteData }) {
+    const b = brandStyles(resolveDocumentAccent(data.accentColor));
     const sym = CURRENCY_SYMBOLS[data.currency] ?? "₺";
     const title = `${data.quoteNo || "Teklif"} — ${L.title.tr}`;
     // Ölçü + Ağırlık kolonları KALDIRILDI (Ölçü: DN ürün adında; Ağırlık: birim karşılıyor).
@@ -246,7 +267,7 @@ export default function QuotePdfDocument({ data }: { data: QuoteData }) {
             <Page size="A4" style={S.page}>
 
                 {/* ── Header band ── */}
-                <View style={S.headerBand} wrap={false}>
+                <View style={b.headerBand} wrap={false}>
                     {data.logoSrc
                         // react-pdf Image'inde alt prop'u yoktur (PDF çıktısı, DOM değil)
                         // eslint-disable-next-line jsx-a11y/alt-text
@@ -275,18 +296,18 @@ export default function QuotePdfDocument({ data }: { data: QuoteData }) {
 
                 {/* ── Title band ── */}
                 <View style={S.titleBand} wrap={false}>
-                    <Text style={S.titleText}>
+                    <Text style={b.titleText}>
                         {L.title.tr}
                         <Text style={{ color: C.border, fontWeight: 600 }}>   |   </Text>
                         <Text style={{ fontStyle: "italic", fontWeight: 600, letterSpacing: 0.6 }}>{L.title.en}</Text>
                     </Text>
-                    <View style={S.titleRule} />
+                    <View style={b.titleRule} />
                 </View>
 
                 {/* ── Meta grid ── */}
                 <View style={S.metaGrid} wrap={false}>
                     <View style={S.metaCol}>
-                        <Text style={S.metaSectionHead}>{trUpper(L.customer.tr)} <Text style={S.sectionHeadEn}>/ {L.customer.en}</Text></Text>
+                        <Text style={b.metaSectionHead}>{trUpper(L.customer.tr)} <Text style={S.sectionHeadEn}>/ {L.customer.en}</Text></Text>
                         <MetaRow label={L.company} value={data.custCompany} />
                         <MetaRow label={L.contact} value={data.custContact} />
                         <MetaRow label={L.phone} value={data.custPhone} />
@@ -294,7 +315,7 @@ export default function QuotePdfDocument({ data }: { data: QuoteData }) {
                         <MetaRow label={L.address} value={data.custAddress} />
                     </View>
                     <View style={{ ...S.metaCol, ...S.metaColRight }}>
-                        <Text style={S.metaSectionHead}>{trUpper(L.quoteDetails.tr)} <Text style={S.sectionHeadEn}>/ {L.quoteDetails.en}</Text></Text>
+                        <Text style={b.metaSectionHead}>{trUpper(L.quoteDetails.tr)} <Text style={S.sectionHeadEn}>/ {L.quoteDetails.en}</Text></Text>
                         <MetaRow label={L.salesRep} value={data.salesRep} />
                         <MetaRow label={L.phone} value={data.salesPhone} />
                         <MetaRow label={L.email} value={data.salesEmail} />
@@ -306,9 +327,9 @@ export default function QuotePdfDocument({ data }: { data: QuoteData }) {
                 </View>
 
                 {/* ── Items table ── */}
-                <Text style={S.tableLabel}>{trUpper(L.lineItems.tr)} <Text style={S.sectionHeadEn}>/ {L.lineItems.en}</Text></Text>
+                <Text style={b.tableLabel}>{trUpper(L.lineItems.tr)} <Text style={S.sectionHeadEn}>/ {L.lineItems.en}</Text></Text>
                 <View style={S.tableBottom}>
-                    <View style={S.headRow} wrap={false}>
+                    <View style={b.headRow} wrap={false}>
                         <Th label={L.rowNo} width={COL.rowNo} />
                         <Th label={L.productCode} width={COL.code} />
                         <Th label={L.leadTime} width={COL.lead} />
@@ -318,7 +339,7 @@ export default function QuotePdfDocument({ data }: { data: QuoteData }) {
                         <Th label={L.totalPrice} width={COL.total} />
                         <Th label={L.hsCode} width={COL.hs} />
                     </View>
-                    {data.rows.map((row, idx) => <ItemRow key={idx} row={row} idx={idx} sym={sym} />)}
+                    {data.rows.map((row, idx) => <ItemRow key={idx} row={row} idx={idx} sym={sym} b={b} />)}
                     {data.rows.length === 0 && (
                         <View style={S.row} wrap={false}>
                             <View style={{ ...S.td, flex: 1, alignItems: "center", padding: px(20) }}>
@@ -331,23 +352,24 @@ export default function QuotePdfDocument({ data }: { data: QuoteData }) {
                 {/* ── Totals ── */}
                 <View style={S.totalsSection} wrap={false}>
                     <View style={S.totalsTable}>
-                        <TotalRow label={L.subtotal} value={`${sym} ${fmt(data.subtotal)}`} />
+                        <TotalRow brand={b.brand} label={L.subtotal} value={`${sym} ${fmt(data.subtotal)}`} />
                         {data.discountAmount > 0 && (
-                            <TotalRow label={L.discount} value={`−${sym} ${fmt(data.discountAmount)}`} />
+                            <TotalRow brand={b.brand} label={L.discount} value={`−${sym} ${fmt(data.discountAmount)}`} />
                         )}
                         <TotalRow
+                            brand={b.brand}
                             label={{ tr: `${L.vat.tr} (${data.vatRate}%)`, en: L.vat.en }}
                             value={`${sym} ${fmt(data.vatTotal)}`}
                         />
                         {/* Toplam Ağırlık satırı KALDIRILDI — ağırlık tekliften çıkarıldı. */}
-                        <TotalRow label={L.grandTotal} value={`${sym} ${fmt(data.grandTotal)}`} grand />
+                        <TotalRow brand={b.brand} label={L.grandTotal} value={`${sym} ${fmt(data.grandTotal)}`} grand />
                     </View>
                 </View>
 
                 {/* ── Terms band (Teslimat | Geçerlilik | Ödeme) ── */}
                 {!!(data.deliveryMethod || data.validUntil || data.paymentMethod) && (
                     <View style={S.section} wrap={false}>
-                        <Text style={S.sectionHead}>{trUpper(L.termsTitle.tr)} <Text style={S.sectionHeadEn}>/ {L.termsTitle.en}</Text></Text>
+                        <Text style={b.sectionHead}>{trUpper(L.termsTitle.tr)} <Text style={S.sectionHeadEn}>/ {L.termsTitle.en}</Text></Text>
                         <View style={S.termsGrid}>
                             {[
                                 { label: L.delivery, value: data.deliveryMethod || "—", left: false },
@@ -367,7 +389,7 @@ export default function QuotePdfDocument({ data }: { data: QuoteData }) {
                 {/* ── Notes ── */}
                 {!!data.notes && (
                     <View style={S.section} wrap={false}>
-                        <Text style={S.sectionHead}>{trUpper(L.notes.tr)} <Text style={S.sectionHeadEn}>/ {L.notes.en}</Text></Text>
+                        <Text style={b.sectionHead}>{trUpper(L.notes.tr)} <Text style={S.sectionHeadEn}>/ {L.notes.en}</Text></Text>
                         <View style={S.notesBox}>
                             <Text>{data.notes}</Text>
                         </View>
@@ -376,7 +398,7 @@ export default function QuotePdfDocument({ data }: { data: QuoteData }) {
 
                 {/* ── Signatures ── */}
                 <View style={{ ...S.section, paddingBottom: px(22) }} wrap={false}>
-                    <Text style={S.sectionHead}>{trUpper(L.signatures.tr)} <Text style={S.sectionHeadEn}>/ {L.signatures.en}</Text></Text>
+                    <Text style={b.sectionHead}>{trUpper(L.signatures.tr)} <Text style={S.sectionHeadEn}>/ {L.signatures.en}</Text></Text>
                     <View style={S.sigGrid}>
                         {data.signatures.map((sig, i) => (
                             <View key={i} style={S.sigCol}>

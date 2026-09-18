@@ -132,7 +132,7 @@ describe("GATE — form ve başlık tipografisi", () => {
         "src/app/dashboard/error.tsx":
             "panel hata sınırı — bölüm başlığı değil, sayfanın yerine geçen hata mesajı",
         "src/app/dashboard/quotes/_components/QuoteForm.tsx":
-            "bastığı PDF'in EKRAN İKİZİ: iki bölüm başlığı marka mavisini (#0072BC) QuoteDocument'in metaSectionHeadStyle'ı ile paylaşır; griye çevirmek ekran-belge aynasını kırardı",
+            "bastığı PDF'in EKRAN İKİZİ: iki bölüm başlığı belge vurgu rengini (`docAccent`, firma ayarı mig.112) QuoteDocument'in metaSectionHeadStyle'ı ile paylaşır; griye çevirmek ekran-belge aynasını kırardı",
     };
 
     it("elle yazılmış bölüm başlığı YALNIZ belgelenmiş istisnalarda olabilir", () => {
@@ -150,7 +150,7 @@ describe("GATE — form ve başlık tipografisi", () => {
         }
     });
 
-    it("`QuoteForm`un h2 istisnası BLANKET değil — yalnız belge ikizinin marka mavisi", () => {
+    it("`QuoteForm`un h2 istisnası BLANKET değil — yalnız belge ikizinin vurgu rengi", () => {
         // Bir dosyayı `H2_EXCEPTIONS`a koymak, o dosyanın TAMAMINI kuralın
         // dışına çıkarır. `QuoteForm` 2000 satır: istisna böyle bırakılırsa
         // yarın oraya yazılacak herhangi bir elle başlık da sessizce geçerdi.
@@ -165,8 +165,10 @@ describe("GATE — form ve başlık tipografisi", () => {
         const manual = [...code.matchAll(/<h2\s[^>]*style=\{/g)]
             .map(m => code.slice(m.index, code.indexOf(">", m.index) + 1));
         expect(manual.length, "elle yazılmış h2 kalmamış — istisna vacuous").toBeGreaterThan(0);
+        // İmza 2026-09-18'de sabit `#0072BC`den `docAccent`e döndü: renk artık firma
+        // ayarı (mig.112). İddia aynı: elle h2 YALNIZ belge ikizinin vurgu başlığı.
         for (const tag of manual) {
-            expect(tag, `belge ikizi imzası taşımayan elle h2: ${tag.slice(0, 90)}`).toContain("#0072BC");
+            expect(tag, `belge ikizi imzası taşımayan elle h2: ${tag.slice(0, 90)}`).toContain("color: docAccent");
         }
         // Mavi OLMAYAN başlıklar gerçekten ortak bileşene gitti.
         expect(code, `${rel}: SectionHeader kullanılmıyor`).toMatch(/<SectionHeader\b/);

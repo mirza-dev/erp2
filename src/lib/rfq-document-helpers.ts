@@ -30,6 +30,8 @@ export interface RfqDocData {
     sellerTaxId: string;
     sellerWeb: string;
     logoSrc: string | null;
+    /** mig.112 — belge vurgu rengi; eksikse `resolveDocumentAccent` varsayılana düşer. */
+    accentColor?: string;
 
     // Bu belgenin gönderildiği tedarikçi
     vendorName: string;

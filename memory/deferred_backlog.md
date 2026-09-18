@@ -226,13 +226,19 @@ Dört dilim: `98a755c` → `7f95ff8` → `8b9453f` → Dilim 3 (E2E + cache fix)
   · Traefik X-Real-IP.
 - `ANTHROPIC_API_KEY` 401 → AI eşleştirme/copilot/ops-summary/sesli giriş ölü.
 - Supabase panel: signups OFF · Redirect URLs (parola sıfırlama + OAuth callback) · Google provider.
+- **mig.112 APPLY (canlı)** — Studio › SQL Editor'de YALNIZ `112_document_accent_color.sql`
+  (`supabase db push` KOŞMA: 111 migration elle uygulandı, CLI geçmişi boş sanır). Uygulanınca
+  Ayarlar › Firma › Belge Rengi kendiliğinden açılır; doğrulama `docs/audit/manual-migration-checks.sql`
+  112 satırı (kolon + CHECK).
 - Paraşüt: API başvurusu · `parasut:gate --write` · go-live ilk hafta iki sayaç.
 - `/gizlilik` 3 köşeli parantez + hukuk onayı · teklif e-posta smoke (Gmail/Outlook) · PMT pilot haftası.
 - Marka oturumunun iki notu: (b) e-posta `COLORS.accent` → **Roven mavisi `#123f73` ✅ (kullanıcı
   kararı 2026-09-18**; `accentSoft #e7ecf1`; kilit `email-internal-templates.test.ts`; yalnız
   Roven markalı iç bildirimler etkilenir — müşteri teklif e-postası accent kullanmaz). (a)
-  `QuoteDocument` `C.brand = "#0072BC"` (teklif belgesindeki PMT mavisi; 4 yerde sabit:
-  `QuoteDocument.tsx` ×3 · `QuoteForm.tsx` ×2 · `globals.css` ×3 baskı) → ikinci müşteri
-  gelirse `company_settings` kolonu + Ayarlar renk alanı gerekir; **karar AÇIK** (PMT tek müşteriyken sabit kalabilir).
+  belge vurgu rengi (`#0072BC`, 8 dosyada sabitti) → **KAPANDI 2026-09-18**: `company_settings.
+  document_accent_color` (**mig.112**) + Ayarlar › Firma › Belge Rengi; varsayılan AYNI renk, PMT'nin
+  belgelerinde tek piksel değişmez. Tek kaynak `src/lib/document-accent.ts`, kapı
+  `gate/document-accent-single-source`. **Canlıda mig.112 UYGULANANA KADAR** alan kilitli
+  görünür (GET kolonu hiç döndürmez) ve PATCH 409 der — kod kırılmaz.
 - Yerel: `colima`/`supabase` işi bitince `supabase stop && colima stop`; Playwright cache'ini
   silen dış süreç bulunmalı (`~/Library/Caches/ms-playwright` iki kez silindi).

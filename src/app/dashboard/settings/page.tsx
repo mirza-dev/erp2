@@ -42,6 +42,8 @@ import {
 } from "@/lib/settings-tabs";
 import { checkPasswordPolicy } from "@/lib/auth/password-policy";
 import SectionHeader from "@/components/ui/SectionHeader";
+import DocumentAccentField from "@/components/settings/DocumentAccentField";
+import { DEFAULT_DOCUMENT_ACCENT, resolveDocumentAccent, validateDocumentAccent } from "@/lib/document-accent";
 
 const settingsTabIcons: Record<SettingsTab, LucideIcon> = {
     firma: Building2,
@@ -105,6 +107,8 @@ const initialFirmaForm = {
     // Kolonlar 073'ten beri vardı ama arayüzü yoktu (2026-08-29'da eklendi).
     quoteNumberPrefix: "TKL",
     quoteNumberSeparator: "-",
+    // mig.112 — belge vurgu rengi (teklif / satın alma siparişi / fiyat talebi).
+    documentAccent: DEFAULT_DOCUMENT_ACCENT,
 };
 
 /** Ayraç seçenekleri — API'deki QUOTE_SEPARATORS kümesiyle birebir. */
@@ -137,6 +141,9 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
     const [logoDragging, setLogoDragging] = useState(false);
     const [logoUploading, setLogoUploading] = useState(false);
     const [fieldErrors, setFieldErrors] = useState<Partial<Record<keyof typeof initialFirmaForm, string>>>({});
+    // mig.112 uygulanmamış DB'de (canlı `dev:live`) GET yanıtında anahtar hiç yoktur →
+    // alan kilitlenir; açık kalsaydı kaydetme 409'a düşerdi.
+    const [accentSupported, setAccentSupported] = useState(true);
     const logoFileRef = useRef<HTMLInputElement>(null);
 
     // Yükle: DB'den mevcut ayarları çek
@@ -158,7 +165,9 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
                     quoteValidityDays: String(s.quote_validity_days ?? 30),
                     quoteNumberPrefix: s.quote_number_prefix ?? "TKL",
                     quoteNumberSeparator: s.quote_number_separator ?? "-",
+                    documentAccent: resolveDocumentAccent(s.document_accent_color),
                 };
+                setAccentSupported("document_accent_color" in s);
                 setForm(loaded);
                 savedRef.current = loaded;
                 if (s.logo_url) {
@@ -170,8 +179,8 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
             .finally(() => setIsLoading(false));
     }, []);
 
-    const set = (key: keyof typeof initialFirmaForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const next = { ...form, [key]: e.target.value };
+    const applyField = (key: keyof typeof initialFirmaForm, value: string) => {
+        const next = { ...form, [key]: value };
         setForm(next);
         const dirty = JSON.stringify(next) !== JSON.stringify(savedRef.current);
         setIsDirty(dirty);
@@ -179,6 +188,9 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
         // Tek alanda yazarken sadece o alanın hatasını temizle (diğer hatalar görünür kalır)
         if (fieldErrors[key]) setFieldErrors(p => ({ ...p, [key]: undefined }));
     };
+
+    const set = (key: keyof typeof initialFirmaForm) => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+        applyField(key, e.target.value);
 
     const validate = (): boolean => {
         const errors: Partial<Record<keyof typeof initialFirmaForm, string>> = {};
@@ -198,6 +210,12 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
         }
         if (!QUOTE_SEPARATOR_OPTIONS.includes(form.quoteNumberSeparator as typeof QUOTE_SEPARATOR_OPTIONS[number])) {
             errors.quoteNumberSeparator = "Ayraç - . _ / karakterlerinden biri olmalı.";
+        }
+        // mig.112 — API ile aynı kural (biçim + beyaz yazı okunabilirliği). Yalnız
+        // DEĞİŞTİYSE: gönderilmeyen alan doğrulanmaz (aşağıdaki handleSave notu).
+        if (form.documentAccent !== savedRef.current.documentAccent) {
+            const accentError = validateDocumentAccent(form.documentAccent);
+            if (accentError) errors.documentAccent = accentError;
         }
         setFieldErrors(errors);
         return Object.keys(errors).length === 0;
@@ -225,6 +243,11 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
                     quote_validity_days: Number(form.quoteValidityDays),
                     quote_number_prefix: form.quoteNumberPrefix.trim(),
                     quote_number_separator: form.quoteNumberSeparator,
+                    // mig.112 — yalnız DEĞİŞTİYSE gönderilir: migration'ı uygulanmamış bir
+                    // DB'de kolonu her kayıtta yollamak firma bilgisi kaydını da 409'a düşürürdü.
+                    ...(form.documentAccent !== savedRef.current.documentAccent
+                        ? { document_accent_color: form.documentAccent }
+                        : {}),
                 }),
             });
             if (!res.ok) {
@@ -383,6 +406,14 @@ function FirmaTab({ onDirtyChange }: { onDirtyChange?: (d: boolean) => void }) {
                     </div>
                 </button>
             </div>
+
+            <DocumentAccentField
+                value={form.documentAccent}
+                onChange={(next) => applyField("documentAccent", next)}
+                supported={accentSupported}
+                error={fieldErrors.documentAccent}
+                companyName={form.name}
+            />
 
             {/* Fields grid */}
             <div>

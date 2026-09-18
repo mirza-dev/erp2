@@ -1,5 +1,6 @@
 import { createServiceClient } from "./service";
 import type { CompanySettingsRow } from "@/lib/database.types";
+import { CompanySettingsColumnMissingError } from "@/lib/company-settings-schema";
 
 export async function dbGetCompanySettings(): Promise<CompanySettingsRow | null> {
     const sb = createServiceClient();
@@ -19,6 +20,11 @@ export async function dbUpdateCompanySettings(
     const sb = createServiceClient();
     const current = await dbGetCompanySettings();
     if (!current) throw new Error("company_settings satırı bulunamadı");
+    // `select("*")` o an var olan her kolonu döndürür (NULL olanlar dahil) → patch'teki
+    // bir anahtar satırda yoksa kolon YOK: migration canlıya henüz uygulanmamış.
+    // Yazmayı denemek PGRST204 → 500 olurdu; route bunu 409 + migration adıyla basar.
+    const missing = Object.keys(patch).filter((key) => !(key in current));
+    if (missing.length > 0) throw new CompanySettingsColumnMissingError(missing);
     const { data, error } = await sb
         .from("company_settings")
         .update({ ...patch, updated_at: new Date().toISOString() })
