@@ -12,8 +12,15 @@
  * Chromium tam CSS + gömülü woff2 ile aynı görseli her makinede üretir.
  *
  * Metinler `docs/brand/roven-marka-rehberi.md` §1.3 / §8'den; renkler §4.4
- * tema-muaf sabitleri (`scripts/brand-mark.ts`). Görselde ürün ekranı YOK
- * (gerçek veri sızmasın — manifest `screenshots`'ın atlanma gerekçesi).
+ * tema-muaf sabitleri (`scripts/brand-mark.ts`). Bu görselde ürün ekranı
+ * YOK — OG kartı küçük boyutta paylaşılır, ekran görüntüsü orada okunmaz.
+ *
+ * Politika notu (2026-09-19): "ürün ekranı yayınlanmaz, gerçek veri sızar"
+ * kuralı artık MUTLAK değil. Landing gerçek ürün ekranları gösteriyor, ama
+ * yalnız `npm run shots` (scripts/build-product-shots.ts) üzerinden: yerel
+ * veritabanında adlar kurgusallaştırılır, veritabanı VE ekrandaki metin
+ * yasak adlara karşı taranır, bulunursa görsel yazılmaz. Elle alınmış bir
+ * ekran görüntüsü yayınlanmaz (rehber §1.5).
  *
  * Kullanım: npm run og:image
  *   İsteğe bağlı: PLAYWRIGHT_CHROMIUM_PATH=<chrome-headless-shell yolu>

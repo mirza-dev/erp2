@@ -57,13 +57,20 @@ Pazarlama metni **yalnız canlı olanı** düz cümleyle vaat eder; anahtara/ent
 | Kural tabanlı uyarılar (9 tip) + takvim | CANLI | düz vaat |
 | Yapay zekâ bulguları / satın alma kopilotu | anahtara bağlı | koşullu |
 | Satın alma önerisi (deterministik motor) | CANLI | düz vaat |
-| Teklif → sipariş → rezervasyon | CANLI | düz vaat |
+| Teklif → sipariş → rezervasyon | CANLI — rezervasyon teklif **gönderilince** (mig.088), kabulde değil | düz vaat |
 | Teklif PDF e-postası | CANLI (`EMAIL_FROM` ister) | düz vaat |
 | Paraşüt entegrasyonu | kod tamam, teslim KAPALI | "hazır, isteğe bağlı açılır" — asla "otomatik akar" deme |
 | PWA, koyu/aydınlık tema, 6 rol, yedek/geri yükleme | CANLI | düz vaat |
 | Davetle kullanıcı açma · 8 adımlı kurulum rehberi + pano bandı · Ayarlar › Sistem Durumu kartı | **DALDA** (`worktree-onboarding`, ERP EKSİKLER ajanı, 2026-09-17) — main'e girmedi | **henüz yazılmaz**; merge olunca "düz vaat"e çekilir ve SSS "Kurulum ne kadar sürer?" cevabı 5 → 8 adıma güncellenir |
 
 Yeni bir vaat eklemeden önce bu tablo güncellenir; tablo yoksa vaat de yoktur.
+
+**Ürün ekran görüntüsü ve referans kuralları (2026-09-19):**
+
+- Pazarlamada gösterilen her ürün ekranı **yalnız `npm run shots` ile** üretilir (`scripts/build-product-shots.ts`). Script yalnız yerel veritabanına yazar, firma/cari/tedarikçi adlarını kurgusal adlarla değiştirir, veritabanını **ve ekranda görünen metni** `src/lib/marketing/forbidden-names.ts` listesine karşı tarar; eşleşme varsa görsel yazılmaz. **Elle alınmış ekran görüntüsü yayınlanmaz** — ilk çekimlerde gerçek ad dört ayrı yoldan sızdı (donmuş teklif künyesi, serbest metin, ASCII e-posta alan adı, ürün üzerindeki tedarikçi adı kopyası).
+- Seed verisindeki gerçek firma adları (Tüpraş, Abdi İbrahim, Enerjisa, Ülker, Star Rafineri, Botaş…) hiçbir pazarlama yüzeyinde geçmez: bu, o firmaların Roven müşterisi olduğu iddiası olurdu.
+- **Referans / vaka bloğu:** pilot işletmenin adı ve rakamları **yalnız yazılı izinle** yayınlanır. İzin gelene kadar `landing-content.ts` → `proof.named: false`, `company: null`, `stats: []`; `marketing-landing.test.ts` bunu kilitler. İzin gelince tek veri nesnesi değişir.
+- Rakip ERP firma adı (Netsis, Logo, Wolvox, Mikro…) vitrin metninde geçmez; karşılaştırma **Excel**'e karşı yapılır (asıl rakip, satış kiti).
 
 ---
 
