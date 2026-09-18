@@ -15,7 +15,6 @@ import {
     ScanLine,
     FileText,
     Bell,
-    Boxes,
     RefreshCw,
     Sparkles,
 } from "lucide-react";
@@ -30,36 +29,40 @@ export const modules = [
     "Uyarılar",
 ];
 
-export const features = [
-    {
-        icon: ScanLine,
-        title: "Excel’ini Bırak, Sistem Eşleştirsin",
-        desc: "Ürün, cari ve stok listeni sürükle bırak — kolonlar otomatik eşleşir, eşleşmeyi bir kez onaylarsın, sistem hatırlar. Yapay zeka anahtarı tanımlıysa PDF ve görsel belgeleri de okur.",
-    },
+/** Özellikler — ikisi büyük ve gerçek ekran görüntülü, üçü küçük kart.
+ *  Stok özelliği burada yok: sayfanın kalbi olan `#rezervasyon` bloğu onu anlatır. */
+export const featuresBig = [
     {
         icon: FileText,
-        title: "Teklif → PDF → E-posta",
-        desc: "Profesyonel teklifi tek tıkla hazırla, müşteriye PDF olarak gönder. Kabul edilince sipariş ve stok rezervasyonu otomatik oluşur.",
-    },
-    {
-        icon: Boxes,
-        title: "Gerçek Zamanlı Stok",
-        desc: "Fiziksel stok, rezerve, satılabilir ve yoldaki mal tek bakışta. Aynı stoğu iki kez satma riski yok — sistem rezervasyonu yönetir.",
+        kicker: "Teklif",
+        title: "Teklif → PDF → e-posta, tek ekrandan",
+        desc: "Antetli, iki dilli teklifi hazırla; müşteriye PDF eki olarak gönder. Gönderildiği an stok rezerve olur, kabul edilince sipariş onaylanır. Revizyonlar zincir hâlinde saklanır — hangi sürümün gönderildiği hep bellidir.",
+        shot: { src: "/shots/teklif.png", alt: "Roven teklif detay ekranı: satıcı anteti, müşteri bilgisi ve teklif künyesi" },
     },
     {
         icon: Bell,
-        title: "Uyarı Takvimi",
-        desc: "Kritik stok, geciken sevkiyat, süresi dolan teklif, vadesi gelen satın alma — dokuz uyarı tipi takvimde, sen fark etmeden önce. Kendi notunu ve hatırlatmanı da aynı takvime yazarsın.",
+        kicker: "Uyarılar",
+        title: "Riskler takvimde, sen fark etmeden önce",
+        desc: "Kritik stok, geciken sevkiyat, süresi dolan teklif, vadesi geçen satın alma — dokuz kural tabanlı uyarı tipi tek takvimde. Kendi notunu ve hatırlatmanı da aynı takvime yazarsın.",
+        shot: { src: "/shots/uyarilar.png", alt: "Roven uyarı takvimi: ay görünümü ve seçili günün kritik uyarıları" },
     },
+];
+
+export const featuresSmall = [
     {
-        icon: RefreshCw,
-        title: "Paraşüt’e Hazır",
-        desc: "Sevk edilen sipariş faturaya, mal kabul alış faturasına, tahsilat durumu panoya — Paraşüt bağlantısı hazır, tek ayarla açılır. Çift veri girişi biter.",
+        icon: ScanLine,
+        title: "Excel’ini bırak, sistem eşleştirsin",
+        desc: "Ürün, cari ve stok listeni sürükle bırak — kolonlar eşleşir, eşleşmeyi bir kez onaylarsın, sistem hatırlar. Yapay zeka anahtarı tanımlıysa PDF ve görsel belgeleri de okur.",
     },
     {
         icon: Sparkles,
-        title: "Satın Alma Önerileri",
+        title: "Satın alma önerileri",
         desc: "Tüketim hızı, tedarik süresi ve açık siparişlerden neyi ne zaman sipariş etmen gerektiği hesaplanır; tedarikçilerden fiyat toplar, kazananı tek tıkla siparişe çevirirsin.",
+    },
+    {
+        icon: RefreshCw,
+        title: "Paraşüt’e hazır",
+        desc: "Satış ve alış faturası, tahsilat durumu, stok mutabakatı — Paraşüt bağlantısı hazır, isteğe bağlı açılır. Açıldığında aynı bilgiyi iki kez girmezsin.",
     },
 ];
 
@@ -81,15 +84,6 @@ export const steps = [
     },
 ];
 
-// Hero ürün-mock'unda kullanılan veriler tamamen kurgusaldır (gerçek müşteri DEĞİL).
-export const mockOrders = [
-    { no: "ORD-2041", name: "Anadolu Makine A.Ş.", status: "Onaylı", tone: "success" },
-    { no: "ORD-2040", name: "Ege Mobilya Sanayi", status: "Rezerve", tone: "warning" },
-    { no: "ORD-2039", name: "Marmara Gıda Dağıtım", status: "Sevk", tone: "accent" },
-    { no: "ORD-2038", name: "Toros Ambalaj Ltd.", status: "Bekliyor", tone: "muted" },
-];
-
-export const mockBars = [38, 54, 41, 67, 49, 72, 60, 84];
 
 // Geniş KOBİ konumlandırması (marka rehberi §0/§1.2): sektör örnekleri
 // vana/endüstri vurgusundan çıkarıldı; her satır ürünün gerçekten kapsadığı bir
@@ -125,6 +119,14 @@ export const faqs = [
     {
         q: "Kim neyi görür?",
         a: "Altı rol: yönetici, satış, satın alma, üretim, muhasebe, izleyici. Fiyat ve maliyet alanları yetkisi olmayana hiç gönderilmez; her değişiklik kimin yaptığıyla birlikte kayıt altındadır.",
+    },
+    {
+        q: "Kaç kullanıcı ekleyebiliriz?",
+        a: "Sınır yok. Ücret kullanıcı ya da modül sayısına göre değil, kurulum ve yıllık bakım olarak alınır; ekibiniz büyüdükçe fatura büyümez.",
+    },
+    {
+        q: "Mevcut programımızdan geçebilir miyiz?",
+        a: "Evet. Ürün, cari, tedarikçi ve açılış stoğu Excel ile aktarılır — çoğu programın dışa aktarımı bu listeleri verir. Geçmiş sipariş ve fatura göçü Dönüşüm paketinde proje olarak yapılır.",
     },
 ];
 
@@ -235,4 +237,105 @@ export const carePlans = [
     { name: "Temel", price: "24.000", desc: "Barındırma, günlük yedek, güncellemeler, e-posta desteği (2 iş günü)." },
     { name: "Öncelikli", price: "42.000", desc: "Telefon ve WhatsApp desteği, aynı iş günü yanıt, aylık 4 saat uzaktan destek, çeyreklik sağlık kontrolü." },
     { name: "Ortak", price: "72.000", desc: "4 saat yanıt, aylık 8 saat geliştirme kotası, yeni özelliklerde öncelik." },
+];
+
+/** Hero — birincil eylem görüşme, demo ikincil (fiyat bandı görüşmeyle kapanır). */
+export const hero = {
+    eyebrow: "Yapay zeka destekli ERP",
+    // " an" bölünmez boşlukla bağlı: yoksa "an," tek başına satıra düşüyordu.
+    titleLead: "Teklifi gönderdiğin\u00a0an,",
+    titleAccent: "stok ayrılır.",
+    sub: "Teklif, sipariş, stok, üretim ve satın alma tek zincirde. Aynı malı iki müşteriye satmak artık mümkün değil — sistem rezervasyonu kendisi yönetir.",
+    trust: ["Kurulum bir öğleden sonra", "Kullanıcı başına ücret yok", "Veritabanı size ait"],
+    shot: { src: "/shots/dashboard.png", alt: "Roven Genel Bakış ekranı: çeyreklik ciro, açık siparişler, teklif hattı ve stok değeri" },
+};
+
+/**
+ * Vaka bloğu (`#referans`).
+ *
+ * KURAL: `named` yalnız pilot işletmenin YAZILI izniyle `true` olur. O güne
+ * kadar sayfa firma adı da rakam da basmaz — gerçek bir firma hakkında izinsiz
+ * iddia yayınlanmaz. `marketing-landing.test.ts` bunu kilitler: `named:false`
+ * iken `company` ve `stats` boş olmalı.
+ */
+export const proof: {
+    named: boolean;
+    company: string | null;
+    statement: string;
+    stats: { value: string; label: string }[];
+} = {
+    named: false,
+    company: null,
+    statement:
+        "Roven, endüstriyel ürün satan ve üreten bir işletmenin gerçek teklif, sipariş ve stok süreçleriyle birlikte geliştirildi. Her ekran, bir satış ekibinin gün içinde gerçekten yaşadığı bir sorundan çıktı.",
+    stats: [],
+};
+
+/** Vaka isimsizken yanında duran, ürünün KENDİSİ hakkındaki doğrulanabilir gerçekler. */
+export const productFacts = [
+    { value: "9", label: "kural tabanlı uyarı tipi" },
+    { value: "6", label: "rol, alan bazlı fiyat yetkisi" },
+    { value: "1", label: "işletmeye 1 ayrı veritabanı" },
+    { value: "0", label: "kullanıcı başına ücret" },
+];
+
+/** Vurucu an (`#rezervasyon`) — ürünün tekil mekanizması. */
+export const reservationChain = [
+    { no: "01", title: "Teklifi gönderdin", desc: "Müşteriye PDF gitti; teklifteki kalemler için bekleyen bir sipariş açıldı." },
+    { no: "02", title: "Stok rezerve edildi", desc: "O miktar satılabilir stoktan düştü. Yetmiyorsa eksik kısım açıkça işaretlenir." },
+    { no: "03", title: "İkinci satışçı aynı malı göremez", desc: "Başka bir teklif yalnız kalan stoğu görür. Teklif reddedilirse rezervasyon kendiliğinden çözülür." },
+];
+
+export const reservationShot = {
+    src: "/shots/stok.png",
+    alt: "Roven Stok & Ürünler listesi: fiziksel stok, satılabilir miktar, kritik ürünler kırmızı",
+    caption: "Stok & Ürünler — “Stok” fiziksel miktar, “Satılabilir” rezervasyonlar düşülmüş hâli. Kırmızı satırlar minimum stoğun altında.",
+};
+
+/** Excel'e karşı (`#excel`) — rakip firma adı geçmez; asıl rakip tablo dosyası. */
+export const excelRows = [
+    { excel: "Aynı stoğu iki kişi aynı anda satabilir", roven: "Teklif gönderilince stok rezerve olur" },
+    { excel: "Kim, ne zaman değiştirdi belli değil", roven: "Her değişiklik kimin yaptığıyla kayıtlı" },
+    { excel: "Teklif revizyonu = yeni bir dosya", roven: "Revizyon zinciri; hangi sürüm gönderildi belli" },
+    { excel: "Fiyatı dosyayı açan herkes görür", roven: "Fiyat ve maliyet yetkisi olmayana hiç gönderilmez" },
+    { excel: "Yedek = birinin masaüstü", roven: "Günlük yedek; geri yükleme prova edildi" },
+];
+
+/** Neden Roven (`#neden`) — üç YAPISAL fark (özellik değil, model). */
+export const whyPoints = [
+    {
+        title: "Kullanıcı başına ücret yok",
+        desc: "Kurulum bir kez, bakım yılda bir. Ekibe yeni kişi katıldığında ya da yeni bir modül açtığınızda fatura değişmez.",
+    },
+    {
+        title: "Veritabanı sizin adınıza açılır",
+        desc: "Her işletme için ayrı bir veritabanı kurulur; başka bir firmayla aynı tabloyu paylaşmazsınız. Tam yedeğiniz her zaman alınabilir.",
+    },
+    {
+        title: "Kurulum bir öğleden sonra",
+        desc: "Elinizdeki Excel listeleriyle. Kurulum paneli adımları sırayla gösterir; aylar süren bir devreye alma projesi değil.",
+    },
+];
+
+/**
+ * Sınırlar (`#sinirlar`) — her madde "ama şu var" ile dengelenir.
+ * Paraşüt dili §1.5: "hazır, isteğe bağlı açılır" — asla otomatik akış vaadi.
+ */
+export const limits = [
+    {
+        no: "e-Fatura ve e-Arşiv kesmez.",
+        but: "Fatura Paraşüt’e gönderilir, e-belge orada kesilir — bağlantı hazır, isteğe bağlı açılır.",
+    },
+    {
+        no: "Resmî muhasebe ve beyanname yapmaz.",
+        but: "Mali müşavirinizin işini almıyoruz; ona temiz, eksiksiz veri veriyoruz.",
+    },
+    {
+        no: "App Store’da değil.",
+        but: "Telefonun ana ekranına uygulama gibi eklenir; tüm ekranlar mobilde çalışır.",
+    },
+    {
+        no: "Sınırsız özelleştirme değil.",
+        but: "Özel alan ve rapor tasarımı Dönüşüm paketinde, proje olarak yapılır.",
+    },
 ];

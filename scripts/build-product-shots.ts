@@ -44,6 +44,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { chromium, type Page } from "@playwright/test";
+import { FORBIDDEN_REAL_NAMES, containsForbiddenName } from "../src/lib/marketing/forbidden-names";
 
 // .env.local'ı elle yükle (backup.ts / check-migrations.ts deseni — dotenv yok)
 const ROOT = process.cwd();
@@ -107,39 +108,9 @@ const FICTIONAL_VENDORS = [
     "Yamaç Çelik San.",
 ];
 
-/**
- * Yayınlanan görselde ASLA görünmemesi gereken adlar.
- *
- * `seed-data.ts`'ten birebir alındı. Burada ikinci kez yazılmaları bilinçli:
- * seed dosyası değişse bile bu liste bir DENETİM kaydıdır — "şu adlar bir kez
- * veritabanındaydı" bilgisini taşır. `marketing-landing.test.ts` bu listeyi
- * `public/shots/` dosya adlarına ve `page.tsx`e karşı kilitler.
- */
-export const FORBIDDEN_REAL_NAMES = [
-    "Tüpraş",
-    "Abdi İbrahim",
-    "Enerjisa",
-    "Ülker",
-    "Star Rafineri",
-    "Botaş",
-    "Langge",
-    "Bulonsan",
-    "PMT",
-    "pmtendustriyel",
-    // ASCII yazımlar — e-posta ve alan adlarında diakritik düşer
-    // (`malzeme@botas.example.com` ilk denetimden geçip görsele düşmüştü).
-    "botas",
-    "tupras",
-    "ulker",
-    "abdibrahim",
-    "starrafineri",
-];
-
-/** Yasak listesiyle karşılaştırma: büyük/küçük harften bağımsız. */
-export function containsForbiddenName(text: string): boolean {
-    const low = text.toLowerCase();
-    return FORBIDDEN_REAL_NAMES.some((bad) => low.includes(bad.toLowerCase()));
-}
+// Yasak ad listesi ortak modülde — landing testi de aynı listeyi kullanır.
+// Script yüklenince main() koştuğu için liste buradan export edilemez.
+export { FORBIDDEN_REAL_NAMES };
 
 /* ────────────────────────────────────────────────────────────────────────
    Kapı
@@ -500,6 +471,13 @@ const SWEPT_TABLES = [
     "quotes",
     "sales_orders",
     "quote_line_items",
+    // Tedarikçi adı ürün ve satın alma kayıtlarında DA kopyalanıyor
+    // (`products.preferred_vendor` metin kolonu). İlk süpürme bunu kaçırdı;
+    // ekrandaki metni tarayan son kapı panoda "Langge" yakaladı.
+    "products",
+    "purchase_orders",
+    "supplier_rfqs",
+    "ai_recommendations",
 ] as const;
 
 async function sweepForbiddenText(): Promise<void> {
@@ -546,7 +524,7 @@ async function assertNoRealNames(): Promise<void> {
     // yok diye patladı, `quotes.seller_*` ise hiç listeye alınmamıştı ve
     // gerçek firma künyesi doğrulamadan geçip görsele düştü. Bir denetimin
     // kapsamı, denetçinin hatırladığı kolonlar kadar olmamalı.
-    for (const table of ["customers", "vendors", "company_settings", "quotes", "sales_orders"]) {
+    for (const table of SWEPT_TABLES) {
         collect(await rest<Record<string, unknown>[]>(`${table}?select=*`));
     }
 
@@ -838,6 +816,25 @@ async function main(): Promise<void> {
             if (shot.prepare) await shot.prepare(page);
 
             await page.addStyleTag({ content: HIDE_DEV_CHROME });
+
+            // SON KAPI — ekranda GÖRÜNEN metin taranır, veritabanı değil.
+            //
+            // Veritabanı denetimi (assertNoRealNames) yetmedi: 2026-09-19'da
+            // port 3100'ü başka bir checkout'un sunucusu devraldı; o kodda firma
+            // adı hâlâ koda gömülüydü ve pano "PMT Endüstriyel" basarak çekildi —
+            // veritabanı tertemizken. Görsele ne girdiğini yalnız görselin
+            // kaynağı söyler. Bulursa dosyayı YAZMADAN durur.
+            const visible = await page.evaluate(() => document.body.innerText);
+            if (containsForbiddenName(visible)) {
+                const hit = FORBIDDEN_REAL_NAMES.find((n) =>
+                    visible.toLocaleLowerCase("tr-TR").includes(n.toLocaleLowerCase("tr-TR")),
+                );
+                fail(
+                    `${shot.file}: ekranda gerçek firma adı görünüyor ("${hit}") — görsel yazılmadı.\n` +
+                        `Sunucu gerçekten BU worktree'nin mi? (${APP_URL})`,
+                );
+            }
+
             const png = await page.screenshot({ type: "png" });
             writeFileSync(join(OUT_DIR, shot.file), png);
             console.log(`[shots] ✓ ${shot.file}  ←  ${route}  (${shot.label})`);
