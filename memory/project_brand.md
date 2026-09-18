@@ -1,6 +1,6 @@
 ---
 name: project_brand
-description: Roven marka + pazarlama (2026-09-15/18) — geniş KOBİ konumu, isim/domain kararı, Akış Altıgeni logosu, fiyat modeli (kurulum + yıllık bakım), landing satış hunisi (fiyat/form/SEO), /rehber içerikleri, satış kiti
+description: Roven marka + pazarlama (2026-09-15/18) — geniş KOBİ konumu, isim/domain kararı, Akış Altıgeni logosu, fiyat modeli (kurulum + yıllık bakım), landing satış hunisi (fiyat/form/SEO), /rehber içerikleri, satış kiti; 2026-09-19 landing yeniden kurgu + `npm run shots` fail-closed ekran görüntüsü boru hattı + isimsiz PMT vaka kapısı
 metadata:
   type: project
 ---
@@ -34,6 +34,16 @@ metadata:
 **`/rehber`** — üç Türkçe yazı (ERP fiyatları · Excel'den geçiş · stok rezervasyonu). İçerik VERİ (`lib/marketing/articles.ts`), MDX değil; vurgu `**…**` → `<strong>` React elemanı, `dangerouslySetInnerHTML` YOK → içerik dosyası etiket üretemez (testle kilitli). `page.tsx`in CSS'i `marketing-css.ts`e taşındı (Next route-segment kuralı page'den sabit export ettirmiyor); token kopyası yasak, testle kilitli.
 
 **`docs/brand/satis-kiti.md`:** ICP (5-50 kişi, **teklif veren** işletme) · **asıl rakip Excel** · 30 dk demo senaryosu (vurucu an: teklif gönderilince satılabilir stok düşer) · itiraz karşılama ("ya bırakırsanız" en meşru itiraz; escrow maddesi sözleşmede HENÜZ YOK, o cümle kullanılmamalı) · kanal sırası **mali müşavir ortaklığı birinci** (müşavirin işini almıyoruz: beyanname/resmî muhasebe ürün kapsamı dışında).
+
+## Landing yeniden kurgu + gerçek ekran görüntüleri (2026-09-19)
+
+**Sayfa artık satış anlatısı, özellik listesi değil:** hero "Teklifi gönderdiğin an, stok ayrılır." → isimsiz vaka → `#rezervasyon` (vurucu an, `stok.png`) → özellikler (görselli) → AI bandı (küçük) → nasıl/kimler → `#excel` → `#neden` → `#fiyat` → `#sinirlar` → SSS (8) → form. Birincil CTA **görüşme**, demo ikincil. Metin `src/lib/marketing/landing-content.ts`te (sayfa yalnız yerleşim); `marketing-landing.test.ts` 14 kilit.
+
+**Ekran görüntüsü politikası DEĞİŞTİ (kontrollü):** eski "ürün ekranı yayınlanmaz" mutlak kuralı yerine **yalnız `npm run shots`** (`scripts/build-product-shots.ts`): loopback-only Supabase, DB'de ad kurgusallaştırma + 10 tablo süpürme + tam kolon tarama + önbellek tazeleme + **ekranda görünen metin kapısı** (`document.body.innerText`, eşleşmede görsel yazılmaz). Yasak ad listesi `src/lib/marketing/forbidden-names.ts` (seed'deki gerçek firmalar + PMT + ASCII e-posta varyantları). Elle alınmış ekran görüntüsü yayınlanmaz (rehber §1.5).
+
+**PMT vaka bloğu:** `proof = { named:false, company:null, stats:[] }` — ad ve rakamlar **kullanıcının yazılı izni gelene kadar** canlıya çıkmaz; test kilitler; izin gelince tek nesne değişir. Bu benim tarafımdan sabit kural: gerçek bir firma hakkında izinsiz iddia yayınlanmaz.
+
+**Vitrin ürünün gerisindeydi:** eski metin "kabul edilince rezervasyon oluşur" diyordu, ürün mig.088'den beri gönderimde rezerve ediyor → düzeltildi + test (`kabul edilince…rezervasyon` yasak). Ders: vaat ≤ canlı tablosu yalnız *fazla* vaadi değil *eksik/yanlış* vaadi de yakalamalı.
 
 **Why:** marka vaatleri koddan bağımsız yazılırsa kapalı özellik satılır; rehber §1.5 tablosu bunu kilitler.
 **How to apply:** yeni pazarlama metni yazmadan önce rehber §1.5'i güncelle; logo/isim değişirse §6.3 / isim raporu §5 listesini tek commit'te uygula; [[project_delivery]] tek-kiracılı modeli "verileriniz size ait" mesajının dayanağı.
