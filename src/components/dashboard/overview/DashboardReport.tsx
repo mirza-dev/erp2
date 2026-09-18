@@ -19,6 +19,8 @@ interface DashboardReportProps {
     range: RangeKey;
     dateStr: string;
     reporting: string;
+    /** Kurulumun firma adı; yoksa künyeden tamamen düşer (yer tutucu basılmaz). */
+    companyName?: string;
     /** Raporu hazırlayan kullanıcı (fullName || email); yoksa satır gizlenir. */
     preparedBy?: string | null;
     kpis: DashboardKpi[];
@@ -51,7 +53,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 }
 
 export default function DashboardReport({
-    range, dateStr, reporting, preparedBy, kpis, trendSub, labels, revenue, cost, counts, trendEmpty,
+    range, dateStr, reporting, companyName, preparedBy, kpis, trendSub, labels, revenue, cost, counts, trendEmpty,
     stockSegments, stockStats, orderRows, alertRows, canViewPrices,
 }: DashboardReportProps) {
     const fmt = (v: number, can = canViewPrices) => formatReportingCompact(v, reporting, can);
@@ -66,7 +68,7 @@ export default function DashboardReport({
                     <span style={{ fontSize: 17, fontWeight: 800, letterSpacing: "-0.01em" }}>· Genel Bakış Raporu</span>
                 </div>
                 <div style={{ fontSize: 11, color: "#444", marginTop: 4 }}>
-                    {dateStr} · Dönem: <b>{range}</b> · PMT Endüstriyel · Para birimi: {reporting}
+                    {dateStr} · Dönem: <b>{range}</b>{companyName ? ` · ${companyName}` : ""} · Para birimi: {reporting}
                 </div>
                 {preparedBy && (
                     <div style={{ fontSize: 11, color: "#444", marginTop: 1 }}>Hazırlayan: <b>{preparedBy}</b></div>

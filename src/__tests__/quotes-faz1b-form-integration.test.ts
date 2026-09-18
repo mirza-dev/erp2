@@ -176,7 +176,12 @@ describe("QuoteForm Faz 1b — V4-A3 satıcı snapshot + freeze", () => {
     });
 
     it("initialData satıcı snapshot'ını hydrate eder", () => {
-        expect(SOURCE).toMatch(/setSellerName\(initialData\.sellerName \|\| "PMT Endüstri A\.Ş\."\)/);
+        // 2026-09-18: fallback artık BOŞ dize — kurulum sahibinin adı koda
+        // gömülemez (ürün tek kiracılı; ikinci müşteri başka firmanın adını
+        // görürdü). Ad company_settings effect'inden gelir.
+        expect(SOURCE).toMatch(/setSellerName\(initialData\.sellerName \|\| ""\)/);
+        expect(SOURCE).not.toMatch(/PMT Endüstri/);
+        expect(SOURCE).not.toMatch(/pmt\.com\.tr/);
         expect(SOURCE).toMatch(/setSellerTel\(initialData\.sellerPhone\)/);
         expect(SOURCE).toMatch(/setSellerWeb\(initialData\.sellerWebsite\)/);
     });

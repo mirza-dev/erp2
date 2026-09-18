@@ -21,6 +21,7 @@
     "schema:bundle": "tsx scripts/build-schema-bundle.ts",
     "pwa:icons": "tsx scripts/build-pwa-icons.ts",
     "og:image": "tsx scripts/build-og-image.ts",
+    "shots": "tsx scripts/build-product-shots.ts",
     "pretest:e2e": "npm run preflight:env",
     "test:e2e": "playwright test",
     "pretest:e2e:ui": "npm run preflight:env",

@@ -16,6 +16,7 @@ import { jsonFetcher, SWR_DEFAULTS } from "./swr-config";
 export const EXCHANGE_RATES_KEY = "/api/exchange-rates";
 export const USER_PROFILE_KEY = "/api/settings/user/profile";
 export const HEALTH_KEY = "/api/health";
+export const COMPANY_PROFILE_KEY = "/api/settings/company";
 
 const EXCHANGE_REFRESH_MS = 20 * 60 * 1000;
 const HEALTH_REFRESH_MS = 5 * 60 * 1000;
@@ -48,6 +49,29 @@ export function useUserProfile(): { profile: UserProfileSummary | undefined } {
  */
 export async function updateUserProfileCache(updated: UserProfileSummary): Promise<void> {
     await globalMutate(USER_PROFILE_KEY, updated, { revalidate: false });
+}
+
+/**
+ * Kurulumun kendi firma adı.
+ *
+ * Neden var (2026-09-18): pano başlığı ve yazdırılan Genel Bakış raporu
+ * firma adını KODA GÖMÜLÜ taşıyordu (`"PMT Endüstriyel"`). Ürün tek kiracılı
+ * ve her müşteri KENDİ kurulumunu alıyor ([[project_delivery]]) — yani ikinci
+ * müşteri kendi panosunda ve kendi bastığı raporda başka bir firmanın adını
+ * görürdü. Kusur sessiz: hiçbir test kırılmaz, yalnız yanlış ad yazar.
+ *
+ * Ad yoksa `undefined` döner ve çağıran onu satırdan tamamen düşürür —
+ * "Firma Adı" gibi bir yer tutucu basmak, bilinmeyeni bilgiymiş gibi
+ * gösterirdi.
+ */
+export function useCompanyProfile(): { companyName: string | undefined } {
+    const { data } = useSWR<{ name?: string | null }>(
+        COMPANY_PROFILE_KEY,
+        jsonFetcher,
+        SWR_DEFAULTS,
+    );
+    const name = typeof data?.name === "string" ? data.name.trim() : "";
+    return { companyName: name.length > 0 ? name : undefined };
 }
 
 /** Ham health yanıtı — status yorumu tüketicide (isHealthPayload) kalır. */

@@ -190,8 +190,10 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
     const [quoteDate, setQuoteDate] = useState("");
     const [validUntil, setValidUntil] = useState("");
 
-    // Seller (PMT) header info
-    const [sellerName, setSellerName] = useState("PMT Endüstri A.Ş.");
+    // Satıcı antet bilgisi. Varsayılan BOŞ: ad company_settings'ten gelir
+    // (aşağıdaki effect). Kurulum sahibinin adı koda gömülemez — ürün tek
+    // kiracılı, her müşteri kendi kurulumunu alır; bkz. useCompanyProfile.
+    const [sellerName, setSellerName] = useState("");
     const [sellerTel, setSellerTel] = useState("");
     const [sellerEmail, setSellerEmail] = useState("");
     const [sellerAddr, setSellerAddr] = useState("");
@@ -244,6 +246,9 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
     // Refs
     const logoFileRef = useRef<HTMLInputElement>(null);
     const custWrapperRef = useRef<HTMLDivElement>(null);
+    // Kullanıcı firma alanına GERÇEKTEN yazdı mı? Aşağıdaki [customers] effect'i
+    // yalnız bu durumda liste açar; hidrasyondan gelen değer için açmaz.
+    const custTypedRef = useRef(false);
 
     // ── Computed ─────────────────────────────────────────────────────────────
     // D1 (2026-06): satır toplamı yuvarlanır SONRA toplanır — 093 RPC'sinin
@@ -298,9 +303,9 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
             setSig1(initialData.sigPrepared);
             setSig2(initialData.sigApproved);
             setSig3(initialData.sigManager);
-            // Faz 1b (V4-A3): satıcı snapshot hydrate. sellerName boşsa "PMT…"
-            // default'a düş; snapshot'sız eski quote'ta company effect doldurur.
-            setSellerName(initialData.sellerName || "PMT Endüstri A.Ş.");
+            // Faz 1b (V4-A3): satıcı snapshot hydrate. sellerName boşsa boş
+            // kalır; snapshot'sız eski quote'ta company effect doldurur.
+            setSellerName(initialData.sellerName || "");
             setSellerTel(initialData.sellerPhone);
             setSellerEmail(initialData.sellerEmail);
             setSellerAddr(initialData.sellerAddress);
@@ -387,7 +392,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
             .then(r => r.ok ? r.json() : null)
             .then(s => {
                 if (!s) return;
-                setSellerName(prev => (prev === "" || prev === "PMT Endüstri A.Ş.") && s.name ? s.name : prev);
+                setSellerName(prev => prev === "" && s.name ? s.name : prev);
                 setSellerTel(prev => prev === "" && s.phone ? s.phone : prev);
                 setSellerEmail(prev => prev === "" && s.email ? s.email : prev);
                 setSellerAddr(prev => prev === "" && s.address ? s.address : prev);
@@ -422,6 +427,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
         // Faz 1b (V4-A2): manuel firma yazımı → seçili müşteri id bütünlüğü bozulur,
         // id temizlenir (kullanıcı listeden seçmediyse customer_id null kalır).
         setCustId("");
+        custTypedRef.current = true;
         if (value.trim().length < 1) {
             setCustSuggestions([]);
             setCustDropdownOpen(false);
@@ -500,7 +506,12 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
         setCustSuggestions([]);
     };
 
+    // Cariler kullanıcı yazdıktan SONRA yüklendiyse eşleşmeleri yakala.
+    // Yalnız yazılmışsa: eski hâli hidrasyonla dolan alanı da yazılmış sayıyor,
+    // kayıtlı her teklif açılırken öneri listesi kendiliğinden beliriyordu
+    // (2026-09-18, vitrin çekiminde görüldü).
     useEffect(() => {
+        if (!custTypedRef.current) return;
         if (custCompany.trim().length < 1 || customers.length === 0) return;
         const q = custCompany.toLowerCase();
         const matches = customers
@@ -1446,7 +1457,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                             {([
                                 ["Sales Rep",  "Satış Temsilcisi", salesRep,   setSalesRep,   "Ad Soyad",             "text"],
                                 ["Phone",      "Telefon",          salesPhone, setSalesPhone, "+90 …",                "text"],
-                                ["Email",      "E-posta",          salesEmail, setSalesEmail, "temsilci@pmt.com.tr",  "email"],
+                                ["Email",      "E-posta",          salesEmail, setSalesEmail, "temsilci@firma.com",   "email"],
                                 ["Date",       "Tarih",            quoteDate,  setQuoteDate,  "",                     "date"],
                                 ["Valid Until","Geçerlilik",       validUntil, setValidUntil, "",                     "date"],
                             ] as [string, string, string, React.Dispatch<React.SetStateAction<string>>, string, string][])
@@ -1889,7 +1900,7 @@ export default function QuoteForm({ initialData, readOnly, status, enableInlineS
                                 className="q-notes"
                                 aria-label="Teslimat şekli"
                                 style={{ width: "100%", background: "var(--bg-secondary)", border: "0.5px solid var(--border-secondary)", borderRadius: "4px", padding: "8px 10px", fontSize: "12px", color: "var(--text-primary)", resize: "vertical", minHeight: "60px", lineHeight: 1.5 }}
-                                placeholder={"İSTANBUL PMT DEPO TESLİMİ\nEXWORKS PMT İSTANBUL DEPO"}
+                                placeholder={"İSTANBUL DEPO TESLİMİ\nEXWORKS İSTANBUL DEPO"}
                                 value={deliveryMethod}
                                 onChange={e => setDeliveryMethod(e.target.value)}
                             />

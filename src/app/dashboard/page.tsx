@@ -3,7 +3,7 @@
 import { useMemo, useState, useEffect } from "react";
 import PageHeader from "@/components/ui/PageHeader";
 import { useProducts, useOrders, useProduction, useAlerts, useReorderSuggestions } from "@/lib/data-context";
-import { useExchangeRates, useUserProfile } from "@/lib/shared-hooks";
+import { useCompanyProfile, useExchangeRates, useUserProfile } from "@/lib/shared-hooks";
 import { usePermissions } from "@/lib/auth/use-permissions";
 import { LoadingState } from "@/components/ui/StateViews";
 import SetupProgressBanner from "@/components/dashboard/SetupProgressBanner";
@@ -57,6 +57,7 @@ export default function DashboardPage() {
     const { ratesData, ratesResolved } = useExchangeRates();
     const rates = (ratesData as ExchangeRates | undefined) ?? null;
     const { profile } = useUserProfile();
+    const { companyName } = useCompanyProfile();
     const preparedBy = profile?.fullName || profile?.email || null;
     // null = yüklenmedi/başarısız/yetkisiz → ilgili KPI kartı hiç üretilmez (fail-soft).
     const [quotes, setQuotes] = useState<QuotePipelineInput[] | null>(null);
@@ -241,7 +242,7 @@ export default function DashboardPage() {
             <div style={{ marginBottom: 16 }}>
             <PageHeader
                 title="Genel Bakış"
-                subtitle={`${dateStr} · PMT Endüstriyel`}
+                subtitle={companyName ? `${dateStr} · ${companyName}` : dateStr}
                 actions={<div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                     <div className="seg" role="group" aria-label="Dönem aralığı">
                         {RANGES.map((r) => (
@@ -366,6 +367,7 @@ export default function DashboardPage() {
             range={range}
             dateStr={dateStr}
             reporting={reporting}
+            companyName={companyName}
             preparedBy={preparedBy}
             kpis={kpis}
             trendSub={period.trendSub}
