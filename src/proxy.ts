@@ -35,7 +35,13 @@ import { REQUEST_ID_HEADER, newRequestId } from "@/lib/telemetry/request-id";
 // dönüyordu ve önbelleğe GİRİŞ SAYFASI yazılıyordu. Dahası yönlendirilmiş bir yanıt
 // bir gezinme isteğini karşılayamaz (SW spec) → çevrimdışı yedek sayfa hiç
 // çalışmıyordu, tarayıcının ağ hatası ekranı çıkıyordu. Sayfa sunucu verisi OKUMAZ.
-const ALWAYS_PUBLIC = ["/api/health", "/api/auth/demo", "/api/seed", "/api/alerts/scan", "/api/alerts/ai-suggest", "/api/ai/purchase-copilot", "/api/parasut/oauth/callback", "/api/email/webhooks/resend", "/auth/callback", "/api/quotes/shared", "/api/developer/retention", "/offline", "/gizlilik"];
+// `/api/contact` — pazarlama sayfasının kurulum görüşmesi formu. Oturumsuz
+// ziyaretçi doldurur, bu yüzden public; kötüye kullanım üç katmanla sınırlı:
+// bal küpü alanı + POLICIES.CONTACT (3 / 15 dk / IP) + alan tavanları.
+// `/rehber` — pazarlama içerik sayfaları (statik, sunucu verisi OKUMAZ). Önek
+// eşleşmesi `/rehber/<slug>`ü de kapsar. Arama motorunun görmesi ŞART: kapının
+// arkasındayken crawler /login'e düşer ve içerik hiç indekslenmez.
+const ALWAYS_PUBLIC = ["/api/health", "/api/auth/demo", "/api/seed", "/api/alerts/scan", "/api/alerts/ai-suggest", "/api/ai/purchase-copilot", "/api/parasut/oauth/callback", "/api/email/webhooks/resend", "/auth/callback", "/api/quotes/shared", "/api/developer/retention", "/api/contact", "/offline", "/gizlilik", "/rehber"];
 
 // Sadece CRON_SECRET Bearer token ile erişilir — session bypass YOK
 // Not: /api/alerts/scan ve /api/alerts/ai-suggest buraya dahil DEĞİL — ikisi de

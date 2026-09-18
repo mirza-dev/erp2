@@ -41,6 +41,48 @@ export default function GlobalError({
                     }}
                 >
                     <div style={{ textAlign: "center", maxWidth: "400px" }}>
+                        {/* Marka: `RovenLogo` IMPORT EDİLMEZ — bu sınır uygulama
+                            bileşenlerinin de çökebildiği anda çalışır, yalnız react +
+                            sentry taşır. İşaret elle, `currentColor` ile (marka
+                            rehberi §6.2: logo kendi rengini taşımaz). */}
+                        <span
+                            aria-hidden="true"
+                            style={{
+                                display: "inline-flex",
+                                alignItems: "center",
+                                gap: "6px",
+                                fontSize: "15px",
+                                fontWeight: 700,
+                                lineHeight: 1,
+                                opacity: 0.85,
+                                marginBottom: "22px",
+                            }}
+                        >
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" style={{ display: "block" }}>
+                                {/* Akış Altıgeni — RovenLogo.tsx ile aynı sayılar; sayfada tek
+                                    işaret olduğu için sabit mask id yeterli. */}
+                                <mask id="roven-channel" maskUnits="userSpaceOnUse" x={0} y={0} width={24} height={24}>
+                                    <rect width={24} height={24} fill="white" />
+                                    <path
+                                        d="M1.5 9.6 H10.2 L13.8 14.4 H22.5"
+                                        fill="none"
+                                        stroke="black"
+                                        strokeWidth={2.4}
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                    />
+                                </mask>
+                                <polygon
+                                    points="12,2.8 19.97,7.4 19.97,16.6 12,21.2 4.03,16.6 4.03,7.4"
+                                    fill="currentColor"
+                                    stroke="currentColor"
+                                    strokeWidth={2.6}
+                                    strokeLinejoin="round"
+                                    mask="url(#roven-channel)"
+                                />
+                            </svg>
+                            Roven
+                        </span>
                         <h1 style={{ fontSize: "17px", fontWeight: 600, margin: "0 0 8px" }}>
                             Uygulama başlatılamadı
                         </h1>

@@ -5,6 +5,10 @@
       .mark { fill: #e6edf3; stroke: #e6edf3; }
     }
   </style>
-  <polygon class="mark" points="12,2.6 20.2,7.3 20.2,16.7 12,21.4 3.8,16.7 3.8,7.3"
-    stroke-width="2.4" stroke-linejoin="round"/>
+  <mask id="roven-channel" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+    <rect width="24" height="24" fill="white"/>
+    <path d="M1.5 9.6 H10.2 L13.8 14.4 H22.5" fill="none" stroke="black" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/>
+  </mask>
+  <polygon class="mark" points="12,2.8 19.97,7.4 19.97,16.6 12,21.2 4.03,16.6 4.03,7.4"
+    stroke-width="2.6" stroke-linejoin="round" mask="url(#roven-channel)"/>
 </svg>

@@ -1,0 +1,210 @@
+<!doctype html>
+<html lang="tr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Roven Logo Konseptleri</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@400;500;600;700&family=Geist+Mono:wght@400;500&display=swap">
+<style>
+:root{
+  --ground:#e8eef5; --surface:#ffffff; --surface-2:#f4f7fa; --line:#c9d3de; --line-2:#dfe6ee;
+  --ink:#172033; --ink-2:#435064; --ink-3:#6b7788;
+  --accent:#123f73; --accent-soft:rgba(18,63,115,.10);
+  --dark-tile:#1a1d23; --dark-tile-2:#131518; --dark-ink:#e6edf3; --dark-ink-2:#aeb7c4; --dark-line:#343d49;
+  --light-tile:#ffffff; --light-tile-2:#e8eef5; --light-ink:#172033; --light-ink-2:#435064; --light-line:#c9d3de;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --ground:#131518; --surface:#1a1d23; --surface-2:#22252c; --line:#343d49; --line-2:#2a313b;
+    --ink:#e6edf3; --ink-2:#aeb7c4; --ink-3:#7a8493;
+    --accent:#58a6ff; --accent-soft:rgba(56,139,253,.15);
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#131518; --surface:#1a1d23; --surface-2:#22252c; --line:#343d49; --line-2:#2a313b;
+  --ink:#e6edf3; --ink-2:#aeb7c4; --ink-3:#7a8493;
+  --accent:#58a6ff; --accent-soft:rgba(56,139,253,.15);
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:"Geist",system-ui,-apple-system,"Segoe UI",sans-serif;-webkit-font-smoothing:antialiased;padding-block:32px 64px;padding-inline:16px}
+.wrap{max-width:1080px;margin:0 auto;display:flex;flex-direction:column;gap:28px}
+h1{font-size:clamp(26px,4vw,36px);font-weight:700;letter-spacing:-.02em;line-height:1.1;margin:0;text-wrap:balance}
+h2{font-size:20px;font-weight:600;letter-spacing:-.01em;margin:0}
+h3{font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-3);margin:0}
+p{margin:0;line-height:1.55}
+.lede{color:var(--ink-2);font-size:15.5px;max-width:62ch}
+.eyebrow{font-family:"Geist Mono",ui-monospace,SFMono-Regular,Menlo,monospace;font-size:11.5px;letter-spacing:.12em;text-transform:uppercase;color:var(--accent);display:inline-flex;align-items:center;gap:8px}
+.eyebrow::before{content:"";width:6px;height:6px;border-radius:50%;background:var(--accent)}
+.card{background:var(--surface);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+.concept{display:grid;grid-template-columns:1.25fr 1fr}
+@media (max-width:820px){.concept{grid-template-columns:1fr}}
+.stage{display:grid;grid-template-columns:1fr 1fr;border-right:1px solid var(--line-2)}
+@media (max-width:820px){.stage{border-right:0;border-bottom:1px solid var(--line-2)}}
+.tile{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:22px;padding:34px 20px;min-height:260px}
+.tile.dark{background:var(--dark-tile-2);color:var(--dark-ink)}
+.tile.light{background:var(--light-tile-2);color:var(--light-ink)}
+.lockup{display:inline-flex;align-items:center;gap:7px;line-height:1}
+.lockup .wm{font-weight:700;letter-spacing:0}
+.mark{display:block;flex-shrink:0}
+.sizes{display:flex;align-items:flex-end;gap:18px}
+.sizes figure{margin:0;display:flex;flex-direction:column;align-items:center;gap:6px}
+.sizes figcaption{font-family:"Geist Mono",monospace;font-size:10px;opacity:.6}
+.tab{display:inline-flex;align-items:center;gap:8px;padding:6px 12px;border-radius:8px 8px 0 0;font-size:12px;white-space:nowrap}
+.tile.dark .tab{background:#22252c;color:var(--dark-ink-2)}
+.tile.light .tab{background:#fff;color:var(--light-ink-2);border:1px solid var(--light-line);border-bottom:0}
+.appicon{width:56px;height:56px;border-radius:14px;display:grid;place-items:center;background:var(--dark-tile);color:var(--dark-ink);box-shadow:0 8px 20px -10px rgba(0,0,0,.6)}
+.tile.light .appicon{border:1px solid var(--light-line)}
+.info{padding:26px 26px 28px;display:flex;flex-direction:column;gap:14px}
+.info .name{display:flex;align-items:baseline;gap:12px}
+.badge{font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.08em;padding:3px 8px;border-radius:999px;background:var(--accent-soft);color:var(--accent)}
+.info p{font-size:14px;color:var(--ink-2)}
+.pm{display:grid;grid-template-columns:1fr 1fr;gap:12px;font-size:13px}
+.pm div{display:flex;flex-direction:column;gap:6px}
+.pm ul{margin:0;padding-left:16px;color:var(--ink-2);display:flex;flex-direction:column;gap:4px}
+.pm h3{font-size:11px}
+.rec{border-color:var(--accent)}
+.rec .info .name::after{content:"Önerilen";font-family:"Geist Mono",monospace;font-size:11px;letter-spacing:.08em;color:var(--accent);margin-left:auto}
+.current{display:grid;grid-template-columns:auto 1fr;gap:22px;align-items:center;padding:20px 24px}
+.current .box{display:inline-flex;gap:14px}
+.current .sq{width:64px;height:64px;border-radius:12px;display:grid;place-items:center}
+.current .sq.d{background:var(--dark-tile);color:var(--dark-ink)}
+.current .sq.l{background:var(--light-tile);color:var(--light-ink);border:1px solid var(--light-line)}
+.current p{font-size:13.5px;color:var(--ink-2)}
+.how{padding:22px 24px;display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+@media (max-width:820px){.how{grid-template-columns:1fr}}
+.how p{font-size:13.5px;color:var(--ink-2)}
+.how strong{color:var(--ink)}
+.foot{font-size:12.5px;color:var(--ink-3)}
+</style>
+
+<div class="wrap">
+  <header style="display:flex;flex-direction:column;gap:12px">
+    <span class="eyebrow">Marka · işaret yenileme · 3 aday</span>
+    <h1>Roven için üç logo konsepti</h1>
+    <p class="lede">Hepsi tek renkle (<code>currentColor</code>) çalışır, koyu ve aydınlık temada kendiliğinden ters döner, 16&nbsp;px sekme ikonuna kadar okunur ve mevcut <code>RovenLogo</code> bileşenine tek dosya değişikliğiyle oturur. Wordmark değişmez: Geist&nbsp;700 &ldquo;Roven&rdquo;.</p>
+  </header>
+
+  <!-- Mevcut -->
+  <section class="card current">
+    <div class="box">
+      <div class="sq d"><svg width="34" height="34" viewBox="0 0 24 24" fill="none"><polygon points="12,2.8 19.97,7.4 19.97,16.6 12,21.2 4.03,16.6 4.03,7.4" fill="currentColor" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/></svg></div>
+      <div class="sq l"><svg width="34" height="34" viewBox="0 0 24 24" fill="none"><polygon points="12,2.8 19.97,7.4 19.97,16.6 12,21.2 4.03,16.6 4.03,7.4" fill="currentColor" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round"/></svg></div>
+    </div>
+    <div>
+      <h3>Bugünkü işaret</h3>
+      <p style="margin-top:6px"><strong style="color:var(--ink)">Dolu altıgen.</strong> Sağlam ve sessiz, ama tek başına hiçbir şey söylemiyor ve sektörde onlarca dolu-altıgen logosu var (paketleme, kripto, hücresel ağ). Aşağıdaki A konsepti bu altıgeni miras alıp anlam katıyor; B ve C sıfırdan başlıyor.</p>
+    </div>
+  </section>
+
+  <!-- A -->
+  <section class="card concept rec" id="konsept-a">
+    <div class="stage">
+      <div class="tile dark">
+        <svg class="mark" width="96" height="96" viewBox="0 0 24 24" fill="none"><defs><mask id="mA1"><rect width="24" height="24" fill="#fff"/><path d="M1.5 9.6 H10.2 L13.8 14.4 H22.5" fill="none" stroke="#000" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></mask></defs><polygon points="12,2.8 19.97,7.4 19.97,16.6 12,21.2 4.03,16.6 4.03,7.4" fill="currentColor" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" mask="url(#mA1)"/></svg>
+        <span class="lockup" style="font-size:22px"><svg class="mark" width="24" height="24" viewBox="0 0 24 24" fill="none"><defs><mask id="mA2"><rect width="24" height="24" fill="#fff"/><path d="M1.5 9.6 H10.2 L13.8 14.4 H22.5" fill="none" stroke="#000" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></mask></defs><polygon points="12,2.8 19.97,7.4 19.97,16.6 12,21.2 4.03,16.6 4.03,7.4" fill="currentColor" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" mask="url(#mA2)"/></svg><span class="wm">Roven</span></span>
+        <div class="sizes">
+          <figure><svg width="32" height="32" viewBox="0 0 24 24" fill="none"><defs><mask id="mA3"><rect width="24" height="24" fill="#fff"/><path d="M1.5 9.6 H10.2 L13.8 14.4 H22.5" fill="none" stroke="#000" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></mask></defs><polygon points="12,2.8 19.97,7.4 19.97,16.6 12,21.2 4.03,16.6 4.03,7.4" fill="currentColor" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" mask="url(#mA3)"/></svg><figcaption>32</figcaption></figure>
+          <figure><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><defs><mask id="mA4"><rect width="24" height="24" fill="#fff"/><path d="M1.5 9.6 H10.2 L13.8 14.4 H22.5" fill="none" stroke="#000" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></mask></defs><polygon points="12,2.8 19.97,7.4 19.97,16.6 12,21.2 4.03,16.6 4.03,7.4" fill="currentColor" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" mask="url(#mA4)"/></svg><figcaption>16</figcaption></figure>
+          <figure><span class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><defs><mask id="mA5"><rect width="24" height="24" fill="#fff"/><path d="M1.5 9.6 H10.2 L13.8 14.4 H22.5" fill="none" stroke="#000" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></mask></defs><polygon points="12,2.8 19.97,7.4 19.97,16.6 12,21.2 4.03,16.6 4.03,7.4" fill="currentColor" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" mask="url(#mA5)"/></svg>Roven · Panel</span><figcaption>sekme</figcaption></figure>
+          <figure><span class="appicon"><svg width="34" height="34" viewBox="0 0 24 24" fill="none"><defs><mask id="mA6"><rect width="24" height="24" fill="#fff"/><path d="M1.5 9.6 H10.2 L13.8 14.4 H22.5" fill="none" stroke="#000" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></mask></defs><polygon points="12,2.8 19.97,7.4 19.97,16.6 12,21.2 4.03,16.6 4.03,7.4" fill="currentColor" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" mask="url(#mA6)"/></svg></span><figcaption>app ikonu</figcaption></figure>
+        </div>
+      </div>
+      <div class="tile light">
+        <svg class="mark" width="96" height="96" viewBox="0 0 24 24" fill="none"><defs><mask id="mA7"><rect width="24" height="24" fill="#fff"/><path d="M1.5 9.6 H10.2 L13.8 14.4 H22.5" fill="none" stroke="#000" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></mask></defs><polygon points="12,2.8 19.97,7.4 19.97,16.6 12,21.2 4.03,16.6 4.03,7.4" fill="currentColor" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" mask="url(#mA7)"/></svg>
+        <span class="lockup" style="font-size:22px"><svg class="mark" width="24" height="24" viewBox="0 0 24 24" fill="none"><defs><mask id="mA8"><rect width="24" height="24" fill="#fff"/><path d="M1.5 9.6 H10.2 L13.8 14.4 H22.5" fill="none" stroke="#000" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></mask></defs><polygon points="12,2.8 19.97,7.4 19.97,16.6 12,21.2 4.03,16.6 4.03,7.4" fill="currentColor" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" mask="url(#mA8)"/></svg><span class="wm">Roven</span></span>
+        <div class="sizes">
+          <figure><svg width="32" height="32" viewBox="0 0 24 24" fill="none"><defs><mask id="mA9"><rect width="24" height="24" fill="#fff"/><path d="M1.5 9.6 H10.2 L13.8 14.4 H22.5" fill="none" stroke="#000" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></mask></defs><polygon points="12,2.8 19.97,7.4 19.97,16.6 12,21.2 4.03,16.6 4.03,7.4" fill="currentColor" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" mask="url(#mA9)"/></svg><figcaption>32</figcaption></figure>
+          <figure><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><defs><mask id="mA10"><rect width="24" height="24" fill="#fff"/><path d="M1.5 9.6 H10.2 L13.8 14.4 H22.5" fill="none" stroke="#000" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></mask></defs><polygon points="12,2.8 19.97,7.4 19.97,16.6 12,21.2 4.03,16.6 4.03,7.4" fill="currentColor" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" mask="url(#mA10)"/></svg><figcaption>16</figcaption></figure>
+          <figure><span class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><defs><mask id="mA11"><rect width="24" height="24" fill="#fff"/><path d="M1.5 9.6 H10.2 L13.8 14.4 H22.5" fill="none" stroke="#000" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></mask></defs><polygon points="12,2.8 19.97,7.4 19.97,16.6 12,21.2 4.03,16.6 4.03,7.4" fill="currentColor" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" mask="url(#mA11)"/></svg>Roven · Panel</span><figcaption>sekme</figcaption></figure>
+          <figure><span class="appicon"><svg width="34" height="34" viewBox="0 0 24 24" fill="none"><defs><mask id="mA12"><rect width="24" height="24" fill="#fff"/><path d="M1.5 9.6 H10.2 L13.8 14.4 H22.5" fill="none" stroke="#000" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"/></mask></defs><polygon points="12,2.8 19.97,7.4 19.97,16.6 12,21.2 4.03,16.6 4.03,7.4" fill="currentColor" stroke="currentColor" stroke-width="2.6" stroke-linejoin="round" mask="url(#mA12)"/></svg></span><figcaption>app ikonu</figcaption></figure>
+        </div>
+      </div>
+    </div>
+    <div class="info">
+      <div class="name"><span class="badge">A</span><h2>Akış Altıgeni</h2></div>
+      <p>Bugünkü altıgen aynen kalır; içinden <strong>tek bir akış kanalı</strong> geçer — sol kenardan girer, ortada bir kademe atlar, sağdan çıkar. Altıgen = işletmenin hücresi (teklif, sipariş, stok, üretim), kanal = &ldquo;Roven hepsini tek akışa bağlar&rdquo; cümlesinin kendisi. Kademe, akışın ERP&rsquo;de bir dönüşümden geçtiğini söyler; düz çizgi olsaydı yalnız bir eksi işareti olurdu.</p>
+      <div class="pm">
+        <div><h3>Lehine</h3><ul><li>Marka hafızasını korur: PWA ikonları, topbar, login, e-posta — hepsi aynı silüet</li><li>Negatif alan tek renkle çalışır; koyu/aydınlık ters çevirmede hiçbir şey kaybolmaz</li><li>16&nbsp;px&rsquo;de hâlâ &ldquo;altıgen + çizgi&rdquo; olarak okunur</li></ul></div>
+        <div><h3>Aleyhine</h3><ul><li>Altıgen ailesinden tamamen kopmaz; ayırt edicilik kanala yaslanır</li><li>Kanal kalınlığı çok küçük boyutta (&lt;12&nbsp;px) kapanabilir — favicon için 16&nbsp;px alt sınır</li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- B -->
+  <section class="card concept" id="konsept-b">
+    <div class="stage">
+      <div class="tile dark">
+        <svg class="mark" width="96" height="96" viewBox="0 0 24 24" fill="none"><path d="M7 21 V4.5 H13.6 a4.4 4.4 0 0 1 0 8.8 H7 M13.2 13.3 L18.4 21" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="lockup" style="font-size:22px"><svg class="mark" width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M7 21 V4.5 H13.6 a4.4 4.4 0 0 1 0 8.8 H7 M13.2 13.3 L18.4 21" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="wm">Roven</span></span>
+        <div class="sizes">
+          <figure><svg width="32" height="32" viewBox="0 0 24 24" fill="none"><path d="M7 21 V4.5 H13.6 a4.4 4.4 0 0 1 0 8.8 H7 M13.2 13.3 L18.4 21" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg><figcaption>32</figcaption></figure>
+          <figure><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M7 21 V4.5 H13.6 a4.4 4.4 0 0 1 0 8.8 H7 M13.2 13.3 L18.4 21" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg><figcaption>16</figcaption></figure>
+          <figure><span class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M7 21 V4.5 H13.6 a4.4 4.4 0 0 1 0 8.8 H7 M13.2 13.3 L18.4 21" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Roven · Panel</span><figcaption>sekme</figcaption></figure>
+          <figure><span class="appicon"><svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M7 21 V4.5 H13.6 a4.4 4.4 0 0 1 0 8.8 H7 M13.2 13.3 L18.4 21" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><figcaption>app ikonu</figcaption></figure>
+        </div>
+      </div>
+      <div class="tile light">
+        <svg class="mark" width="96" height="96" viewBox="0 0 24 24" fill="none"><path d="M7 21 V4.5 H13.6 a4.4 4.4 0 0 1 0 8.8 H7 M13.2 13.3 L18.4 21" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>
+        <span class="lockup" style="font-size:22px"><svg class="mark" width="24" height="24" viewBox="0 0 24 24" fill="none"><path d="M7 21 V4.5 H13.6 a4.4 4.4 0 0 1 0 8.8 H7 M13.2 13.3 L18.4 21" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg><span class="wm">Roven</span></span>
+        <div class="sizes">
+          <figure><svg width="32" height="32" viewBox="0 0 24 24" fill="none"><path d="M7 21 V4.5 H13.6 a4.4 4.4 0 0 1 0 8.8 H7 M13.2 13.3 L18.4 21" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg><figcaption>32</figcaption></figure>
+          <figure><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><path d="M7 21 V4.5 H13.6 a4.4 4.4 0 0 1 0 8.8 H7 M13.2 13.3 L18.4 21" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg><figcaption>16</figcaption></figure>
+          <figure><span class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><path d="M7 21 V4.5 H13.6 a4.4 4.4 0 0 1 0 8.8 H7 M13.2 13.3 L18.4 21" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg>Roven · Panel</span><figcaption>sekme</figcaption></figure>
+          <figure><span class="appicon"><svg width="34" height="34" viewBox="0 0 24 24" fill="none"><path d="M7 21 V4.5 H13.6 a4.4 4.4 0 0 1 0 8.8 H7 M13.2 13.3 L18.4 21" stroke="currentColor" stroke-width="3.4" stroke-linecap="round" stroke-linejoin="round"/></svg></span><figcaption>app ikonu</figcaption></figure>
+        </div>
+      </div>
+    </div>
+    <div class="info">
+      <div class="name"><span class="badge">B</span><h2>Geometrik R</h2></div>
+      <p>Tek kalın çizgiyle çizilmiş, <strong>açık gövdeli bir R</strong>. Bacak gövdeden hafifçe ayrılır — harf değil, bir <em>rota</em> gibi okunur: yukarıdan gelen çizgi bir kavis yapar ve dışarı çıkar. Wordmark olmadan da &ldquo;Roven&rdquo;a işaret eder; e-posta imzası, sosyal profil, PDF antet köşesi gibi yalnız-işaret yüzeylerde en güçlü aday.</p>
+      <div class="pm">
+        <div><h3>Lehine</h3><ul><li>Yalnız-işaret olarak markayı taşır (altıgen taşımaz)</li><li>Çizgi tabanlı: tek yol, mask yok, her SVG/PDF motorunda sorunsuz</li><li>Kalın hatlar 16&nbsp;px&rsquo;de net; iOS ana ekran ikonunda çok iyi durur</li></ul></div>
+        <div><h3>Aleyhine</h3><ul><li>Bugünkü altıgenle sıfır süreklilik — PWA ikonları, favicon, e-posta antetinin tamamı değişir</li><li>&ldquo;R monogram&rdquo; kalabalık bir sınıf; tescil ön taramasında sınıf 9/42&rsquo;de benzeri çok</li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- C -->
+  <section class="card concept" id="konsept-c">
+    <div class="stage">
+      <div class="tile dark">
+        <svg class="mark" width="96" height="96" viewBox="0 0 24 24" fill="none"><defs><mask id="mC1"><rect width="24" height="24" fill="#fff"/><circle cx="7.4" cy="16.6" r="2.3" fill="#000"/><circle cx="16.6" cy="7.4" r="2.3" fill="#000"/><path d="M9.1 14.9 C 13.4 14.9 10.6 9.1 14.9 9.1" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round"/></mask></defs><rect x="2" y="2" width="20" height="20" rx="6" fill="currentColor" mask="url(#mC1)"/></svg>
+        <span class="lockup" style="font-size:22px"><svg class="mark" width="24" height="24" viewBox="0 0 24 24" fill="none"><defs><mask id="mC2"><rect width="24" height="24" fill="#fff"/><circle cx="7.4" cy="16.6" r="2.3" fill="#000"/><circle cx="16.6" cy="7.4" r="2.3" fill="#000"/><path d="M9.1 14.9 C 13.4 14.9 10.6 9.1 14.9 9.1" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round"/></mask></defs><rect x="2" y="2" width="20" height="20" rx="6" fill="currentColor" mask="url(#mC2)"/></svg><span class="wm">Roven</span></span>
+        <div class="sizes">
+          <figure><svg width="32" height="32" viewBox="0 0 24 24" fill="none"><defs><mask id="mC3"><rect width="24" height="24" fill="#fff"/><circle cx="7.4" cy="16.6" r="2.3" fill="#000"/><circle cx="16.6" cy="7.4" r="2.3" fill="#000"/><path d="M9.1 14.9 C 13.4 14.9 10.6 9.1 14.9 9.1" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round"/></mask></defs><rect x="2" y="2" width="20" height="20" rx="6" fill="currentColor" mask="url(#mC3)"/></svg><figcaption>32</figcaption></figure>
+          <figure><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><defs><mask id="mC4"><rect width="24" height="24" fill="#fff"/><circle cx="7.4" cy="16.6" r="2.3" fill="#000"/><circle cx="16.6" cy="7.4" r="2.3" fill="#000"/><path d="M9.1 14.9 C 13.4 14.9 10.6 9.1 14.9 9.1" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round"/></mask></defs><rect x="2" y="2" width="20" height="20" rx="6" fill="currentColor" mask="url(#mC4)"/></svg><figcaption>16</figcaption></figure>
+          <figure><span class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><defs><mask id="mC5"><rect width="24" height="24" fill="#fff"/><circle cx="7.4" cy="16.6" r="2.3" fill="#000"/><circle cx="16.6" cy="7.4" r="2.3" fill="#000"/><path d="M9.1 14.9 C 13.4 14.9 10.6 9.1 14.9 9.1" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round"/></mask></defs><rect x="2" y="2" width="20" height="20" rx="6" fill="currentColor" mask="url(#mC5)"/></svg>Roven · Panel</span><figcaption>sekme</figcaption></figure>
+          <figure><span class="appicon"><svg width="34" height="34" viewBox="0 0 24 24" fill="none"><defs><mask id="mC6"><rect width="24" height="24" fill="#fff"/><circle cx="7.4" cy="16.6" r="2.3" fill="#000"/><circle cx="16.6" cy="7.4" r="2.3" fill="#000"/><path d="M9.1 14.9 C 13.4 14.9 10.6 9.1 14.9 9.1" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round"/></mask></defs><rect x="2" y="2" width="20" height="20" rx="6" fill="currentColor" mask="url(#mC6)"/></svg></span><figcaption>app ikonu</figcaption></figure>
+        </div>
+      </div>
+      <div class="tile light">
+        <svg class="mark" width="96" height="96" viewBox="0 0 24 24" fill="none"><defs><mask id="mC7"><rect width="24" height="24" fill="#fff"/><circle cx="7.4" cy="16.6" r="2.3" fill="#000"/><circle cx="16.6" cy="7.4" r="2.3" fill="#000"/><path d="M9.1 14.9 C 13.4 14.9 10.6 9.1 14.9 9.1" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round"/></mask></defs><rect x="2" y="2" width="20" height="20" rx="6" fill="currentColor" mask="url(#mC7)"/></svg>
+        <span class="lockup" style="font-size:22px"><svg class="mark" width="24" height="24" viewBox="0 0 24 24" fill="none"><defs><mask id="mC8"><rect width="24" height="24" fill="#fff"/><circle cx="7.4" cy="16.6" r="2.3" fill="#000"/><circle cx="16.6" cy="7.4" r="2.3" fill="#000"/><path d="M9.1 14.9 C 13.4 14.9 10.6 9.1 14.9 9.1" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round"/></mask></defs><rect x="2" y="2" width="20" height="20" rx="6" fill="currentColor" mask="url(#mC8)"/></svg><span class="wm">Roven</span></span>
+        <div class="sizes">
+          <figure><svg width="32" height="32" viewBox="0 0 24 24" fill="none"><defs><mask id="mC9"><rect width="24" height="24" fill="#fff"/><circle cx="7.4" cy="16.6" r="2.3" fill="#000"/><circle cx="16.6" cy="7.4" r="2.3" fill="#000"/><path d="M9.1 14.9 C 13.4 14.9 10.6 9.1 14.9 9.1" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round"/></mask></defs><rect x="2" y="2" width="20" height="20" rx="6" fill="currentColor" mask="url(#mC9)"/></svg><figcaption>32</figcaption></figure>
+          <figure><svg width="16" height="16" viewBox="0 0 24 24" fill="none"><defs><mask id="mC10"><rect width="24" height="24" fill="#fff"/><circle cx="7.4" cy="16.6" r="2.3" fill="#000"/><circle cx="16.6" cy="7.4" r="2.3" fill="#000"/><path d="M9.1 14.9 C 13.4 14.9 10.6 9.1 14.9 9.1" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round"/></mask></defs><rect x="2" y="2" width="20" height="20" rx="6" fill="currentColor" mask="url(#mC10)"/></svg><figcaption>16</figcaption></figure>
+          <figure><span class="tab"><svg width="14" height="14" viewBox="0 0 24 24" fill="none"><defs><mask id="mC11"><rect width="24" height="24" fill="#fff"/><circle cx="7.4" cy="16.6" r="2.3" fill="#000"/><circle cx="16.6" cy="7.4" r="2.3" fill="#000"/><path d="M9.1 14.9 C 13.4 14.9 10.6 9.1 14.9 9.1" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round"/></mask></defs><rect x="2" y="2" width="20" height="20" rx="6" fill="currentColor" mask="url(#mC11)"/></svg>Roven · Panel</span><figcaption>sekme</figcaption></figure>
+          <figure><span class="appicon"><svg width="34" height="34" viewBox="0 0 24 24" fill="none"><defs><mask id="mC12"><rect width="24" height="24" fill="#fff"/><circle cx="7.4" cy="16.6" r="2.3" fill="#000"/><circle cx="16.6" cy="7.4" r="2.3" fill="#000"/><path d="M9.1 14.9 C 13.4 14.9 10.6 9.1 14.9 9.1" fill="none" stroke="#000" stroke-width="2.2" stroke-linecap="round"/></mask></defs><rect x="2" y="2" width="20" height="20" rx="6" fill="currentColor" mask="url(#mC12)"/></svg></span><figcaption>app ikonu</figcaption></figure>
+        </div>
+      </div>
+    </div>
+    <div class="info">
+      <div class="name"><span class="badge">C</span><h2>Tek Akış</h2></div>
+      <p>Yuvarlatılmış kare plaka; içinde <strong>iki düğüm ve onları bağlayan tek bir S-kanal</strong>. Sol-alt düğüm gelen iş (teklif, sipariş, belge), sağ-üst düğüm sonuç (stok, fatura, rapor); aradaki kanal Roven. &ldquo;Excel&rsquo;de teklif, WhatsApp&rsquo;ta sipariş&rdquo; dağınıklığının tam karşıtı: iki nokta, bir yol.</p>
+      <div class="pm">
+        <div><h3>Lehine</h3><ul><li>Doğrudan uygulama-ikonu formu: telefonda kutu-içinde-kutu sorunu yok, maskeleme gerekmez</li><li>Anlatı landing&rsquo;in &ldquo;tek akış&rdquo; cümlesiyle birebir</li><li>Geniş KOBİ konumlandırmasına en nötr aday (sektör çağrışımı yok)</li></ul></div>
+        <div><h3>Aleyhine</h3><ul><li>&ldquo;Bağlantı/entegrasyon&rdquo; sınıfında çok benzeri var (Zapier-tipi işaretler)</li><li>16&nbsp;px&rsquo;de düğümler noktaya iner, S-kanal kaybolur — sekme ikonunda en zayıf</li><li>Wordmark yanında plaka ağır durur; topbar&rsquo;da küçültülmesi gerekir</li></ul></div>
+      </div>
+    </div>
+  </section>
+
+  <section class="card how">
+    <div><h3>Seçim ölçütü</h3><p style="margin-top:8px"><strong>Yalnız-işaret testi:</strong> wordmark olmadan bir e-posta imzasında ne söylüyor? B en çok, C orta, A en az (ama A&rsquo;nın süreklilik avantajı var).</p></div>
+    <div><h3>Küçük boyut testi</h3><p style="margin-top:8px"><strong>16&nbsp;px sekme:</strong> B ve A okunur; C&rsquo;nin kanalı kapanır. Uygulama ikonunda (56&nbsp;px+) üçü de temiz.</p></div>
+    <div><h3>Bedel</h3><p style="margin-top:8px"><strong>A:</strong> yalnız <code>RovenLogo</code> + <code>icon.svg</code> + PWA ikon yeniden üretimi; e-posta/PDF/login kendiliğinden geçer. <strong>B/C:</strong> aynı dosyalar, ek olarak logo testinin <code>&lt;polygon&gt;</code> sözleşmesi güncellenir. Hiçbirinde migration ya da manifest değişikliği yok.</p></div>
+  </section>
+
+  <p class="foot">Öneri: <strong>A</strong> — bugünkü işaretin bütün yüzeylerdeki hafızasını korur, anlamı ekler, tek renk kuralını ve 16&nbsp;px alt sınırını bozmaz. B, yalnız-işaret kullanım ağırlık kazanırsa (sosyal medya, dış yazışma) güçlü ikinci aday. Seçtiğin harfi yaz; koda o uygulanır.</p>
+</div>
+
+</html>

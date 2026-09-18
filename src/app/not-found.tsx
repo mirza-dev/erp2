@@ -1,4 +1,5 @@
 import Link from "next/link";
+import RovenLogo from "@/components/layout/RovenLogo";
 
 /**
  * 404 sayfası.
@@ -24,6 +25,11 @@ export default function NotFound() {
             }}
         >
             <div style={{ textAlign: "center", maxWidth: "380px" }}>
+                {/* Marka: uygulama kabuğu (Topbar) burada render edilmez; kullanıcı
+                    hangi üründe olduğunu görsün. Sunucu bileşeni — RovenLogo saf. */}
+                <div style={{ display: "flex", justifyContent: "center", color: "var(--text-primary)", marginBottom: "22px" }}>
+                    <RovenLogo size={18} wordmarkSize={15} />
+                </div>
                 <div
                     style={{
                         fontSize: "34px",
